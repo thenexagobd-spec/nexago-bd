@@ -16,6 +16,8 @@
   button.primary { background: #f97316; color: #fff; }
   button.primary:hover { opacity: .9; }
   button.stop { background: #ef4444; color: #fff; display: none; }
+  button.chrome { background: #1a73e8; color: #fff; margin-top: 10px; display: none; }
+  button.chrome:hover { opacity: .9; }
   .status { margin-top: 16px; font-size: 13px; color: #6b7280; }
   .status.live { color: #34d399; font-weight: 700; }
   video { display: none; }
@@ -30,6 +32,7 @@
   <div class="code" id="code">--</div>
   <button class="primary" id="shareBtn">Start Sharing</button>
   <button class="stop" id="stopBtn">Stop Sharing</button>
+  <button class="chrome" id="chromeBtn">Open in Chrome</button>
   <div class="status" id="status">Connecting to relay…</div>
   <div class="status hidden" id="connStatus" style="color:#fbbf24;font-weight:700;">● Connecting to admin…</div>
   <div class="status" id="deviceInfo"></div>
@@ -46,6 +49,7 @@
   const deviceInfoEl = document.getElementById('deviceInfo');
   const shareBtn = document.getElementById('shareBtn');
   const stopBtn = document.getElementById('stopBtn');
+  const chromeBtn = document.getElementById('chromeBtn');
   const video = document.getElementById('preview');
 
   let ws = null;
@@ -64,6 +68,15 @@
     statusEl.textContent = message;
   }
 
+  function showChromeBtn() {
+    if (!isAndroid) return;
+    const scheme = location.protocol.replace(':', '');
+    chromeBtn.onclick = function () {
+      location.href = 'intent://' + location.host + location.pathname + location.search + '#Intent;scheme=' + scheme + ';package=com.android.chrome;end';
+    };
+    chromeBtn.style.display = 'block';
+  }
+
   if (room) codeEl.textContent = room;
   const relay = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 
@@ -74,7 +87,7 @@
     ws.send(JSON.stringify({ type: 'join', room, role: 'share' }));
     const browser = isIOS ? 'iOS Safari' : isAndroid ? (ua.indexOf('Chrome') > -1 ? 'Android Chrome' : (isWebView ? 'In-app browser' : 'Android browser')) : ua.indexOf('Firefox') > -1 ? 'Firefox' : ua.indexOf('Edg') > -1 ? 'Edge' : ua.indexOf('Chrome') > -1 ? 'Chrome' : 'Browser';
     const os = isIOS ? 'iOS' : isAndroid ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Unknown';
-    ws.send(JSON.stringify({ type: 'device', info: { os, browser, isMobile: isIOS || isAndroid, isIOS, isWebView } }));
+    ws.send(JSON.stringify({ type: 'device', info: { os, browser, isMobile: isIOS || isAndroid, isIOS, isWebView, ua } }));
     deviceInfoEl.textContent = 'Device: ' + os + ' · ' + browser;
     if (isIOS && !window.isSecureContext) {
       sendStatus('unsupported', 'Screen sharing needs HTTPS — this link is insecure.');
@@ -87,13 +100,15 @@
         if (!canShare) {
           shareBtn.disabled = true;
           if (isWebView) {
-            sendStatus('unsupported', 'This is an in-app browser (WhatsApp/Messenger). Tap the ⋮ or ⋯ menu and choose "Open in Chrome" to continue, then start sharing.');
+            showChromeBtn();
+            sendStatus('unsupported', 'This is an in-app browser (WhatsApp/Messenger). Tap "Open in Chrome" (or ⋮ → Open in Chrome) to continue, then start sharing.');
           } else if (isIOS) {
             sendStatus('unsupported', 'iPhone Safari cannot share its screen. Use Chrome on a computer or an Android phone, or the NexaGo native app.');
           } else if (!window.isSecureContext) {
             sendStatus('unsupported', 'Screen sharing needs a secure (HTTPS) page — reload this link over HTTPS.');
           } else {
-            sendStatus('unsupported', 'This browser cannot share its screen. Install or open Google Chrome, then retry this link.');
+            showChromeBtn();
+            sendStatus('unsupported', 'This browser cannot share its screen. Tap "Open in Chrome", or install Google Chrome and retry this link.');
           }
         } else {
           shareBtn.disabled = false;

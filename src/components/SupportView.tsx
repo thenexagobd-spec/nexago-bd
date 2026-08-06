@@ -827,7 +827,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
   const [launchedApp, setLaunchedApp] = useState<{ name: string; stage: number; steps: Array<{ label: string; status: 'waiting' | 'running' | 'ok' | 'warn' }>; issues: string[]; booted: boolean } | null>(null);
   const [realSession, setRealSession] = useState<{ code: string; shareUrl: string; status: 'idle' | 'waiting' | 'sharing' | 'live' | 'offline' | 'error' }>({ code: '', shareUrl: '', status: 'idle' });
   const [realStream, setRealStream] = useState<MediaStream | null>(null);
-  const [peerDevice, setPeerDevice] = useState<{ os?: string; browser?: string; isMobile?: boolean } | null>(null);
+  const [peerDevice, setPeerDevice] = useState<{ os?: string; browser?: string; isMobile?: boolean; isWebView?: boolean; ua?: string } | null>(null);
   const [shareStatus, setShareStatus] = useState<{ state: string; message: string } | null>(null);
   const realWsRef = useRef<WebSocket | null>(null);
   const realPcRef = useRef<RTCPeerConnection | null>(null);
@@ -5112,9 +5112,9 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                         <span className={realSession.status === 'sharing' || realSession.status === 'live' ? 'text-emerald-400 font-bold' : 'text-gray-500'}>{realSession.status === 'sharing' || realSession.status === 'live' ? '● Yes' : 'Not yet'}</span>
                       </div>
                       {peerDevice && (
-                        <div className="flex items-center justify-between text-[9px] text-gray-400">
+                        <div className="flex items-center justify-between text-[9px] text-gray-400" title={peerDevice.ua || ''}>
                           <span>Device</span>
-                          <span className="text-gray-300">{peerDevice.isMobile ? <Smartphone className="w-3 h-3 inline-block mr-0.5" /> : <Monitor className="w-3 h-3 inline-block mr-0.5" />}{peerDevice.os} · {peerDevice.browser}</span>
+                          <span className="text-gray-300">{peerDevice.isMobile ? <Smartphone className="w-3 h-3 inline-block mr-0.5" /> : <Monitor className="w-3 h-3 inline-block mr-0.5" />}{peerDevice.os} · {peerDevice.browser}{peerDevice.isWebView ? ' (in-app browser)' : ''}</span>
                         </div>
                       )}
                       <div className="flex items-center justify-between text-[9px] text-gray-400">
