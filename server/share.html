@@ -33,6 +33,7 @@
   <button class="primary" id="shareBtn">Start Sharing</button>
   <button class="stop" id="stopBtn">Stop Sharing</button>
   <button class="chrome" id="chromeBtn">Open in Chrome</button>
+  <button class="chrome" id="copyBtn" style="background:#374151;">Copy link</button>
   <div class="status" id="status">Connecting to relay…</div>
   <div class="status hidden" id="connStatus" style="color:#fbbf24;font-weight:700;">● Connecting to admin…</div>
   <div class="status" id="deviceInfo"></div>
@@ -50,6 +51,7 @@
   const shareBtn = document.getElementById('shareBtn');
   const stopBtn = document.getElementById('stopBtn');
   const chromeBtn = document.getElementById('chromeBtn');
+  const copyBtn = document.getElementById('copyBtn');
   const video = document.getElementById('preview');
 
   let ws = null;
@@ -78,6 +80,10 @@
       location.href = 'intent://' + location.host + location.pathname + location.search + '#Intent;scheme=' + scheme + ';package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(playStore) + ';end';
     };
     chromeBtn.style.display = 'block';
+    copyBtn.onclick = function () {
+      try { navigator.clipboard.writeText(location.href); copyBtn.textContent = 'Copied!'; setTimeout(function(){ copyBtn.textContent = 'Copy link'; }, 1500); } catch (e) { /* ignore */ }
+    };
+    copyBtn.style.display = 'block';
   }
 
   if (room) codeEl.textContent = room;
@@ -112,6 +118,9 @@
             sendStatus('unsupported', 'iPhone Safari cannot share its screen. Use Chrome on a computer or an Android phone, or the NexaGo native app.');
           } else if (!window.isSecureContext) {
             sendStatus('unsupported', 'Screen sharing needs a secure (HTTPS) page — reload this link over HTTPS.');
+          } else if (ua.indexOf('Chrome') > -1) {
+            showChromeBtn();
+            sendStatus('unsupported', 'This browser reports as Chrome but screen-sharing is disabled here (a custom/in-app browser). Tap "Open in Chrome", or copy the link and paste it into the real Google Chrome app.');
           } else {
             showChromeBtn();
             sendStatus('unsupported', 'This browser cannot share its screen. Tap "Open in Chrome", or install Google Chrome and retry this link.');
