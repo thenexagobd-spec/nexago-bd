@@ -71,8 +71,9 @@
   function showChromeBtn() {
     if (!isAndroid) return;
     const scheme = location.protocol.replace(':', '');
+    const playStore = 'https://play.google.com/store/apps/details?id=com.android.chrome';
     chromeBtn.onclick = function () {
-      location.href = 'intent://' + location.host + location.pathname + location.search + '#Intent;scheme=' + scheme + ';package=com.android.chrome;end';
+      location.href = 'intent://' + location.host + location.pathname + location.search + '#Intent;scheme=' + scheme + ';package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(playStore) + ';end';
     };
     chromeBtn.style.display = 'block';
   }
@@ -87,7 +88,7 @@
     ws.send(JSON.stringify({ type: 'join', room, role: 'share' }));
     const browser = isIOS ? 'iOS Safari' : isAndroid ? (ua.indexOf('Chrome') > -1 ? 'Android Chrome' : (isWebView ? 'In-app browser' : 'Android browser')) : ua.indexOf('Firefox') > -1 ? 'Firefox' : ua.indexOf('Edg') > -1 ? 'Edge' : ua.indexOf('Chrome') > -1 ? 'Chrome' : 'Browser';
     const os = isIOS ? 'iOS' : isAndroid ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Unknown';
-    ws.send(JSON.stringify({ type: 'device', info: { os, browser, isMobile: isIOS || isAndroid, isIOS, isWebView, ua } }));
+    ws.send(JSON.stringify({ type: 'device', info: { os, browser, isMobile: isIOS || isAndroid, isIOS, isWebView, ua, gdm: canShare } }));
     deviceInfoEl.textContent = 'Device: ' + os + ' · ' + browser;
     if (isIOS && !window.isSecureContext) {
       sendStatus('unsupported', 'Screen sharing needs HTTPS — this link is insecure.');
