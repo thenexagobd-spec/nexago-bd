@@ -25,6 +25,7 @@ import SettingsView from './components/SettingsView';
 import EarningsView from './components/EarningsView';
 import FleetPromosView from './components/FleetPromosView';
 import InventoryView from './components/InventoryView';
+import ProductInventoryView from './components/ProductInventoryView';
 import StoreDashboardView from './components/StoreDashboardView';
 import DeliveryDashboardView from './components/DeliveryDashboardView';
 import { CustomerStorefront } from './components/CustomerStorefront';
@@ -734,70 +735,12 @@ export default function App() {
     switch (tabName) {
       case 'Products':
         return (
-          <div className="space-y-6 fade-in">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Product Inventory</h3>
-                <p className="text-xs text-gray-400">Add, track, and modify active groceries catalog items</p>
-              </div>
-              <button 
-                onClick={() => showToast("Product addition wizard is locked under sandbox mode.", "info")}
-                className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
-              >
-                + Add Product
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Products</span>
-                <div className="text-2xl font-black text-white mt-1">{products.length}</div>
-              </div>
-              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Active Catalog Categories</span>
-                <div className="text-2xl font-black text-brand-orange mt-1">6 Categories</div>
-              </div>
-              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Low Stock Warnings</span>
-                <div className="text-2xl font-black text-red-400 mt-1">
-                  {products.filter(p => p.stock <= 10).length} Items
-                </div>
-              </div>
-            </div>
-            <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
-                    <th className="py-3 px-4 font-bold text-[10px] uppercase">ID</th>
-                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Product Name</th>
-                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Category</th>
-                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Stock Level</th>
-                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Unit Price</th>
-                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-brand-border/40">
-                  {products.map(p => (
-                    <tr key={p.id} className="hover:bg-brand-dark/10 transition-colors">
-                      <td className="py-3 px-4 font-mono text-gray-400 font-bold">#{p.id}</td>
-                      <td className="py-3 px-4 font-bold text-white">{p.name}</td>
-                      <td className="py-3 px-4 text-gray-300 font-semibold">{p.category}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-gray-300">{p.stock} Units</td>
-                      <td className="py-3 px-4 font-bold text-brand-orange">৳ {p.price}</td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                          p.status === 'In Stock' ? 'bg-emerald-500/10 text-emerald-400' :
-                          p.status === 'Low Stock' ? 'bg-orange-500/10 text-orange-400' :
-                          'bg-red-500/10 text-red-400'
-                        }`}>
-                          {p.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ProductInventoryView
+            products={products}
+            onProductsChange={setProducts}
+            showToast={showToast}
+            onAddNotification={handleAddNotification}
+          />
         );
 
       case 'Categories':
