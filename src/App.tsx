@@ -528,6 +528,34 @@ export default function App() {
     setNotifications([newNotif, ...notifications]);
   };
 
+  const handlePosSaleRecorded = (items: { productId: string; name: string; qty: number; price: number }[], source: 'counter' | 'delivery') => {
+    if (!items.length) return;
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const today = new Date().toISOString().slice(0, 10);
+    const ledger = getStoredData<any[]>('sd_stock_ledger', []);
+    const entries = items.map(it => ({
+      id: 'LED-' + Math.floor(100 + Math.random() * 900),
+      productId: it.productId,
+      productName: it.name,
+      type: 'Sale',
+      qty: -Math.abs(it.qty),
+      reason: source === 'delivery' ? 'POS delivery dispatch' : 'POS counter sale',
+      by: 'POS',
+      time: nowTime,
+      date: today
+    }));
+    setStoredData('sd_stock_ledger', [...entries, ...ledger]);
+    items.forEach(it => {
+      const p = products.find((x: any) => x.id === it.productId);
+      if (!p) return;
+      const after = Math.max(0, (p.stock ?? 0) - it.qty);
+      if (after <= (p.reorderPoint ?? 5)) {
+        handleAddNotification({ title: 'Low stock alert', message: `"${it.name}" fell to ${after} after a POS sale — reorder point is ${p.reorderPoint ?? 5}.`, type: 'system' });
+      }
+    });
+    showToast(`${items.length} item(s) deducted from inventory stock`, 'success');
+  };
+
   const handleOrderReport = (rep: { orderId: string; reason: string; note: string }) => {
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setOrderReports(prev => {
@@ -3876,7 +3904,7 @@ export default function App() {
           )}
 
           {activeTab === 'POS System' && (
-            <PosSystem products={products} orders={orders} onProductsChange={setProducts} onCreateOrder={handleSilentAddOrder} onUpdateOrder={handleUpdateOrder} onSendToDriver={setDriverDispatchOrder} onDeleteOrder={handleDeleteOrder} onNavigate={setActiveTab} />
+            <PosSystem products={products} orders={orders} onProductsChange={setProducts} onCreateOrder={handleSilentAddOrder} onUpdateOrder={handleUpdateOrder} onSendToDriver={setDriverDispatchOrder} onDeleteOrder={handleDeleteOrder} onNavigate={setActiveTab} onSaleRecorded={handlePosSaleRecorded} />
           )}
 
           {activeTab === 'Vehicles Management' && (

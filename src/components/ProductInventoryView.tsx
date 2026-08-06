@@ -6,10 +6,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SystemNotification } from '../types';
 import { getStoredData, setStoredData } from '../data';
-import { Plus, Pencil, Trash2, Search, Package, AlertTriangle, ClipboardList, X, Save, History, Truck, Tag, Box, Wallet, Minus, CheckCircle2, ShoppingCart, Download, Upload, Barcode, CalendarDays, TrendingUp } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Package, AlertTriangle, ClipboardList, X, Save, History, Truck, Tag, Box, Wallet, Minus, CheckCircle2, ShoppingCart, Download, Upload, Barcode, CalendarDays, TrendingUp, Boxes, MessageCircle, Undo2, Warehouse } from 'lucide-react';
 import InventoryLabelModal from './InventoryLabel';
 import PurchaseOrdersView from './PurchaseOrdersView';
 import InventoryReportsView from './InventoryReportsView';
+import StoreOpsView from './StoreOpsView';
 import { BatchEntry, LedgerEntry, PurchaseOrder, addDays, downloadBlob, effectiveExpiry, encodeCSV, fmt, nowTime, parseCSV, poNumber, todayISO } from './inventoryUtils';
 
 interface ProductInventoryViewProps {
@@ -35,7 +36,8 @@ export default function ProductInventoryView({ products, onProductsChange, showT
   const [ledger, setLedger] = useState<LedgerEntry[]>(() => getStoredData('sd_stock_ledger', []));
   const [batches, setBatches] = useState<BatchEntry[]>(() => getStoredData('sd_batches', []));
   const [pos, setPos] = useState<PurchaseOrder[]>(() => getStoredData('sd_purchase_orders', []));
-  const [tab, setTab] = useState<'inventory' | 'pos' | 'reports'>('inventory');
+  const [undoStack, setUndoStack] = useState<any[]>(() => getStoredData('sd_undo_stack', []));
+  const [tab, setTab] = useState<'inventory' | 'pos' | 'reports' | 'warehouse'>('inventory');
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -47,12 +49,144 @@ export default function ProductInventoryView({ products, onProductsChange, showT
   const [adjust, setAdjust] = useState<{ id: string; name: string; delta: string; reason: string; type: string; batch: string; expiry: string } | null>(null);
   const [panel, setPanel] = useState<'none' | 'reorder' | 'ledger'>('none');
   const [labelSel, setLabelSel] = useState<any[] | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const [wa, setWa] = useState<{ p: any; suggested: number } | null>(null);
+  const [waMsgText, setWaMsgText] = useState('');
+  const [waPhone, setWaPhone] = useState('');
+  const [variantTarget, setVariantTarget] = useState<any | null>(null);
+  const [variantDraft, setVariantDraft] = useState<any[]>([]);
   const importRef = useRef<HTMLInputElement | null>(null);
+  const PAGE_SIZE = 15;
 
   useEffect(() => { setStoredData('sd_stock_ledger', ledger); }, [ledger]);
   useEffect(() => { setStoredData('sd_products', products); }, [products]);
   useEffect(() => { setStoredData('sd_batches', batches); }, [batches]);
   useEffect(() => { setStoredData('sd_purchase_orders', pos); }, [pos]);
+  useEffect(() => { setStoredData('sd_undo_stack', undoStack.slice(0, 12)); }, [undoStack]);
+  useEffect(() => { setPage(1); }, [search, catFilter, statusFilter, sortBy]);
+
+  const pushUndo = (label: string) => {
+    setUndoStack(prev => [{
+      label,
+      time: nowTimeLocal(),
+      products: JSON.parse(JSON.stringify(products)),
+      ledger: JSON.parse(JSON.stringify(ledger)),
+      batches: JSON.parse(JSON.stringify(batches)),
+      pos: JSON.parse(JSON.stringify(pos))
+    }, ...prev].slice(0, 12));
+  };
+
+  const doUndo = () => {
+    if (undoStack.length === 0) return;
+    const snap = undoStack[0];
+    onProductsChange(snap.products || []);
+    setLedger(snap.ledger || []);
+    setBatches(snap.batches || []);
+    setPos(snap.pos || []);
+    setUndoStack(undoStack.slice(1));
+    showToast(`Undid: ${snap.label}`, 'success');
+  };
+
+  const toggleAll = () => {
+    const ids = new Set(filtered.map((p: any) => p.id));
+    const allSel = ids.size > 0 && ids.size === selected.size && [...ids].every(id => selected.has(id));
+    setSelected(allSel ? new Set() : ids);
+  };
+
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const bulkDelete = () => {
+    if (selected.size === 0) return;
+    pushUndo(`Bulk delete ${selected.size} item(s)`);
+    const ids = Array.from(selected);
+    onProductsChange(products.filter((x: any) => !ids.includes(x.id)));
+    logEntry({ productId: 'BULK-DELETE', productName: `${ids.length} product(s) deleted`, type: 'Remove', qty: 0, reason: 'Bulk delete', by: 'Admin', date: todayISO() });
+    setSelected(new Set());
+    showToast(`Deleted ${ids.length} product(s)`, 'success');
+  };
+
+  const bulkLabels = () => {
+    if (selected.size === 0) return;
+    setLabelSel(products.filter((x: any) => selected.has(x.id)));
+  };
+
+  const bulkExport = () => {
+    if (selected.size === 0) return;
+    downloadBlob(`products-${todayISO()}.csv`, encodeCSV(products.filter((x: any) => selected.has(x.id))));
+  };
+
+  const waNumber = (p: any) => {
+    const digits = String(p.supplierContact || '').replace(/\D/g, '');
+    return digits.length >= 10 ? digits : '';
+  };
+
+  const waMsg = (p: any, suggested: number) => {
+    const supplier = p.supplier && p.supplier !== '—' ? p.supplier : 'Supplier';
+    return `Dear ${supplier},\n\nThis is NexaGo BD. We need to reorder:\n\n${p.name} — current stock ${p.stock} ${p.unit || 'pcs'}, reorder point ${p.reorderPoint ?? 5}.\nPlease arrange ${suggested} ${p.unit || 'pcs'}.\n\nThanks!`;
+  };
+
+  const openWa = (p: any, suggested: number) => {
+    setWa({ p, suggested });
+    setWaMsgText(waMsg(p, suggested));
+    setWaPhone(waNumber(p));
+  };
+
+  const sendWa = () => {
+    if (!wa) return;
+    const num = waPhone.replace(/\D/g, '');
+    const url = num.length >= 10
+      ? `https://wa.me/${num}?text=${encodeURIComponent(waMsgText)}`
+      : `https://wa.me/?text=${encodeURIComponent(waMsgText)}`;
+    if (num.length < 10) {
+      navigator.clipboard?.writeText(waMsgText).catch(() => undefined);
+      showToast('No supplier phone saved — message copied, pick the contact in WhatsApp', 'info');
+    }
+    window.open(url, '_blank');
+  };
+
+  const patchVariant = (i: number, key: string, val: any) => {
+    setVariantDraft(d => d.map((v, idx) => idx === i ? { ...v, [key]: val } : v));
+  };
+
+  const removeVariant = (id: string) => {
+    setVariantDraft(d => d.filter(v => v.id !== id));
+  };
+
+  const openVariants = (p: any) => {
+    setVariantTarget(p);
+    setVariantDraft((p.variants || []).map((v: any) => ({ ...v })));
+  };
+
+  const addVariant = () => {
+    setVariantDraft(d => [...d, { id: 'V-' + Math.floor(100 + Math.random() * 900), label: '', sku: '', stock: 0, cost: 0, price: 0 }]);
+  };
+
+  const saveVariants = () => {
+    if (!variantTarget) return;
+    pushUndo('Variant update');
+    const old = variantTarget.variants || [];
+    old.forEach((v: any) => {
+      const nv = variantDraft.find((x: any) => x.id === v.id);
+      const nStock = nv ? (Number(nv.stock) || 0) : 0;
+      if (nv && nStock !== (Number(v.stock) || 0)) {
+        logEntry({ productId: variantTarget.id, productName: `${variantTarget.name} (${nv.label})`, type: 'Adjust', qty: nStock - (Number(v.stock) || 0), reason: 'Variant stock update', by: 'Admin', date: todayISO() });
+      }
+    });
+    const newSum = variantDraft.reduce((s: number, v: any) => s + (Number(v.stock) || 0), 0);
+    const parent = products.find((x: any) => x.id === variantTarget.id);
+    const st = newSum <= 0 ? 'Out of Stock' : newSum <= (parent?.reorderPoint ?? 5) ? 'Low Stock' : 'In Stock';
+    const cleaned = variantDraft.map(v => ({ ...v, label: String(v.label || '').trim() })).filter((v: any) => v.label || v.sku);
+    onProductsChange(products.map((x: any) => x.id === variantTarget.id ? { ...x, variants: cleaned, stock: newSum, status: st, updatedAt: nowTimeLocal() } : x));
+    setVariantTarget(null);
+    showToast(`Variants saved — total stock ${newSum}`, 'success');
+  };
 
   const categories = Array.from(new Set(products.map((p: any) => p.category).filter(Boolean)));
   const fallbackImg = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600';
@@ -93,6 +227,10 @@ export default function ProductInventoryView({ products, onProductsChange, showT
       return (a.name || '').localeCompare(b.name || '');
     });
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   const logEntry = (e: Omit<LedgerEntry, 'id' | 'time'>) => {
     setLedger(prev => [{ id: 'LED-' + Math.floor(100 + Math.random() * 900), time: nowTimeLocal(), ...e }, ...prev]);
   };
@@ -107,6 +245,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     if (!form.name.trim()) { showToast('Product name is required', 'info'); return; }
     const price = Number(form.price) || 0;
     if (price <= 0) { showToast('Enter a valid selling price', 'info'); return; }
+    pushUndo(editing ? 'Edit product' : 'Add product');
     const product: any = {
       id: editing ? editing.id : 'PROD-' + (100 + products.length + 1),
       name: form.name.trim(),
@@ -151,6 +290,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
   const deleteProduct = () => {
     const p = products.find((x: any) => x.id === deleteId);
     if (!p) return;
+    pushUndo('Delete product');
     onProductsChange(products.filter((x: any) => x.id !== deleteId));
     logEntry({ productId: p.id, productName: p.name, type: 'Remove', qty: 0, reason: 'Removed from catalog', by: 'Admin', date: todayISO() });
     showToast(`"${p.name}" removed`, 'info');
@@ -169,6 +309,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     if (!adjust) return;
     const mag = Math.abs(Number(adjust.delta) || 0);
     if (mag === 0) { showToast('Enter a non-zero quantity', 'info'); return; }
+    pushUndo('Stock movement');
     const positive = adjust.type === 'Restock' || adjust.type === 'Return';
     const signed = positive ? mag : -mag;
     onProductsChange(products.map((x: any) => {
@@ -190,6 +331,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
   };
 
   const createOrder = (p: any) => {
+    pushUndo('Create purchase order');
     const suggested = Math.max(p.rp * 2 - (p.stock ?? 0), 10);
     const unitCost = p.cost || Math.round((p.price || 0) * 0.75);
     const po: PurchaseOrder = {
@@ -264,6 +406,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
           added.push(item);
         });
         if (added.length === 0) { showToast('No new products found in CSV (check header names / duplicate SKUs)', 'info'); return; }
+        pushUndo('CSV import');
         onProductsChange([...added, ...products]);
         logEntry({ productId: 'CSV-IMPORT', productName: `${added.length} product(s) imported from CSV`, type: 'Add', qty: 0, reason: 'Bulk import', by: 'Admin', date: todayISO() });
         showToast(`Imported ${added.length} product(s)`, 'success');
@@ -290,7 +433,8 @@ export default function ProductInventoryView({ products, onProductsChange, showT
   const tabs = [
     { id: 'inventory' as const, label: 'Inventory', icon: Package, badge: 0 },
     { id: 'pos' as const, label: 'Purchase Orders', icon: ShoppingCart, badge: pendingPos },
-    { id: 'reports' as const, label: 'Reports', icon: TrendingUp, badge: 0 }
+    { id: 'reports' as const, label: 'Reports', icon: TrendingUp, badge: 0 },
+    { id: 'warehouse' as const, label: 'Warehouse', icon: Warehouse, badge: 0 }
   ];
 
   return (
@@ -301,13 +445,24 @@ export default function ProductInventoryView({ products, onProductsChange, showT
           <h3 className="text-lg font-bold text-white uppercase tracking-wider">Product Inventory</h3>
           <p className="text-xs text-gray-400">Add, track, procure, and forecast groceries catalog items</p>
         </div>
-        <button
-          onClick={() => { setEditing(null); setForm(emptyForm()); setFormOpen(true); }}
-          className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center space-x-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Product</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={doUndo}
+            disabled={undoStack.length === 0}
+            className={`px-3.5 py-2 rounded-lg text-xs font-semibold cursor-pointer flex items-center space-x-1.5 border ${undoStack.length ? 'bg-brand-dark border-brand-border text-gray-300 hover:text-white' : 'bg-brand-dark/30 border-brand-border/50 text-gray-600 cursor-not-allowed'}`}
+            title={undoStack.length ? `Undo: ${undoStack[0].label} (${undoStack[0].time})` : 'Nothing to undo'}
+          >
+            <Undo2 className="w-4 h-4" />
+            <span>Undo{undoStack.length ? `: ${undoStack[0].label}` : ''}</span>
+          </button>
+          <button
+            onClick={() => { setEditing(null); setForm(emptyForm()); setFormOpen(true); }}
+            className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center space-x-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Product</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -330,11 +485,22 @@ export default function ProductInventoryView({ products, onProductsChange, showT
           addBatches={(bs) => setBatches(prev => [...bs, ...prev])}
           logEntry={logEntry}
           showToast={showToast}
+          snapshot={pushUndo}
         />
       )}
 
       {tab === 'reports' && (
         <InventoryReportsView products={products} ledger={ledger} batches={batches} />
+      )}
+
+      {tab === 'warehouse' && (
+        <StoreOpsView
+          products={products}
+          onProductsChange={onProductsChange}
+          logEntry={logEntry}
+          showToast={showToast}
+          snapshot={pushUndo}
+        />
       )}
 
       {tab === 'inventory' && (
@@ -419,6 +585,19 @@ export default function ProductInventoryView({ products, onProductsChange, showT
             <input ref={importRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onImportFile} />
           </div>
 
+          {/* Bulk bar */}
+          {selected.size > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-500/10 border border-blue-500/30 rounded-xl px-4 py-2.5">
+              <span className="text-[10px] font-bold text-blue-300">{selected.size} selected</span>
+              <div className="flex items-center space-x-2">
+                <button onClick={bulkExport} className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 text-blue-200 rounded-lg text-[10px] font-bold cursor-pointer hover:bg-blue-500/30 flex items-center space-x-1"><Download className="w-3 h-3" /><span>Export</span></button>
+                <button onClick={bulkLabels} className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 text-blue-200 rounded-lg text-[10px] font-bold cursor-pointer hover:bg-blue-500/30 flex items-center space-x-1"><Barcode className="w-3 h-3" /><span>Labels</span></button>
+                <button onClick={bulkDelete} className="px-3 py-1.5 bg-red-500/20 border border-red-500/40 text-red-200 rounded-lg text-[10px] font-bold cursor-pointer hover:bg-red-500/30 flex items-center space-x-1"><Trash2 className="w-3 h-3" /><span>Delete</span></button>
+                <button onClick={() => setSelected(new Set())} className="px-3 py-1.5 bg-brand-dark border border-brand-border text-gray-300 rounded-lg text-[10px] font-bold cursor-pointer hover:text-white">Clear</button>
+              </div>
+            </div>
+          )}
+
           {/* Reorder panel */}
           {panel === 'reorder' && (
             <div className="bg-brand-card border border-brand-border rounded-xl p-4">
@@ -437,6 +616,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="text-[10px] font-mono text-amber-300">Order {suggested} units</span>
+                          <button onClick={() => openWa(p, suggested)} className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 rounded-lg text-[10px] font-bold cursor-pointer hover:bg-emerald-500/20 flex items-center space-x-1" title="Notify supplier on WhatsApp"><MessageCircle className="w-3 h-3" /><span>WhatsApp</span></button>
                           <button onClick={() => createOrder(p)} className="px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[10px] font-bold cursor-pointer flex items-center space-x-1"><CheckCircle2 className="w-3 h-3" /><span>Create Purchase Order</span></button>
                         </div>
                       </div>
@@ -490,6 +670,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+                    <th className="py-3 px-4 w-8"><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={toggleAll} className="accent-brand-orange cursor-pointer" title="Select all (current page)" /></th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Product</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Category</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Stock</th>
@@ -503,17 +684,18 @@ export default function ProductInventoryView({ products, onProductsChange, showT
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border/40">
-                  {filtered.length === 0 && (
-                    <tr><td colSpan={10} className="py-8 text-center text-gray-500">No products match your filters.</td></tr>
+                  {pageItems.length === 0 && (
+                    <tr><td colSpan={11} className="py-8 text-center text-gray-500">No products match your filters.</td></tr>
                   )}
-                  {filtered.map((p: any) => (
-                    <tr key={p.id} className="hover:bg-brand-dark/10 transition-colors">
+                  {pageItems.map((p: any) => (
+                    <tr key={p.id} className={`hover:bg-brand-dark/10 transition-colors ${selected.has(p.id) ? 'bg-blue-500/5' : ''}`}>
+                      <td className="py-3 px-4"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleOne(p.id)} className="accent-brand-orange cursor-pointer" /></td>
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-3">
                           <img src={p.image || fallbackImg} alt={p.name} className="w-9 h-9 rounded-lg object-cover border border-brand-border" />
                           <div className="min-w-0">
                             <p className="font-bold text-white truncate">{p.name}</p>
-                            <p className="font-mono text-[9px] text-gray-500">{p.id}{p.sku ? ' · ' + p.sku : ''}</p>
+                            <p className="font-mono text-[9px] text-gray-500">{p.id}{p.sku ? ' · ' + p.sku : ''}{p.variants?.length ? <span className="text-brand-orange font-bold"> · {p.variants.length} var</span> : ''}</p>
                           </div>
                         </div>
                       </td>
@@ -538,6 +720,8 @@ export default function ProductInventoryView({ products, onProductsChange, showT
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-1.5">
+                          <button onClick={() => openWa(p, Math.max(p.rp * 2 - (p.stock ?? 0), 10))} className="p-1.5 bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 rounded-lg cursor-pointer hover:bg-emerald-500/20" title="Notify supplier on WhatsApp"><MessageCircle className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => openVariants(p)} className="p-1.5 bg-indigo-500/10 border border-indigo-500/40 text-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-500/20" title="Manage variants"><Boxes className="w-3.5 h-3.5" /></button>
                           <button onClick={() => setLabelSel([p])} className="p-1.5 bg-gray-600/20 border border-gray-500/40 text-gray-300 rounded-lg cursor-pointer hover:bg-gray-600/30" title="Print label"><Barcode className="w-3.5 h-3.5" /></button>
                           <button onClick={() => openEdit(p)} className="p-1.5 bg-gray-600/20 border border-gray-500/40 text-gray-300 rounded-lg cursor-pointer hover:bg-gray-600/30" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
                           <button onClick={() => setDeleteId(p.id)} className="p-1.5 bg-red-500/10 border border-red-500/40 text-red-300 rounded-lg cursor-pointer hover:bg-red-500/20" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -547,6 +731,16 @@ export default function ProductInventoryView({ products, onProductsChange, showT
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-t border-brand-border/40">
+              <span className="text-[10px] text-gray-500">{filtered.length} item{filtered.length === 1 ? '' : 's'} · page {safePage} of {pageCount} ({PAGE_SIZE} per page)</span>
+              <div className="flex items-center space-x-1.5">
+                <button onClick={() => setPage(Math.max(1, safePage - 1))} disabled={safePage <= 1} className="px-3 py-1.5 bg-brand-dark border border-brand-border rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-gray-300 hover:text-white">Prev</button>
+                {Array.from({ length: pageCount }).slice(0, 7).map((_, i) => (
+                  <button key={i} onClick={() => setPage(i + 1)} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer border ${safePage === i + 1 ? 'bg-brand-orange border-brand-orange text-white' : 'bg-brand-dark border-brand-border text-gray-400 hover:text-white'}`}>{i + 1}</button>
+                ))}
+                <button onClick={() => setPage(Math.min(pageCount, safePage + 1))} disabled={safePage >= pageCount} className="px-3 py-1.5 bg-brand-dark border border-brand-border rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-gray-300 hover:text-white">Next</button>
+              </div>
             </div>
           </div>
         </>
@@ -698,6 +892,67 @@ export default function ProductInventoryView({ products, onProductsChange, showT
 
       {/* Labels */}
       {labelSel && <InventoryLabelModal products={labelSel} onClose={() => setLabelSel(null)} />}
+
+      {/* WhatsApp supplier */}
+      {wa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md bg-brand-card border border-brand-border rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2"><MessageCircle className="w-4 h-4 text-emerald-400" /><span>Notify Supplier — {wa.p.name}</span></h4>
+              <button onClick={() => setWa(null)} className="text-gray-500 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[10px]">
+              <div className="bg-brand-dark/40 border border-brand-border rounded-lg px-3 py-2"><span className="text-gray-500 uppercase text-[9px] block">Supplier</span><span className="text-white font-bold">{wa.p.supplier || '—'}</span></div>
+              <div className="bg-brand-dark/40 border border-brand-border rounded-lg px-3 py-2"><span className="text-gray-500 uppercase text-[9px] block">Stock / Reorder Pt</span><span className="text-white font-bold font-mono">{wa.p.stock} / {wa.p.reorderPoint ?? 5}</span></div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Supplier WhatsApp Number</label>
+              <input value={waPhone} onChange={(e) => setWaPhone(e.target.value)} placeholder="e.g. 8801712345678" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-emerald-400 placeholder:text-gray-600" />
+              <p className="text-[9px] text-gray-600 mt-1">Auto-filled from the product's supplier contact. Numbers with at least 10 digits open wa.me directly.</p>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Message</label>
+              <textarea value={waMsgText} onChange={(e) => setWaMsgText(e.target.value)} rows={6} className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-emerald-400 resize-none" />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button onClick={() => setWa(null)} className="px-4 py-2 bg-gray-600/20 border border-gray-500/40 text-gray-300 rounded-lg text-[10px] font-bold cursor-pointer hover:bg-gray-600/30">Cancel</button>
+              <button onClick={sendWa} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-bold cursor-pointer flex items-center space-x-1.5"><MessageCircle className="w-3.5 h-3.5" /><span>Open WhatsApp</span></button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Variants */}
+      {variantTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-brand-card border border-brand-border rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2"><Boxes className="w-4 h-4 text-indigo-400" /><span>Variants — {variantTarget.name}</span></h4>
+              <button onClick={() => setVariantTarget(null)} className="text-gray-500 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-[10px] text-gray-500">Sub-SKUs (sizes / weights). Parent stock = sum of all variant stock.</p>
+            <div className="space-y-2">
+              {variantDraft.map((v: any, i: number) => (
+                <div key={v.id} className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center bg-brand-dark/40 border border-brand-border rounded-lg p-2">
+                  <input value={v.label} onChange={(e) => patchVariant(i, 'label', e.target.value)} placeholder="Label (500g)" className="col-span-2 px-2 py-1.5 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                  <input value={v.sku} onChange={(e) => patchVariant(i, 'sku', e.target.value)} placeholder="SKU" className="px-2 py-1.5 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                  <input type="number" min={0} value={v.stock} onChange={(e) => patchVariant(i, 'stock', e.target.value)} placeholder="Stock" className="px-2 py-1.5 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                  <input type="number" min={0} value={v.price} onChange={(e) => patchVariant(i, 'price', e.target.value)} placeholder="Price" className="px-2 py-1.5 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                  <button onClick={() => removeVariant(v.id)} className="p-2 bg-red-500/10 border border-red-500/40 text-red-300 rounded-lg cursor-pointer hover:bg-red-500/20" title="Remove variant"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between">
+              <button onClick={addVariant} className="px-3 py-2 bg-indigo-500/10 border border-indigo-500/40 text-indigo-300 rounded-lg text-[10px] font-bold cursor-pointer hover:bg-indigo-500/20 flex items-center space-x-1"><Plus className="w-3.5 h-3.5" /><span>Add Variant</span></button>
+              <span className="text-[10px] text-gray-400">Total stock: <span className="text-white font-black font-mono">{variantDraft.reduce((s: number, v: any) => s + (Number(v.stock) || 0), 0)}</span></span>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button onClick={() => setVariantTarget(null)} className="px-4 py-2 bg-gray-600/20 border border-gray-500/40 text-gray-300 rounded-lg text-[10px] font-bold cursor-pointer hover:bg-gray-600/30">Cancel</button>
+              <button onClick={saveVariants} className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[10px] font-bold cursor-pointer flex items-center space-x-1.5"><Save className="w-3.5 h-3.5" /><span>Save Variants</span></button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

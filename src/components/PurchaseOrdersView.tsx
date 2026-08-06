@@ -15,11 +15,12 @@ interface PurchaseOrdersViewProps {
   addBatches: (bs: BatchEntry[]) => void;
   logEntry: (e: Omit<LedgerEntry, 'id' | 'time'>) => void;
   showToast: (msg: string, type?: 'success' | 'info') => void;
+  snapshot?: (label: string) => void;
 }
 
 interface DraftItem extends POItem { _key: number; }
 
-export default function PurchaseOrdersView({ pos, onPosChange, products, onProductsChange, addBatches, logEntry, showToast }: PurchaseOrdersViewProps) {
+export default function PurchaseOrdersView({ pos, onPosChange, products, onProductsChange, addBatches, logEntry, showToast, snapshot }: PurchaseOrdersViewProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [receiveId, setReceiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ supplier: string; supplierContact: string; notes: string; items: DraftItem[] }>({
@@ -83,6 +84,7 @@ export default function PurchaseOrdersView({ pos, onPosChange, products, onProdu
   const createPO = () => {
     const valid = draft.items.filter(it => it.productId && it.qty > 0);
     if (valid.length === 0) { showToast('Add at least one product with qty', 'info'); return; }
+    snapshot?.('Create purchase order');
     const items: POItem[] = valid.map(({ _key, ...rest }) => rest);
     const total = items.reduce((s, it) => s + it.qty * it.unitCost, 0);
     const po: PurchaseOrder = {
@@ -104,6 +106,7 @@ export default function PurchaseOrdersView({ pos, onPosChange, products, onProdu
   const receivePO = () => {
     const po = pos.find(p => p.id === receiveId);
     if (!po) return;
+    snapshot?.('Receive purchase order');
     po.items.forEach((it: POItem) => {
       const existing = products.find((p: any) => p.id === it.productId);
       if (!existing) return;
@@ -138,6 +141,7 @@ export default function PurchaseOrdersView({ pos, onPosChange, products, onProdu
   };
 
   const cancelPO = (id: string) => {
+    snapshot?.('Cancel purchase order');
     onPosChange(pos.map(p => p.id === id ? { ...p, status: 'Cancelled' as const } : p));
     showToast('PO cancelled', 'info');
   };

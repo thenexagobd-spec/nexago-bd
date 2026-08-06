@@ -49,6 +49,7 @@ interface PosSystemProps {
   onSendToDriver?: (order: Order) => void;
   onDeleteOrder?: (id: string) => void;
   onNavigate?: (tab: string) => void;
+  onSaleRecorded?: (items: { productId: string; name: string; qty: number; price: number }[], source: 'counter' | 'delivery') => void;
 }
 
 const formatMoney = (value: number) => `Tk ${Math.abs(value).toFixed(2)}`;
@@ -135,7 +136,7 @@ function readSaved<T>(key: string, fallback: T): T {
   }
 }
 
-export default function PosSystem({ products, orders = [], onProductsChange, onCreateOrder, onUpdateOrder, onSendToDriver, onDeleteOrder, onNavigate }: PosSystemProps) {
+export default function PosSystem({ products, orders = [], onProductsChange, onCreateOrder, onUpdateOrder, onSendToDriver, onDeleteOrder, onNavigate, onSaleRecorded }: PosSystemProps) {
   const [mode, setMode] = useState<PosMode>('SALES');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -409,6 +410,12 @@ export default function PosSystem({ products, orders = [], onProductsChange, onC
         const stock = Math.max(0, product.stock - sold.qty * multiplier);
         return { ...product, stock, status: stock === 0 ? 'Out of Stock' : stock <= 10 ? 'Low Stock' : 'In Stock' };
       }));
+      onSaleRecorded?.(record.lines
+        .filter(line => !line.foc)
+        .map(line => {
+          const mult = line.uom === 'CASE' ? 24 : line.uom === 'BOX' ? 6 : 1;
+          return { productId: line.product.id, name: line.product.name, qty: line.qty * mult, price: line.rate };
+        }), 'counter');
       const linkedOrder = linkedOrderId ? orders.find(order => order.id === linkedOrderId) : undefined;
       if (linkedOrder && onUpdateOrder) {
         onUpdateOrder({
@@ -479,6 +486,12 @@ export default function PosSystem({ products, orders = [], onProductsChange, onC
       const stock = Math.max(0, product.stock - sold.qty * multiplier);
       return { ...product, stock, status: stock === 0 ? 'Out of Stock' : stock <= 10 ? 'Low Stock' : 'In Stock' };
     }));
+    onSaleRecorded?.(cart
+      .filter(line => !line.foc)
+      .map(line => {
+        const mult = line.uom === 'CASE' ? 24 : line.uom === 'BOX' ? 6 : 1;
+        return { productId: line.product.id, name: line.product.name, qty: line.qty * mult, price: line.rate };
+      }), 'delivery');
     clearSale();
     setReceived('');
     notify(`Delivery ${newId} dispatched to driver`);
