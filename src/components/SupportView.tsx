@@ -827,6 +827,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
   const [launchedApp, setLaunchedApp] = useState<{ name: string; stage: number; steps: Array<{ label: string; status: 'waiting' | 'running' | 'ok' | 'warn' }>; issues: string[]; booted: boolean } | null>(null);
   const [realSession, setRealSession] = useState<{ code: string; shareUrl: string; status: 'idle' | 'waiting' | 'sharing' | 'live' | 'offline' | 'error' }>({ code: '', shareUrl: '', status: 'idle' });
   const [realStream, setRealStream] = useState<MediaStream | null>(null);
+  const [realMode, setRealMode] = useState<'screen' | 'camera'>('screen');
   const [peerDevice, setPeerDevice] = useState<{ os?: string; browser?: string; isMobile?: boolean; isWebView?: boolean; ua?: string; gdm?: boolean; secure?: boolean; mediaDevices?: boolean } | null>(null);
   const [shareStatus, setShareStatus] = useState<{ state: string; message: string } | null>(null);
   const realWsRef = useRef<WebSocket | null>(null);
@@ -2907,6 +2908,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
         } else if (m.type === 'status') {
           setShareStatus(m.message ? { state: m.state, message: m.message } : null);
         } else if (m.type === 'offer' && m.from === 'share') {
+          setRealMode(m.mode === 'camera' ? 'camera' : 'screen');
           handleRealOffer(m.sdp);
         } else if (m.type === 'ice' && m.from === 'share') {
           if (realPcRef.current) {
@@ -2974,6 +2976,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
     if (realStream) { realStream.getTracks().forEach(t => t.stop()); setRealStream(null); }
     setPeerDevice(null);
     setShareStatus(null);
+    setRealMode('screen');
     setRealSession({ code: '', shareUrl: '', status: 'idle' });
     setTechAudit(prev => [{ action: 'Real remote session ended', detail: `Closed room ${realSession.code || '—'}`, time: nowTime() }, ...prev]);
   };
@@ -5139,7 +5142,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                       </div>
                       <div className="flex items-center space-x-1.5">
                         <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-rose-500/10 text-rose-300 border border-rose-500/30">● LIVE</span>
-                        <span className="px-2 py-0.5 rounded text-[8px] font-mono text-gray-400">WebRTC</span>
+                        <span className="px-2 py-0.5 rounded text-[8px] font-mono text-gray-400">{realMode === 'camera' ? 'Camera' : 'WebRTC'}</span>
                         <button onClick={stopRealSession} className="px-2 py-1 rounded text-[8px] font-black uppercase bg-red-500/10 border border-red-500/40 text-red-300 cursor-pointer hover:bg-red-500/20">Exit</button>
                       </div>
                     </div>

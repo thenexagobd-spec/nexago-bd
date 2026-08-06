@@ -34,6 +34,7 @@
   <button class="stop" id="stopBtn">Stop Sharing</button>
   <button class="chrome" id="chromeBtn">Open in Chrome</button>
   <button class="chrome" id="copyBtn" style="background:#374151;">Copy link</button>
+  <button class="chrome" id="camBtn" style="background:#7c3aed;">Share camera instead</button>
   <div class="status" id="status">Connecting to relay…</div>
   <div class="status hidden" id="connStatus" style="color:#fbbf24;font-weight:700;">● Connecting to admin…</div>
   <div class="status" id="deviceInfo"></div>
@@ -52,6 +53,7 @@
   const stopBtn = document.getElementById('stopBtn');
   const chromeBtn = document.getElementById('chromeBtn');
   const copyBtn = document.getElementById('copyBtn');
+  const camBtn = document.getElementById('camBtn');
   const video = document.getElementById('preview');
 
   let ws = null;
@@ -89,6 +91,12 @@
     copyBtn.style.display = 'block';
   }
 
+  function showCamBtn() {
+    if (hasMediaDevices && navigator.mediaDevices.getUserMedia && !canShare) {
+      camBtn.style.display = 'block';
+    }
+  }
+
   if (room) codeEl.textContent = room;
   const relay = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 
@@ -123,9 +131,11 @@
             sendStatus('unsupported', 'Screen sharing needs a secure (HTTPS) page — reload this link over HTTPS.');
           } else if (ua.indexOf('Chrome') > -1) {
             showChromeBtn();
+            showCamBtn();
             sendStatus('unsupported', 'This browser reports as Chrome but screen-sharing is disabled here (a custom/in-app browser). Tap "Open in Chrome", or copy the link and paste it into the real Google Chrome app.');
           } else {
             showChromeBtn();
+            showCamBtn();
             sendStatus('unsupported', 'This browser cannot share its screen. Tap "Open in Chrome", or install Google Chrome and retry this link.');
           }
         } else {
@@ -158,17 +168,23 @@
     if (ws) ws.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription, room }));
   }
 
-  async function startSharing() {
-    if (!canShare) {
+  async function startSharing(mode) {
+    mode = mode || 'screen';
+    if (mode === 'screen' && !canShare) {
       sendStatus('unsupported', 'Screen sharing is not available in this browser/app.');
       return;
     }
     try {
-      sendStatus('picker', 'Choose the screen/app to share…');
-      localStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: 15, max: 30 } },
-        audio: false
-      });
+      if (mode === 'screen') {
+        sendStatus('picker', 'Choose the screen/app to share…');
+        localStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: { ideal: 15, max: 30 } },
+          audio: false
+        });
+      } else {
+        sendStatus('picker', 'Requesting camera access…');
+        localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      }
     } catch (e) {
       sendStatus('error', 'Sharing cancelled or not available: ' + (e.name || ''));
       return;
@@ -177,6 +193,9 @@
     video.srcObject = localStream;
     shareBtn.style.display = 'none';
     stopBtn.style.display = 'block';
+    chromeBtn.style.display = 'none';
+    copyBtn.style.display = 'none';
+    camBtn.style.display = 'none';
     statusEl.textContent = 'Sharing — connecting to admin…';
     statusEl.classList.add('live');
     sendStatus('sharing', 'Sharing — connecting to admin…');
@@ -194,13 +213,13 @@
       if (e.candidate && ws) ws.send(JSON.stringify({ type: 'ice', candidate: JSON.stringify(e.candidate), room }));
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') sendStatus('live', '● Admin is viewing your screen');
+      if (pc.connectionState === 'connected') sendStatus('live', '● Admin is viewing your ' + (mode === 'camera' ? 'camera' : 'screen'));
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') sendStatus('error', 'Connection dropped — check network, retry from Chrome');
     };
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    if (ws) ws.send(JSON.stringify({ type: 'offer', sdp: pc.localDescription, room }));
+    if (ws) ws.send(JSON.stringify({ type: 'offer', sdp: pc.localDescription, mode, room }));
   }
 
   function stopSharing() {
@@ -213,7 +232,8 @@
     sendStatus('stopped', 'Sharing stopped — tap Start Sharing again to resume.');
   }
 
-  shareBtn.addEventListener('click', startSharing);
+  shareBtn.addEventListener('click', function(){ startSharing('screen'); });
+  camBtn.addEventListener('click', function(){ startSharing('camera'); });
   stopBtn.addEventListener('click', stopSharing);
 
   if (!room) {

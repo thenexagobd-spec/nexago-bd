@@ -118,7 +118,7 @@ wss.on('connection', (ws, req) => {
     if (!target || target.readyState !== 1) return;
 
     if (msg.type === 'offer' || msg.type === 'answer' || msg.type === 'ice') {
-      target.send(JSON.stringify({ type: msg.type, sdp: msg.sdp, candidate: msg.candidate, from: role }));
+      target.send(JSON.stringify({ type: msg.type, sdp: msg.sdp, candidate: msg.candidate, mode: msg.mode, from: role }));
     } else if (msg.type === 'device' && role === 'share') {
       target.send(JSON.stringify({ type: 'device', info: msg.info }));
     } else if (msg.type === 'status' && role === 'share') {
