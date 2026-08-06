@@ -1,0 +1,4156 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { 
+  Order, Driver, Zone, User, Payment, Vehicle, PromotionBanner, SupportTicket, SystemNotification, ChatLogEntry, OrderReportEntry, makeOrderId
+} from './types';
+import { 
+  defaultOrders, defaultDrivers, defaultZones, defaultUsers, 
+  defaultPayments, defaultVehicles, defaultBanners, defaultSupportTickets, 
+  defaultNotifications, getStoredData, setStoredData, getZonesWithDefaults, 
+} from './data';
+
+import DashboardView from './components/DashboardView';
+import UsersView from './components/UsersView';
+import DriversView from './components/DriversView';
+import OrdersView from './components/OrdersView';
+import ZonesView from './components/ZonesView';
+import SupportView from './components/SupportView';
+import NotificationsView from './components/NotificationsView';
+import SettingsView from './components/SettingsView';
+import EarningsView from './components/EarningsView';
+import FleetPromosView from './components/FleetPromosView';
+import InventoryView from './components/InventoryView';
+import StoreDashboardView from './components/StoreDashboardView';
+import DeliveryDashboardView from './components/DeliveryDashboardView';
+import { CustomerStorefront } from './components/CustomerStorefront';
+import { useLiveDrivers } from './hooks/useLiveDrivers';
+import { ScanOrderModule } from './components/ScanOrderModule';
+import MobileAppSimulator from './components/MobileAppSimulator';
+import MFSBusinessView from './components/MFSBusinessView';
+import PosSystem from './components/PosSystem';
+import VehiclesView from './components/VehiclesView';
+
+import { 
+  LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
+  Map, Truck, Bookmark, FileText, LifeBuoy, Bell, Settings, LogOut, Menu, X, 
+  Check, Calendar, BellOff, Box, FolderOpen, Store, ClipboardList, Ticket,
+  BarChart3, ShieldCheck, MapPin, Star, Megaphone, ShieldAlert, Award, Download,
+  Copy, ExternalLink, Plus, Link, Search, Mail, Trash2, Edit, MessageSquare, CheckCircle, XCircle, Clock, ArrowRight, Sparkles, TrendingUp, Printer, Globe, ShoppingBag,
+  Camera, QrCode, Smartphone, Wallet
+} from 'lucide-react';
+
+export default function App() {
+  // Navigation State
+  const [activeTab, setActiveTab] = useState<string>('Dashboard');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Standalone Store Portal state
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('storeId');
+  });
+  const [activeMerchantTab, setActiveMerchantTab] = useState<string>('Dashboard');
+  const [isOrderScannerOpen, setIsOrderScannerOpen] = useState<boolean>(false);
+
+  // Listen to browser URL changes (for navigation/back button support)
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSelectedStoreId(params.get('storeId'));
+      setActiveMerchantTab('Dashboard');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleLaunchStore = (storeId: string) => {
+    setSelectedStoreId(storeId);
+    setActiveMerchantTab('Dashboard');
+    const newUrl = `${window.location.origin}${window.location.pathname}?storeId=${storeId}`;
+    window.history.pushState({ storeId }, '', newUrl);
+    showToast("Launching store merchant portal...", "info");
+  };
+
+  const handleExitStorePortal = () => {
+    setSelectedStoreId(null);
+    setActiveMerchantTab('Dashboard');
+    const newUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.pushState({}, '', newUrl);
+    showToast("Returned to super admin panel", "info");
+  };
+  
+  // Separate Workspace Panel State: 'super_admin' = Super Admin Control Center, 'store' = Grocery Admin, 'delivery' = Delivery Logistics
+  const [activePanelMode, setActivePanelMode] = useState<'super_admin' | 'store' | 'delivery'>('super_admin');
+
+  // Compact Layout / Tight Mode state
+  const [isTightMode, setIsTightMode] = useState<boolean>(() => {
+    const stored = localStorage.getItem('is_tight_mode');
+    return stored === 'true';
+  });
+
+  const toggleTightMode = () => {
+    setIsTightMode(prev => {
+      const next = !prev;
+      localStorage.setItem('is_tight_mode', String(next));
+      showToast(next ? "Tight Mode (Compact UI) enabled" : "Standard spacing enabled", "info");
+      return next;
+    });
+  };
+
+  // Collections Persistent State
+  const [orders, setOrders] = useState<Order[]>(() => {
+    const stored = getStoredData<Order[]>('sd_orders_v2', defaultOrders);
+    return stored.filter(o => !/^ORD-001\d+/.test(o.id || ''));
+  });
+  const [driverDispatchOrder, setDriverDispatchOrder] = useState<Order | null>(null);
+  const [adminDispatchOrder, setAdminDispatchOrder] = useState<Order | null>(null);
+  const [customerDispatchOrder, setCustomerDispatchOrder] = useState<Order | null>(null);
+  const [drivers, setDrivers] = useState<Driver[]>(() => getStoredData('sd_drivers', defaultDrivers));
+  const [zones, setZones] = useState<Zone[]>(() => getZonesWithDefaults());
+  const [users, setUsers] = useState<User[]>(() => getStoredData('sd_users', defaultUsers));
+  const [payments, setPayments] = useState<Payment[]>(() => getStoredData('sd_payments', defaultPayments));
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() => getStoredData('sd_vehicles', defaultVehicles));
+  const [banners, setBanners] = useState<PromotionBanner[]>(() => getStoredData('sd_banners', defaultBanners));
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => getStoredData('sd_tickets', defaultSupportTickets));
+  const [notifications, setNotifications] = useState<SystemNotification[]>(() => getStoredData('sd_notifications', defaultNotifications));
+  const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
+  const [orderReports, setOrderReports] = useState<OrderReportEntry[]>([]);
+  const unreadNotifCount = notifications.filter(n => !n.read).length;
+
+  const { liveDrivers, locSim, setLocSim, simTick } = useLiveDrivers(drivers);
+
+  // Additional Interactive Mock States for the rich new sidebar panels
+  const [products, setProducts] = useState([
+    { id: 'PROD-101', name: 'Fresh Apples (Premium)', category: 'Fruits & Vegetables', stock: 45, price: 180, status: 'In Stock', image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&q=80&w=600' },
+    { id: 'PROD-102', name: 'Organic Bananas', category: 'Fruits & Vegetables', stock: 120, price: 90, status: 'In Stock', image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&q=80&w=600' },
+    { id: 'PROD-103', name: 'Miniket Rice 5kg', category: 'Rice & Grains', stock: 35, price: 380, status: 'In Stock', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600' },
+    { id: 'PROD-104', name: 'Jasmine Rice 1kg', category: 'Rice & Grains', stock: 8, price: 150, status: 'Low Stock', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600' },
+    { id: 'PROD-105', name: 'Whole Milk 1L', category: 'Dairy & Eggs', stock: 0, price: 95, status: 'Out of Stock', image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&q=80&w=600' },
+    { id: 'PROD-106', name: 'Fresh Farm Eggs (Dozen)', category: 'Dairy & Eggs', stock: 80, price: 145, status: 'In Stock', image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&q=80&w=600' },
+    { id: 'PROD-107', name: 'Brown Bread 400g', category: 'Bakery', stock: 15, price: 65, status: 'In Stock', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=600' },
+  ]);
+
+  const [categories, setCategories] = useState([
+    { id: 'CAT-01', name: 'Fruits & Vegetables', itemsCount: 48, status: 'Active' },
+    { id: 'CAT-02', name: 'Dairy & Eggs', itemsCount: 32, status: 'Active' },
+    { id: 'CAT-03', name: 'Rice & Grains', itemsCount: 15, status: 'Active' },
+    { id: 'CAT-04', name: 'Bakery & Bread', itemsCount: 22, status: 'Active' },
+    { id: 'CAT-05', name: 'Beverages', itemsCount: 64, status: 'Active' },
+    { id: 'CAT-06', name: 'Snacks & Confectionery', itemsCount: 110, status: 'Active' },
+  ]);
+
+  const [stores, setStores] = useState<any[]>(() => {
+    const storesSeed = [
+      { id: 'STR-01', name: 'Fresh Mart', address: 'Dhanmondi, Dhaka', rating: 4.8, orders: 1240, status: 'Active', category: 'Grocery', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600', description: 'Fresh groceries & produce delivered fast', deliveryFee: 60, offer: '10% OFF first order' },
+      { id: 'STR-02', name: 'Daily Grocery', address: 'Gulshan, Dhaka', rating: 4.6, orders: 980, status: 'Active', category: 'Grocery', image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=600', description: 'Daily essentials at the best prices', deliveryFee: 50, offer: 'Free delivery over Tk 500' },
+      { id: 'STR-03', name: 'Green Basket', address: 'Uttara, Dhaka', rating: 4.7, orders: 840, status: 'Active', category: 'Fruits & Veg', image: 'https://images.unsplash.com/photo-1543168256-418811576931?auto=format&fit=crop&q=80&w=600', description: 'Organic fruits & vegetables, farm to door', deliveryFee: 70, offer: 'Buy 2 Get 1 Free' },
+      { id: 'STR-04', name: 'Super Shop', address: 'Mirpur, Dhaka', rating: 4.5, orders: 720, status: 'Active', category: 'Department Store', image: 'https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&q=80&w=600', description: 'One-stop shop for household needs', deliveryFee: 55, offer: 'Flat 5% OFF' },
+      { id: 'STR-05', name: 'Save Mart', address: 'Banani, Dhaka', rating: 4.4, orders: 530, status: 'Active', category: 'Grocery', image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=600', description: 'Savings on everything you need', deliveryFee: 45, offer: 'Tk 40 OFF first order' },
+    ];
+    const loaded = getStoredData('sd_stores', storesSeed);
+    return storesSeed.map(seed => ({ ...seed, ...(loaded.find((l: any) => l.id === seed.id) || {}) }));
+  });
+
+  const [inventory, setInventory] = useState([
+    { id: 'INV-301', name: 'Whole Milk 1L', store: 'Fresh Mart', stock: 0, reorderPoint: 10, status: 'Reorder Needed' },
+    { id: 'INV-302', name: 'Jasmine Rice 1kg', store: 'Daily Grocery', stock: 8, reorderPoint: 15, status: 'Low Stock' },
+    { id: 'INV-303', name: 'Fresh Farm Eggs', store: 'Green Basket', stock: 80, reorderPoint: 20, status: 'Healthy' },
+    { id: 'INV-304', name: 'Jasmine Rice 5kg', store: 'Super Shop', stock: 35, reorderPoint: 10, status: 'Healthy' },
+  ]);
+
+  const [coupons, setCoupons] = useState([
+    { id: 'CPN-01', code: 'EID20', discount: '20% Off', minOrder: 1000, usages: 420, status: 'Active' },
+    { id: 'CPN-02', code: 'FREEGO', discount: 'Free Delivery', minOrder: 500, usages: 980, status: 'Active' },
+    { id: 'CPN-03', code: 'GROCERY5', discount: '৳50 Flat Off', minOrder: 400, usages: 150, status: 'Active' },
+  ]);
+
+  const [staff, setStaff] = useState([
+    { id: 'STF-01', name: 'Asif Rahman', role: 'Inventory Manager', shift: 'Day Shift', status: 'Active' },
+    { id: 'STF-02', name: 'Nusrat Jahan', role: 'Support Supervisor', shift: 'Night Shift', status: 'Active' },
+    { id: 'STF-03', name: 'Monirul Islam', role: 'Delivery Lead', shift: 'Day Shift', status: 'Active' },
+  ]);
+
+  const [reviews, setReviews] = useState([
+    { id: 'REV-01', customer: 'John Doe', item: 'Fresh Mart (Dhanmondi)', rating: 5, comment: 'Extremely fresh apples, delivery was fast!', date: 'May 26, 2024' },
+    { id: 'REV-02', customer: 'Sarah Khan', item: 'Daily Grocery (Gulshan)', rating: 4, comment: 'Great quality but the delivery was slightly delayed.', date: 'May 26, 2024' },
+    { id: 'REV-03', customer: 'Rafiq Hasan', item: 'Green Basket (Uttara)', rating: 5, comment: 'Highly recommended! The eggs were safely packed.', date: 'May 25, 2024' },
+  ]);
+
+  const [marketing, setMarketing] = useState([
+    { id: 'MKT-01', title: 'bKash Eid 20% Off Splash', channel: 'In-app Banner', budget: 15000, clicks: 1420, status: 'Running' },
+    { id: 'MKT-02', title: 'Friday Free Delivery Rush', channel: 'Push Notification', budget: 5000, clicks: 980, status: 'Running' },
+    { id: 'MKT-03', title: 'Daily Mart Launch', channel: 'Sms Broadcast', budget: 8000, clicks: 0, status: 'Scheduled' },
+  ]);
+
+  // UI Control states
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [quickActionModal, setQuickActionModal] = useState<'driver' | 'user' | 'zone' | 'notification' | 'banner' | null>(null);
+  const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [isAddingStore, setIsAddingStore] = useState(false);
+  const [newStoreName, setNewStoreName] = useState('');
+  const [newStoreAddress, setNewStoreAddress] = useState('');
+
+  // Merchant specific interactive states
+  const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
+  const [mProdName, setMProdName] = useState('');
+  const [mProdCat, setMProdCat] = useState('Fruits & Vegetables');
+  const [mProdPrice, setMProdPrice] = useState('');
+  const [mProdStock, setMProdStock] = useState('');
+  const [mCatName, setMCatName] = useState('');
+  const [mCouponCode, setMCouponCode] = useState('');
+  const [mCouponDiscount, setMCouponDiscount] = useState('');
+  const [mCouponMinOrder, setMCouponMinOrder] = useState('');
+  const [mStaffName, setMStaffName] = useState('');
+  const [mStaffRole, setMStaffRole] = useState('Cashier');
+  const [mStaffShift, setMStaffShift] = useState('Day Shift');
+  const [mMarketingTitle, setMMarketingTitle] = useState('');
+  const [mMarketingChannel, setMMarketingChannel] = useState('In-app Banner');
+  const [mMarketingBudget, setMMarketingBudget] = useState('');
+  const [mTicketSubject, setMTicketSubject] = useState('');
+  const [mTicketPriority, setMTicketPriority] = useState('Medium');
+  const [mTicketMsg, setMTicketMsg] = useState('');
+  const [mSelectedOrder, setMSelectedOrder] = useState<Order | null>(null);
+  const [printingReceiptOrder, setPrintingReceiptOrder] = useState<Order | null>(null);
+  const [mReviewReplies, setMReviewReplies] = useState<Record<string, string>>({});
+  const [merchantUnreadNotifCount, setMerchantUnreadNotifCount] = useState(5);
+  const [isMerchantNotifDropdownOpen, setIsMerchantNotifDropdownOpen] = useState(false);
+  const [isMerchantProfileDropdownOpen, setIsMerchantProfileDropdownOpen] = useState(false);
+  const [isMerchantMobileSidebarOpen, setIsMerchantMobileSidebarOpen] = useState(false);
+
+  // Sync to localStorage
+  useEffect(() => { setStoredData('sd_orders_v2', orders); }, [orders]);
+  useEffect(() => { setStoredData('sd_drivers', drivers); }, [drivers]);
+  useEffect(() => { setStoredData('sd_zones', zones); }, [zones]);
+  useEffect(() => { setStoredData('sd_users', users); }, [users]);
+  useEffect(() => { setStoredData('sd_payments', payments); }, [payments]);
+  useEffect(() => { setStoredData('sd_vehicles', vehicles); }, [vehicles]);
+  useEffect(() => { setStoredData('sd_banners', banners); }, [banners]);
+  useEffect(() => { setStoredData('sd_tickets', supportTickets); }, [supportTickets]);
+  useEffect(() => { setStoredData('sd_notifications', notifications); }, [notifications]);
+  useEffect(() => { setStoredData('sd_stores', stores); }, [stores]);
+
+  // Toast System trigger helper
+  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // HANDLERS
+  // Orders
+  const handleAddOrder = (orderData: Omit<Order, 'id' | 'date'> & { id?: string }) => {
+    const newId = orderData.id || makeOrderId();
+    const newOrder: Order = {
+      ...orderData,
+      id: newId,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      source: orderData.source || ((orderData.pickupCoords || orderData.deliveryCoords) ? 'customer-app' : 'counter')
+    };
+
+    // Auto-assign the nearest online live driver if none was chosen (customer orders)
+    if (!newOrder.driverId && newOrder.pickupCoords) {
+      let best: { id: string } | null = null;
+      let bestD = Infinity;
+      for (const d of liveDrivers) {
+        if (d.status === 'Offline') continue;
+        const dd = Math.pow(d.lat - newOrder.pickupCoords.lat, 2) + Math.pow(d.lng - newOrder.pickupCoords.lng, 2);
+        if (dd < bestD) { bestD = dd; best = d; }
+      }
+      if (best) {
+        newOrder.driverId = best.id;
+        setDrivers(drivers.map(d => d.id === best!.id ? { ...d, status: 'On-Delivery' as const } : d));
+      }
+    }
+
+    setOrders([newOrder, ...orders]);
+
+    // Customer-placed order → surface on admin live board
+    if (newOrder.deliveryCoords || newOrder.pickupCoords) {
+      handleAddNotification({
+        title: `🛒 New Customer Order #${newId}`,
+        message: `${newOrder.customerName} ordered from ${newOrder.storeName} (৳${newOrder.amount.toLocaleString()})${newOrder.driverId ? ` — rider ${newOrder.driverId} auto-assigned` : ''}`,
+        type: 'order'
+      });
+    }
+
+    // Create matching transaction log
+    const newTxn: Payment = {
+      id: `TXN-982${40 + payments.length + 1}`,
+      orderId: newId,
+      amount: orderData.amount,
+      method: orderData.paymentMethod,
+      status: orderData.status === 'Completed' ? 'Paid' : orderData.status === 'Cancelled' ? 'Failed' : 'Pending',
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+    setPayments([newTxn, ...payments]);
+
+    // Credit driver completed count / earnings
+    if (orderData.driverId) {
+      setDrivers(drivers.map(d => d.id === orderData.driverId ? {
+        ...d,
+        completedOrders: d.completedOrders + (orderData.status === 'Completed' ? 1 : 0),
+        earnings: d.earnings + (orderData.status === 'Completed' ? orderData.amount * 0.8 : 0)
+      } : d));
+    }
+
+    showToast(`Order #${newId} dispatched successfully!`);
+  };
+
+  // Same as handleAddOrder but without the global toast — used by the phone simulator,
+  // which shows its own in-phone toast so nothing appears outside the device frames.
+  const handleSilentAddOrder = (orderData: Omit<Order, 'id' | 'date'> & { id?: string }) => {
+    const newId = orderData.id || makeOrderId();
+    const newOrder: Order = {
+      ...orderData,
+      id: newId,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      source: orderData.source || ((orderData.pickupCoords || orderData.deliveryCoords) ? 'customer-app' : 'counter')
+    };
+
+    if (!newOrder.driverId && newOrder.pickupCoords) {
+      let best: { id: string } | null = null;
+      let bestD = Infinity;
+      for (const d of liveDrivers) {
+        if (d.status === 'Offline') continue;
+        const dd = Math.pow(d.lat - newOrder.pickupCoords.lat, 2) + Math.pow(d.lng - newOrder.pickupCoords.lng, 2);
+        if (dd < bestD) { bestD = dd; best = d; }
+      }
+      if (best) {
+        newOrder.driverId = best.id;
+        setDrivers(drivers.map(d => d.id === best!.id ? { ...d, status: 'On-Delivery' as const } : d));
+      }
+    }
+
+    setOrders([newOrder, ...orders]);
+
+    if (newOrder.deliveryCoords || newOrder.pickupCoords) {
+      handleAddNotification({
+        title: `🛒 New Customer Order #${newId}`,
+        message: `${newOrder.customerName} ordered from ${newOrder.storeName} (৳${newOrder.amount.toLocaleString()})${newOrder.driverId ? ` — rider ${newOrder.driverId} auto-assigned` : ''}`,
+        type: 'order'
+      });
+    }
+
+    const newTxn: Payment = {
+      id: `TXN-982${40 + payments.length + 1}`,
+      orderId: newId,
+      amount: orderData.amount,
+      method: orderData.paymentMethod,
+      status: orderData.status === 'Completed' ? 'Paid' : orderData.status === 'Cancelled' ? 'Failed' : 'Pending',
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+    setPayments([newTxn, ...payments]);
+
+    if (orderData.driverId) {
+      setDrivers(drivers.map(d => d.id === orderData.driverId ? {
+        ...d,
+        completedOrders: d.completedOrders + (orderData.status === 'Completed' ? 1 : 0),
+        earnings: d.earnings + (orderData.status === 'Completed' ? orderData.amount * 0.8 : 0)
+      } : d));
+    }
+  };
+
+  const handleUpdateOrder = (updatedOrder: Order) => {
+    applyOrderUpdate(updatedOrder);
+    showToast(`Order #${updatedOrder.id} successfully updated.`);
+  };
+
+  const handleSilentUpdateOrder = (updatedOrder: Order) => {
+    applyOrderUpdate(updatedOrder);
+  };
+
+  const applyOrderUpdate = (updatedOrder: Order) => {
+    const original = orders.find(o => o.id === updatedOrder.id);
+    if (original && original.status !== 'Completed' && updatedOrder.status === 'Completed' && updatedOrder.driverId) {
+      setDrivers(drivers.map(d => d.id === updatedOrder.driverId ? {
+        ...d,
+        completedOrders: d.completedOrders + 1,
+        earnings: d.earnings + updatedOrder.amount * 0.8
+      } : d));
+    }
+
+    setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+
+    // Update payment
+    setPayments(payments.map(p => p.orderId === updatedOrder.id ? {
+      ...p,
+      status: updatedOrder.status === 'Completed' ? 'Paid' : updatedOrder.status === 'Cancelled' ? 'Failed' : 'Pending'
+    } : p));
+  };
+
+  const handleDeleteOrder = (id: string) => {
+    // Deleted orders are not erased — they are marked Cancelled so they stay in order history
+    setOrders(orders.map(o => o.id === id ? { ...o, status: 'Cancelled' as const } : o));
+    setPayments(payments.map(p => p.orderId === id ? { ...p, status: 'Failed' as const } : p));
+    showToast(`Order #${id} deleted (kept in history as Cancelled).`);
+  };
+
+  // Manually assign a driver to an order (used when driver rejects/doesn't accept)
+  const handleAssignDriver = (order: Order, driverId: string) => {
+    const updated = { ...order, driverId };
+    handleUpdateOrder(updated);
+    setDriverDispatchOrder(null);
+    setAdminDispatchOrder(updated);
+    showToast(`Order #${order.id} assigned to ${driverId} and pushed to Driver App (auto-online)`, 'success');
+  };
+
+  // Re-activate a cancelled order — push it straight to the chosen destination app
+  const handleReactivateOrder = (order: Order, destination: 'driver' | 'customer' | 'store') => {
+    const updated = { ...order, status: (destination === 'store' ? 'Confirmed' : 'Ongoing') as Order['status'] };
+    handleUpdateOrder(updated);
+    if (destination === 'driver') {
+      setAdminDispatchOrder(updated);
+      showToast(`Order #${order.id} re-activated → Driver App (resume delivery).`, 'success');
+    } else if (destination === 'customer') {
+      setCustomerDispatchOrder(updated);
+      showToast(`Order #${order.id} re-activated → Customer App only.`, 'success');
+    } else {
+      showToast(`Order #${order.id} re-activated → Store queue.`, 'success');
+    }
+  };
+
+  // Drivers
+  const handleAddDriver = (driverData: Omit<Driver, 'id' | 'completedOrders' | 'earnings'>) => {    const newId = `DRV123${456 + drivers.length + 1}`;
+    const newDriver: Driver = {
+      ...driverData,
+      id: newId,
+      completedOrders: 0,
+      earnings: 0
+    };
+    setDrivers([...drivers, newDriver]);
+    showToast(`Driver ${driverData.name} registered successfully!`);
+  };
+
+  const handleUpdateDriver = (updatedDriver: Driver) => {
+    setDrivers(drivers.map(d => d.id === updatedDriver.id ? updatedDriver : d));
+    showToast(`Driver profile ${updatedDriver.id} updated.`);
+  };
+
+  const handleDeleteDriver = (id: string) => {
+    setDrivers(drivers.filter(d => d.id !== id));
+    showToast(`Driver ${id} deleted from fleet.`);
+  };
+
+  // Zones
+  const handleAddZone = (zoneData: Omit<Zone, 'id' | 'ordersCount' | 'earnings'>) => {
+    const newId = `Z-${zones.length + 1}`;
+    const newZone: Zone = {
+      ...zoneData,
+      id: newId,
+      ordersCount: 0,
+      earnings: 0,
+      pendingOrders: zoneData.pendingOrders ?? 0,
+      activeDrivers: zoneData.activeDrivers ?? 0,
+      avgDeliveryMin: zoneData.avgDeliveryMin ?? 0,
+      totalKm: zoneData.totalKm ?? 0,
+      coveragePct: zoneData.coveragePct ?? 100,
+      drivers: zoneData.drivers ?? [],
+      deliveryFee: zoneData.deliveryFee ?? 50,
+      minOrder: zoneData.minOrder ?? 100,
+      operatingHours: zoneData.operatingHours ?? '9AM-11PM',
+      peakHourOrders: zoneData.peakHourOrders ?? 0,
+      returnRate: zoneData.returnRate ?? 0,
+      satisfaction: zoneData.satisfaction ?? 90,
+      coords: zoneData.coords
+    };
+    setZones([...zones, newZone]);
+    showToast(`Zone ${zoneData.name} activated.`);
+  };
+
+  const handleUpdateZone = (updatedZone: Zone) => {
+    setZones(zones.map(z => z.id === updatedZone.id ? updatedZone : z));
+    showToast(`Zone ${updatedZone.id} updated.`);
+  };
+
+  const handleDeleteZone = (id: string) => {
+    setZones(zones.filter(z => z.id !== id));
+    showToast(`Zone ${id} deactivated.`);
+  };
+
+  // Users
+  const handleAddUser = (userData: User) => {
+    setUsers([userData, ...users]);
+    showToast(`Account for ${userData.name} configured.`);
+  };
+
+  const handleUpdateUser = (updatedUser: User) => {
+    setUsers(users.map(u => u.phone === updatedUser.phone ? updatedUser : u));
+    showToast(`User ${updatedUser.name} profile adjusted.`);
+  };
+
+  const handleDeleteUser = (phone: string) => {
+    setUsers(users.filter(u => u.phone !== phone));
+    showToast("User account terminated.");
+  };
+
+  // Vehicles
+  const handleAddVehicle = (vehicle: Vehicle) => {
+    setVehicles([...vehicles, vehicle]);
+    showToast(`Vehicle ${vehicle.plateNumber} logged.`);
+  };
+
+  const handleDeleteVehicle = (plateNo: string) => {
+    setVehicles(vehicles.filter(v => v.plateNumber !== plateNo));
+    showToast("Vehicle unlinked.");
+  };
+
+  // Banners
+  const handleAddBanner = (bannerData: Omit<PromotionBanner, 'id'>) => {
+    const newId = `BAN-${banners.length + 1}`;
+    const newBanner: PromotionBanner = {
+      ...bannerData,
+      id: newId
+    };
+    setBanners([...banners, newBanner]);
+    showToast("Promotional banner campaign published.");
+  };
+
+  const handleDeleteBanner = (id: string) => {
+    setBanners(banners.filter(b => b.id !== id));
+    showToast("Banner removed.");
+  };
+
+  // Notifications
+  const handleAddNotification = (notifData: Omit<SystemNotification, 'id' | 'time' | 'read'>) => {
+    const newNotif: SystemNotification = {
+      ...notifData,
+      id: `NOTIF-${notifications.length + 1}`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      read: false
+    };
+    setNotifications([newNotif, ...notifications]);
+  };
+
+  const handleOrderReport = (rep: { orderId: string; reason: string; note: string }) => {
+    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setOrderReports(prev => {
+      const existing = prev.find(r => r.orderId === rep.orderId && r.reason === rep.reason && r.time === timeNow);
+      if (existing) return prev;
+      return [{ orderId: rep.orderId, reason: rep.reason, note: rep.note, time: timeNow }, ...prev];
+    });
+    // Auto-create a linked Support Ticket for this report (only once per order)
+    setSupportTickets(prev => {
+      const linked = prev.some(t => t.subject.includes(`order ${rep.orderId}`) || t.messages.some(m => m.text.includes(rep.orderId)));
+      if (linked) return prev;
+      const order = orders.find(o => o.id === rep.orderId);
+      const newTicket: SupportTicket = {
+        id: `TCK-80${prev.length + 1}`,
+        user: 'Customer',
+        subject: `Report on order ${rep.orderId} — ${rep.reason}`,
+        priority: ((order && order.amount >= 500) || /urgent|not delivered|never came/i.test(rep.reason)) ? 'High' : 'Medium',
+        status: 'Open',
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        messages: [{ sender: 'user', text: `Report on order ${rep.orderId}: ${rep.reason}${rep.note ? ' — ' + rep.note : ''}`, time: timeNow }]
+      };
+      return [newTicket, ...prev];
+    });
+    handleAddNotification({ title: '📢 Customer Report — ' + rep.orderId, message: `${rep.reason}${rep.note ? ' · ' + rep.note : ''}`, type: 'system' });
+  };
+
+  const handleMarkAllNotificationsAsRead = () => {
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
+    showToast("All system alerts cleared.");
+  };
+
+  const handleClearAllNotifications = () => {
+    setNotifications([]);
+    showToast("Notifications center purged.");
+  };
+
+  // Support
+  const handleReplyTicket = (id: string, message: string) => {
+    setSupportTickets(supportTickets.map(t => {
+      if (t.id === id) {
+        return {
+          ...t,
+          status: 'Resolved',
+          replies: [
+            ...t.replies,
+            {
+              sender: 'Support Desk',
+              message,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]
+        };
+      }
+      return t;
+    }));
+    showToast("Reply sent to customer inbox.");
+  };
+
+  const handleUpdateTicketStatus = (id: string, newStatus: SupportTicket['status']) => {
+    setSupportTickets(supportTickets.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    showToast(`Ticket status updated to: ${newStatus}`);
+  };
+
+  // Support Desk refund → mark the order's payment as Refunded in the Payments module
+  const handlePaymentRefund = (orderId: string, amount: number, reason: string) => {
+    setPayments(payments.map(p => p.orderId === orderId ? { ...p, status: 'Refunded' as const } : p));
+    showToast(`Payment for #${orderId} marked Refunded (Tk ${amount.toFixed(2)}) · ${reason}`, 'info');
+  };
+
+  // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
+  const sidebarItems = React.useMemo(() => {
+    const allItems: Array<{ name: string; icon: any; badgeCount?: number; section?: string }> = [
+      // --- DELIVERY SYSTEM MANAGEMENT PANEL (Requested Screenshot) ---
+      { section: 'Delivery System', name: 'Dashboard', icon: LayoutDashboard },
+      { name: 'Mobile App Simulator', icon: Smartphone },
+      { name: 'Users Management', icon: Users, badgeCount: users.length },
+      { name: 'Drivers Management', icon: UserSquare2, badgeCount: drivers.length },
+      { name: 'Orders Management', icon: ClipboardList, badgeCount: orders.length },
+      { name: 'Earnings & Payouts', icon: DollarSign },
+      { name: 'Zones & Areas', icon: MapPin, badgeCount: zones.length },
+      { name: 'Vehicles Management', icon: Truck },
+      { name: 'Promotions & Banners', icon: Megaphone, badgeCount: banners.length },
+
+      // --- PREVIOUS GROCERY STORE & CATALOG ADMIN ---
+      { section: 'Store & Catalog Admin', name: 'Store Dashboard', icon: Store },
+      { name: 'Products', icon: Box, badgeCount: products.length },
+      { name: 'Categories', icon: FolderOpen },
+      { name: 'Inventory', icon: ClipboardList },
+      { name: 'Stores & Merchants', icon: Store, badgeCount: stores.length },
+      { name: 'Staff Management', icon: ShieldCheck },
+      { name: 'Reviews', icon: Star },
+      { name: 'Coupons', icon: Ticket },
+      { name: 'Customer Storefront', icon: Globe },
+
+      // --- SYSTEM OPERATIONS & FINANCE ---
+      { section: 'Finance & System', name: 'Payments', icon: CreditCard },
+      { name: 'MFS Business & Settlement', icon: Wallet },
+      { name: 'POS System', icon: ShoppingCart },
+      { name: 'Support Tickets', icon: LifeBuoy, badgeCount: supportTickets.filter(t => t.status === 'Open').length },
+      { name: 'Notifications', icon: Bell, badgeCount: unreadNotifCount },
+      { name: 'Reports & Analytics', icon: BarChart3 },
+      { name: 'Settings', icon: Settings },
+    ];
+
+    if (activePanelMode === 'super_admin') {
+      return allItems;
+    } else if (activePanelMode === 'delivery') {
+      return allItems.filter(item => 
+        [
+          'Dashboard', 'Mobile App Simulator', 'Users Management', 'Drivers Management', 'Orders Management', 
+          'Earnings & Payouts', 'Zones & Areas', 'Vehicles Management', 'Promotions & Banners',
+          'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'Settings'
+        ].includes(item.name)
+      ).map((item) => {
+        if (item.name === 'Dashboard') {
+          return { ...item, section: 'Delivery System' };
+        }
+        if (item.name === 'Payments') {
+          return { ...item, section: 'Finance & System' };
+        }
+        return { ...item, section: item.section };
+      });
+    } else if (activePanelMode === 'store') {
+      return allItems.filter(item => 
+        [
+          'Store Dashboard', 'Products', 'Categories', 'Inventory', 
+          'Stores & Merchants', 'Staff Management', 'Reviews', 'Coupons', 'Customer Storefront',
+          'Payments', 'MFS Business & Settlement', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'Settings'
+        ].includes(item.name)
+      ).map((item) => {
+        if (item.name === 'Store Dashboard') {
+          return { ...item, section: 'Store & Catalog Admin' };
+        }
+        if (item.name === 'Payments') {
+          return { ...item, section: 'Finance & System' };
+        }
+        return { ...item, section: item.section };
+      });
+    }
+
+    return allItems;
+  }, [
+    activePanelMode,
+    users.length,
+    drivers.length,
+    orders.length,
+    zones.length,
+    banners.length,
+    products.length,
+    categories.length,
+    stores.length,
+    supportTickets,
+    unreadNotifCount
+  ]);
+
+  // Quick Action Forms submit helper
+  const handleQuickActionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget as HTMLFormElement);
+    if (quickActionModal === 'driver') {
+      handleAddDriver({
+        name: fd.get('name') as string,
+        phone: fd.get('phone') as string,
+        vehicleType: fd.get('vehicleType') as string,
+        rating: 5.0,
+        status: 'Online'
+      });
+    } else if (quickActionModal === 'user') {
+      handleAddUser({
+        id: `USR-${Math.floor(Math.random() * 9000) + 1000}`,
+        name: fd.get('name') as string,
+        email: fd.get('email') as string,
+        phone: fd.get('phone') as string,
+        role: fd.get('role') as any,
+        status: 'Active',
+        joinDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        ordersCount: 0
+      });
+    } else if (quickActionModal === 'zone') {
+      handleAddZone({
+        name: fd.get('name') as string,
+        status: 'Active'
+      });
+    } else if (quickActionModal === 'notification') {
+      handleAddNotification({
+        title: fd.get('title') as string,
+        message: fd.get('message') as string,
+        type: 'system'
+      });
+    } else if (quickActionModal === 'banner') {
+      handleAddBanner({
+        title: fd.get('title') as string,
+        subtitle: fd.get('subtitle') as string,
+        status: 'Active',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        clicks: 0
+      });
+    }
+    setQuickActionModal(null);
+  };
+
+  // Custom Interactive Renderer for newly requested sidebar items to keep app 100% functional
+  const renderGenericView = (tabName: string) => {
+    switch (tabName) {
+      case 'Products':
+        return (
+          <div className="space-y-6 fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Product Inventory</h3>
+                <p className="text-xs text-gray-400">Add, track, and modify active groceries catalog items</p>
+              </div>
+              <button 
+                onClick={() => showToast("Product addition wizard is locked under sandbox mode.", "info")}
+                className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                + Add Product
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Products</span>
+                <div className="text-2xl font-black text-white mt-1">{products.length}</div>
+              </div>
+              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Active Catalog Categories</span>
+                <div className="text-2xl font-black text-brand-orange mt-1">6 Categories</div>
+              </div>
+              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Low Stock Warnings</span>
+                <div className="text-2xl font-black text-red-400 mt-1">
+                  {products.filter(p => p.stock <= 10).length} Items
+                </div>
+              </div>
+            </div>
+            <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">ID</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Product Name</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Category</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Stock Level</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Unit Price</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-border/40">
+                  {products.map(p => (
+                    <tr key={p.id} className="hover:bg-brand-dark/10 transition-colors">
+                      <td className="py-3 px-4 font-mono text-gray-400 font-bold">#{p.id}</td>
+                      <td className="py-3 px-4 font-bold text-white">{p.name}</td>
+                      <td className="py-3 px-4 text-gray-300 font-semibold">{p.category}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-gray-300">{p.stock} Units</td>
+                      <td className="py-3 px-4 font-bold text-brand-orange">৳ {p.price}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          p.status === 'In Stock' ? 'bg-emerald-500/10 text-emerald-400' :
+                          p.status === 'Low Stock' ? 'bg-orange-500/10 text-orange-400' :
+                          'bg-red-500/10 text-red-400'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+      case 'Categories':
+        return (
+          <div className="space-y-6 fade-in">
+            <div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider">Departmental Categories</h3>
+              <p className="text-xs text-gray-400">Configure supermarket categories, grocery slots, and sub-sections</p>
+            </div>
+            <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Category Code</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Category Title</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Active Item Count</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-border/40">
+                  {categories.map(c => (
+                    <tr key={c.id} className="hover:bg-brand-dark/10 transition-colors">
+                      <td className="py-3 px-4 font-mono text-gray-400 font-bold">#{c.id}</td>
+                      <td className="py-3 px-4 font-bold text-white">{c.name}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-gray-300">{c.itemsCount} SKUs</td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase">
+                          {c.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+      case 'Stores': {
+        const handleCreateStore = (e: React.FormEvent) => {
+          e.preventDefault();
+          if (!newStoreName || !newStoreAddress) {
+            showToast("Please fill in all fields", "info");
+            return;
+          }
+          
+          const newId = `STR-0${stores.length + 1}`;
+          const newStore = {
+            id: newId,
+            name: newStoreName,
+            address: newStoreAddress,
+            rating: 5.0,
+            orders: 0,
+            status: 'Active'
+          };
+          
+          setStores([...stores, newStore]);
+          setNewStoreName('');
+          setNewStoreAddress('');
+          setIsAddingStore(false);
+          showToast(`Store "${newStore.name}" registered successfully!`, "success");
+        };
+
+        return (
+          <div className="space-y-6 fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Partner Outlets</h3>
+                <p className="text-xs text-gray-400">Registered grocery chains and store locations in coverage areas</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => setActiveTab('Customer Site')}
+                  className="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer transition-all shadow-md"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>Launch Customer Site</span>
+                </button>
+                <button 
+                  onClick={() => setIsAddingStore(!isAddingStore)}
+                  className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer transition-all self-start"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isAddingStore ? "Cancel Registration" : "Register New Store"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Register New Store Form */}
+            {isAddingStore && (
+              <form onSubmit={handleCreateStore} className="bg-brand-card border border-brand-border/85 rounded-xl p-5 space-y-4 max-w-xl animate-in slide-in-from-top-4 duration-200">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider border-b border-brand-border/40 pb-2">Register Partner Outlet</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Store Outlet Name</label>
+                    <input 
+                      type="text"
+                      required
+                      value={newStoreName}
+                      onChange={(e) => setNewStoreName(e.target.value)}
+                      className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange/50" 
+                      placeholder="e.g. Agora Superstore, Shwapno Dhanmondi" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Store Address / Area Location</label>
+                    <input 
+                      type="text"
+                      required
+                      value={newStoreAddress}
+                      onChange={(e) => setNewStoreAddress(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#080e17] text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange/50" 
+                      placeholder="e.g. Road 12, Banani, Dhaka" 
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingStore(false)}
+                    className="px-3 py-2 bg-brand-dark border border-brand-border hover:bg-brand-border/30 text-gray-300 rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    Register & Generate Link
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {stores.map(s => {
+                const dashboardUrl = `${window.location.origin}${window.location.pathname}?storeId=${s.id}`;
+                return (
+                  <div key={s.id} className="bg-brand-card border border-brand-border rounded-xl p-5 flex flex-col justify-between shadow-lg hover:border-brand-border-hover transition-all">
+                    <div>
+                      <div className="flex items-center justify-between border-b border-brand-border/35 pb-2.5 mb-3">
+                        <div className="flex items-center space-x-2">
+                          <Store className="w-4 h-4 text-brand-orange" />
+                          <span className="font-bold text-white text-sm">{s.name}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase border border-emerald-500/10">
+                          {s.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 font-medium mb-3">{s.address}</p>
+
+                      {/* URL Block for Merchant Entrance */}
+                      <div className="bg-[#080e17] border border-brand-border/40 rounded-lg p-2.5 mb-4">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[9px] text-brand-orange font-bold uppercase tracking-wider flex items-center space-x-1">
+                            <Link className="w-2.5 h-2.5 mr-0.5" />
+                            Merchant Dashboard Link
+                          </span>
+                          <span className="text-[9px] text-gray-500 font-bold uppercase">ID: {s.id}</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5">
+                          <input 
+                            type="text" 
+                            readOnly 
+                            value={dashboardUrl}
+                            className="flex-1 bg-[#0c1624] px-2 py-1 text-[10px] font-mono text-gray-300 rounded border border-brand-border/30 select-all outline-none"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(dashboardUrl);
+                              showToast(`Link copied for ${s.name}`, "success");
+                            }}
+                            className="p-1.5 bg-brand-dark hover:bg-brand-orange/10 border border-brand-border hover:border-brand-orange/30 text-gray-400 hover:text-brand-orange rounded cursor-pointer transition-all"
+                            title="Copy Merchant Link"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center border-t border-brand-border/40 pt-3.5 text-xs">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-gray-400 text-[11px]">Rating: <b className="text-white">⭐ {s.rating}</b></span>
+                        <span className="text-gray-400 text-[11px]">Orders: <b className="text-brand-orange">{s.orders}</b></span>
+                      </div>
+                      <button
+                        onClick={() => handleLaunchStore(s.id)}
+                        className="flex items-center space-x-1 px-3 py-1.5 bg-brand-orange/10 border border-brand-orange/30 hover:bg-brand-orange/20 text-brand-orange hover:text-white rounded text-[11px] font-bold transition-all cursor-pointer"
+                      >
+                        <span>Enter Dashboard</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      case 'Customer Site':
+        return (
+          <CustomerStorefront
+            stores={stores}
+            products={products}
+            orders={orders}
+            liveDrivers={liveDrivers}
+        onAddOrder={handleAddOrder}
+        onUpdateOrder={handleUpdateOrder}
+        onSilentUpdateOrder={handleSilentUpdateOrder}
+        onReturnToAdmin={() => setActiveTab('Dashboard')}
+        onLaunchMerchantStore={handleLaunchStore}
+        onReport={handleOrderReport}
+        showToast={showToast}
+      />
+        );
+
+      case 'Inventory':
+        return <InventoryView onAddNotification={handleAddNotification} showToast={showToast} products={products} onProductsChange={setProducts} />;
+
+      case 'Coupons':
+        return (
+          <div className="space-y-6 fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Coupon Campaigns</h3>
+                <p className="text-xs text-gray-400">Configure promotional discounts and code triggers</p>
+              </div>
+              <button 
+                onClick={() => showToast("Coupon additions are locked in demo sandbox.", "info")}
+                className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                + Create Promo Code
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {coupons.map(c => (
+                <div key={c.id} className="bg-brand-card border border-brand-border rounded-xl p-5 relative overflow-hidden">
+                  <div className="absolute right-0 top-0 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase px-2.5 py-1 rounded-bl">
+                    Active
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">CODE</span>
+                  <div className="text-xl font-black text-white mt-1 font-mono tracking-wider">{c.code}</div>
+                  <div className="text-xs text-brand-orange font-bold mt-2">{c.discount}</div>
+                  <div className="text-xs text-gray-400 mt-1">Min. Purchase: ৳ {c.minOrder}</div>
+                  <div className="border-t border-brand-border/40 mt-3 pt-2 text-[10px] text-gray-500 font-bold">
+                    TOTAL USAGES: {c.usages}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'Reports':
+        return (
+          <div className="space-y-6 fade-in">
+            <div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider">Logistics & Performance Reports</h3>
+              <p className="text-xs text-gray-400">Download system data summaries, driver audit logs, and gross earnings reports</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-brand-card p-5 border border-brand-border rounded-xl flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-white text-sm">Monthly Driver Payout Log</h4>
+                  <p className="text-xs text-gray-400 mt-1">Summary of earnings and commissions for May 2024</p>
+                </div>
+                <button 
+                  onClick={() => showToast("Exporting payout report PDF...", "success")}
+                  className="p-2 bg-brand-dark hover:bg-brand-orange/10 border border-brand-border rounded text-brand-orange cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="bg-brand-card p-5 border border-brand-border rounded-xl flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-white text-sm">Fulfillment Center Delivery Audit</h4>
+                  <p className="text-xs text-gray-400 mt-1">Order completion, cancellation ratios, and latency graphs</p>
+                </div>
+                <button 
+                  onClick={() => showToast("Exporting CSV report...", "success")}
+                  className="p-2 bg-brand-dark hover:bg-brand-orange/10 border border-brand-border rounded text-brand-orange cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Staff Management':
+        return (
+          <div className="space-y-6 fade-in">
+            <div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider">Supermarket & Dispatch Staff</h3>
+              <p className="text-xs text-gray-400">Authorized personnel managing logistics and partner portals</p>
+            </div>
+            <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Staff ID</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Full Name</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Assigned Role</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Shift Profile</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">System Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-border/40">
+                  {staff.map(s => (
+                    <tr key={s.id} className="hover:bg-brand-dark/10 transition-colors">
+                      <td className="py-3 px-4 font-mono text-gray-400 font-bold">#{s.id}</td>
+                      <td className="py-3 px-4 font-bold text-white">{s.name}</td>
+                      <td className="py-3 px-4 text-brand-orange font-semibold">{s.role}</td>
+                      <td className="py-3 px-4 text-gray-300">{s.shift}</td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase">
+                          {s.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+      case 'Reviews':
+        return (
+          <div className="space-y-6 fade-in">
+            <div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider">Customer Experience Reviews</h3>
+              <p className="text-xs text-gray-400">Post-delivery rating audits and feedback comments</p>
+            </div>
+            <div className="space-y-3">
+              {reviews.map(r => (
+                <div key={r.id} className="bg-brand-card border border-brand-border rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-white text-xs">{r.customer}</span>
+                      <span className="text-[10px] text-gray-500 ml-2">{r.date}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: r.rating }).map((_, idx) => (
+                        <Star key={idx} className="w-3 h-3 text-brand-orange fill-brand-orange" />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-400 font-bold mt-1">Target: <span className="text-brand-orange">{r.item}</span></div>
+                  <p className="text-xs text-gray-300 mt-2 leading-relaxed">"{r.comment}"</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'Vehicles Management':
+      case 'Vehicles':
+        return (
+          <div className="space-y-6 fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Fleet & Vehicles Management</h3>
+                <p className="text-xs text-gray-400">Registered delivery transport units assigned to active drivers</p>
+              </div>
+              <button 
+                onClick={() => showToast("Vehicle registered to logistics fleet!", "success")}
+                className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer shadow-md"
+              >
+                + Register New Vehicle
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Motorcycles</span>
+                <div className="text-2xl font-black text-white mt-1">12 Units</div>
+                <span className="text-[10px] text-emerald-400 font-semibold">10 On Delivery Route</span>
+              </div>
+              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Bicycles / E-Bikes</span>
+                <div className="text-2xl font-black text-brand-orange mt-1">8 Units</div>
+                <span className="text-[10px] text-emerald-400 font-semibold">7 Active</span>
+              </div>
+              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">CNG Auto Rickshaws</span>
+                <div className="text-2xl font-black text-white mt-1">5 Units</div>
+                <span className="text-[10px] text-gray-400 font-semibold">Bulk Grocery Express</span>
+              </div>
+              <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Mini Covered Vans</span>
+                <div className="text-2xl font-black text-emerald-400 mt-1">3 Units</div>
+                <span className="text-[10px] text-emerald-400 font-semibold">Inter-Zone Supply</span>
+              </div>
+            </div>
+            <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Vehicle ID</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Type & Model</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Plate / Reg No</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Assigned Driver</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-border/40">
+                  {drivers.map((d, i) => (
+                    <tr key={d.id} className="hover:bg-brand-dark/10 transition-colors">
+                      <td className="py-3 px-4 font-mono text-gray-400 font-bold">#VEC-00{i + 1}</td>
+                      <td className="py-3 px-4 font-bold text-white">{d.vehicleType || "Honda CB Shine 125"}</td>
+                      <td className="py-3 px-4 font-mono text-gray-300 font-semibold">DHAKA-METRO-HA-{1020 + i}</td>
+                      <td className="py-3 px-4 text-brand-orange font-bold">{d.name}</td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase">
+                          {d.status === 'Online' ? 'Active' : 'Standby'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+      case 'Earnings & Payouts':
+      case 'Earnings':
+        return (
+          <div className="space-y-6 fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Earnings & Driver Payouts</h3>
+                <p className="text-xs text-gray-400">Platform revenue balance, store merchant commissions, and courier payouts</p>
+              </div>
+              <button 
+                onClick={() => showToast("Dispatched payout batch to bKash Merchant API!", "success")}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer shadow-md"
+              >
+                Trigger Bulk Payout (bKash/Nagad)
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Gross Platform Revenue</span>
+                <div className="text-2xl font-black text-white mt-1">৳ 125,430.00</div>
+                <span className="text-[10px] text-emerald-400 font-bold">+18.6% vs last week</span>
+              </div>
+              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Driver Earnings Dispatched</span>
+                <div className="text-2xl font-black text-brand-orange mt-1">৳ 68,200.00</div>
+                <span className="text-[10px] text-gray-400 font-semibold">Weekly cycle cleared</span>
+              </div>
+              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Pending Payout Reserves</span>
+                <div className="text-2xl font-black text-emerald-400 mt-1">৳ 14,850.00</div>
+                <span className="text-[10px] text-emerald-400 font-semibold">Ready for Friday batch</span>
+              </div>
+            </div>
+            <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Recipient Driver</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Completed Deliveries</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Net Earnings</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Payout Method</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Payout Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-border/40">
+                  {drivers.map(d => (
+                    <tr key={d.id} className="hover:bg-brand-dark/10 transition-colors">
+                      <td className="py-3 px-4 font-bold text-white">{d.name} <span className="text-[10px] text-gray-500 font-mono">({d.id})</span></td>
+                      <td className="py-3 px-4 font-mono font-bold text-gray-300">{d.rating > 4.5 ? '68 Deliveries' : '45 Deliveries'}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-brand-orange">৳ {(d.rating * 2400).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-gray-300 font-semibold">bKash Personal</td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase">
+                          Cleared
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+      case 'Promotions & Banners':
+      case 'Banners':
+        return (
+          <div className="space-y-6 fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Promotions & Promotional Banners</h3>
+                <p className="text-xs text-gray-400">Manage home banner carousel, discounts, and customer pushes</p>
+              </div>
+              <button 
+                onClick={() => showToast("Banner campaign uploaded and live on mobile apps!", "success")}
+                className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                + Add Promotional Banner
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {banners.map(b => (
+                <div key={b.id} className="bg-brand-card border border-brand-border rounded-xl p-5 space-y-3 relative">
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono text-[10px] text-brand-orange font-bold uppercase">#{b.id}</span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase">
+                      {b.status}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-black text-white">{b.title}</h4>
+                  <p className="text-xs text-gray-400">{b.subtitle}</p>
+                  <div className="flex items-center justify-between border-t border-brand-border/40 pt-3 text-[11px]">
+                    <span className="text-gray-400">Total Banner Clicks: <b className="text-brand-orange">{b.clicks}</b></span>
+                    <span className="text-gray-500">Expires: {b.endDate}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'Notifications':
+        return (
+          <div className="space-y-6 fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Broadcast System Notifications</h3>
+                <p className="text-xs text-gray-400">Dispatch push alerts to drivers, clients, and store managers</p>
+              </div>
+              <button 
+                onClick={() => showToast("Push notification transmitted to 1,240 active app users!", "success")}
+                className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                + Broadcast Push Alert
+              </button>
+            </div>
+            <div className="space-y-3">
+              {notifications.map(n => (
+                <div key={n.id} className="bg-brand-card border border-brand-border rounded-xl p-4 flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-white text-xs">{n.title}</span>
+                      <span className="text-[10px] text-gray-500 font-mono">{n.time}</span>
+                    </div>
+                    <p className="text-xs text-gray-300 mt-1">{n.message}</p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase shrink-0 ${
+                    n.read ? 'bg-gray-800 text-gray-400' : 'bg-brand-orange/20 text-brand-orange'
+                  }`}>
+                    {n.read ? 'Read' : 'Unread'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'Reports & Analytics':
+        return (
+          <div className="space-y-6 fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Reports & Analytics</h3>
+                <p className="text-xs text-gray-400">Platform performance metrics, order latency, and financial exports</p>
+              </div>
+              <button 
+                onClick={() => showToast("Full platform audit report downloaded!", "success")}
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export System Audit (CSV)</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Average Delivery Latency</span>
+                <div className="text-2xl font-black text-emerald-400 mt-1">24.5 Mins</div>
+                <span className="text-[10px] text-emerald-400 font-semibold">-3.2 mins vs target</span>
+              </div>
+              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Customer Fulfillment Rate</span>
+                <div className="text-2xl font-black text-white mt-1">98.5%</div>
+                <span className="text-[10px] text-emerald-400 font-semibold">1,248 total orders</span>
+              </div>
+              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Active Coverage Zones</span>
+                <div className="text-2xl font-black text-brand-orange mt-1">5 Areas</div>
+                <span className="text-[10px] text-gray-400 font-semibold">Dhanmondi, Gulshan, Uttara, Mirpur, Banani</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Marketing':
+        return (
+          <div className="space-y-6 fade-in">
+            <div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider">Marketing Campaigns</h3>
+              <p className="text-xs text-gray-400">Promotions, banner ads, bKash/Nagad campaigns, and analytics</p>
+            </div>
+            <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">ID</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Campaign Name</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Platform/Channel</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Budget Assigned</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Engagement clicks</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-border/40">
+                  {marketing.map(m => (
+                    <tr key={m.id} className="hover:bg-brand-dark/10 transition-colors">
+                      <td className="py-3 px-4 font-mono text-gray-400 font-bold">#{m.id}</td>
+                      <td className="py-3 px-4 font-bold text-white">{m.title}</td>
+                      <td className="py-3 px-4 text-gray-300 font-semibold">{m.channel}</td>
+                      <td className="py-3 px-4 font-mono text-white font-bold">৳ {m.budget}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-brand-orange">{m.clicks} Clicks</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          m.status === 'Running' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-orange-500/10 text-orange-400'
+                        }`}>
+                          {m.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="py-20 text-center text-gray-500">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Module Active</h3>
+            <p className="text-xs mt-1">The NexaGo BD active module: {tabName}</p>
+          </div>
+        );
+    }
+  };
+
+  if (selectedStoreId) {
+    const activeStore = stores.find(s => s.id === selectedStoreId) || stores[0];
+    const storeOrders = orders.filter(o => o.storeName.toLowerCase() === activeStore.name.toLowerCase());
+    
+    // Merchant Side Navigation Options
+    const merchantSidebarItems = [
+      { name: 'Dashboard', icon: LayoutDashboard },
+      { name: 'Orders', icon: ShoppingCart, badgeCount: storeOrders.length },
+      { name: 'Scan Order', icon: Camera },
+      { name: 'Products', icon: Box },
+      { name: 'Categories', icon: FolderOpen },
+      { name: 'Customers', icon: Users },
+      { name: 'Reviews', icon: Star },
+      { name: 'Coupons', icon: Ticket },
+      { name: 'Inventory', icon: ClipboardList },
+      { name: 'Staff', icon: UserSquare2 },
+      { name: 'Payments', icon: CreditCard },
+      { name: 'Reports', icon: BarChart3 },
+      { name: 'Settings', icon: Settings },
+      { name: 'Store Profile', icon: Store },
+      { name: 'Marketing', icon: Megaphone },
+      { name: 'Support Tickets', icon: LifeBuoy },
+    ];
+
+    // Derived statistics and values for current merchant context
+    const currentProducts = products.filter(p => p.id !== ''); // Allow full list for demo or mock
+    const storeCategories = categories;
+    const storeStaff = staff;
+    const storeCoupons = coupons;
+    const storeReviews = reviews.filter(r => r.item.toLowerCase().includes(activeStore.name.toLowerCase()) || r.item.toLowerCase().includes('fresh mart'));
+
+    // Handle Order status transition from within Merchant Panel
+    const updateMerchantOrderStatus = (orderId: string, newStatus: 'Completed' | 'Ongoing' | 'Cancelled') => {
+      setOrders(prevOrders => 
+        prevOrders.map(o => o.id === orderId ? { ...o, status: newStatus } : o)
+      );
+      showToast(`Order #${orderId} set to ${newStatus}`, "success");
+    };
+
+    // Handle Creating custom product inside Merchant Context
+    const handleMerchantAddProduct = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!mProdName || !mProdPrice || !mProdStock) {
+        showToast("Please fill all product fields", "info");
+        return;
+      }
+      const newProd = {
+        id: `PROD-${100 + products.length + 1}`,
+        name: mProdName,
+        category: mProdCat,
+        stock: parseInt(mProdStock) || 0,
+        price: parseFloat(mProdPrice) || 0,
+        status: parseInt(mProdStock) > 10 ? 'In Stock' : (parseInt(mProdStock) > 0 ? 'Low Stock' : 'Out of Stock')
+      };
+      setProducts([...products, newProd]);
+      setMProdName('');
+      setMProdPrice('');
+      setMProdStock('');
+      showToast(`Product "${newProd.name}" added to inventory!`, "success");
+    };
+
+    // Handle Adding category
+    const handleMerchantAddCategory = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!mCatName) return;
+      const newCat = {
+        id: `CAT-0${categories.length + 1}`,
+        name: mCatName,
+        itemsCount: 0,
+        status: 'Active'
+      };
+      setCategories([...categories, newCat]);
+      setMCatName('');
+      showToast(`Category "${newCat.name}" launched!`, "success");
+    };
+
+    // Handle Adding coupon
+    const handleMerchantAddCoupon = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!mCouponCode || !mCouponDiscount) return;
+      const newCpn = {
+        id: `CPN-0${coupons.length + 1}`,
+        code: mCouponCode.toUpperCase(),
+        discount: mCouponDiscount,
+        minOrder: parseInt(mCouponMinOrder) || 0,
+        usages: 0,
+        status: 'Active'
+      };
+      setCoupons([...coupons, newCpn]);
+      setMCouponCode('');
+      setMCouponDiscount('');
+      setMCouponMinOrder('');
+      showToast(`Promo coupon "${newCpn.code}" is now active!`, "success");
+    };
+
+    // Handle Hiring new staff
+    const handleMerchantAddStaff = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!mStaffName) return;
+      const newStf = {
+        id: `STF-0${staff.length + 1}`,
+        name: mStaffName,
+        role: mStaffRole,
+        shift: mStaffShift,
+        status: 'Active'
+      };
+      setStaff([...staff, newStf]);
+      setMStaffName('');
+      showToast(`Staff member "${newStf.name}" onboarded successfully!`, "success");
+    };
+
+    // Handle Creating support ticket
+    const handleMerchantAddTicket = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!mTicketSubject || !mTicketMsg) return;
+      const newTicket: SupportTicket = {
+        id: `TCK-80${supportTickets.length + 1}`,
+        user: activeStore.name,
+        subject: mTicketSubject,
+        priority: mTicketPriority as 'Low' | 'Medium' | 'High',
+        status: 'Open',
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        messages: [{ sender: 'user', text: mTicketMsg, time: 'Just Now' }]
+      };
+      setSupportTickets([newTicket, ...supportTickets]);
+      setMTicketSubject('');
+      setMTicketMsg('');
+      showToast("Support ticket registered with platform admin", "success");
+    };
+
+    // Handle editing and saving store profile
+    const handleMerchantSaveProfile = (e: React.FormEvent) => {
+      e.preventDefault();
+      const updatedStores = stores.map(s => {
+        if (s.id === activeStore.id) {
+          return {
+            ...s,
+            name: activeStore.name,
+            address: activeStore.address,
+            category: activeStore.category || "Restaurant",
+            status: activeStore.status
+          };
+        }
+        return s;
+      });
+      setStores(updatedStores);
+      showToast("Store settings saved in cloud db!", "success");
+    };
+
+    // Payout tracker calculations
+    const totalEarnings = storeOrders.reduce((sum, o) => sum + o.amount, 0);
+    const unpaidBalance = totalEarnings * 0.95; // 5% marketplace commission
+
+    const handlePayoutRequest = () => {
+      showToast(`Processing bank payout of ৳ ${unpaidBalance.toFixed(2)} to merchant account...`, "info");
+      setTimeout(() => {
+        showToast("Payout successfully transferred to bank account!", "success");
+      }, 1500);
+    };
+
+    // Custom filtered views
+    const renderMerchantTabContent = () => {
+      const searchLower = merchantSearchQuery.toLowerCase();
+      
+      switch (activeMerchantTab) {
+        case 'Dashboard':
+          return (
+            <div className="space-y-6">
+              {/* URL Alert Block */}
+              <div className="bg-[#0c1624]/40 border border-brand-border/60 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-inner animate-in fade-in duration-200">
+                <div className="text-xs">
+                  <span className="text-gray-400 font-medium">Merchant Dashboard Access Link:</span>
+                  <span className="font-mono text-brand-orange ml-2 font-bold select-all bg-brand-dark/60 px-2.5 py-1 rounded border border-brand-border/40">
+                    {window.location.origin}?storeId={activeStore.id}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}?storeId=${activeStore.id}`);
+                    showToast("Dashboard Link Copied!", "success");
+                  }}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-brand-orange/10 border border-brand-orange/35 hover:bg-brand-orange/20 text-brand-orange rounded text-xs font-bold transition-all cursor-pointer"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Copy Link</span>
+                </button>
+              </div>
+
+              <StoreDashboardView 
+                orders={storeOrders} 
+                onNavigate={(tab) => {
+                  const mapped = merchantSidebarItems.find(item => item.name.toLowerCase() === tab.toLowerCase());
+                  if (mapped) setActiveMerchantTab(mapped.name);
+                }}
+                productsCount={products.filter(p => p.category !== '').length}
+                categoriesCount={categories.length}
+                customersCount={storeOrders.length + 3}
+                reviewsCount={storeReviews.length}
+                isTightMode={isTightMode}
+              />
+            </div>
+          );
+
+        case 'Scan Order':
+          return (
+            <div className="space-y-5 fade-in">
+              <ScanOrderModule 
+                orders={storeOrders} 
+                onUpdateOrderStatus={updateMerchantOrderStatus}
+                onPrintReceipt={(ord) => setPrintingReceiptOrder(ord)}
+              />
+            </div>
+          );
+
+        case 'Orders': {
+          const filteredOrders = storeOrders.filter(o => 
+            o.id.toLowerCase().includes(searchLower) ||
+            o.customerName.toLowerCase().includes(searchLower)
+          );
+
+          return (
+            <div className="space-y-5 fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Merchant Orders Fulfillment</h3>
+                  <p className="text-[11px] text-gray-400">Incoming, packing and dispatch logistics for your outlet</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setIsOrderScannerOpen(!isOrderScannerOpen)}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center space-x-2 border shadow-md ${
+                      isOrderScannerOpen
+                        ? 'bg-brand-orange text-white border-brand-orange shadow-brand-orange/20 ring-2 ring-brand-orange/40'
+                        : 'bg-brand-orange/15 hover:bg-brand-orange border-brand-orange/40 hover:border-brand-orange text-brand-orange hover:text-white'
+                    }`}
+                  >
+                    <Camera className="w-4 h-4 animate-pulse" />
+                    <span>{isOrderScannerOpen ? 'Hide Order Scanner' : 'Scan Order (Camera)'}</span>
+                  </button>
+
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input 
+                      type="text" 
+                      placeholder="Search Order ID / Client..." 
+                      value={merchantSearchQuery}
+                      onChange={(e) => setMerchantSearchQuery(e.target.value)}
+                      className="w-48 sm:w-56 bg-brand-card border border-brand-border text-xs px-9 py-2 rounded-lg outline-none text-white focus:border-brand-orange"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* CAMERA SCAN ORDER MODULE */}
+              {isOrderScannerOpen && (
+                <ScanOrderModule 
+                  orders={storeOrders} 
+                  onUpdateOrderStatus={updateMerchantOrderStatus}
+                  onPrintReceipt={(ord) => setPrintingReceiptOrder(ord)}
+                  onClose={() => setIsOrderScannerOpen(false)}
+                />
+              )}
+
+              {/* Layout splits into List & Details if selected */}
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                <div className="xl:col-span-2 bg-[#0c1624]/60 border border-brand-border/60 rounded-xl overflow-hidden shadow-lg">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-brand-border/50 bg-[#0c1624] text-gray-400 text-[10px] font-black uppercase tracking-wider">
+                        <th className="py-3 px-4">Order Code</th>
+                        <th className="py-3 px-4">Client Name</th>
+                        <th className="py-3 px-4">Total Price</th>
+                        <th className="py-3 px-4">Timeline</th>
+                        <th className="py-3 px-4">Logistics Status</th>
+                        <th className="py-3 px-4 text-right">Fulfillment</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brand-border/30 text-xs">
+                      {filteredOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center py-10 text-gray-500 font-medium">No active orders found matching query</td>
+                        </tr>
+                      ) : (
+                        filteredOrders.map(o => (
+                          <tr 
+                            key={o.id} 
+                            onClick={() => setMSelectedOrder(o)}
+                            className={`hover:bg-brand-orange/5 transition-colors cursor-pointer ${mSelectedOrder?.id === o.id ? 'bg-brand-orange/10 border-l-2 border-brand-orange' : ''}`}
+                          >
+                            <td className="py-3.5 px-4 font-mono font-bold text-gray-400">#{o.id}</td>
+                            <td className="py-3.5 px-4 font-bold text-white">{o.customerName}</td>
+                            <td className="py-3.5 px-4 font-mono text-brand-orange font-bold">৳ {o.amount.toLocaleString()}</td>
+                            <td className="py-3.5 px-4 text-gray-400 font-medium">{o.time || "09:30 AM"}</td>
+                            <td className="py-3.5 px-4">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                                o.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                o.status === 'Ongoing' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                'bg-red-500/10 text-red-400 border border-red-500/20'
+                              }`}>
+                                {o.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right space-x-1.5" onClick={e => e.stopPropagation()}>
+                              <button 
+                                onClick={() => updateMerchantOrderStatus(o.id, 'Completed')}
+                                className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded text-[10px] font-bold cursor-pointer transition-all"
+                                title="Fulfill Order"
+                              >
+                                Fulfill
+                              </button>
+                              <button 
+                                onClick={() => updateMerchantOrderStatus(o.id, 'Ongoing')}
+                                className="px-2 py-1 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded text-[10px] font-bold cursor-pointer transition-all"
+                                title="Mark Preparing"
+                              >
+                                Prepare
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Selected Order Detail Sidebar */}
+                <div className="bg-[#0c1624]/80 border border-brand-border/60 rounded-xl p-5 space-y-4 shadow-xl">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-brand-border/40 pb-3">
+                    Order Inspection Box
+                  </h4>
+                  {mSelectedOrder ? (
+                    <div className="space-y-4 text-xs">
+                      <div className="flex justify-between items-center bg-brand-dark/40 p-2.5 rounded-lg border border-brand-border/30">
+                        <span className="font-mono font-bold text-gray-300">Code: #{mSelectedOrder.id}</span>
+                        <span className="text-[10px] text-brand-orange font-bold">{mSelectedOrder.date}</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Client & Dispatch Details</p>
+                        <div className="bg-brand-dark/20 p-3 rounded-lg border border-brand-border/20 space-y-1">
+                          <p className="font-bold text-white text-sm">{mSelectedOrder.customerName}</p>
+                          <p className="text-gray-400 font-semibold">{mSelectedOrder.address || "Dhanmondi, Road 8A, Dhaka"}</p>
+                          <p className="text-gray-500 font-mono text-[10px]">Method: {mSelectedOrder.paymentMethod || "bKash Digital"}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Requested Cart Items</p>
+                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                          {products.slice(0, 3).map((prod, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-brand-dark/30 px-3 py-2 rounded-md border border-brand-border/20">
+                              <div>
+                                <p className="font-bold text-white text-[11px]">{prod.name}</p>
+                                <p className="text-[9px] text-gray-500 font-mono">Qty: {1 + idx} • {prod.category}</p>
+                              </div>
+                              <span className="font-mono font-bold text-brand-orange text-[11px]">৳ {(prod.price * (1+idx)).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center border-t border-brand-border/30 pt-3 text-sm font-bold text-white">
+                        <span>Fulfillment Value:</span>
+                        <span className="text-lg text-brand-orange">৳ {mSelectedOrder.amount.toLocaleString()}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-1.5">
+                        <button
+                          onClick={() => updateMerchantOrderStatus(mSelectedOrder.id, 'Completed')}
+                          className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                        >
+                          Fulfill Complete
+                        </button>
+                        <button
+                          onClick={() => updateMerchantOrderStatus(mSelectedOrder.id, 'Cancelled')}
+                          className="w-full py-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                        >
+                          Cancel order
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => setPrintingReceiptOrder(mSelectedOrder)}
+                        className="w-full py-2.5 bg-brand-dark hover:bg-brand-border/40 border border-brand-border text-gray-200 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-2 mt-2 cursor-pointer shadow-md"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-brand-orange animate-pulse" />
+                        <span>Print Invoice Receipt</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-16 text-gray-500 space-y-2">
+                      <ShoppingCart className="w-10 h-10 text-brand-border mx-auto opacity-30" />
+                      <p className="font-medium text-xs">Select any order from list to inspect cart details, customer address and update logistics logs.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        case 'Products': {
+          const filteredProducts = currentProducts.filter(p => 
+            p.name.toLowerCase().includes(searchLower) ||
+            p.category.toLowerCase().includes(searchLower)
+          );
+
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
+              {/* Product catalog List */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Product Catalog</h3>
+                    <p className="text-[11px] text-gray-400">Inventory and availability items active for consumer ordering</p>
+                  </div>
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input 
+                      type="text" 
+                      placeholder="Search name, category..." 
+                      value={merchantSearchQuery}
+                      onChange={(e) => setMerchantSearchQuery(e.target.value)}
+                      className="bg-brand-card border border-brand-border text-xs px-9 py-2 rounded-lg outline-none text-white focus:border-brand-orange"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {filteredProducts.map(p => (
+                    <div key={p.id} className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-4 flex flex-col justify-between hover:border-brand-border-hover transition-all shadow-md">
+                      <div>
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-[9px] font-mono text-gray-500 font-bold uppercase">{p.id}</span>
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                            p.status === 'In Stock' ? 'bg-emerald-500/10 text-emerald-400' :
+                            p.status === 'Low Stock' ? 'bg-orange-500/10 text-orange-400' :
+                            'bg-red-500/10 text-red-400'
+                          }`}>
+                            {p.status}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-white text-[13px] tracking-wide line-clamp-1">{p.name}</h4>
+                        <p className="text-[10px] text-brand-orange font-semibold tracking-wider uppercase mt-0.5">{p.category}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-brand-border/30 mt-3 pt-3">
+                        <span className="font-mono text-white text-sm font-bold">৳ {p.price}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] text-gray-400 font-bold">Stock: {p.stock}</span>
+                          <button 
+                            onClick={() => {
+                              const updated = products.map(item => item.id === p.id ? { ...item, stock: item.stock + 10, status: 'In Stock' } : item);
+                              setProducts(updated);
+                              showToast(`Added +10 to ${p.name} stock`, "success");
+                            }}
+                            className="px-1.5 py-0.5 bg-brand-orange/10 border border-brand-orange/30 text-[10px] font-bold rounded hover:bg-brand-orange text-brand-orange hover:text-white transition-all"
+                          >
+                            +10
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add New Product Form */}
+              <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-4 shadow-xl h-fit">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-brand-border/40 pb-3 flex items-center space-x-2">
+                  <Plus className="w-4 h-4 text-brand-orange" />
+                  <span>Launch New Product</span>
+                </h4>
+                <form onSubmit={handleMerchantAddProduct} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Product Title / Label</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={mProdName}
+                      onChange={(e) => setMProdName(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. Organic Strawberries 250g"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Category Section</label>
+                    <select 
+                      value={mProdCat}
+                      onChange={(e) => setMProdCat(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                    >
+                      {categories.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Item Price (৳)</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={mProdPrice}
+                        onChange={(e) => setMProdPrice(e.target.value)}
+                        className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                        placeholder="e.g. 150"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Stock Quantity</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={mProdStock}
+                        onChange={(e) => setMProdStock(e.target.value)}
+                        className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                        placeholder="e.g. 50"
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-3 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg font-bold uppercase tracking-wider transition-all mt-2 cursor-pointer shadow-md"
+                  >
+                    Confirm & Publish Item
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+        }
+
+        case 'Categories':
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
+              <div className="lg:col-span-2 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Product Categories</h3>
+                  <p className="text-[11px] text-gray-400">Department sections active for your menu layout</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {storeCategories.map(c => {
+                    const mappedCount = products.filter(p => p.category === c.name).length;
+                    return (
+                      <div key={c.id} className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 flex items-center justify-between shadow-md">
+                        <div>
+                          <h4 className="font-bold text-white text-[14px]">{c.name}</h4>
+                          <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase">ID: {c.id}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="block font-mono text-brand-orange font-bold text-lg">{mappedCount || c.itemsCount}</span>
+                          <span className="text-[9px] text-gray-400 font-black uppercase tracking-wider">Items Active</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Add New Category */}
+              <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-4 shadow-xl h-fit">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-brand-border/40 pb-3 flex items-center space-x-2">
+                  <Plus className="w-4 h-4 text-brand-orange" />
+                  <span>Create Category Department</span>
+                </h4>
+                <form onSubmit={handleMerchantAddCategory} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Department Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={mCatName}
+                      onChange={(e) => setMCatName(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. Frozen Foods, Fresh Organic"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-3 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg font-bold uppercase tracking-wider transition-all mt-2 cursor-pointer"
+                  >
+                    Launch Category
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+
+        case 'Customers': {
+          const uniqueCustomers = Array.from(new Set(storeOrders.map(o => o.customerName))) as string[];
+          const dispCustList = uniqueCustomers.map((name, idx) => {
+            const custOrders = storeOrders.filter(o => o.customerName === name);
+            const totalSpent = custOrders.reduce((sum, o) => sum + o.amount, 0);
+            return {
+              id: `CUST-98${idx + 1}`,
+              name,
+              email: `${name.toLowerCase().replace(/\s/g, '')}@gmail.com`,
+              ordersCount: custOrders.length,
+              totalSpent,
+              status: 'Verified Member'
+            };
+          });
+
+          return (
+            <div className="space-y-4 fade-in">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Customers Hub</h3>
+                <p className="text-[11px] text-gray-400">Directory of consumers placing delivery orders at your outlet</p>
+              </div>
+
+              <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl overflow-hidden shadow-lg">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-brand-border/50 bg-[#0c1624] text-gray-400 text-[10px] font-black uppercase tracking-wider">
+                      <th className="py-3 px-4">Client ID</th>
+                      <th className="py-3 px-4">Full Name</th>
+                      <th className="py-3 px-4">Contact Email</th>
+                      <th className="py-3 px-4">Orders Placed</th>
+                      <th className="py-3 px-4">Revenue Spent</th>
+                      <th className="py-3 px-4">Trust Status</th>
+                      <th className="py-3 px-4 text-right">Marketing Message</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-border/30 text-xs">
+                    {dispCustList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-12 text-gray-500 font-semibold">No consumer interactions registered yet</td>
+                      </tr>
+                    ) : (
+                      dispCustList.map(c => (
+                        <tr key={c.id} className="hover:bg-brand-dark/10 transition-colors">
+                          <td className="py-3.5 px-4 font-mono font-bold text-gray-500">{c.id}</td>
+                          <td className="py-3.5 px-4 font-bold text-white">{c.name}</td>
+                          <td className="py-3.5 px-4 font-semibold text-gray-300">{c.email}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-gray-400">{c.ordersCount} Orders</td>
+                          <td className="py-3.5 px-4 font-mono text-brand-orange font-bold">৳ {c.totalSpent.toLocaleString()}</td>
+                          <td className="py-3.5 px-4">
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 text-[9px] font-bold uppercase tracking-wider">
+                              {c.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button 
+                              onClick={() => showToast(`Discount promotional flyer dispatched to ${c.name}!`, "success")}
+                              className="px-2.5 py-1 bg-brand-orange/15 hover:bg-brand-orange border border-brand-orange/30 hover:border-brand-orange text-brand-orange hover:text-white rounded text-[10px] font-bold cursor-pointer transition-all"
+                            >
+                              Send Flyer
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+
+        case 'Reviews':
+          return (
+            <div className="space-y-4 fade-in">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Customer Feedback & Reviews</h3>
+                <p className="text-[11px] text-gray-400">Reputation rating scores and service feedback left by consumers</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {storeReviews.length === 0 ? (
+                  <div className="col-span-2 bg-[#0c1624]/40 border border-brand-border/40 py-12 rounded-xl text-center text-gray-500 font-medium">
+                    No consumer reviews submitted for this outlet yet.
+                  </div>
+                ) : (
+                  storeReviews.map(r => (
+                    <div key={r.id} className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-3.5 shadow-md">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-bold text-white text-sm">{r.customer}</h4>
+                          <span className="text-[10px] text-gray-500 font-bold">{r.date} • {r.item}</span>
+                        </div>
+                        <div className="flex items-center space-x-0.5 bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/20 text-brand-orange">
+                          <Star className="w-3 h-3 fill-brand-orange" />
+                          <span className="text-[11px] font-black">{r.rating}.0</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-gray-300 font-medium italic">"{r.comment}"</p>
+
+                      {/* Display replies if exists */}
+                      {mReviewReplies[r.id] && (
+                        <div className="bg-brand-dark/40 border-l-2 border-brand-orange p-2.5 rounded text-[11px] space-y-0.5">
+                          <span className="block text-[9px] font-black text-brand-orange uppercase">Merchant Reply Box:</span>
+                          <p className="text-gray-300 font-medium">{mReviewReplies[r.id]}</p>
+                        </div>
+                      )}
+
+                      {/* Add interactive reply input */}
+                      <div className="pt-2 border-t border-brand-border/25 flex items-center space-x-2">
+                        <input 
+                          type="text" 
+                          id={`reply-input-${r.id}`}
+                          placeholder="Type reply back to consumer..." 
+                          className="flex-1 bg-brand-dark/60 border border-brand-border text-[11px] px-2.5 py-1.5 rounded outline-none text-white focus:border-brand-orange"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const input = e.currentTarget;
+                              if (!input.value) return;
+                              setMReviewReplies({ ...mReviewReplies, [r.id]: input.value });
+                              input.value = '';
+                              showToast("Reply published to feedback system", "success");
+                            }
+                          }}
+                        />
+                        <button 
+                          onClick={() => {
+                            const input = document.getElementById(`reply-input-${r.id}`) as HTMLInputElement;
+                            if (input && input.value) {
+                              setMReviewReplies({ ...mReviewReplies, [r.id]: input.value });
+                              input.value = '';
+                              showToast("Reply published to feedback system", "success");
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[10px] font-bold rounded cursor-pointer transition-all"
+                        >
+                          Reply
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          );
+
+        case 'Coupons':
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
+              <div className="lg:col-span-2 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Promo Codes & Coupons</h3>
+                  <p className="text-[11px] text-gray-400">Launch and configure promo coupons active for your storefront</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {storeCoupons.map(c => (
+                    <div key={c.id} className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 flex flex-col justify-between shadow-md relative overflow-hidden">
+                      {/* Ticket cutouts for aesthetics */}
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-6 rounded-r-full bg-brand-dark/90 border-r border-brand-border"></div>
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-6 rounded-l-full bg-brand-dark/90 border-l border-brand-border"></div>
+                      
+                      <div className="px-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="px-2 py-0.5 bg-brand-orange/15 rounded text-brand-orange font-mono text-[11px] font-black border border-brand-orange/20 uppercase tracking-wider">
+                            Code: {c.code}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-bold">Usages: {c.usages}</span>
+                        </div>
+                        <h4 className="font-bold text-white text-[15px]">{c.discount}</h4>
+                        <p className="text-[10px] text-gray-400 mt-1 font-semibold">Min purchase required: ৳ {c.minOrder}</p>
+                      </div>
+
+                      <div className="flex justify-between items-center border-t border-brand-border/30 px-3 mt-4 pt-3.5">
+                        <span className="text-[10px] text-gray-400 font-bold uppercase">Status: <b className="text-emerald-400">Active</b></span>
+                        <button 
+                          onClick={() => {
+                            setCoupons(coupons.filter(item => item.id !== c.id));
+                            showToast(`Coupon ${c.code} deleted`, "info");
+                          }}
+                          className="text-[10px] text-red-400 hover:text-red-300 font-bold flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Coupon Form */}
+              <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-4 shadow-xl h-fit">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-brand-border/40 pb-3 flex items-center space-x-2">
+                  <Ticket className="w-4 h-4 text-brand-orange" />
+                  <span>Configure Promo Code</span>
+                </h4>
+                <form onSubmit={handleMerchantAddCoupon} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Coupon Promo Code</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={mCouponCode}
+                      onChange={(e) => setMCouponCode(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. SUMMER25, EIDBITE"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Discount Offer Display</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={mCouponDiscount}
+                      onChange={(e) => setMCouponDiscount(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. 20% Off, ৳100 Flat discount"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Minimum Order Amount (৳)</label>
+                    <input 
+                      type="number" 
+                      required
+                      value={mCouponMinOrder}
+                      onChange={(e) => setMCouponMinOrder(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. 500"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-3 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg font-bold uppercase tracking-wider transition-all mt-2 cursor-pointer"
+                  >
+                    Publish Coupon Code
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+
+        case 'Inventory': {
+          return (
+            <div className="space-y-4 fade-in">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Inventory & Stocks</h3>
+                <p className="text-[11px] text-gray-400">Stock level adjustments and automatic low supply notifications</p>
+              </div>
+
+              <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl overflow-hidden shadow-lg">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-brand-border/50 bg-[#0c1624] text-gray-400 text-[10px] font-black uppercase tracking-wider">
+                      <th className="py-3 px-4">Item ID</th>
+                      <th className="py-3 px-4">Product Name</th>
+                      <th className="py-3 px-4">Remaining Stock</th>
+                      <th className="py-3 px-4">Status Indicator</th>
+                      <th className="py-3 px-4">Refill Stock Level</th>
+                      <th className="py-3 px-4 text-right">Instant Restock</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-border/30 text-xs">
+                    {products.map(p => {
+                      const percentage = Math.min(100, (p.stock / 120) * 100);
+                      const barColor = p.stock > 20 ? 'bg-emerald-500' : (p.stock > 0 ? 'bg-orange-500' : 'bg-red-500');
+                      return (
+                        <tr key={p.id} className="hover:bg-brand-dark/10 transition-colors">
+                          <td className="py-3.5 px-4 font-mono font-bold text-gray-500">{p.id}</td>
+                          <td className="py-3.5 px-4 font-bold text-white">{p.name}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-gray-300">
+                            <div className="flex items-center space-x-2">
+                              <span>{p.stock} units</span>
+                              <div className="w-16 h-1.5 bg-brand-dark rounded-full overflow-hidden">
+                                <div className={`h-full ${barColor}`} style={{ width: `${percentage}%` }}></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                              p.stock > 20 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10' :
+                              p.stock > 0 ? 'bg-orange-500/10 text-orange-400 border border-orange-500/10' :
+                              'bg-red-500/10 text-red-400 border border-red-500/10'
+                            }`}>
+                              {p.stock > 20 ? 'Healthy' : (p.stock > 0 ? 'Low Stock' : 'Reorder Needed')}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-gray-500 font-bold uppercase tracking-wide">Reorder at 15 items</td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button 
+                              onClick={() => {
+                                const updated = products.map(item => item.id === p.id ? { ...item, stock: item.stock + 50, status: 'In Stock' } : item);
+                                setProducts(updated);
+                                showToast(`Refilled +50 units for ${p.name}`, "success");
+                              }}
+                              className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 border border-emerald-500/30 text-emerald-400 hover:text-white rounded text-[10px] font-bold cursor-pointer transition-all"
+                            >
+                              +50 Restock
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+
+        case 'Staff':
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
+              <div className="lg:col-span-2 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Outlet Employee Roster</h3>
+                  <p className="text-[11px] text-gray-400">Team schedules, shift supervisors, and cashier assignments</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {storeStaff.map(s => (
+                    <div key={s.id} className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 flex items-center justify-between shadow-md">
+                      <div>
+                        <h4 className="font-bold text-white text-sm">{s.name}</h4>
+                        <p className="text-[10px] text-brand-orange font-bold uppercase tracking-wider mt-0.5">{s.role}</p>
+                        <p className="text-[10px] text-gray-500 font-semibold mt-1">{s.shift} assignment</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase tracking-wider border border-emerald-500/10">
+                          {s.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Employee */}
+              <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-4 shadow-xl h-fit">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-brand-border/40 pb-3 flex items-center space-x-2">
+                  <Plus className="w-4 h-4 text-brand-orange" />
+                  <span>Onboard New Employee</span>
+                </h4>
+                <form onSubmit={handleMerchantAddStaff} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Employee Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={mStaffName}
+                      onChange={(e) => setMStaffName(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. Moniruzzaman Kabir"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Role / Position</label>
+                    <select 
+                      value={mStaffRole}
+                      onChange={(e) => setMStaffRole(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                    >
+                      <option value="Cashier">Cashier Counter Staff</option>
+                      <option value="Inventory Manager">Inventory Coordinator</option>
+                      <option value="Kitchen Chef">Fulfillment Cook</option>
+                      <option value="Delivery Coordinator">Courier Coordinator</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Working Shift</label>
+                    <select 
+                      value={mStaffShift}
+                      onChange={(e) => setMStaffShift(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                    >
+                      <option value="Day Shift">Day Shift (08:00 AM - 04:00 PM)</option>
+                      <option value="Evening Shift">Evening Shift (04:00 PM - 12:00 AM)</option>
+                      <option value="Night Shift">Night Shift (12:00 AM - 08:00 AM)</option>
+                    </select>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-3 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg font-bold uppercase tracking-wider transition-all mt-2 cursor-pointer"
+                  >
+                    Confirm Hiring
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+
+        case 'Payments':
+          return (
+            <div className="space-y-6 fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 shadow-md">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Fulfillment Revenue</span>
+                  <h3 className="text-xl font-bold text-white mt-1">৳ {totalEarnings.toLocaleString()}</h3>
+                  <p className="text-[10px] text-emerald-400 mt-1 font-semibold flex items-center">
+                    <TrendingUp className="w-2.5 mr-0.5" />
+                    <span>Calculated from active orders</span>
+                  </p>
+                </div>
+                <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 shadow-md">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Unpaid Earnings Ledger</span>
+                  <h3 className="text-xl font-bold text-brand-orange mt-1">৳ {unpaidBalance.toLocaleString()}</h3>
+                  <p className="text-[10px] text-gray-500 mt-1 font-semibold">After 5% marketplace fee deductions</p>
+                </div>
+                <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 shadow-md flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Payout Route</span>
+                    <p className="text-xs font-bold text-white mt-1">Standard Chartered Bank (XXXX-892)</p>
+                  </div>
+                  <button 
+                    onClick={handlePayoutRequest}
+                    className="w-full mt-2 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer"
+                  >
+                    Request Instant Bank Transfer
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider">Ledger & Disbursements Transaction Log</h4>
+                <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl overflow-hidden shadow-lg">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-brand-border/50 bg-[#0c1624] text-gray-400 text-[10px] font-black uppercase tracking-wider">
+                        <th className="py-3 px-4">Transaction Code</th>
+                        <th className="py-3 px-4">Fulfillment Code</th>
+                        <th className="py-3 px-4">Disbursed Amount</th>
+                        <th className="py-3 px-4">Deduction Commission</th>
+                        <th className="py-3 px-4">Timeline</th>
+                        <th className="py-3 px-4 text-right">Route Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brand-border/30 text-xs">
+                      {storeOrders.map((o, idx) => (
+                        <tr key={idx} className="hover:bg-brand-dark/10 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-gray-500">#TXN-982{40 + idx}</td>
+                          <td className="py-3 px-4 font-mono font-semibold text-gray-300">#{o.id}</td>
+                          <td className="py-3 px-4 font-mono text-white font-bold">৳ {(o.amount * 0.95).toFixed(2)}</td>
+                          <td className="py-3 px-4 font-mono text-red-400 font-bold">৳ {(o.amount * 0.05).toFixed(2)}</td>
+                          <td className="py-3 px-4 text-gray-400 font-semibold">{o.time || "09:30 AM"}</td>
+                          <td className="py-3 px-4 text-right">
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 text-[9px] font-bold uppercase">
+                              Processing
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+
+        case 'Reports':
+          return (
+            <div className="space-y-6 fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Financial Reports & Exports</h3>
+                  <p className="text-[11px] text-gray-400">Export statement ledgers and transaction digests</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ store: activeStore.name, totalRevenue: totalEarnings, ordersCount: storeOrders.length }));
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", `Report_${activeStore.name.replace(/\s/g, '_')}_2024.json`);
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+                    showToast("Statement generated and downloaded!", "success");
+                  }}
+                  className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer transition-all self-start"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download JSON Audit Statement</span>
+                </button>
+              </div>
+
+              {/* Stats bento layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-4">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">Weekly Performance Metrics</h4>
+                  <div className="space-y-3.5 text-xs">
+                    <div className="flex justify-between items-center bg-brand-dark/30 p-2.5 rounded border border-brand-border/25">
+                      <span className="text-gray-400 font-semibold">Average Order Value (AOV):</span>
+                      <span className="font-mono text-white font-bold">৳ {(totalEarnings / (storeOrders.length || 1)).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-brand-dark/30 p-2.5 rounded border border-brand-border/25">
+                      <span className="text-gray-400 font-semibold">Fulfillment Success Rate:</span>
+                      <span className="font-mono text-emerald-400 font-bold">98.5%</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-brand-dark/30 p-2.5 rounded border border-brand-border/25">
+                      <span className="text-gray-400 font-semibold">Customer Retention Multiplier:</span>
+                      <span className="font-mono text-white font-bold">2.4x</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 flex flex-col justify-between">
+                  <div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Automated Monthly Digests</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed font-medium">Configure automated exports of your ledger transactions. Reports are formatted for clean accounting system ingest. Standard payouts settle on Friday.</p>
+                  </div>
+                  <div className="flex space-x-2 pt-4">
+                    <button 
+                      onClick={() => showToast("CSV ledger export prepared and emailed!", "success")}
+                      className="flex-1 py-2 bg-brand-dark hover:bg-brand-border/40 border border-brand-border text-gray-300 hover:text-white rounded text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Export CSV Ledger
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+
+        case 'Settings':
+          return (
+            <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-6 space-y-6 max-w-2xl fade-in shadow-xl">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Outlet Integration Settings</h3>
+                <p className="text-[11px] text-gray-400">Configure sound triggers, system alerts, and routing parameters</p>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div className="flex items-center justify-between p-3 bg-brand-dark/30 rounded-lg border border-brand-border/25">
+                  <div>
+                    <h4 className="font-bold text-white">Auditory Alarm Alerts</h4>
+                    <p className="text-[11px] text-gray-500 font-semibold">Play siren alarm audio upon receiving new grocery orders</p>
+                  </div>
+                  <input type="checkbox" defaultChecked className="accent-brand-orange w-4 h-4 cursor-pointer" />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-brand-dark/30 rounded-lg border border-brand-border/25">
+                  <div>
+                    <h4 className="font-bold text-white">Automatic Dispatch Sync</h4>
+                    <p className="text-[11px] text-gray-500 font-semibold">Auto-assign nearest platform delivery courier once order is packed</p>
+                  </div>
+                  <input type="checkbox" defaultChecked className="accent-brand-orange w-4 h-4 cursor-pointer" />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-brand-dark/30 rounded-lg border border-brand-border/25">
+                  <div>
+                    <h4 className="font-bold text-white">Daily Summary Invoices</h4>
+                    <p className="text-[11px] text-gray-500 font-semibold">Dispatch daily PDF transaction reports directly to Shakib Hasan</p>
+                  </div>
+                  <input type="checkbox" className="accent-brand-orange w-4 h-4 cursor-pointer" />
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button 
+                    onClick={() => showToast("Notification parameters configured", "success")}
+                    className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Save Preferences
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+
+        case 'Store Profile':
+          return (
+            <form onSubmit={handleMerchantSaveProfile} className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-6 space-y-6 max-w-2xl fade-in shadow-xl">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Store Profile Card Settings</h3>
+                <p className="text-[11px] text-gray-400">Configure naming, storefront location, and retail status shown to clients</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Outlet Store Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={activeStore.name}
+                    onChange={(e) => {
+                      const updated = stores.map(s => s.id === activeStore.id ? { ...s, name: e.target.value } : s);
+                      setStores(updated);
+                    }}
+                    className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Department Category</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={activeStore.category || "Restaurant"}
+                    onChange={(e) => {
+                      const updated = stores.map(s => s.id === activeStore.id ? { ...s, category: e.target.value } : s);
+                      setStores(updated);
+                    }}
+                    className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Physical Address / Area location</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={activeStore.address}
+                    onChange={(e) => {
+                      const updated = stores.map(s => s.id === activeStore.id ? { ...s, address: e.target.value } : s);
+                      setStores(updated);
+                    }}
+                    className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Platform Status</label>
+                  <select 
+                    value={activeStore.status}
+                    onChange={(e) => {
+                      const updated = stores.map(s => s.id === activeStore.id ? { ...s, status: e.target.value } : s);
+                      setStores(updated);
+                    }}
+                    className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                  >
+                    <option value="Active">Active & Serving</option>
+                    <option value="Suspended">Temporary Suspended</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Operating Status (Open / Closed)</label>
+                  <select 
+                    value={activeStore.operatingStatus || "Open"}
+                    onChange={(e) => {
+                      const updated = stores.map(s => s.id === activeStore.id ? { ...s, operatingStatus: e.target.value } : s);
+                      setStores(updated);
+                    }}
+                    className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                  >
+                    <option value="Open">● Open</option>
+                    <option value="Closed">○ Closed</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button 
+                  type="submit"
+                  className="px-5 py-2.5 bg-[#10b981] hover:bg-emerald-600 text-white font-bold rounded-lg text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Save Profile Settings
+                </button>
+              </div>
+            </form>
+          );
+
+        case 'Marketing':
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
+              <div className="lg:col-span-2 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Promo Banners & Marketing</h3>
+                  <p className="text-[11px] text-gray-400">Manage digital platform campaigns and budget targets</p>
+                </div>
+                <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl overflow-hidden shadow-lg">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-brand-border/50 bg-[#0c1624] text-gray-400 text-[10px] font-black uppercase tracking-wider">
+                        <th className="py-3 px-4">Campaign ID</th>
+                        <th className="py-3 px-4">Title</th>
+                        <th className="py-3 px-4">Channel</th>
+                        <th className="py-3 px-4">Budget Assigned</th>
+                        <th className="py-3 px-4">Engagement Clicks</th>
+                        <th className="py-3 px-4 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brand-border/30 text-xs">
+                      {marketing.map(m => (
+                        <tr key={m.id} className="hover:bg-brand-dark/10 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-gray-500">#{m.id}</td>
+                          <td className="py-3 px-4 font-bold text-white">{m.title}</td>
+                          <td className="py-3 px-4 text-gray-300 font-semibold">{m.channel}</td>
+                          <td className="py-3 px-4 font-mono font-bold text-white">৳ {m.budget}</td>
+                          <td className="py-3 px-4 font-mono font-bold text-brand-orange">{m.clicks} Clicks</td>
+                          <td className="py-3 px-4 text-right">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                              m.status === 'Running' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-orange-500/10 text-orange-400'
+                            }`}>
+                              {m.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Add Promo Campaign */}
+              <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-4 shadow-xl h-fit">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-brand-border/40 pb-3 flex items-center space-x-2">
+                  <Megaphone className="w-4 h-4 text-brand-orange" />
+                  <span>Launch Promo Campaign</span>
+                </h4>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!mMarketingTitle || !mMarketingBudget) return;
+                  const newMkt = {
+                    id: `MKT-0${marketing.length + 1}`,
+                    title: mMarketingTitle,
+                    channel: mMarketingChannel,
+                    budget: parseInt(mMarketingBudget) || 0,
+                    clicks: 0,
+                    status: 'Running'
+                  };
+                  setMarketing([...marketing, newMkt]);
+                  setMMarketingTitle('');
+                  setMMarketingBudget('');
+                  showToast(`Campaign "${newMkt.title}" launched successfully!`, "success");
+                }} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Campaign Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={mMarketingTitle}
+                      onChange={(e) => setMMarketingTitle(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. Free Dessert Weekend Promotion"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Channel platform</label>
+                    <select 
+                      value={mMarketingChannel}
+                      onChange={(e) => setMMarketingChannel(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                    >
+                      <option value="In-app Banner">In-App Dashboard Banner</option>
+                      <option value="Push Notification">Push Notification Blast</option>
+                      <option value="SMS Broadcast">Mobile SMS Broadcast</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Budget Budget (৳)</label>
+                    <input 
+                      type="number" 
+                      required
+                      value={mMarketingBudget}
+                      onChange={(e) => setMMarketingBudget(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. 5000"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-3 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg font-bold uppercase tracking-wider transition-all mt-2 cursor-pointer"
+                  >
+                    Launch Campaign
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+
+        case 'Support Tickets':
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
+              <div className="lg:col-span-2 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Help & Technical Support</h3>
+                  <p className="text-[11px] text-gray-400">Get technical assistance or appeal financial settlement holds</p>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {supportTickets.filter(t => t.user === activeStore.name || t.category === 'Merchant Support').map(t => (
+                    <div key={t.id} className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-3.5 shadow-md">
+                      <div className="flex justify-between items-center">
+                        <span className="font-mono text-[10px] text-gray-500 font-bold">Ticket: #{t.id}</span>
+                        <div className="flex space-x-2">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                            t.priority === 'High' ? 'bg-red-500/15 text-red-400 border border-red-500/10' :
+                            t.priority === 'Medium' ? 'bg-orange-500/15 text-orange-400 border border-orange-500/10' :
+                            'bg-blue-500/15 text-blue-400 border border-blue-500/10'
+                          }`}>
+                            {t.priority} Priority
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 text-[9px] font-bold uppercase">
+                            {t.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white text-sm">{t.subject}</h4>
+                        <p className="text-xs text-gray-400 mt-1 font-semibold">Registered on: {t.date}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Ticket Form */}
+              <div className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 space-y-4 shadow-xl h-fit">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-brand-border/40 pb-3 flex items-center space-x-2">
+                  <LifeBuoy className="w-4 h-4 text-brand-orange" />
+                  <span>Open Help Ticket</span>
+                </h4>
+                <form onSubmit={handleMerchantAddTicket} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Problem Subject</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={mTicketSubject}
+                      onChange={(e) => setMTicketSubject(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                      placeholder="e.g. Settlement payout not cleared"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Priority Urgency</label>
+                    <select 
+                      value={mTicketPriority}
+                      onChange={(e) => setMTicketPriority(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
+                    >
+                      <option value="Low">Low - System feedback</option>
+                      <option value="Medium">Medium - Standard query</option>
+                      <option value="High">High - Terminal blocker</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Detailed Message</label>
+                    <textarea 
+                      required
+                      rows={3}
+                      value={mTicketMsg}
+                      onChange={(e) => setMTicketMsg(e.target.value)}
+                      className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange resize-none"
+                      placeholder="Type details regarding the issue..."
+                    ></textarea>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-3 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg font-bold uppercase tracking-wider transition-all mt-2 cursor-pointer animate-pulse"
+                  >
+                    Transmit Ticket
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+
+        default:
+          return (
+            <div className="py-20 text-center text-gray-500">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Under Development</h3>
+              <p className="text-xs mt-1">This specific department is being optimized for real-time operations.</p>
+            </div>
+          );
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-brand-dark flex font-sans antialiased text-gray-200">
+        
+        {/* MERCHANT SIDEBAR - Static left panel */}
+        <aside className="hidden lg:flex flex-col w-64 bg-[#0c1624] border-r border-brand-border/60 shrink-0 select-none">
+          {/* Brand header matching screenshot exactly */}
+          <div className="p-5 border-b border-brand-border/45 flex items-center space-x-3 bg-brand-dark/15">
+            <div className="w-10 h-10 rounded-xl bg-brand-orange/15 border border-brand-orange/30 flex items-center justify-center text-brand-orange shrink-0 shadow-md">
+              <ShoppingCart className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-sm font-black text-white tracking-wide uppercase line-clamp-1">{activeStore.name}</h1>
+              <p className="text-[10px] text-brand-orange font-bold tracking-wider uppercase mt-0.5">Store Dashboard</p>
+            </div>
+          </div>
+
+          {/* Navigation links matching list in screenshot */}
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-none">
+            {merchantSidebarItems.map((item) => {
+              const IconComp = item.icon;
+              const isActive = activeMerchantTab === item.name;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => {
+                    setActiveMerchantTab(item.name);
+                    setMerchantSearchQuery('');
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-150 group cursor-pointer ${
+                    isActive 
+                      ? 'bg-brand-orange text-white shadow-lg' 
+                      : 'text-gray-400 hover:bg-brand-card hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-brand-orange'}`} />
+                    <span>{item.name}</span>
+                  </div>
+                  {item.badgeCount !== undefined && item.badgeCount > 0 && (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isActive ? 'bg-white text-brand-orange' : 'bg-brand-orange/15 text-brand-orange'}`}>
+                      {item.badgeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Back to Platform Admin button masqueraded as Logout */}
+            <button
+              onClick={handleExitStorePortal}
+              className="w-full flex items-center space-x-3 px-3.5 py-2.5 mt-4 rounded-lg text-xs font-bold uppercase tracking-wider text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 text-red-400" />
+              <span>Back to Admin</span>
+            </button>
+          </nav>
+
+          {/* Bottom custom profile element matching screenshot */}
+          <div className="p-4 border-t border-brand-border/40 bg-brand-dark/25 flex items-center space-x-3 select-none">
+            <div className="w-10 h-10 rounded-xl bg-brand-orange/20 border border-brand-orange/30 overflow-hidden shrink-0 flex items-center justify-center text-brand-orange shadow-md relative">
+              <Store className="w-5 h-5" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-brand-orange/20 to-transparent"></div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-xs font-black text-white uppercase tracking-wider truncate">{activeStore.name}</h4>
+              <p className="text-[10px] text-gray-400 font-semibold truncate uppercase mt-0.5">{activeStore.category || "Restaurant"}</p>
+              <div className="flex items-center space-x-1 mt-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">
+                  {activeStore.operatingStatus === 'Closed' ? 'Closed' : 'Open'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* MOBILE SIDEBAR FOR MERCHANT */}
+        {isMerchantMobileSidebarOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden flex bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <aside className="w-64 bg-[#0c1624] flex flex-col h-full animate-in slide-in-from-left duration-200">
+              <div className="p-5 border-b border-brand-border/40 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-lg bg-brand-orange/20 flex items-center justify-center text-brand-orange font-bold text-sm">B</div>
+                  <span className="font-bold text-white text-xs uppercase truncate tracking-wider">{activeStore.name}</span>
+                </div>
+                <button onClick={() => setIsMerchantMobileSidebarOpen(false)} className="text-gray-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                {merchantSidebarItems.map((item) => {
+                  const IconComp = item.icon;
+                  const isActive = activeMerchantTab === item.name;
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => {
+                        setActiveMerchantTab(item.name);
+                        setMerchantSearchQuery('');
+                        setIsMerchantMobileSidebarOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider ${
+                        isActive ? 'bg-brand-orange text-white' : 'text-gray-400 hover:bg-brand-card hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <IconComp className="w-4 h-4 shrink-0" />
+                        <span>{item.name}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={handleExitStorePortal}
+                  className="w-full flex items-center space-x-3 px-3 py-2 mt-4 rounded-lg text-xs font-bold text-red-400 hover:bg-red-500/10"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Back to Admin</span>
+                </button>
+              </nav>
+            </aside>
+          </div>
+        )}
+
+        {/* MERCHANT BODY PANEL */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          
+          {/* HEADER - top navbar matching layout exactly */}
+          <header className="h-16 bg-[#0c1624] border-b border-brand-border/60 flex items-center justify-between px-6 shrink-0 shadow-md">
+            {/* Left: Breadcrumbs welcome */}
+            <div className="flex items-center space-x-3">
+              <button 
+                onClick={() => setIsMerchantMobileSidebarOpen(true)}
+                className="lg:hidden p-1.5 bg-brand-dark/80 hover:bg-brand-border border border-brand-border rounded-md text-gray-300"
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-black text-brand-orange uppercase tracking-wider">{activeMerchantTab}</span>
+                  <span className="text-[9px] text-gray-500 font-bold uppercase">/</span>
+                  <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-black uppercase px-1.5 py-0.5 rounded tracking-widest animate-pulse">
+                    Outlet Panel Live
+                  </span>
+                </div>
+                <h1 className="text-xs font-black text-white uppercase tracking-wider mt-0.5">Welcome back, {activeStore.name}!</h1>
+              </div>
+            </div>
+
+            {/* Middle: Universal Search Bar with hotkey */}
+            <div className="hidden md:flex items-center space-x-2 bg-brand-dark/80 border border-brand-border px-3 py-1.5 rounded-lg w-72 group focus-within:border-brand-orange transition-all">
+              <Search className="w-3.5 h-3.5 text-gray-500 group-focus-within:text-brand-orange" />
+              <input 
+                type="text" 
+                placeholder="Search anything..." 
+                value={merchantSearchQuery}
+                onChange={(e) => setMerchantSearchQuery(e.target.value)}
+                className="flex-1 bg-transparent text-xs text-white outline-none placeholder-gray-500"
+              />
+              <span className="text-[9px] font-black text-gray-500 bg-brand-card/80 border border-brand-border px-1.5 py-0.5 rounded">Ctrl + /</span>
+            </div>
+
+            {/* Right: Badge notifications, profile avatar dropdown */}
+            <div className="flex items-center space-x-3">
+              {/* Inbox notifications */}
+              <div className="relative">
+                <button 
+                  onClick={() => setIsMerchantNotifDropdownOpen(!isMerchantNotifDropdownOpen)}
+                  className="p-2 bg-brand-dark hover:bg-brand-border/30 border border-brand-border hover:border-brand-orange/40 text-gray-400 hover:text-white rounded-lg transition-all cursor-pointer relative"
+                >
+                  <Bell className="w-4 h-4" />
+                  {merchantUnreadNotifCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-black text-white flex items-center justify-center shadow-lg border border-[#0c1624]">
+                      {merchantUnreadNotifCount}
+                    </span>
+                  )}
+                </button>
+                {/* Notification Dropdown list */}
+                {isMerchantNotifDropdownOpen && (
+                  <div className="absolute right-0 mt-2.5 w-72 bg-[#0c1624] border border-brand-border rounded-xl p-4 shadow-2xl z-50 text-xs space-y-3 animate-in fade-in duration-200">
+                    <div className="flex justify-between items-center border-b border-brand-border/40 pb-2">
+                      <span className="font-black text-white uppercase tracking-wider text-[10px]">Active Orders Alert</span>
+                      <button 
+                        onClick={() => {
+                          setMerchantUnreadNotifCount(0);
+                          setIsMerchantNotifDropdownOpen(false);
+                          showToast("Notifications cleared", "info");
+                        }} 
+                        className="text-[9px] text-brand-orange hover:underline font-bold uppercase"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="space-y-2.5 max-h-48 overflow-y-auto">
+                      <div className="p-2 bg-brand-dark/40 rounded border border-brand-border/20 space-y-0.5">
+                        <div className="flex justify-between font-bold text-white text-[10px]">
+                          <span>🛒 New Grocery Request</span>
+                          <span className="text-[9px] text-brand-orange">Just Now</span>
+                        </div>
+                        <p className="text-gray-400">Order #ORD-001248 has been requested and assigned to prepare.</p>
+                      </div>
+                      <div className="p-2 bg-brand-dark/40 rounded border border-brand-border/20 space-y-0.5">
+                        <div className="flex justify-between font-bold text-white text-[10px]">
+                          <span>📦 Stock Refill Required</span>
+                          <span className="text-[9px] text-gray-500">2h ago</span>
+                        </div>
+                        <p className="text-gray-400">Jasmine Rice 1kg has crossed critical reorder thresholds.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Message box */}
+              <button className="p-2 bg-brand-dark hover:bg-brand-border/30 border border-brand-border hover:border-brand-orange/40 text-gray-400 hover:text-white rounded-lg transition-all relative">
+                <Mail className="w-4 h-4" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full text-[9px] font-black text-white flex items-center justify-center shadow-lg border border-[#0c1624]">
+                  3
+                </span>
+              </button>
+
+              {/* Separator */}
+              <span className="w-px h-6 bg-brand-border/60"></span>
+
+              {/* Admin credentials & Avatar profile dropdown */}
+              <div className="relative">
+                <button 
+                  onClick={() => setIsMerchantProfileDropdownOpen(!isMerchantProfileDropdownOpen)}
+                  className="flex items-center space-x-2 hover:bg-brand-card/60 p-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <img 
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100" 
+                    alt="Shakib Hasan" 
+                    referrerPolicy="no-referrer"
+                    className="w-7.5 h-7.5 rounded-full object-cover border border-brand-orange/40 shadow" 
+                  />
+                  <div className="text-left hidden xl:block">
+                    <span className="block text-xs font-black text-white leading-none">Shakib Hasan</span>
+                    <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Store Admin</span>
+                  </div>
+                </button>
+                {isMerchantProfileDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-[#0c1624] border border-brand-border rounded-xl p-2 shadow-2xl z-50 text-xs space-y-1 animate-in fade-in duration-200">
+                    <button 
+                      onClick={() => {
+                        setActiveMerchantTab('Store Profile');
+                        setIsMerchantProfileDropdownOpen(false);
+                      }} 
+                      className="w-full text-left px-3 py-2 hover:bg-brand-card text-white font-bold rounded-lg transition-all uppercase tracking-wider text-[10px]"
+                    >
+                      Store Profile Settings
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setActiveMerchantTab('Settings');
+                        setIsMerchantProfileDropdownOpen(false);
+                      }} 
+                      className="w-full text-left px-3 py-2 hover:bg-brand-card text-white font-bold rounded-lg transition-all uppercase tracking-wider text-[10px]"
+                    >
+                      Outlet Preferences
+                    </button>
+                    <hr className="border-brand-border/30 my-1" />
+                    <button 
+                      onClick={handleExitStorePortal} 
+                      className="w-full text-left px-3 py-2 hover:bg-red-500/10 text-red-400 font-bold rounded-lg transition-all uppercase tracking-wider text-[10px]"
+                    >
+                      Exit to Super Admin
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* MAIN CONTAINER PAGE BODY */}
+          <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full scrollbar-thin">
+            {renderMerchantTabContent()}
+          </main>
+
+          {/* TOAST SYSTEM POPUP */}
+          {toast && (
+            <div className="fixed bottom-5 right-5 z-50 flex items-center space-x-2 bg-brand-dark border border-brand-border px-4 py-3 rounded-lg shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-300">
+              <div className={`w-2 h-2 rounded-full ${toast.type === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-brand-orange animate-pulse'}`} />
+              <p className="text-xs font-bold text-white uppercase tracking-wider">{toast.message}</p>
+            </div>
+          )}
+
+          {/* PRINTABLE RECEIPT OVERLAY MODAL */}
+          {printingReceiptOrder && (() => {
+            const deliveryFee = 40;
+            const orderAmount = printingReceiptOrder.amount;
+            const computedSubtotal = Math.max(0, Math.round((orderAmount - deliveryFee) / 1.05));
+            const computedTax = Math.max(0, orderAmount - computedSubtotal - deliveryFee);
+            
+            // Generate deterministic mock items that sum to exactly computedSubtotal
+            const receiptItems = [
+              { name: products[0]?.name || 'Fresh Apples (Premium)', qty: 1, price: Math.round(computedSubtotal * 0.4) },
+              { name: products[1]?.name || 'Organic Bananas', qty: 2, price: Math.round((computedSubtotal * 0.3) / 2) },
+              { name: products[2]?.name || 'Miniket Rice 5kg', qty: 1, price: computedSubtotal - Math.round(computedSubtotal * 0.4) - (Math.round((computedSubtotal * 0.3) / 2) * 2) }
+            ];
+
+            return (
+              <div id="printable-receipt-modal" className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print:static print:bg-white print:p-0 print:m-0">
+                <style>{`
+                  @media print {
+                    /* Hide everything else on the page during physical print */
+                    body * {
+                      visibility: hidden !important;
+                    }
+                    /* Show only the printable modal container and its nested descendants */
+                    #printable-receipt-modal, 
+                    #printable-receipt-modal * {
+                      visibility: visible !important;
+                    }
+                    /* Re-anchor printable receipt container strictly to top-left of paper */
+                    #printable-receipt-modal {
+                      position: absolute !important;
+                      left: 0 !important;
+                      top: 0 !important;
+                      width: 100% !important;
+                      background: white !important;
+                      color: black !important;
+                      box-shadow: none !important;
+                    }
+                    .no-print {
+                      display: none !important;
+                      visibility: hidden !important;
+                    }
+                  }
+                `}</style>
+
+                {/* Main Modal Box Container */}
+                <div className="bg-white text-gray-900 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden max-h-[90vh] border border-gray-100 print:border-none print:shadow-none print:max-h-none print:w-full">
+                  {/* Header Preview Action Banner - Hidden on physical printed paper */}
+                  <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between no-print">
+                    <div className="flex items-center space-x-2">
+                      <Printer className="w-4 h-4 text-brand-orange animate-pulse" />
+                      <span className="text-xs font-black text-gray-800 uppercase tracking-wider">Print Preview Receipt</span>
+                    </div>
+                    <button 
+                      onClick={() => setPrintingReceiptOrder(null)}
+                      className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-200/50 transition-all cursor-pointer"
+                      title="Close Preview"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Cash Receipt Paper Area (Monospaced styled for premium authentic look) */}
+                  <div className="p-8 overflow-y-auto flex-1 bg-white font-mono text-xs text-black border-b border-dashed border-gray-300 print:overflow-visible print:p-0">
+                    <div className="space-y-6">
+                      {/* Store Details Header */}
+                      <div className="text-center space-y-2">
+                        {/* Placeholder Brand Logo - High Contrast Vector Badge for Screen & Paper Media */}
+                        <div className="flex flex-col items-center justify-center space-y-1.5 py-1">
+                          <div className="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center shadow-xs border-2 border-black print:bg-black print:text-white print:border-black">
+                            <svg className="w-8 h-8 fill-current" viewBox="0 0 24 24">
+                              <path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm7 17H5V8h2v2c0 .55.45 1 1 1s1-.45 1-1V8h6v2c0 .55.45 1 1 1s1-.45 1-1V8h2v12z"/>
+                            </svg>
+                          </div>
+                          <div className="flex items-center space-x-1.5 text-[9px] font-black tracking-widest uppercase text-black print:text-black">
+                            <span>★</span>
+                            <span>SMART SHOP BRAND</span>
+                            <span>★</span>
+                          </div>
+                        </div>
+
+                        <h2 className="text-lg font-black uppercase tracking-tight text-black print:text-black">{activeStore.name}</h2>
+                        <p className="text-[10px] text-gray-600 uppercase font-bold">Official Invoice & Cash Voucher</p>
+                        <p className="text-[9px] text-gray-500 leading-normal">{activeStore.address || 'Dhanmondi, Dhaka, Bangladesh'}</p>
+                        <p className="text-[9px] text-gray-500">Phone Contact: +880 1712-345678</p>
+                      </div>
+
+                      {/* Receipt divider lines */}
+                      <div className="text-center text-gray-400 font-bold tracking-widest leading-none select-none">
+                        ------------------------------------------
+                      </div>
+
+                      {/* Receipt Metadata information */}
+                      <div className="space-y-1 text-[11px]">
+                        <div className="flex justify-between">
+                          <span className="font-bold text-gray-600">INVOICE CODE:</span>
+                          <span className="font-bold">#{printingReceiptOrder.id}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-bold text-gray-600">DATE & TIME:</span>
+                          <span>{printingReceiptOrder.date} • {printingReceiptOrder.time || '11:46 AM'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-bold text-gray-600">PAYMENT BY:</span>
+                          <span className="font-bold uppercase">{printingReceiptOrder.paymentMethod}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-bold text-gray-600">ORDER STATE:</span>
+                          <span className="font-bold uppercase text-emerald-600">{printingReceiptOrder.status}</span>
+                        </div>
+                      </div>
+
+                      {/* Receipt divider lines */}
+                      <div className="text-center text-gray-400 font-bold tracking-widest leading-none select-none">
+                        - - - - - - - - - - - - - - - - - - - - -
+                      </div>
+
+                      {/* Customer / Logistics delivery details */}
+                      <div className="space-y-1.5 text-[11px] bg-gray-50 p-2.5 rounded border border-gray-100 print:bg-white print:border-none print:p-0">
+                        <p className="font-black text-gray-700 text-[10px] uppercase tracking-wider mb-1">Customer Delivery Details:</p>
+                        <div className="flex justify-between">
+                          <span className="font-bold text-gray-600">DELIVERY TYPE:</span>
+                          <span className="font-bold text-gray-900">🏠 HOME DELIVERY</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-bold text-gray-600">ORDER RESPONSE:</span>
+                          <span className="font-bold text-emerald-700">✔ CONFIRMED</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-bold text-gray-600">DELIVERY MODE:</span>
+                          <span className="font-bold">{printingReceiptOrder.priority || 'Normal'}</span>
+                        </div>
+                        <p className="font-bold text-gray-900">{printingReceiptOrder.customerName}</p>
+                        {printingReceiptOrder.customerPhone && (
+                          <p className="text-gray-600">Phone: {printingReceiptOrder.customerPhone}</p>
+                        )}
+                        <p className="text-gray-600 leading-snug">Deliver to: {printingReceiptOrder.address || 'Dhanmondi Road 8A, Dhaka'}</p>
+                        {printingReceiptOrder.zone && (
+                          <p className="text-gray-600">Delivery Zone: {printingReceiptOrder.zone}</p>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Est. Delivery:</span>
+                          <span className="font-bold text-gray-800">{printingReceiptOrder.estimatedMinutes ? `${printingReceiptOrder.estimatedMinutes} min` : '30 min'}</span>
+                        </div>
+                        {printingReceiptOrder.codAmount ? (
+                          <div className="flex justify-between border-t border-dashed border-gray-300 pt-1 mt-0.5">
+                            <span className="font-bold text-gray-600">COD COLLECT:</span>
+                            <span className="font-bold text-gray-900">৳{printingReceiptOrder.codAmount.toLocaleString()}</span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Receipt divider lines */}
+                      <div className="text-center text-gray-400 font-bold tracking-widest leading-none select-none">
+                        - - - - - - - - - - - - - - - - - - - - -
+                      </div>
+
+                      {/* Items Listing Table */}
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-12 text-[10px] font-black text-gray-500 uppercase tracking-wider pb-1.5 border-b border-gray-200">
+                          <div className="col-span-6">Item Desc</div>
+                          <div className="col-span-2 text-center">Qty</div>
+                          <div className="col-span-2 text-right">Price</div>
+                          <div className="col-span-2 text-right">Total</div>
+                        </div>
+
+                        <div className="divide-y divide-dashed divide-gray-200 space-y-2 pt-1 text-[11px]">
+                          {receiptItems.map((item, index) => (
+                            <div key={index} className="grid grid-cols-12 pt-2 first:pt-0">
+                              <div className="col-span-6 font-bold text-gray-800 break-words">{item.name}</div>
+                              <div className="col-span-2 text-center text-gray-600">{item.qty}</div>
+                              <div className="col-span-2 text-right font-mono text-gray-600">৳{item.price.toLocaleString()}</div>
+                              <div className="col-span-2 text-right font-mono font-bold">৳{(item.price * item.qty).toLocaleString()}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Receipt divider lines */}
+                      <div className="text-center text-gray-400 font-bold tracking-widest leading-none select-none">
+                        ------------------------------------------
+                      </div>
+
+                      {/* Total calculation breakdowns */}
+                      <div className="space-y-2 text-[11px]">
+                        <div className="flex justify-between text-gray-600">
+                          <span>Items Subtotal:</span>
+                          <span className="font-mono">৳{computedSubtotal.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-600">
+                          <span>Govt VAT / Tax (5%):</span>
+                          <span className="font-mono">৳{computedTax.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-600">
+                          <span>Delivery Logistics:</span>
+                          <span className="font-mono">৳{deliveryFee.toLocaleString()}</span>
+                        </div>
+                        <div className="text-center text-gray-300 font-bold tracking-widest leading-none select-none py-1">
+                          - - - - - - - - - - - - -
+                        </div>
+                        <div className="flex justify-between text-sm font-black text-gray-900 pt-1">
+                          <span>TOTAL PAID AMOUNT:</span>
+                          <span className="font-mono text-base text-gray-900">৳{orderAmount.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Receipt divider lines */}
+                      <div className="text-center text-gray-400 font-bold tracking-widest leading-none select-none">
+                        ==========================================
+                      </div>
+
+                      {/* Dynamically Generated QR Code for Warehouse Logistics Scanning */}
+                      <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg border border-gray-200/80 text-center space-y-2 print:bg-white print:border-none print:p-0">
+                        <div className="bg-white p-2 rounded border border-gray-200 shadow-2xs print:border-black print:p-1">
+                          <QRCodeSVG 
+                            value={JSON.stringify({
+                              orderId: printingReceiptOrder.id,
+                              store: activeStore.name,
+                              customer: printingReceiptOrder.customerName,
+                              amount: printingReceiptOrder.amount,
+                              status: printingReceiptOrder.status
+                            })}
+                            size={96}
+                            level="M"
+                            includeMargin={false}
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-[9px] text-gray-800 tracking-wider uppercase">
+                            Warehouse Logistics QR Code
+                          </p>
+                          <p className="text-[8px] text-gray-500 font-mono">
+                            SCAN FOR FAST DISPATCH • ORDER #{printingReceiptOrder.id}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Barcode and thank you footer */}
+                      <div className="text-center space-y-2.5 pt-1">
+                        <div className="font-mono text-[9px] text-gray-400 tracking-widest select-none">
+                          ||||||| | |||||||| |||| | ||||||| | ||||
+                          <span className="block text-[8px] text-gray-500 tracking-normal mt-0.5">MEMBER ID: CUST-981- {printingReceiptOrder.customerName.replace(/\s/g, '').toUpperCase().slice(0, 4)}</span>
+                        </div>
+                        <p className="text-[10px] font-black uppercase text-gray-800 tracking-wider">*** Thank you for shopping! ***</p>
+                        <p className="text-[8px] text-gray-500">Powered by Antigravity OS Marketplace Platform</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Footer - Hidden on physical printed paper */}
+                  <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex space-x-3 no-print">
+                    <button
+                      onClick={() => setPrintingReceiptOrder(null)}
+                      className="flex-1 py-2.5 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Close Preview
+                    </button>
+                    <button
+                      onClick={() => {
+                        window.print();
+                        showToast("Document transmitted to printer spool!", "success");
+                      }}
+                      className="flex-1 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-2 shadow-md cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>Trigger Print</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* FOOTER */}
+          <footer className="py-4 border-t border-brand-border/40 text-center text-[10px] text-gray-500 bg-[#0c1624]/20 select-none flex items-center justify-between px-6 shrink-0">
+            <p>© 2026 {activeStore.name}. All rights reserved. The NexaGo BD</p>
+            <p className="font-mono text-gray-600">Version 1.0.0</p>
+          </footer>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeTab === 'Customer Site') {
+    return (
+      <CustomerStorefront
+        stores={stores}
+        products={products}
+        orders={orders}
+        liveDrivers={liveDrivers}
+        onAddOrder={handleAddOrder}
+        onUpdateOrder={handleUpdateOrder}
+        onSilentUpdateOrder={handleSilentUpdateOrder}
+        onReturnToAdmin={() => setActiveTab('Dashboard')}
+        onLaunchMerchantStore={handleLaunchStore}
+        onReport={handleOrderReport}
+        showToast={showToast}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-brand-dark flex font-sans antialiased text-gray-200">
+      
+      {/* SIDEBAR - Left panel */}
+      {/* Desktop static Sidebar */}
+      {activeTab !== 'POS System' && (
+      <aside className="hidden lg:flex flex-col w-64 bg-[#0c1624] border-r border-brand-border/60 shrink-0 select-none">
+        
+        {/* Workspace Switcher Header for 3 Separate Dashboards */}
+        <div className="p-3 border-b border-brand-border/40 bg-brand-dark/40 space-y-2.5">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-9 h-9 rounded-xl bg-brand-orange text-white flex items-center justify-center font-black shrink-0 shadow-md">
+              {activePanelMode === 'super_admin' ? <ShieldCheck className="w-5 h-5 text-white" /> :
+               activePanelMode === 'store' ? <ShoppingCart className="w-5 h-5 text-white" /> : 
+               <Truck className="w-5 h-5 text-white" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xs font-black text-white tracking-wide uppercase truncate">
+                {activePanelMode === 'super_admin' ? 'Super Admin' :
+                 'The NexaGo BD'}
+              </h1>
+              <p className="text-[9px] text-brand-orange font-bold tracking-wider uppercase">
+                {activePanelMode === 'super_admin' ? 'Control Center' :
+                 activePanelMode === 'store' ? 'Store Catalog' : 'Logistics Fleet'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex bg-[#070e17] p-1 rounded-lg border border-brand-border/60">
+            <button
+              onClick={() => {
+                setActivePanelMode('super_admin');
+                setActiveTab('Dashboard');
+                showToast("Switched to Super Admin Control Center Dashboard", "info");
+              }}
+              className={`flex-1 py-1 px-1 text-[9px] font-bold rounded flex items-center justify-center space-x-0.5 cursor-pointer ${
+                activePanelMode === 'super_admin' ? 'bg-brand-orange text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="w-3 h-3" />
+              <span>Super</span>
+            </button>
+            <button
+              onClick={() => {
+                setActivePanelMode('store');
+                setActiveTab('Store Dashboard');
+                 showToast("Switched to The NexaGo BD Admin Dashboard", "info");
+              }}
+              className={`flex-1 py-1 px-1 text-[9px] font-bold rounded flex items-center justify-center space-x-0.5 cursor-pointer ${
+                activePanelMode === 'store' ? 'bg-brand-orange text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <ShoppingCart className="w-3 h-3" />
+              <span>Store</span>
+            </button>
+            <button
+              onClick={() => {
+                setActivePanelMode('delivery');
+                setActiveTab('Dashboard');
+                showToast("Switched to Delivery Management Dashboard", "info");
+              }}
+              className={`flex-1 py-1 px-1 text-[9px] font-bold rounded flex items-center justify-center space-x-0.5 cursor-pointer ${
+                activePanelMode === 'delivery' ? 'bg-brand-orange text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Truck className="w-3 h-3" />
+              <span>Delivery</span>
+            </button>
+          </div>
+        </div>
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-none">
+          {sidebarItems.map((item) => {
+            const IconComp = item.icon;
+            const isActive = activeTab === item.name;
+            return (
+              <React.Fragment key={item.name}>
+                {item.section && (
+                  <div className="px-3 pt-3 pb-1 text-[9px] font-black uppercase tracking-wider text-brand-orange/90 border-t border-brand-border/40 mt-2 first:mt-0 first:border-0 first:pt-0">
+                    {item.section}
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setActiveTab(item.name);
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all relative ${
+                    isActive 
+                      ? 'bg-brand-orange text-white font-bold shadow-md' 
+                      : 'text-gray-300 hover:text-white hover:bg-[#132238]'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                    <span>{item.name}</span>
+                  </div>
+                  {item.badgeCount !== undefined && (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-brand-border/60 text-gray-300'
+                    }`}>
+                      {item.badgeCount}
+                    </span>
+                  )}
+                </button>
+              </React.Fragment>
+            );
+          })}
+
+          <button
+            onClick={() => {
+              showToast("Session reset. Welcome to The NexaGo BD Admin Panel!", "info");
+              setActiveTab('Dashboard');
+            }}
+            className="w-full flex items-center space-x-3 px-3 py-2.5 mt-3 rounded-lg text-xs font-semibold text-red-400 hover:text-white hover:bg-red-500/10 cursor-pointer transition-all"
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span>Logout</span>
+          </button>
+        </nav>
+
+        {/* Profile Footer */}
+        <div className="p-4 border-t border-brand-border/40 bg-brand-dark/30 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-9 h-9 rounded-full bg-brand-orange text-white flex items-center justify-center font-black text-xs shadow-md">
+              AU
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-white leading-tight">Admin User</h4>
+              <p className="text-[9px] text-gray-400 font-semibold uppercase">Super Administrator</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1.5 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-[9px] font-bold text-emerald-400">Online</span>
+          </div>
+        </div>
+      </aside>
+      )}
+
+      {/* Mobile Sidebar overlay Drawer */}
+      {isMobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden bg-brand-dark/80 backdrop-blur-xs">
+          <div className="w-64 bg-[#0c1624] border-r border-brand-border flex flex-col h-full animate-in slide-in-from-left duration-200">
+            <div className="p-4 border-b border-brand-border flex items-center justify-between bg-brand-dark/30">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-brand-orange text-white flex items-center justify-center font-black text-xs shadow-md">
+                  <Box className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xs font-black text-white tracking-wide uppercase">The NexaGo BD</h1>
+                  <p className="text-[9px] text-brand-orange font-bold uppercase">Admin Panel</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="text-gray-400 hover:text-white p-1 rounded hover:bg-brand-dark cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-none">
+              {sidebarItems.map((item) => {
+                const IconComp = item.icon;
+                const isActive = activeTab === item.name;
+                return (
+                  <React.Fragment key={item.name}>
+                    {item.section && (
+                      <div className="px-3 pt-3 pb-1 text-[9px] font-black uppercase tracking-wider text-brand-orange/90 border-t border-brand-border/40 mt-2 first:mt-0 first:border-0 first:pt-0">
+                        {item.section}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        setActiveTab(item.name);
+                        setIsMobileSidebarOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                        isActive 
+                          ? 'bg-brand-orange text-white font-bold shadow-md' 
+                          : 'text-gray-300 hover:text-white hover:bg-[#132238]'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                        <span>{item.name}</span>
+                      </div>
+                      {item.badgeCount !== undefined && (
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          isActive ? 'bg-white/20 text-white' : 'bg-brand-border/60 text-gray-300'
+                        }`}>
+                          {item.badgeCount}
+                        </span>
+                      )}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+
+              <button
+                onClick={() => {
+                  showToast("Session reset. Welcome to The NexaGo BD Admin Panel!", "info");
+                  setActiveTab('Dashboard');
+                  setIsMobileSidebarOpen(false);
+                }}
+                className="w-full flex items-center space-x-3 px-3 py-2.5 mt-3 rounded-lg text-xs font-semibold text-red-400 hover:text-white hover:bg-red-500/10 cursor-pointer transition-all"
+              >
+                <LogOut className="w-4 h-4 shrink-0" />
+                <span>Logout</span>
+              </button>
+            </nav>
+
+            <div className="p-4 border-t border-brand-border bg-brand-dark/30 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-full bg-brand-orange text-white flex items-center justify-center font-bold text-xs">AU</div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Admin User</h4>
+                  <p className="text-[9px] text-gray-400 font-semibold uppercase">Super Administrator</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1.5 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-[9px] font-bold text-emerald-400">Online</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MAIN VIEWPORT WRAPPER */}
+      <div className="flex-1 flex flex-col min-w-0">
+        
+        {/* HEADER BAR */}
+        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && (
+        <header className="h-16 border-b border-brand-border/60 bg-[#0c1624]/65 backdrop-blur-md flex items-center justify-between px-5 select-none shrink-0 sticky top-0 z-40">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-1.5 hover:bg-brand-dark text-gray-300 hover:text-white rounded lg:hidden cursor-pointer"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-wide uppercase">{activeTab}</h2>
+              <p className="text-[10px] text-gray-400 mt-0.5">Home &gt; {activeTab}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {/* Tight Mode Toggle Switch */}
+            <button
+              onClick={toggleTightMode}
+              className={`flex items-center space-x-2 px-3 py-1.5 bg-brand-dark/80 border hover:border-brand-orange/40 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                isTightMode ? 'text-brand-orange border-brand-orange/35' : 'text-gray-300 border-brand-border/80'
+              }`}
+              title="Toggle Compact UI Spacing (Tight Mode)"
+            >
+              <span className="font-bold uppercase text-[9px] tracking-wider">Tight Mode</span>
+              <div className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                isTightMode ? 'bg-brand-orange' : 'bg-gray-700'
+              }`}>
+                <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  isTightMode ? 'translate-x-3' : 'translate-x-0'
+                }`} />
+              </div>
+            </button>
+
+            {/* Date Picker Display */}
+            <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-brand-dark/80 border border-brand-border/80 rounded-lg text-xs font-semibold text-gray-300">
+              <Calendar className="w-3.5 h-3.5 text-brand-orange" />
+              <span>May 20, 2024 - May 26, 2024</span>
+            </div>
+
+            {/* Notification Center */}
+            <div className="relative">
+              <button
+                onClick={() => setIsNotifDropdownOpen(!isNotifDropdownOpen)}
+                className="p-1.5 bg-brand-dark hover:bg-brand-orange/10 border border-brand-border hover:border-brand-orange/30 text-gray-300 hover:text-brand-orange rounded-lg transition-all relative cursor-pointer"
+                title="Notifications Desk"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadNotifCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center animate-bounce">
+                    {unreadNotifCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Dropdown Drawer */}
+              {isNotifDropdownOpen && (
+                <div className="absolute right-0 mt-2.5 w-80 bg-[#0e1b2c] border border-brand-border rounded-xl shadow-2xl overflow-hidden z-50 fade-in">
+                  <div className="p-3 border-b border-brand-border bg-brand-dark/30 flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">System Alerts</span>
+                    {unreadNotifCount > 0 && (
+                      <button 
+                        onClick={handleMarkAllNotificationsAsRead}
+                        className="text-[10px] text-brand-orange hover:underline font-bold cursor-pointer"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto divide-y divide-brand-border/30">
+                    {notifications.slice(0, 4).map((notif) => (
+                      <div key={notif.id} className="p-3 hover:bg-brand-dark/30 transition-colors text-left">
+                        <div className="flex items-start justify-between">
+                          <h4 className={`text-xs font-bold ${notif.read ? 'text-gray-400' : 'text-white'}`}>{notif.title}</h4>
+                          <span className="text-[9px] text-gray-500">{notif.time}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-300 mt-1 line-clamp-2 leading-relaxed">{notif.message}</p>
+                      </div>
+                    ))}
+                    {notifications.length === 0 && (
+                      <div className="p-4 text-center text-xs text-gray-500 flex flex-col items-center justify-center space-y-1">
+                        <BellOff className="w-6 h-6 text-gray-600 mb-1" />
+                        <span>All alerts read</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2 bg-brand-dark/50 border-t border-brand-border text-center">
+                    <button 
+                      onClick={() => {
+                        setActiveTab('Notifications');
+                        setIsNotifDropdownOpen(false);
+                      }}
+                      className="text-[11px] text-gray-400 hover:text-white font-bold cursor-pointer hover:underline"
+                    >
+                      View All Alerts
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Profile Avatar Badge */}
+            <div className="flex items-center space-x-2.5 pl-2 border-l border-brand-border/40">
+              <div className="w-8.5 h-8.5 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-bold text-brand-orange text-xs">
+                AU
+              </div>
+              <div className="hidden sm:block text-left">
+                <h4 className="text-xs font-bold text-white leading-tight">Admin User</h4>
+                <p className="text-[9px] text-gray-500 font-semibold uppercase tracking-wider">Super Admin</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        )}
+
+        {/* TOAST SYSTEM */}
+        {toast && (
+          <div className="fixed top-20 right-4 z-[200] flex items-center space-x-2 px-4 py-3 bg-[#0c1a29] border-l-4 border-brand-orange text-white rounded-lg shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 text-xs">
+            <Check className="w-4 h-4 text-brand-orange" />
+            <span className="font-semibold">{toast.message}</span>
+          </div>
+        )}
+
+        {/* CORE CONTENT SWITCH CONTAINER */}
+        <main className={`flex-1 overflow-y-auto ${activeTab === 'Mobile App Simulator' || activeTab === 'POS System' ? 'p-0' : 'p-4 md:p-6'}`}>
+          {activeTab === 'Dashboard' && activePanelMode === 'super_admin' && (
+            <DashboardView 
+              orders={orders} 
+              drivers={drivers} 
+              zones={zones} 
+              notifications={notifications}
+              onNavigate={(tab) => setActiveTab(tab)}
+              onOpenQuickAction={(action) => setQuickActionModal(action)}
+              isTightMode={isTightMode}
+            />
+          )}
+
+          {activeTab === 'Dashboard' && activePanelMode === 'delivery' && (
+            <DeliveryDashboardView 
+              orders={orders}
+              drivers={drivers}
+              zones={zones}
+              vehicles={vehicles}
+              notifications={notifications}
+              onUpdateOrderStatus={handleUpdateOrder}
+              onUpdateDriver={handleUpdateDriver}
+              isTightMode={isTightMode}
+            />
+          )}
+
+          {(activeTab === 'Store Dashboard' || (activeTab === 'Dashboard' && activePanelMode === 'store')) && (
+            <StoreDashboardView 
+              orders={orders} 
+              onNavigate={(tab) => setActiveTab(tab)}
+              productsCount={products.length}
+              categoriesCount={categories.length}
+              customersCount={users.length}
+              reviewsCount={reviews.length}
+              isTightMode={isTightMode}
+            />
+          )}
+
+          {(activeTab === 'Users Management' || activeTab === 'Customers') && (
+            <UsersView 
+              users={users}
+              onAddUser={handleAddUser}
+              onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
+            />
+          )}
+
+          {(activeTab === 'Drivers Management' || activeTab === 'Suppliers') && (
+            <DriversView 
+              drivers={drivers}
+              onAddDriver={handleAddDriver}
+              onUpdateDriver={handleUpdateDriver}
+              onDeleteDriver={handleDeleteDriver}
+              vehicles={[{id:'V001',regNo:'DHAKA METRO-HA-54-3210',type:'Motorcycle',brand:'Yamaha',model:'FZ-S FI V3',year:2023,driverName:'Rahim Khan',fuelType:'Octane',status:'Active',fuelCost:12400,maintenanceCost:5800,odoKm:28500,downtime:5},{id:'V002',regNo:'DHAKA METRO-LA-23-5678',type:'Motorcycle',brand:'Suzuki',model:'Gixxer 150 Fi',year:2024,driverName:'Shakib Hasan',fuelType:'Petrol',status:'Active',fuelCost:9800,maintenanceCost:3200,odoKm:19200,downtime:2}]}
+            />
+          )}
+
+          {(activeTab === 'Orders Management' || activeTab === 'Orders') && (
+            <OrdersView 
+              orders={orders}
+              drivers={drivers}
+              onAddOrder={handleAddOrder}
+              onUpdateOrder={handleUpdateOrder}
+              onDeleteOrder={handleDeleteOrder}
+              onAssignDriver={handleAssignDriver}
+              onCancelOrder={(order, note) => {
+                handleAddNotification({ title: '🚫 Order Cancelled — ' + order.id, message: note, type: 'system' });
+                showToast(`Order #${order.id} cancelled by admin · ${note}`, 'info');
+              }}
+              onReactivateOrder={handleReactivateOrder}
+              onUndoStatus={(order) => {
+                if (order.status === 'Completed') {
+                  handleUpdateOrder({ ...order, status: 'Ongoing' });
+                  showToast(`Order #${order.id} status undone → Ongoing`, 'info');
+                }
+              }}
+              showToast={showToast}
+            />
+          )}
+
+          {(activeTab === 'Payments' || activeTab === 'Earnings & Payouts') && (
+            <EarningsView payments={payments} drivers={drivers} orders={orders} />
+          )}
+
+          {activeTab === 'MFS Business & Settlement' && (
+            <MFSBusinessView orders={orders} />
+          )}
+
+          {activeTab === 'POS System' && (
+            <PosSystem products={products} orders={orders} onProductsChange={setProducts} onCreateOrder={handleSilentAddOrder} onUpdateOrder={handleUpdateOrder} onSendToDriver={setDriverDispatchOrder} onDeleteOrder={handleDeleteOrder} onNavigate={setActiveTab} />
+          )}
+
+          {activeTab === 'Vehicles Management' && (
+            <VehiclesView />
+          )}
+
+          {(activeTab === 'Zones & Areas' || activeTab === 'Delivery Management') && (
+            <ZonesView 
+              zones={zones}
+              liveDrivers={liveDrivers}
+              locSim={locSim}
+              onToggleLocSim={() => setLocSim(!locSim)}
+              simTick={simTick}
+              onAddZone={handleAddZone}
+              onUpdateZone={handleUpdateZone}
+              onDeleteZone={handleDeleteZone}
+            />
+          )}
+
+          {activeTab === 'Settings' && (
+            <SettingsView />
+          )}
+
+          {activeTab === 'Support Tickets' && (
+            <SupportView 
+              tickets={supportTickets}
+              onReplyTicket={handleReplyTicket}
+              onUpdateStatus={handleUpdateTicketStatus}
+              orders={orders}
+              chatLog={chatLog}
+              reports={orderReports}
+              onPaymentRefund={handlePaymentRefund}
+              onNotify={handleAddNotification}
+            />
+          )}
+
+          {activeTab === 'Stores & Merchants' && (
+            renderGenericView('Stores')
+          )}
+
+          {activeTab === 'Customer Storefront' && (
+            renderGenericView('Customer Site')
+          )}
+
+          {activeTab === 'Mobile App Simulator' && (
+            <MobileAppSimulator 
+              orders={orders}
+              liveDrivers={liveDrivers}
+              drivers={drivers}
+              stores={stores}
+              products={products}
+              zones={zones}
+              users={users}
+              payments={payments}
+              vehicles={vehicles}
+              banners={banners}
+              supportTickets={supportTickets}
+              notifications={notifications}
+              categories={categories}
+              coupons={coupons}
+              staff={staff}
+              reviews={reviews}
+              marketing={marketing}
+              onAddOrder={handleSilentAddOrder}
+              onUpdateOrder={handleSilentUpdateOrder}
+              onUpdateDriver={handleUpdateDriver}
+              onDriversChange={setDrivers}
+              onProductsChange={setProducts}
+              onStoresChange={setStores}
+              onZonesChange={setZones}
+              onUsersChange={setUsers}
+              onPaymentsChange={setPayments}
+              onVehiclesChange={setVehicles}
+              onBannersChange={setBanners}
+              onTicketsChange={setSupportTickets}
+              onNotificationsChange={setNotifications}
+              onCategoriesChange={setCategories}
+              onCouponsChange={setCoupons}
+              onStaffChange={setStaff}
+              onReviewsChange={setReviews}
+              onMarketingChange={setMarketing}
+              onReport={handleOrderReport}
+              onChatLogChange={setChatLog}
+              incomingDispatch={driverDispatchOrder}
+              adminDispatch={adminDispatchOrder}
+              customerDispatchOrder={customerDispatchOrder}
+              onDriverRejected={(id) => { handleAddNotification({ title: '🚫 Driver Rejected — ' + id, message: `Driver rejected order #${id} — assign a rider from the Orders tab`, type: 'system' }); }}
+              onStoreRejected={(id) => { handleAddNotification({ title: '🚫 Store Rejected — ' + id, message: `Store rejected order #${id} — no rider assigned yet`, type: 'system' }); }}
+              showToast={showToast}
+            />
+          )}
+
+          {/* Render high-fidelity dynamic panel for other active tabs */}
+          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator'].includes(activeTab) && (
+            renderGenericView(activeTab)
+          )}
+        </main>
+
+        {/* APP FOOTER LINE */}
+        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && (
+        <footer className="py-4 border-t border-brand-border/40 text-center text-[10px] text-gray-500 select-none bg-[#0c1624]/20">
+          <p>© 2026 The NexaGo BD. All rights reserved. Version 1.0.0 &nbsp;|&nbsp; Support: <span className="text-brand-orange">thenexagobd@gmail.com</span></p>
+        </footer>
+        )}
+      </div>
+
+      {/* QUICK ACTIONS SUBMIT POPUP MODAL (Triggers direct dashboard quick grid submits) */}
+      {quickActionModal && (
+        <div className="fixed inset-0 z-50 bg-brand-dark/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-brand-card border border-brand-border rounded-xl max-w-sm w-full overflow-hidden shadow-2xl fade-in">
+            <div className="flex items-center justify-between p-4 border-b border-brand-border">
+              <h3 className="font-semibold text-white text-xs uppercase tracking-wider">
+                Quick Action: Add {quickActionModal}
+              </h3>
+              <button
+                onClick={() => setQuickActionModal(null)}
+                className="text-gray-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickActionSubmit} className="p-4 space-y-4">
+              {quickActionModal === 'driver' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Driver Name</label>
+                    <input name="name" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Shakib Hasan" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Phone Number</label>
+                    <input name="phone" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="01712345678" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Vehicle Type</label>
+                    <input name="vehicleType" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Motorcycle (Honda 125)" />
+                  </div>
+                </>
+              )}
+
+              {quickActionModal === 'user' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">User Full Name</label>
+                    <input name="name" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Rahim Khan" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Email Address</label>
+                    <input name="email" type="email" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="rahim@email.com" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Phone</label>
+                    <input name="phone" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="01811223344" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Role Type</label>
+                    <select name="role" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none cursor-pointer">
+                      <option value="Customer">Customer</option>
+                      <option value="Admin">Admin</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {quickActionModal === 'zone' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">New Coverage Zone Name</label>
+                  <input name="name" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="e.g. Mirpur, Farmgate" />
+                </div>
+              )}
+
+              {quickActionModal === 'notification' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Announcement Title</label>
+                    <input name="title" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="System alert description" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Message Body</label>
+                    <textarea name="message" required rows={3} className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none resize-none" placeholder="Alert message detailed description..." />
+                  </div>
+                </>
+              )}
+
+              {quickActionModal === 'banner' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Campaign Title Headline</label>
+                    <input name="title" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="e.g. Eid 20% off with bKash" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Campaign Subtitle Description</label>
+                    <input name="subtitle" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Use coupon code EID20" />
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-brand-border/40">
+                <button
+                  type="button"
+                  onClick={() => setQuickActionModal(null)}
+                  className="px-4 py-2 bg-brand-dark border border-brand-border hover:bg-brand-border/30 text-gray-300 rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  Apply Action
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

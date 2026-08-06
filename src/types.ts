@@ -1,0 +1,192 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface Order {
+  id: string; // e.g. "ORD-001248"
+  storeName: string;
+  address: string;
+  status: 'Completed' | 'Pending' | 'Confirmed' | 'Processing' | 'Cancelled' | 'Ongoing';
+  amount: number;
+  date: string; // "May 20", etc.
+  time?: string; // "11:46 AM", etc.
+  customerName: string;
+  customerPhone?: string; // e.g. "01712-345678"
+  driverId?: string;
+  paymentMethod: string;
+  pickupCoords?: { lat: number; lng: number };
+  deliveryCoords?: { lat: number; lng: number };
+  priority?: 'Normal' | 'Express' | 'Urgent';
+  pickupLocation?: string;
+  zone?: string;
+  itemCount?: number;
+  parcelSize?: 'Small' | 'Medium' | 'Large';
+  instructions?: string;
+  deliveryCharge?: number;
+  codAmount?: number;
+  estimatedMinutes?: number;
+  items?: Array<{ productId: string; name: string; price: number; quantity: number }>;
+  scheduledSlot?: string;
+  deliveryPin?: string;
+  splitWalletAmount?: number;
+  source?: 'customer-app' | 'pos-dispatch' | 'counter';
+  pickedUp?: boolean;
+  extraStores?: string[];
+}
+
+export type DriverDutyStatus = 'Online' | 'Offline' | 'On-Delivery';
+
+// Big numeric order id shared across Admin / Customer / Store / Driver (e.g. 4577685123)
+export const makeOrderId = () => `45${String(Date.now()).slice(-8)}`;
+
+export interface DriverDocument {
+  type: 'NID Card' | 'Driving License' | 'Vehicle Registration' | 'Profile Photo' | 'Other';
+  fileName: string;
+  submittedAt: string;
+  status: 'Pending' | 'Verified' | 'Rejected';
+}
+
+export interface DriverStatusLog {
+  id: string;
+  status: DriverDutyStatus;
+  timestamp: string; // ISO format or formatted timestamp
+  formattedTime?: string;
+  reason?: string;
+  updatedBy?: string;
+  location?: string;
+  durationMinutes?: number;
+}
+
+export interface Driver {
+  id: string; // e.g. "DRV123456"
+  name: string;
+  completedOrders: number;
+  earnings: number;
+  rating: number;
+  status: DriverDutyStatus;
+  phone: string;
+  vehicleType: string;
+  dispatchLocked?: boolean;
+  commissionRate?: number;
+  verificationStatus?: 'Verified' | 'Pending Audit' | 'Rejected';
+  codCashCollected?: number;
+  nidNumber?: string;
+  licenseNumber?: string;
+  documents?: DriverDocument[];
+  statusHistory?: DriverStatusLog[];
+  locationCoords?: { lat: number; lng: number };
+  currentZone?: string;
+}
+
+export interface Zone {
+  id: string;
+  name: string;
+  ordersCount: number;
+  earnings: number;
+  status: 'Active' | 'Inactive';
+  pendingOrders?: number;
+  activeDrivers?: number;
+  avgDeliveryMin?: number;
+  totalKm?: number;
+  drivers?: string[];
+  coveragePct?: number;
+  deliveryFee?: number;
+  minOrder?: number;
+  operatingHours?: string;
+  peakHourOrders?: number;
+  returnRate?: number;
+  satisfaction?: number;
+  coords?: { x: number; y: number }[];
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'Customer' | 'Admin' | 'Super Admin';
+  status: 'Active' | 'Suspended';
+  joinDate: string;
+  ordersCount: number;
+  walletBalance?: number;
+  membershipTier?: 'Standard' | 'Silver VIP' | 'Gold VIP';
+  address?: string;
+}
+
+export interface Payment {
+  id: string;
+  orderId: string;
+  amount: number;
+  method: string;
+  status: 'Paid' | 'Pending' | 'Failed' | 'Refunded';
+  date: string;
+}
+
+export interface Vehicle {
+  id: string;
+  type: 'Bike' | 'Bicycle' | 'Car' | 'Van' | 'Motorcycle';
+  plateNumber: string;
+  driverName: string;
+  status: 'Active' | 'Maintenance' | 'Inactive';
+}
+
+export interface PromotionBanner {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl?: string;
+  status: 'Active' | 'Scheduled' | 'Expired';
+  startDate: string;
+  endDate: string;
+  clicks: number;
+}
+
+export interface SupportTicket {
+  id: string;
+  user: string;
+  subject: string;
+  priority: 'Low' | 'Medium' | 'High';
+  status: 'Open' | 'In Progress' | 'Resolved';
+  date: string;
+  messages: Array<{
+    sender: 'user' | 'admin';
+    text: string;
+    time: string;
+  }>;
+}
+
+export interface SystemNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'order' | 'system' | 'driver' | 'payment';
+  time: string;
+  read: boolean;
+}
+
+export interface ChatLogEntry {
+  sender: 'customer' | 'driver';
+  name: string;
+  text: string;
+  time: string;
+  image?: string;
+  orderId: string;
+}
+
+export interface OrderReportEntry {
+  orderId: string;
+  reason: string;
+  note: string;
+  time: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  stock: number;
+  status: string;
+  image?: string;
+}

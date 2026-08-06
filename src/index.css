@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-dark: #080f19;
+  --color-brand-card: #0e1a2b;
+  --color-brand-border: #162a45;
+  --color-brand-orange: #f26522;
+  --color-brand-orange-hover: #d95316;
+  --color-brand-green: #10b981;
+  --color-brand-blue: #3b82f6;
+  --color-brand-red: #ef4444;
+}
+
+/* Base style resets */
+html, body, #root {
+  background-color: #080f19;
+  color: #f3f4f6;
+  font-family: var(--font-sans);
+  min-height: 100vh;
+}
+
+/* Thermal (80mm) receipt paper for all printable receipts */
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
+/* Print ONLY the active receipt (PosSystem, payouts, etc.), nothing else */
+@media print {
+  html, body { margin: 0 !important; padding: 0 !important; }
+  body * { visibility: hidden !important; }
+  #pos-receipt, #pos-receipt * { visibility: visible !important; }
+  #pos-receipt {
+    position: absolute !important;
+    left: 0 !important; top: 0 !important;
+    width: 80mm !important; max-width: 80mm !important;
+    max-height: none !important; overflow: visible !important;
+    box-shadow: none !important; border: none !important; margin: 0 !important;
+    page-break-inside: avoid !important; break-inside: avoid !important;
+  }
+  .no-print { display: none !important; visibility: hidden !important; }
+}
+
+/* Custom Webkit scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080f19;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #162a45;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #203e66;
+}
+
+/* Smooth fade in transition classes */
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

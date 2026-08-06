@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: nexago-relay
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server/relay.mjs
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: RELAY_PUBLIC_URL
+        sync: false

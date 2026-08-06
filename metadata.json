@@ -1,0 +1,8 @@
+{
+  "name": "Smart Delivery",
+  "description": "High-fidelity, responsive, and fully interactive admin dashboard for Smart Delivery services, with live-updating statistics, order flows, driver profiles, and management views.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

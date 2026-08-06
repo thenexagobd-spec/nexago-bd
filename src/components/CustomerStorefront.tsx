@@ -1,0 +1,3268 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ShoppingBag, Search, MapPin, Bell, Heart, CreditCard, Wallet, Ticket,
+  HelpCircle, Settings, LogOut, ChevronDown, ChevronLeft, ChevronRight, Filter, Star,
+  Clock, Truck, Shield, Gift, Store, Plus, Minus, CheckCircle, X,
+  ShieldCheck, Home, Package, Map, Phone, Copy, Check, RefreshCw,
+  Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
+  RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
+  Sun, Moon, MessageCircle, BellPlus, Share2, LocateFixed, CalendarClock, AlertCircle
+} from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { Order, Product } from '../types';
+import LeafletMap, { LiveVeh } from './LeafletMap';
+import { LiveDriverSim } from '../hooks/useLiveDrivers';
+import { getStoredData, setStoredData } from '../data';
+
+interface CustomerStorefrontProps {
+  stores: Array<{
+    id: string;
+    name: string;
+    address: string;
+    status: string;
+    rating: number;
+    orders: number;
+    category?: string;
+  }>;
+  products: Product[];
+  orders: Order[];
+  liveDrivers: LiveDriverSim[];
+  onAddOrder: (orderData: Omit<Order, 'id' | 'date'>) => void;
+  onUpdateOrder: (order: Order) => void;
+  onSilentUpdateOrder?: (order: Order) => void;
+  onReturnToAdmin: () => void;
+  onLaunchMerchantStore: (storeId: string) => void;
+  onReport?: (report: { orderId: string; reason: string; note: string }) => void;
+  showToast: (message: string, type?: 'success' | 'info') => void;
+}
+
+interface SavedAddress {
+  id: string;
+  title: string;
+  address: string;
+  area: string;
+  phone: string;
+  isDefault: boolean;
+}
+
+interface SavedPaymentMethod {
+  id: string;
+  type: 'bKash' | 'Nagad' | 'Card' | 'COD';
+  accountName: string;
+  accountNumber: string;
+  isDefault: boolean;
+  pin?: string;
+}
+
+interface WalletTransaction {
+  id: string;
+  type: 'Top-Up' | 'Order Payment' | 'Refund' | 'Cashback';
+  amount: number;
+  date: string;
+  status: 'Completed' | 'Pending';
+}
+
+interface SupportTicketItem {
+  id: string;
+  subject: string;
+  category: string;
+  status: 'Open' | 'Resolved' | 'In Progress';
+  date: string;
+  lastMessage: string;
+}
+
+interface StoreProduct {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  stock: number;
+  status: string;
+  unit: string;
+  desc: string;
+  image: string;
+}
+
+interface StoreDef {
+  id: string;
+  name: string;
+  subtext: string;
+  category: string;
+  badgeColor: string;
+  rating: number;
+  reviewsCount: string;
+  deliveryTime: string;
+  deliveryFee: number;
+  image: string;
+  logoText: string;
+  logoBg: string;
+  pickup: { lat: number; lng: number };
+  catalog: StoreProduct[];
+}
+
+const AREA_COORDS: Record<string, [number, number]> = {
+  'Dhanmondi': [23.7539, 90.3836],
+  'Gulshan': [23.8133, 90.4301],
+  'Banani': [23.8168, 90.4234],
+  'Mirpur': [23.7998, 90.3665],
+  'Motijheel': [23.7822, 90.4145],
+  'Uttara': [23.8759, 90.3795],
+  'Badda': [23.8286, 90.4183],
+  'Tejgaon': [23.7995, 90.4349],
+  'Farmgate': [23.7936, 90.4045],
+  'Shahbagh': [23.7806, 90.4009],
+};
+
+const U = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=600`;
+
+const STORE_DEFS: StoreDef[] = [
+  {
+    id: 'S1', name: 'Fresh Mart', subtext: 'The NexaGo BD', category: 'Grocery',
+    badgeColor: 'bg-emerald-600 text-white', rating: 4.6, reviewsCount: '230+',
+    deliveryTime: '30-40 min', deliveryFee: 40,
+    image: U('photo-1542838132-92c53300491e'), logoText: 'Fresh Mart', logoBg: 'bg-emerald-100 text-emerald-800',
+    pickup: { lat: 23.7806, lng: 90.4009 },
+    catalog: [
+      { id: 'S1-P1', name: 'Fresh Apples (Premium)', price: 180, category: 'Fruits & Veg', stock: 45, status: 'In Stock', unit: '1 kg', desc: 'Crisp, juicy imported apples. Perfect for snacks & salads.', image: U('photo-1560806887-1e4cd0b6cbd6') },
+      { id: 'S1-P2', name: 'Organic Bananas', price: 90, category: 'Fruits & Veg', stock: 120, status: 'In Stock', unit: '12 pcs', desc: 'Farm-fresh sweet bananas, rich in potassium.', image: U('photo-1571771894821-ce9b6c11b08e') },
+      { id: 'S1-P3', name: 'Miniket Rice 5kg', price: 380, category: 'Rice & Grains', stock: 35, status: 'In Stock', unit: '5 kg', desc: 'Premium Miniket rice, soft and aromatic.', image: U('photo-1586201375761-83865001e31c') },
+      { id: 'S1-P4', name: 'Whole Milk 1L', price: 95, category: 'Dairy & Eggs', stock: 60, status: 'In Stock', unit: '1 L', desc: 'Full-cream pasteurised cow milk, farm fresh daily.', image: U('photo-1550583724-b2692b85b150') },
+      { id: 'S1-P5', name: 'Fresh Farm Eggs (Dozen)', price: 145, category: 'Dairy & Eggs', stock: 80, status: 'In Stock', unit: '12 pcs', desc: 'Grade-A brown eggs from local farms.', image: U('photo-1582722872445-44dc5f7e3c8f') },
+      { id: 'S1-P6', name: 'Brown Bread 400g', price: 65, category: 'Bakery', stock: 15, status: 'In Stock', unit: '400 g', desc: 'Whole-grain brown bread, high fibre.', image: U('photo-1509440159596-0249088772ff') },
+      { id: 'S1-P7', name: 'Tomatoes (Local)', price: 80, category: 'Fruits & Veg', stock: 9, status: 'Low Stock', unit: '1 kg', desc: 'Vine-ripened local tomatoes.', image: U('photo-1546094096-0df4bcaaa337') },
+      { id: 'S1-P8', name: 'Onion (Local)', price: 65, category: 'Fruits & Veg', stock: 50, status: 'In Stock', unit: '1 kg', desc: 'Fresh local onions.', image: U('photo-1508747703725-719777637510') },
+      { id: 'S1-P9', name: 'Soybean Oil 2L', price: 350, category: 'Oil & Ghee', stock: 28, status: 'In Stock', unit: '2 L', desc: 'Refined soybean cooking oil.', image: U('photo-1474979266404-7eaacbcd87c5') },
+      { id: 'S1-P10', name: 'White Sugar 1kg', price: 130, category: 'Sugar & Salt', stock: 0, status: 'Out of Stock', unit: '1 kg', desc: 'Fine granulated sugar.', image: U('photo-1584744982491-665216d95f8b') },
+    ]
+  },
+  {
+    id: 'S2', name: 'Daily Shopper', subtext: 'Supermarket', category: 'Supermarket',
+    badgeColor: 'bg-orange-500 text-white', rating: 4.5, reviewsCount: '180+',
+    deliveryTime: '40-50 min', deliveryFee: 50,
+    image: U('photo-1578916171728-46686eac8d58'), logoText: 'DS', logoBg: 'bg-orange-100 text-orange-800',
+    pickup: { lat: 23.7822, lng: 90.4145 },
+    catalog: [
+      { id: 'S2-P1', name: 'Toilet Paper 12 Roll', price: 420, category: 'Household', stock: 30, status: 'In Stock', unit: '12 rolls', desc: '3-ply soft toilet rolls.', image: U('photo-1584634731339-252c581abfc5') },
+      { id: 'S2-P2', name: 'Detergent Powder 1kg', price: 210, category: 'Household', stock: 40, status: 'In Stock', unit: '1 kg', desc: 'Stain-removing laundry detergent.', image: U('photo-1585699324551-f6c309eedeca') },
+      { id: 'S2-P3', name: 'Dishwash Liquid 500ml', price: 120, category: 'Household', stock: 25, status: 'In Stock', unit: '500 ml', desc: 'Lemon-fresh dishwashing liquid.', image: U('photo-1620381131645-6c135a50e3cb') },
+      { id: 'S2-P4', name: 'Shampoo 350ml', price: 320, category: 'Personal Care', stock: 18, status: 'In Stock', unit: '350 ml', desc: 'Anti-dandruff herbal shampoo.', image: U('photo-1556228720-195a672e8a03') },
+      { id: 'S2-P5', name: 'Toothpaste 150g', price: 140, category: 'Personal Care', stock: 55, status: 'In Stock', unit: '150 g', desc: 'Fluoride protection toothpaste.', image: U('photo-1585421514738-01798e13b998') },
+      { id: 'S2-P6', name: 'Bath Soap (3 Pack)', price: 180, category: 'Personal Care', stock: 7, status: 'Low Stock', unit: '3 pcs', desc: 'Moisturising bath soap bars.', image: U('photo-1583947215259-38e31be8751f') },
+      { id: 'S2-P7', name: 'Instant Noodles (5 Pack)', price: 175, category: 'Snacks', stock: 0, status: 'Out of Stock', unit: '5 pcs', desc: 'Quick-cook masala noodles.', image: U('photo-1612929633738-8fe44f7ec841') },
+      { id: 'S2-P8', name: 'Family Biscuits 500g', price: 160, category: 'Snacks', stock: 42, status: 'In Stock', unit: '500 g', desc: 'Crunchy tea-time biscuits.', image: U('photo-1558961363-fa8fdf82db35') },
+    ]
+  },
+  {
+    id: 'S3', name: 'Spice Garden', subtext: 'Bangladeshi · Indian', category: 'Restaurant',
+    badgeColor: 'bg-red-600 text-white', rating: 4.7, reviewsCount: '320+',
+    deliveryTime: '35-45 min', deliveryFee: 60,
+    image: U('photo-1517248135467-4c7edcad34c4'), logoText: 'SG', logoBg: 'bg-red-100 text-red-800',
+    pickup: { lat: 23.7539, lng: 90.3836 },
+    catalog: [
+      { id: 'S3-P1', name: 'Kacchi Biryani', price: 420, category: 'Biryani', stock: 30, status: 'In Stock', unit: '1 plate', desc: 'Fragrant basmati kacchi with tender mutton.', image: U('photo-1596797038530-2c107229654b') },
+      { id: 'S3-P2', name: 'Chicken Biryani', price: 280, category: 'Biryani', stock: 40, status: 'In Stock', unit: '1 plate', desc: 'Classic chicken biryani with mint raita.', image: U('photo-1563379091339-03b21ab4a4f8') },
+      { id: 'S3-P3', name: 'Beef Bhuna', price: 480, category: 'Mains', stock: 22, status: 'In Stock', unit: '1 plate', desc: 'Slow-cooked spicy beef bhuna.', image: U('photo-1604908176997-125f25cc6f3d') },
+      { id: 'S3-P4', name: 'Tandoori Chicken (Half)', price: 380, category: 'Mains', stock: 16, status: 'In Stock', unit: 'half', desc: 'Char-grilled tandoori chicken.', image: U('photo-1604503468506-a8da13d82791') },
+      { id: 'S3-P5', name: 'Garlic Naan', price: 80, category: 'Breads', stock: 50, status: 'In Stock', unit: '1 pc', desc: 'Fresh tandoor naan with garlic butter.', image: U('photo-1601050690597-df0568f70950') },
+      { id: 'S3-P6', name: 'Veg Curry & Rice', price: 180, category: 'Mains', stock: 8, status: 'Low Stock', unit: '1 plate', desc: 'Mixed vegetable curry with steamed rice.', image: U('photo-1512621776951-a57141f2eefd') },
+      { id: 'S3-P7', name: 'Misti Doi', price: 120, category: 'Dessert', stock: 25, status: 'In Stock', unit: '1 cup', desc: 'Traditional caramelised sweet yoghurt.', image: U('photo-1551024506-0bccd828d307') },
+      { id: 'S3-P8', name: 'Lemon Mint Sharbat', price: 90, category: 'Drinks', stock: 0, status: 'Out of Stock', unit: '1 glass', desc: 'Refreshing mint lemonade.', image: U('photo-1600271886742-f049cd451bba') },
+    ]
+  },
+  {
+    id: 'S4', name: 'Burger House', subtext: 'Fast Food · Burgers', category: 'Fast Food',
+    badgeColor: 'bg-amber-600 text-white', rating: 4.4, reviewsCount: '150+',
+    deliveryTime: '25-35 min', deliveryFee: 40,
+    image: U('photo-1568901346375-23c9450c58cd'), logoText: 'BH', logoBg: 'bg-amber-100 text-amber-800',
+    pickup: { lat: 23.7936, lng: 90.4045 },
+    catalog: [
+      { id: 'S4-P1', name: 'Classic Beef Burger', price: 320, category: 'Burgers', stock: 35, status: 'In Stock', unit: '1 pc', desc: 'Juicy beef patty, cheese, fresh veggies.', image: U('photo-1568901346375-23c9450c58cd') },
+      { id: 'S4-P2', name: 'Zinger Chicken Burger', price: 280, category: 'Burgers', stock: 30, status: 'In Stock', unit: '1 pc', desc: 'Crispy fried chicken zinger.', image: U('photo-1550547660-d9450f859349') },
+      { id: 'S4-P3', name: 'French Fries (Large)', price: 130, category: 'Sides', stock: 60, status: 'In Stock', unit: 'large', desc: 'Golden crispy fries with dip.', image: U('photo-1573080496219-bb080dd4f877') },
+      { id: 'S4-P4', name: 'BBQ Wings (6 pc)', price: 260, category: 'Sides', stock: 20, status: 'In Stock', unit: '6 pcs', desc: 'Smoky grilled BBQ wings.', image: U('photo-1567620832903-9fc6debc209f') },
+      { id: 'S4-P5', name: 'Chocolate Shake', price: 190, category: 'Drinks', stock: 12, status: 'In Stock', unit: '1 glass', desc: 'Thick cold chocolate milkshake.', image: U('photo-1572490122747-3968b75cc699') },
+      { id: 'S4-P6', name: 'Cold Coffee', price: 170, category: 'Drinks', stock: 9, status: 'Low Stock', unit: '1 glass', desc: 'Iced blended coffee.', image: U('photo-1461023058943-07fcbe16d735') },
+      { id: 'S4-P7', name: 'Cheese Fries', price: 180, category: 'Sides', stock: 0, status: 'Out of Stock', unit: '1 box', desc: 'Fries loaded with cheese sauce.', image: U('photo-1541592106381-b31e9677c0e5') },
+    ]
+  },
+  {
+    id: 'S5', name: 'MedPlus', subtext: 'Pharmacy', category: 'Pharmacy',
+    badgeColor: 'bg-blue-600 text-white', rating: 4.6, reviewsCount: '210+',
+    deliveryTime: '30-40 min', deliveryFee: 40,
+    image: U('photo-1586015555751-63bb77f4322a'), logoText: 'MP', logoBg: 'bg-blue-100 text-blue-800',
+    pickup: { lat: 23.8096, lng: 90.4144 },
+    catalog: [
+      { id: 'S5-P1', name: 'Paracetamol 500mg (20)', price: 30, category: 'Pain Relief', stock: 100, status: 'In Stock', unit: '20 tabs', desc: 'Fever & headache relief tablets.', image: U('photo-1584308666744-24d5c474f2ae') },
+      { id: 'S5-P2', name: 'Vitamin C 1000mg (30)', price: 450, category: 'Vitamins', stock: 40, status: 'In Stock', unit: '30 tabs', desc: 'Immune support effervescent.', image: U('photo-1587854692152-cbe660dbde88') },
+      { id: 'S5-P3', name: 'Digital Thermometer', price: 250, category: 'Devices', stock: 15, status: 'In Stock', unit: '1 pc', desc: 'Fast digital body thermometer.', image: U('photo-1583947581279-4eec4ae225d1') },
+      { id: 'S5-P4', name: 'Antiseptic Bandage', price: 60, category: 'First Aid', stock: 50, status: 'In Stock', unit: '1 pc', desc: 'Waterproof wound bandage.', image: U('photo-1576091160399-112ba8d25d1d') },
+      { id: 'S5-P5', name: 'Hand Sanitizer 100ml', price: 110, category: 'First Aid', stock: 5, status: 'Low Stock', unit: '100 ml', desc: '70% alcohol hand sanitiser.', image: U('photo-1585386959984-a4155224a1ad') },
+      { id: 'S5-P6', name: 'BP Monitor (Digital)', price: 1850, category: 'Devices', stock: 8, status: 'In Stock', unit: '1 pc', desc: 'Automatic arm blood pressure monitor.', image: U('photo-1584384358998-1c3b19760f2f') },
+      { id: 'S5-P7', name: 'Antacid 250ml', price: 140, category: 'Digestive', stock: 0, status: 'Out of Stock', unit: '250 ml', desc: 'Fast heartburn & acidity relief.', image: U('photo-1471864190281-a93a3070b6de') },
+    ]
+  },
+  {
+    id: 'S6', name: 'Fresh Valley', subtext: 'Fruits & Vegetables', category: 'Fruits & Veg',
+    badgeColor: 'bg-green-700 text-white', rating: 4.5, reviewsCount: '160+',
+    deliveryTime: '20-30 min', deliveryFee: 30,
+    image: U('photo-1610832958506-aa56368176cf'), logoText: 'FV', logoBg: 'bg-green-100 text-green-800',
+    pickup: { lat: 23.7864, lng: 90.4097 },
+    catalog: [
+      { id: 'S6-P1', name: 'Ripe Mangoes (Alphonso)', price: 150, category: 'Fruits', stock: 40, status: 'In Stock', unit: '1 kg', desc: 'Sweet juicy seasonal mangoes.', image: U('photo-1553279768-865429fa0078') },
+      { id: 'S6-P2', name: 'Seedless Watermelon', price: 160, category: 'Fruits', stock: 20, status: 'In Stock', unit: '1 pc', desc: 'Fresh whole watermelon.', image: U('photo-1587049352846-4a222e784d38') },
+      { id: 'S6-P3', name: 'Cucumber', price: 40, category: 'Vegetables', stock: 70, status: 'In Stock', unit: '500 g', desc: 'Crisp fresh cucumbers.', image: U('photo-1604977042946-1eecc30f269e') },
+      { id: 'S6-P4', name: 'Carrot', price: 70, category: 'Vegetables', stock: 55, status: 'In Stock', unit: '1 kg', desc: 'Fresh orange carrots.', image: U('photo-1447175008436-054170c2e979') },
+      { id: 'S6-P5', name: 'Green Coriander', price: 25, category: 'Herbs', stock: 30, status: 'In Stock', unit: '100 g', desc: 'Fresh coriander leaves.', image: U('photo-1532336414038-cf19250c5757') },
+      { id: 'S6-P6', name: 'Ginger', price: 130, category: 'Vegetables', stock: 6, status: 'Low Stock', unit: '500 g', desc: 'Fresh local ginger.', image: U('photo-1596040033229-a9821ebd058d') },
+      { id: 'S6-P7', name: 'Strawberries', price: 290, category: 'Fruits', stock: 0, status: 'Out of Stock', unit: '250 g', desc: 'Imported fresh strawberries.', image: U('photo-1464965911861-746a04b4bca6') },
+    ]
+  },
+  {
+    id: 'S7', name: 'Meat Express', subtext: 'Meat & Fish Shop', category: 'Meat & Fish',
+    badgeColor: 'bg-rose-700 text-white', rating: 4.3, reviewsCount: '120+',
+    deliveryTime: '30-40 min', deliveryFee: 50,
+    image: U('photo-1607623814075-e51df1bdc82f'), logoText: 'ME', logoBg: 'bg-rose-100 text-rose-800',
+    pickup: { lat: 23.7998, lng: 90.3665 },
+    catalog: [
+      { id: 'S7-P1', name: 'Beef (Boneless)', price: 980, category: 'Beef', stock: 30, status: 'In Stock', unit: '1 kg', desc: 'Fresh local beef, cut to order.', image: U('photo-1544025162-d76694265947') },
+      { id: 'S7-P2', name: 'Broiler Chicken', price: 230, category: 'Chicken', stock: 45, status: 'In Stock', unit: '1 kg', desc: 'Fresh dressed broiler chicken.', image: U('photo-1604503468506-a8da13d82791') },
+      { id: 'S7-P3', name: 'Rui Fish', price: 420, category: 'Fish', stock: 20, status: 'In Stock', unit: '1 kg', desc: 'Fresh pond rui fish.', image: U('photo-1498654200943-1088dd4438ae') },
+      { id: 'S7-P4', name: 'Mutton (Boneless)', price: 1350, category: 'Mutton', stock: 12, status: 'In Stock', unit: '1 kg', desc: 'Tender local mutton.', image: U('photo-1602470520998-f4a52199a3d6') },
+      { id: 'S7-P5', name: 'Shrimp (Medium)', price: 850, category: 'Fish', stock: 8, status: 'Low Stock', unit: '1 kg', desc: 'Medium size fresh shrimp.', image: U('photo-1559737558-2f5a35f4523b') },
+      { id: 'S7-P6', name: 'Beef Liver', price: 320, category: 'Beef', stock: 0, status: 'Out of Stock', unit: '500 g', desc: 'Fresh beef liver.', image: U('photo-1579895994587-0711b75ea737') },
+    ]
+  },
+  {
+    id: 'S8', name: 'Cake Cottage', subtext: 'Bakery · Cakes', category: 'Bakery',
+    badgeColor: 'bg-purple-600 text-white', rating: 4.7, reviewsCount: '190+',
+    deliveryTime: '25-35 min', deliveryFee: 40,
+    image: U('photo-1578985545062-69928b1d9587'), logoText: 'CC', logoBg: 'bg-purple-100 text-purple-800',
+    pickup: { lat: 23.7917, lng: 90.4192 },
+    catalog: [
+      { id: 'S8-P1', name: 'Black Forest Cake', price: 950, category: 'Cakes', stock: 10, status: 'In Stock', unit: '1 kg', desc: 'Classic chocolate cherry black forest.', image: U('photo-1578985545062-69928b1d9587') },
+      { id: 'S8-P2', name: 'Chocolate Truffle Cake', price: 1100, category: 'Cakes', stock: 8, status: 'In Stock', unit: '1 kg', desc: 'Rich Belgian chocolate truffle.', image: U('photo-1587248720327-8eb72564be1e') },
+      { id: 'S8-P3', name: 'Vanilla Cupcake', price: 120, category: 'Pastries', stock: 24, status: 'In Stock', unit: '1 pc', desc: 'Fluffy vanilla cupcake with frosting.', image: U('photo-1574085733277-851d9d856a3a') },
+      { id: 'S8-P4', name: 'Butter Croissant', price: 90, category: 'Pastries', stock: 18, status: 'In Stock', unit: '1 pc', desc: 'Flaky buttery croissant.', image: U('photo-1555507036-ab1f4038808a') },
+      { id: 'S8-P5', name: 'Chocolate Chip Cookie', price: 80, category: 'Biscuits', stock: 40, status: 'In Stock', unit: '1 pc', desc: 'Warm gooey chocolate chip cookie.', image: U('photo-1499636136210-6f4ee915583e') },
+      { id: 'S8-P6', name: 'Red Velvet Slice', price: 250, category: 'Cakes', stock: 5, status: 'Low Stock', unit: '1 slice', desc: 'Cream cheese red velvet slice.', image: U('photo-1606983340126-99ab4feaa64a') },
+      { id: 'S8-P7', name: 'Brownie (4 pc)', price: 320, category: 'Pastries', stock: 0, status: 'Out of Stock', unit: '4 pcs', desc: 'Fudgy walnut brownies.', image: U('photo-1606313564200-e75d5e30476c') },
+    ]
+  },
+];
+
+const CATEGORIES = ['All', 'Grocery', 'Supermarket', 'Restaurant', 'Fast Food', 'Bakery', 'Pharmacy', 'Fruits & Veg', 'Meat & Fish'];
+
+const BANNERS = [
+  { emoji: '🛒', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-600 to-teal-800', cta: 'Shop Now' },
+  { emoji: '🍕', title: 'Free Delivery', sub: 'On all orders above ৳500', bg: 'from-orange-500 to-red-600', cta: 'Order Food' },
+  { emoji: '💊', title: 'Medicine in 30 min', sub: 'MedPlus pharmacy now at your doorstep', bg: 'from-sky-600 to-blue-800', cta: 'Order Medicine' },
+  { emoji: '🥭', title: 'Fresh Fruits & Veg', sub: 'Farm-fresh daily from Fresh Valley', bg: 'from-green-600 to-emerald-800', cta: 'Buy Fresh' },
+];
+
+const COUPONS = [
+  { code: 'EID2024', discountText: '৳100 Flat Discount', desc: 'On orders above ৳500 from any store', validTill: '31 Aug 2026', discountValue: 100, minOrder: 500 },
+  { code: 'FREESHIP', discountText: 'Free Delivery', desc: '100% free delivery on all grocery orders', validTill: '15 Aug 2026', isFreeShip: true, discountValue: 0, minOrder: 200 },
+  { code: 'SUMMER15', discountText: '15% Off (max ৳150)', desc: 'On bakery & restaurant orders above ৳400', validTill: '10 Aug 2026', discountValue: 150, minOrder: 400 },
+  { code: 'SMARTSHOP', discountText: '৳50 Smart Cashback', desc: 'Direct cashback to your wallet', validTill: '31 Dec 2026', discountValue: 50, minOrder: 0 },
+];
+
+const LS_KEYS = {
+  favs: 'ss_favs',
+  addr: 'ss_addr',
+  pays: 'ss_pays',
+  wallet: 'ss_wallet',
+  wtxn: 'ss_wtxn',
+  profile: 'ss_profile',
+  tickets: 'ss_tickets',
+  cart: 'ss_cart',
+  lang: 'ss_lang',
+  notifs: 'ss_notifs',
+  reviews: 'ss_reviews',
+  spend: 'ss_spend',
+  chat: 'ss_chat',
+  storeRatings: 'ss_store_ratings',
+  watched: 'ss_watched',
+  watchSnap: 'ss_watch_snap',
+  referral: 'ss_referral',
+  dark: 'ss_dark',
+};
+
+const SCHEDULE_SLOTS = [
+  'ASAP (Fastest)',
+  'Today · 2:00 PM – 4:00 PM',
+  'Today · 5:00 PM – 7:00 PM',
+  'Today · 7:00 PM – 9:00 PM',
+  'Tomorrow · 10:00 AM – 12:00 PM',
+];
+
+interface ChatMsg { id: string; from: 'me' | 'rider'; text: string; time: string; }
+interface StoreRatingAgg { total: number; count: number; }
+
+type Lang = 'en' | 'bn';
+
+interface CustomerNotif {
+  id: string;
+  title: string;
+  body: string;
+  emoji: string;
+  time: string;
+  read: boolean;
+}
+
+interface ProductReview {
+  id: string;
+  productId: string;
+  user: string;
+  rating: number;
+  comment: string;
+  date: string;
+}
+
+const T_DICT: Record<Lang, Record<string, string>> = {
+  en: {
+    brandTag: 'NexaGo BD Delivery',
+    searchPlaceholder: 'Search stores, restaurants, pharmacies...',
+    home: 'Home',
+    orders: 'Orders',
+    myOrders: 'My Orders',
+    favorites: 'Favorites',
+    addresses: 'Addresses',
+    payments: 'Payments',
+    wallet: 'Wallet',
+    coupons: 'Coupons',
+    help: 'Help & Support',
+    settings: 'Settings',
+    notifications: 'Notifications',
+    markAllRead: 'Mark all read',
+    freeDelivery: 'Free Delivery',
+    freeDeliverySub: 'On orders above ৳500',
+    shopNow: 'Shop Now',
+    exitCustomer: 'Exit Customer Site',
+    popularNearYou: 'Popular Near You',
+    popularSub: 'Top-rated stores in your area',
+    viewAll: 'View All',
+    orderNow: 'Order Now',
+    wideRange: 'Wide Range of Stores',
+    wideRangeSub: 'Grocery, restaurants, pharmacies & more',
+    fastDelivery: 'Fast Delivery',
+    fastDeliverySub: 'Get orders at your doorstep fast',
+    securePay: 'Secure Payments',
+    securePaySub: 'bKash, Nagad, COD & card options',
+    bestOffers: 'Best Offers',
+    bestOffersSub: 'Exclusive deals on every order',
+    allStores: 'All Stores',
+    filter: 'Filter',
+    sortBy: 'Sort by',
+    recommended: 'Recommended',
+    highestRating: 'Highest Rating',
+    fastestDelivery: 'Fastest Delivery',
+    myOrderHistory: 'My Order History',
+    orderHistorySub: 'Track active deliveries, view receipt QR codes, and re-order',
+    browseStores: 'Browse Stores',
+    noOrders: 'No orders placed yet',
+    noOrdersSub: 'Pick items from your favorite grocery or restaurant stores to order.',
+    totalAmount: 'Total Amount',
+    receipt: 'Receipt',
+    trackDelivery: 'Track Delivery',
+    delivered: 'Delivered',
+    reOrder: 'Re-order',
+    cancelOrder: 'Cancel Order',
+    delivery: 'Delivery',
+    contactPhone: 'Contact Phone',
+    paymentMethod: 'Payment Method',
+    placeOrder: 'Place Order',
+    yourBasket: 'Your Basket',
+    items: 'Items',
+    basketEmpty: 'Basket is empty. Add items from the menu.',
+    couponCode: 'Coupon code (EID2024)',
+    apply: 'Apply',
+    subtotal: 'Subtotal',
+    vat: 'VAT (5%)',
+    promoDiscount: 'Promo Discount',
+    grandTotal: 'Grand Total',
+    deliveryDetails: 'Delivery Details',
+    deliveryAddress: 'Delivery Address',
+    savedAddresses: 'Saved Addresses',
+    addNewAddress: 'Add New Address',
+    newAddressDetails: 'New Address Details',
+    saveAddress: 'Save Address',
+    cancel: 'Cancel',
+    defaultAddress: 'Default Address',
+    useForOrders: 'Use for Orders',
+    delete: 'Delete',
+    paymentMethods: 'Payment Methods',
+    linkPayment: 'Link Payment Account',
+    walletBalance: 'Wallet Balance',
+    topUp: 'Top Up',
+    noFavoriteStores: 'No favorite stores added',
+    liveTracking: 'Live Delivery Tracking',
+    orderConfirmed: 'Order Confirmed',
+    preparingAtStore: 'Preparing at Store',
+    outForDelivery: 'Out for Delivery',
+    minsAway: 'mins away',
+    closeTracking: 'Close Tracking Window',
+    officialReceipt: 'Official Order Receipt',
+    printReceipt: 'Print Receipt',
+    viewStore: 'View Store',
+    goToCart: 'View Cart',
+    bestCoupon: 'Best coupon for you',
+    loyaltyTier: 'Your Rewards Tier',
+    standard: 'Standard Member',
+    silver: 'Silver VIP',
+    gold: 'Gold VIP',
+    earnPerOrder: 'Cashback on every order',
+    language: 'বাংলা',
+    merchantPortal: 'Merchant Portal',
+    productDetails: 'Product Details',
+    reviews: 'Reviews',
+    writeReview: 'Write a Review',
+    submitReview: 'Submit Review',
+    addToCart: 'Add',
+    searchResults: 'Search Results',
+    storeMatches: 'Stores',
+    productMatches: 'Products',
+    noResults: 'No results found',
+    noResultsSub: 'Try a different search keyword.',
+    cartDrawer: 'Your Cart',
+    checkout: 'Checkout',
+    emptyCart: 'Your cart is empty',
+    emptyCartSub: 'Browse stores and add items to start shopping.',
+    confirmCancelTitle: 'Cancel this order?',
+    confirmCancelBody: 'Your order will be cancelled and payment refunded to your wallet.',
+    yesCancel: 'Yes, Cancel Order',
+    keepOrder: 'Keep Order',
+    cancelled: 'Cancelled',
+    freeShip: 'FREE',
+    callDriver: 'Calling driver',
+    courierDriver: 'Courier Driver',
+    atStore: 'At store',
+    assignedDriver: 'Rider assigned',
+    fromWallet: 'from wallet',
+  },
+  bn: {
+    brandTag: 'নেক্সাগো বিডি ডেলিভারি',
+    searchPlaceholder: 'দোকান, রেস্তোরাঁ, ফার্মেসি খুঁজুন...',
+    home: 'হোম',
+    orders: 'অর্ডার',
+    myOrders: 'আমার অর্ডার',
+    favorites: 'প্রিয়',
+    addresses: 'ঠিকানা',
+    payments: 'পেমেন্ট',
+    wallet: 'ওয়ালেট',
+    coupons: 'কুপন',
+    help: 'সাহায্য ও সাপোর্ট',
+    settings: 'সেটিংস',
+    notifications: 'নোটিফিকেশন',
+    markAllRead: 'সব পড়া হয়েছে',
+    freeDelivery: 'ফ্রি ডেলিভারি',
+    freeDeliverySub: '৳৫০০ এর উপরে অর্ডারে',
+    shopNow: 'কিনুন',
+    exitCustomer: 'কাস্টমার সাইট ত্যাগ করুন',
+    popularNearYou: 'আপনার কাছাকাছি জনপ্রিয়',
+    popularSub: 'আপনার এলাকার সেরা দোকানগুলো',
+    viewAll: 'সব দেখুন',
+    orderNow: 'অর্ডার করুন',
+    wideRange: 'বহু দোকান',
+    wideRangeSub: 'বাজার, রেস্তোরাঁ, ফার্মেসি ও আরও অনেক কিছু',
+    fastDelivery: 'দ্রুত ডেলিভারি',
+    fastDeliverySub: 'দরজায় দ্রুত ডেলিভারি',
+    securePay: 'নিরাপদ পেমেন্ট',
+    securePaySub: 'বিকাশ, নগদ, ক্যাশ ও কার্ড',
+    bestOffers: 'সেরা অফার',
+    bestOffersSub: 'প্রতিটি অর্ডারে এক্সক্লুসিভ ডিল',
+    allStores: 'সব দোকান',
+    filter: 'ফিল্টার',
+    sortBy: 'সাজান',
+    recommended: 'সুপারিশকৃত',
+    highestRating: 'সর্বোচ্চ রেটিং',
+    fastestDelivery: 'দ্রুততম ডেলিভারি',
+    myOrderHistory: 'আমার অর্ডার ইতিহাস',
+    orderHistorySub: 'সক্রিয় ডেলিভারি ট্র্যাক করুন, রসিদ QR দেখুন ও পুনরায় অর্ডার করুন',
+    browseStores: 'দোকান দেখুন',
+    noOrders: 'এখনো কোনো অর্ডার নেই',
+    noOrdersSub: 'আপনার প্রিয় দোকান থেকে পণ্য বেছে অর্ডার করুন।',
+    totalAmount: 'মোট পরিমাণ',
+    receipt: 'রসিদ',
+    trackDelivery: 'ডেলিভারি ট্র্যাক করুন',
+    delivered: 'ডেলিভারড',
+    reOrder: 'পুনরায় অর্ডার',
+    cancelOrder: 'অর্ডার বাতিল',
+    delivery: 'ডেলিভারি',
+    contactPhone: 'যোগাযোগের নম্বর',
+    paymentMethod: 'পেমেন্ট পদ্ধতি',
+    placeOrder: 'অর্ডার করুন',
+    yourBasket: 'আপনার ঝুড়ি',
+    items: 'আইটেম',
+    basketEmpty: 'ঝুড়ি খালি। মেনু থেকে পণ্য যোগ করুন।',
+    couponCode: 'কুপন কোড (EID2024)',
+    apply: 'প্রয়োগ',
+    subtotal: 'সাবটোটাল',
+    vat: 'ভ্যাট (৫%)',
+    promoDiscount: 'প্রোমো ডিসকাউন্ট',
+    grandTotal: 'সর্বমোট',
+    deliveryDetails: 'ডেলিভারি বিবরণ',
+    deliveryAddress: 'ডেলিভারি ঠিকানা',
+    savedAddresses: 'সংরক্ষিত ঠিকানা',
+    addNewAddress: 'নতুন ঠিকানা যোগ করুন',
+    newAddressDetails: 'নতুন ঠিকানার বিবরণ',
+    saveAddress: 'ঠিকানা সংরক্ষণ',
+    cancel: 'বাতিল',
+    defaultAddress: 'ডিফল্ট ঠিকানা',
+    useForOrders: 'অর্ডারে ব্যবহার করুন',
+    delete: 'মুছুন',
+    paymentMethods: 'পেমেন্ট পদ্ধতি',
+    linkPayment: 'পেমেন্ট অ্যাকাউন্ট লিংক',
+    walletBalance: 'ওয়ালেট ব্যালেন্স',
+    topUp: 'টপ-আপ',
+    noFavoriteStores: 'কোনো প্রিয় দোকান নেই',
+    liveTracking: 'লাইভ ডেলিভারি ট্র্যাকিং',
+    orderConfirmed: 'অর্ডার নিশ্চিত হয়েছে',
+    preparingAtStore: 'দোকানে প্রস্তুত হচ্ছে',
+    outForDelivery: 'ডেলিভারির পথে',
+    minsAway: 'মিনিট বাকি',
+    closeTracking: 'ট্র্যাকিং উইন্ডো বন্ধ করুন',
+    officialReceipt: 'অফিসিয়াল অর্ডার রসিদ',
+    printReceipt: 'রসিদ প্রিন্ট করুন',
+    viewStore: 'দোকান দেখুন',
+    goToCart: 'কার্ট দেখুন',
+    bestCoupon: 'আপনার জন্য সেরা কুপন',
+    loyaltyTier: 'আপনার রিওয়ার্ড লেভেল',
+    standard: 'স্ট্যান্ডার্ড মেম্বার',
+    silver: 'সিলভার ভিআইপি',
+    gold: 'গোল্ড ভিআইপি',
+    earnPerOrder: 'প্রতিটি অর্ডারে ক্যাশব্যাক',
+    language: 'English',
+    merchantPortal: 'মার্চেন্ট পোর্টাল',
+    productDetails: 'পণ্যের বিবরণ',
+    reviews: 'রিভিউ',
+    writeReview: 'রিভিউ লিখুন',
+    submitReview: 'রিভিউ জমা দিন',
+    addToCart: 'যোগ করুন',
+    searchResults: 'সার্চ ফলাফল',
+    storeMatches: 'দোকান',
+    productMatches: 'পণ্য',
+    noResults: 'কোনো ফলাফল পাওয়া যায়নি',
+    noResultsSub: 'অন্য কীওয়ার্ড দিয়ে চেষ্টা করুন।',
+    cartDrawer: 'আপনার কার্ট',
+    checkout: 'চেকআউট',
+    emptyCart: 'আপনার কার্ট খালি',
+    emptyCartSub: 'দোকান ঘুরে কার্টে পণ্য যোগ করুন।',
+    confirmCancelTitle: 'এই অর্ডারটি বাতিল করবেন?',
+    confirmCancelBody: 'অর্ডারটি বাতিল হলে টাকা ওয়ালেটে ফেরত যাবে।',
+    yesCancel: 'হ্যাঁ, অর্ডার বাতিল',
+    keepOrder: 'অর্ডার রাখুন',
+    cancelled: 'বাতিল',
+    freeShip: 'ফ্রি',
+    callDriver: 'ড্রাইভারকে কল',
+    courierDriver: 'কুরিয়ার ড্রাইভার',
+    atStore: 'দোকানে',
+    assignedDriver: 'রাইডার নিয়োগ হয়েছে',
+    fromWallet: 'ওয়ালেট থেকে',
+  },
+};
+
+const LOYALTY_TIERS = [
+  { key: 'standard' as const, label: 'Standard Member', minSpend: 0, cashbackPct: 1, color: 'bg-gray-600', icon: '★' },
+  { key: 'silver' as const, label: 'Silver VIP', minSpend: 3000, cashbackPct: 3, color: 'bg-slate-400', icon: '🥈' },
+  { key: 'gold' as const, label: 'Gold VIP', minSpend: 10000, cashbackPct: 5, color: 'bg-amber-500', icon: '🥇' },
+];
+
+const AVATAR_COLORS = ['bg-emerald-600', 'bg-orange-500', 'bg-blue-600', 'bg-rose-600', 'bg-violet-600', 'bg-teal-600', 'bg-amber-500', 'bg-indigo-600'];
+const hashColor = (s: string) => AVATAR_COLORS[Math.abs(s.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length];
+const initialsOf = (s: string) => (s || '').split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
+
+const ETA_STEPS = [
+  { label: 'Order Confirmed', desc: 'Store has accepted your order', min: 0.0 },
+  { label: 'Preparing at Store', desc: 'Your items are being packed', min: 0.18 },
+  { label: 'Out for Delivery', desc: 'Courier driver is on the way', min: 0.42 },
+  { label: 'Delivered', desc: 'Order delivered to your door', min: 0.9 },
+];
+
+export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
+  stores,
+  products,
+  orders,
+  liveDrivers,
+  onAddOrder,
+  onUpdateOrder,
+  onSilentUpdateOrder,
+  onReturnToAdmin,
+  onLaunchMerchantStore,
+  onReport,
+  showToast,
+}) => {
+  const [activeNav, setActiveNav] = useState<
+    'Home' | 'Orders' | 'My Orders' | 'Favorites' | 'Addresses' | 'Payments' | 'Wallet' | 'Coupons' | 'Help' | 'Settings'
+  >('Home');
+
+  const [lang, setLang] = useState<Lang>(() => getStoredData(LS_KEYS.lang, 'en'));
+  useEffect(() => setStoredData(LS_KEYS.lang, lang), [lang]);
+  const T = T_DICT[lang];
+
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+
+  const [customerNotifs, setCustomerNotifs] = useState<CustomerNotif[]>(() => getStoredData(LS_KEYS.notifs, [
+    { id: 'CN-1', title: 'Order On The Way!', body: 'Your Fresh Mart order is assigned to a courier driver.', emoji: '🛵', time: '2m ago', read: false },
+    { id: 'CN-2', title: '৳100 Discount Voucher', body: 'Use code EID2024 on any store above ৳500.', emoji: '🎉', time: '1h ago', read: false },
+    { id: 'CN-3', title: 'MedPlus 30-min delivery', body: 'Essential medicines now at your doorstep.', emoji: '💊', time: '3h ago', read: true },
+  ]));
+  useEffect(() => setStoredData(LS_KEYS.notifs, customerNotifs), [customerNotifs]);
+
+  const [totalSpend, setTotalSpend] = useState<number>(() => getStoredData(LS_KEYS.spend, 0));
+  useEffect(() => setStoredData(LS_KEYS.spend, totalSpend), [totalSpend]);
+
+  const [productReviews, setProductReviews] = useState<ProductReview[]>(() => getStoredData(LS_KEYS.reviews, []));
+  useEffect(() => setStoredData(LS_KEYS.reviews, productReviews), [productReviews]);
+
+  const [detailProduct, setDetailProduct] = useState<StoreProduct | null>(null);
+  const [detailStoreName, setDetailStoreName] = useState('');
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewText, setNewReviewText] = useState('');
+
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+
+  // Checkout: delivery pin on map + scheduling
+  const [deliveryPin, setDeliveryPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduleSlot, setScheduleSlot] = useState(SCHEDULE_SLOTS[0]);
+
+  // Split payment
+  const [splitWalletAmount, setSplitWalletAmount] = useState<number>(0);
+
+  // Rider chat
+  const [chatOrderId, setChatOrderId] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<Record<string, ChatMsg[]>>(() => getStoredData(LS_KEYS.chat, {}));
+  useEffect(() => setStoredData(LS_KEYS.chat, chatMessages), [chatMessages]);
+
+  // Store ratings (after delivery)
+  const [storeRatings, setStoreRatings] = useState<Record<string, StoreRatingAgg>>(() => getStoredData(LS_KEYS.storeRatings, {}));
+  useEffect(() => setStoredData(LS_KEYS.storeRatings, storeRatings), [storeRatings]);
+  const [rateOrder, setRateOrder] = useState<Order | null>(null);
+  const [rateVal, setRateVal] = useState(5);
+  const [rateComment, setRateComment] = useState('');
+  const [reportOrder, setReportOrder] = useState<Order | null>(null);
+  const [reportReason, setReportReason] = useState('Wrong item received');
+  const [reportNote, setReportNote] = useState('');
+
+  // Watched products for price-drop / restock alerts
+  const [watchedProducts, setWatchedProducts] = useState<string[]>(() => getStoredData(LS_KEYS.watched, []));
+  useEffect(() => setStoredData(LS_KEYS.watched, watchedProducts), [watchedProducts]);
+  const [watchSnapshot, setWatchSnapshot] = useState<Record<string, { stock: number; price: number }>>(() => getStoredData(LS_KEYS.watchSnap, {}));
+  useEffect(() => setStoredData(LS_KEYS.watchSnap, watchSnapshot), [watchSnapshot]);
+
+  // Referral
+  const [referralState, setReferralState] = useState(() => getStoredData(LS_KEYS.referral, { code: `NEXA-${['RAH', 'KAR', 'SMI', 'JAM', 'PRI', 'TAN'][Math.floor(Math.random() * 6)]}${Math.floor(1000 + Math.random() * 9000)}`, earned: 0, redeemed: 0 }));
+  useEffect(() => setStoredData(LS_KEYS.referral, referralState), [referralState]);
+
+  // Dark mode
+  const [darkMode, setDarkMode] = useState<boolean>(() => getStoredData(LS_KEYS.dark, false));
+  useEffect(() => setStoredData(LS_KEYS.dark, darkMode), [darkMode]);
+
+  const unreadNotifCount = customerNotifs.filter(n => !n.read).length;
+  const tier = LOYALTY_TIERS.slice().reverse().find(t => totalSpend >= t.minSpend) || LOYALTY_TIERS[0];
+
+  const displayRating = (store: { name: string; rating: number }) => {
+    const agg = storeRatings[store.name];
+    if (!agg || agg.count === 0) return store.rating;
+    return +(((store.rating * 5 + agg.total) / (5 + agg.count))).toFixed(1);
+  };
+
+  const statusProgressFloor = (status?: string) => {
+    switch (status) {
+      case 'Confirmed': return 0.18;
+      case 'Processing': return 0.42;
+      case 'Ongoing': return 0.45;
+      case 'Completed': return 1;
+      default: return 0;
+    }
+  };
+
+  // Live admin-inventory sync: admin price/stock changes flow into the customer catalog
+  const syncedStores = useMemo(() => {
+    const override = new globalThis.Map<string, { price: number; stock: number }>();
+    for (const p of products) {
+      override.set(p.name.toLowerCase(), { price: p.price, stock: p.stock });
+    }
+    return STORE_DEFS.map(s => ({
+      ...s,
+      catalog: s.catalog.map(prod => {
+        const ov = override.get(prod.name.toLowerCase());
+        if (!ov) return prod;
+        const stock = ov.stock;
+        return { ...prod, price: ov.price, stock, status: stock === 0 ? 'Out of Stock' : (stock <= 8 ? 'Low Stock' : 'In Stock') };
+      })
+    }));
+  }, [products]);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'Recommended' | 'Rating' | 'Fastest'>('Recommended');
+
+  const [favoriteStoreIds, setFavoriteStoreIds] = useState<string[]>(() => getStoredData(LS_KEYS.favs, ['S1', 'S3']));
+  useEffect(() => setStoredData(LS_KEYS.favs, favoriteStoreIds), [favoriteStoreIds]);
+
+  const [cart, setCart] = useState<Array<{ product: StoreProduct; quantity: number }>>(() => getStoredData(LS_KEYS.cart, []));
+  useEffect(() => setStoredData(LS_KEYS.cart, cart), [cart]);
+
+  const [selectedStore, setSelectedStore] = useState<StoreDef | null>(null);
+  const [storeCat, setStoreCat] = useState<string>('All');
+  const [storeSearch, setStoreSearch] = useState<string>('');
+
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; isFreeShip?: boolean } | null>(null);
+  const [couponInput, setCouponInput] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad' | 'Cash on Delivery' | 'Card' | 'Split (Wallet + bKash)'>('bKash');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('House 42, Road 8A, Dhanmondi, Dhaka');
+  const [customerPhone, setCustomerPhone] = useState<string>('01712-345678');
+
+  const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+
+  const [addresses, setAddresses] = useState<SavedAddress[]>(() => getStoredData(LS_KEYS.addr, [
+    { id: 'ADDR-1', title: 'Home', address: 'House 42, Road 8A, Flat 4B', area: 'Dhanmondi, Dhaka 1209', phone: '01712-345678', isDefault: true },
+    { id: 'ADDR-2', title: 'Office', address: 'Level 7, Tower 14, Gulshan Avenue', area: 'Gulshan-1, Dhaka 1212', phone: '01819-987654', isDefault: false }
+  ]));
+  useEffect(() => setStoredData(LS_KEYS.addr, addresses), [addresses]);
+  const [isAddingAddress, setIsAddingAddress] = useState(false);
+  const [newAddrTitle, setNewAddrTitle] = useState('Home');
+  const [newAddrStreet, setNewAddrStreet] = useState('');
+  const [newAddrArea, setNewAddrArea] = useState('Dhanmondi, Dhaka');
+  const [newAddrPhone, setNewAddrPhone] = useState('01712-345678');
+
+  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>(() => getStoredData(LS_KEYS.pays, [
+    { id: 'PAY-1', type: 'bKash', accountName: 'Rahim Khan', accountNumber: '01712-345678', isDefault: true, pin: '12345' },
+    { id: 'PAY-2', type: 'Nagad', accountName: 'Rahim Khan', accountNumber: '01819-987654', isDefault: false, pin: '24680' },
+    { id: 'PAY-3', type: 'Card', accountName: 'Rahim Khan (DBBL Visa)', accountNumber: '**** **** **** 4821', isDefault: false }
+  ]));
+  useEffect(() => setStoredData(LS_KEYS.pays, paymentMethods), [paymentMethods]);
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [newPayType, setNewPayType] = useState<'bKash' | 'Nagad' | 'Card'>('bKash');
+  const [newPayAccount, setNewPayAccount] = useState('');
+
+  const [walletBalance, setWalletBalance] = useState<number>(() => getStoredData(LS_KEYS.wallet, 1250));
+  useEffect(() => setStoredData(LS_KEYS.wallet, walletBalance), [walletBalance]);
+  const [topUpAmount, setTopUpAmount] = useState<string>('500');
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>(() => getStoredData(LS_KEYS.wtxn, [
+    { id: 'TXN-901', type: 'Top-Up', amount: 1000, date: 'May 20, 2026', status: 'Completed' },
+    { id: 'TXN-902', type: 'Cashback', amount: 50, date: 'May 18, 2026', status: 'Completed' },
+    { id: 'TXN-903', type: 'Order Payment', amount: -480, date: 'May 15, 2026', status: 'Completed' }
+  ]));
+  useEffect(() => setStoredData(LS_KEYS.wtxn, walletTransactions), [walletTransactions]);
+  const [bankBalance, setBankBalance] = useState<number>(() => getStoredData('ss_bank', 15000));
+  useEffect(() => setStoredData('ss_bank', bankBalance), [bankBalance]);
+  const [splitPinInput, setSplitPinInput] = useState('');
+
+  const [tickets, setTickets] = useState<SupportTicketItem[]>(() => getStoredData(LS_KEYS.tickets, [
+    { id: 'TCK-104', subject: 'Delay in Fresh Mart delivery', category: 'Order Delivery', status: 'In Progress', date: 'May 19, 2026', lastMessage: 'Agent is contacting the delivery partner.' },
+    { id: 'TCK-102', subject: 'bKash payment cashback query', category: 'Payment / Refund', status: 'Resolved', date: 'May 10, 2026', lastMessage: 'Cashback ৳50 credited to your wallet.' }
+  ]));
+  useEffect(() => setStoredData(LS_KEYS.tickets, tickets), [tickets]);
+  const [isNewTicketModal, setIsNewTicketModal] = useState(false);
+  const [ticketCategory, setTicketCategory] = useState('Order Delivery');
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketDetail, setTicketDetail] = useState('');
+
+  const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: 'Rahim Khan', email: 'rahim.khan@example.com', sms: true, emailNotif: true }));
+  useEffect(() => setStoredData(LS_KEYS.profile, customerProfile), [customerProfile]);
+
+  const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Payment flow modal
+  const [payModal, setPayModal] = useState<null | 'bKash' | 'Nagad' | 'Card' | 'COD' | 'Split (Wallet + bKash)'>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [cardInfo, setCardInfo] = useState({ number: '', name: '', expiry: '', cvv: '' });
+
+  // Tracking live sim
+  const [bannerIdx, setBannerIdx] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setBannerIdx(i => (i + 1) % BANNERS.length), 4500);
+    return () => clearInterval(t);
+  }, []);
+
+  // Order status-change notifications: when a tracked order reaches Delivered/Completed
+  const seenCompletedRef = React.useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const ord of orders) {
+      if ((ord.status === 'Completed') && !seenCompletedRef.current.has(ord.id)) {
+        seenCompletedRef.current.add(ord.id);
+        setCustomerNotifs(prev => [{
+          id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Order Delivered',
+          body: `Order #${ord.id} from ${ord.storeName} has been delivered. Enjoy!`, emoji: '🛵', time: 'Just now', read: false
+        }, ...prev]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
+  const filteredStores = useMemo(() => {
+    return syncedStores.filter(store => {
+      const matchesCategory = selectedCategory === 'All' || store.category === selectedCategory;
+      const matchesSearch = store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        store.subtext.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        store.category.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    }).sort((a, b) => {
+      if (sortBy === 'Rating') return b.rating - a.rating;
+      if (sortBy === 'Fastest') return parseInt(a.deliveryTime) - parseInt(b.deliveryTime);
+      return 0;
+    });
+  }, [selectedCategory, searchQuery, sortBy]);
+
+  const toggleFavorite = (e: React.MouseEvent, storeId: string) => {
+    e.stopPropagation();
+    setFavoriteStoreIds(prev => {
+      if (prev.includes(storeId)) {
+        showToast('Favorite store removed', 'info');
+        return prev.filter(id => id !== storeId);
+      }
+      showToast('Added to favorites ❤️', 'success');
+      return [...prev, storeId];
+    });
+  };
+
+  const cartSubtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const rawDeliveryCharge = selectedStore ? selectedStore.deliveryFee : 40;
+  const deliveryCharge = appliedCoupon?.isFreeShip ? 0 : rawDeliveryCharge;
+  const vatTax = Math.round(cartSubtotal * 0.05);
+  const couponDiscountAmount = appliedCoupon?.discount || 0;
+  const cartGrandTotal = Math.max(0, cartSubtotal + deliveryCharge + vatTax - couponDiscountAmount);
+
+  const openStore = (store: StoreDef) => {
+    setSelectedStore(store);
+    setStoreCat('All');
+    setStoreSearch('');
+    setAppliedCoupon(null);
+    setCouponInput('');
+  };
+
+  const handleAddToCart = (prod: StoreProduct) => {
+    if (prod.status === 'Out of Stock') {
+      showToast(`${prod.name} is out of stock`, 'info');
+      return;
+    }
+    const inCart = cart.find(i => i.product.id === prod.id);
+    if (inCart && inCart.quantity >= prod.stock) {
+      showToast(`Only ${prod.stock} available in stock`, 'info');
+      return;
+    }
+    setCart(prev => {
+      const existing = prev.find(i => i.product.id === prod.id);
+      if (existing) return prev.map(i => i.product.id === prod.id ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { product: prod, quantity: 1 }];
+    });
+    showToast(`${prod.name} added to cart`, 'info');
+  };
+
+  const handleUpdateQty = (productId: string, delta: number) => {
+    setCart(prev => prev.map(i => {
+      if (i.product.id === productId) {
+        const newQty = i.quantity + delta;
+        if (newQty > (i.product.stock || 99)) {
+          showToast(`Max stock for ${i.product.name} reached`, 'info');
+          return i;
+        }
+        return newQty > 0 ? { ...i, quantity: newQty } : i;
+      }
+      return i;
+    }));
+  };
+
+  const handleApplyCouponCode = (codeToApply?: string) => {
+    const code = (codeToApply || couponInput).trim().toUpperCase();
+    if (!code) return;
+    const found = COUPONS.find(c => c.code === code);
+    if (!found) {
+      showToast('Invalid promo coupon code', 'info');
+      return;
+    }
+    if (cartSubtotal < found.minOrder) {
+      showToast(`Minimum order ৳${found.minOrder} required for ${code}`, 'info');
+      return;
+    }
+    if (found.isFreeShip) {
+      setAppliedCoupon({ code: found.code, discount: 0, isFreeShip: true });
+      showToast(`Coupon ${code} applied: Free Delivery!`, 'success');
+    } else {
+      setAppliedCoupon({ code: found.code, discount: found.discountValue });
+      showToast(`Coupon ${code} applied: ৳${found.discountValue} discount!`, 'success');
+    }
+  };
+
+  const finishOrder = (orderBase: Omit<Order, 'id' | 'date'>) => {
+    onAddOrder(orderBase);
+    const cashback = Math.round(orderBase.amount * (tier.cashbackPct / 100));
+    if (cashback > 0) {
+      setWalletBalance(prev => prev + cashback);
+      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: cashback, date: 'Just now', status: 'Completed' }, ...prev]);
+      setTotalSpend(prev => prev + orderBase.amount);
+      setCustomerNotifs(prev => [{
+        id: `CN-${Date.now().toString().slice(-4)}`, title: `${tier.icon} ${tier.label} Cashback`,
+        body: `৳${cashback} cashback credited to your wallet.`, emoji: tier.icon, time: 'Just now', read: false
+      }, ...prev]);
+    }
+    if (appliedCoupon?.code === 'SMARTSHOP') {
+      setWalletBalance(prev => prev + 50);
+      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: 50, date: 'Just now', status: 'Completed' }, ...prev]);
+    }
+    setCustomerNotifs(prev => [{
+      id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Order Placed',
+      body: `Order ${orderBase.itemCount} item(s) from ${orderBase.storeName} — ${orderBase.priority || 'Normal'} delivery.`, emoji: '📦', time: 'Just now', read: false
+    }, ...prev]);
+    setCart([]);
+    setAppliedCoupon(null);
+    setSelectedStore(null);
+    setIsCartDrawerOpen(false);
+    setActiveNav('My Orders');
+  };
+
+  const handlePlaceCustomerOrder = () => {
+    if (cart.length === 0) {
+      showToast('Your cart is empty. Add items to order!', 'info');
+      return;
+    }
+    if (paymentMethod === 'bKash' || paymentMethod === 'Nagad' || paymentMethod === 'Card' || paymentMethod === 'Split (Wallet + bKash)') {
+      setPayModal(paymentMethod);
+      setPinInput('');
+      setCardInfo({ number: '', name: '', expiry: '', cvv: '' });
+      setSplitWalletAmount(Math.min(walletBalance, cartGrandTotal));
+      return;
+    }
+    setPayModal('COD');
+  };
+
+  const confirmPayment = () => {
+    const targetStore = selectedStore;
+    if (!targetStore) return;
+    const areaMatch = deliveryAddress.match(/(Dhanmondi|Gulshan|Banani|Mirpur|Motijheel|Uttara|Badda|Tejgaon|Farmgate|Shahbagh)/i);
+    const areaName = areaMatch ? areaMatch[1] : 'Dhanmondi';
+    const dest = deliveryPin || AREA_COORDS[areaName] || [23.7539, 90.3836];
+    const estimated = parseInt(targetStore.deliveryTime) || 35;
+    const assigned = liveDriverOf({ storeName: targetStore.name, pickupCoords: targetStore.pickup } as Order);
+    const deliveryPinCode = String(Math.floor(1000 + Math.random() * 9000));
+
+    // Split payment: deduct wallet portion now
+    let splitDeduct = 0;
+    if (paymentMethod === 'Split (Wallet + bKash)' && splitWalletAmount > 0) {
+      splitDeduct = Math.min(splitWalletAmount, walletBalance, cartGrandTotal);
+      setWalletBalance(prev => prev - splitDeduct);
+      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Order Payment', amount: -splitDeduct, date: 'Just now', status: 'Completed' }, ...prev]);
+    }
+
+    finishOrder({
+      customerName: customerProfile.name,
+      storeName: targetStore.name,
+      amount: cartGrandTotal,
+      status: 'Confirmed',
+      paymentMethod: paymentMethod === 'Split (Wallet + bKash)' ? `Split (Wallet ৳${splitDeduct} + bKash ৳${cartGrandTotal - splitDeduct})` : paymentMethod,
+      customerPhone,
+      address: deliveryAddress,
+      deliveryCoords: { lat: dest[0], lng: dest[1] },
+      pickupCoords: targetStore.pickup,
+      pickupLocation: targetStore.name,
+      driverId: assigned ? assigned.id : undefined,
+      itemCount: cart.reduce((s, i) => s + i.quantity, 0),
+      deliveryCharge,
+      estimatedMinutes: estimated,
+      priority: cartGrandTotal > 1500 ? 'Express' : 'Normal',
+      scheduledSlot: isScheduled ? scheduleSlot : undefined,
+      deliveryPin: deliveryPinCode,
+      splitWalletAmount: splitDeduct || undefined,
+      items: cart.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.price, quantity: i.quantity }))
+    });
+    setPayModal(null);
+    setIsScheduled(false);
+    setDeliveryPin(null);
+    showToast(`Order placed successfully with ${targetStore.name}!`, 'success');
+  };
+
+  const reorder = (ord: Order) => {
+    const store = syncedStores.find(s => s.name === ord.storeName) || syncedStores[0];
+    setSelectedStore(store);
+    setStoreCat('All');
+    setStoreSearch('');
+    setAppliedCoupon(null);
+    setCouponInput('');
+    const restocked: Array<{ product: StoreProduct; quantity: number }> = [];
+    for (const it of ord.items || []) {
+      const p = store.catalog.find(c => c.id === it.productId);
+      if (p && p.status !== 'Out of Stock') restocked.push({ product: p, quantity: Math.min(it.quantity, p.stock || 1) });
+    }
+    if (restocked.length > 0) setCart(restocked);
+    showToast(`Re-order cart ready from ${store.name}`, 'success');
+  };
+
+  const confirmCancelOrder = () => {
+    if (!cancelConfirmId) return;
+    const ord = orders.find(o => o.id === cancelConfirmId);
+    if (ord) {
+      onUpdateOrder({ ...ord, status: 'Cancelled' });
+      setWalletBalance(prev => prev + ord.amount);
+      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Refund', amount: ord.amount, date: 'Just now', status: 'Completed' }, ...prev]);
+      setCustomerNotifs(prev => [{
+        id: `CN-${Date.now().toString().slice(-4)}`, title: '↩️ Order Cancelled',
+        body: `Order #${ord.id} was cancelled. ৳${ord.amount} refunded to wallet.`, emoji: '↩️', time: 'Just now', read: false
+      }, ...prev]);
+      showToast(`Order #${ord.id} cancelled — ৳${ord.amount} refunded to wallet`, 'info');
+    }
+    setCancelConfirmId(null);
+  };
+
+  const confirmDelivery = (ord: Order) => {
+    onUpdateOrder({ ...ord, status: 'Completed' });
+    setCustomerNotifs(prev => [{
+      id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Delivery Confirmed',
+      body: `Order #${ord.id} marked delivered. Rate your store in My Orders!`, emoji: '🛵', time: 'Just now', read: false
+    }, ...prev]);
+    showToast('Delivery confirmed — thank you for shopping with Smart Shop!', 'success');
+    setTrackingOrder(null);
+  };
+
+  const sendChatMessage = () => {
+    if (!chatOrderId || !chatInput.trim()) return;
+    const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const mine: ChatMsg = { id: `CM-${Date.now()}`, from: 'me', text: chatInput.trim(), time: now };
+    setChatMessages(prev => ({ ...prev, [chatOrderId]: [...(prev[chatOrderId] || []), mine] }));
+    setChatInput('');
+    const rider = liveDriverOf(orders.find(o => o.id === chatOrderId) as Order);
+    const autoReplies = [
+      `আপনার অর্ডারটি ${trackVeh?.roadName || 'পথে'} আছে, ${etaMins} মিনিটের মধ্যে পৌঁছাবে ইনশাআল্লাহ।`,
+      'Sure, I will deliver it to your door. Please keep the cash / PIN ready.',
+      'I am on my way. If you need anything else, text me here anytime.',
+    ];
+    const replyText = autoReplies[Math.floor(Math.random() * autoReplies.length)];
+    setTimeout(() => {
+      const rnow = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const reply: ChatMsg = { id: `CM-${Date.now() + 1}`, from: 'rider', text: replyText, time: rnow };
+      setChatMessages(prev => ({ ...prev, [chatOrderId]: [...(prev[chatOrderId] || []), reply] }));
+    }, 1200);
+  };
+
+  const submitStoreRating = () => {
+    if (!rateOrder) return;
+    const key = rateOrder.storeName;
+    setStoreRatings(prev => {
+      const agg = prev[key] || { total: 0, count: 0 };
+      return { ...prev, [key]: { total: agg.total + rateVal, count: agg.count + 1 } };
+    });
+    setCustomerNotifs(prev => [{
+      id: `CN-${Date.now().toString().slice(-4)}`, title: '⭐ Thank you for rating!',
+      body: `Your ${rateVal}-star rating for ${key} has been published.`, emoji: '⭐', time: 'Just now', read: false
+    }, ...prev]);
+    setRateOrder(null);
+    setRateComment('');
+    setRateVal(5);
+    showToast(`Thanks! ${rateVal}-star rating submitted for ${key}`, 'success');
+  };
+
+  const toggleWatch = (productId: string) => {
+    setWatchedProducts(prev => {
+      const has = prev.includes(productId);
+      const next = has ? prev.filter(id => id !== productId) : [...prev, productId];
+      showToast(has ? 'Removed price-drop alert' : 'Price-drop alert set for this product', 'info');
+      return next;
+    });
+  };
+
+  const redeemReferral = () => {
+    setWalletBalance(prev => prev + 100);
+    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: 100, date: 'Just now', status: 'Completed' }, ...prev]);
+    setReferralState(s => ({ ...s, earned: s.earned + 100, redeemed: s.redeemed + 1 }));
+    setCustomerNotifs(prev => [{
+      id: `CN-${Date.now().toString().slice(-4)}`, title: '🎁 Referral Reward',
+      body: 'Your friend used your code — ৳100 cashback added to wallet!', emoji: '🎁', time: 'Just now', read: false
+    }, ...prev]);
+    showToast('Referral redeemed — ৳100 cashback added!', 'success');
+  };
+
+  // Watched product price-drop / restock alert monitor
+  useEffect(() => {
+    if (watchedProducts.length === 0) return;
+    const check = () => {
+      setWatchSnapshot(snap => {
+        let changed = false;
+        let next = { ...snap };
+        for (const s of syncedStores) {
+          for (const p of s.catalog) {
+            if (!watchedProducts.includes(p.id)) continue;
+            const prevSnap = next[p.id];
+            if (!prevSnap) { next[p.id] = { stock: p.stock, price: p.price }; continue; }
+            const restocked = prevSnap.stock === 0 && p.stock > 0;
+            const priceDrop = p.price < prevSnap.price;
+            if (restocked || priceDrop) {
+              changed = true;
+              setCustomerNotifs(prevN => [{
+                id: `CN-${Date.now().toString().slice(-4)}`, title: restocked ? '🔔 Back in Stock!' : '📉 Price Dropped!',
+                body: `${p.name} ${restocked ? 'is now available again' : `now ৳${p.price} (was ৳${prevSnap.price})`} at ${s.name}.`,
+                emoji: restocked ? '🔔' : '📉', time: 'Just now', read: false
+              }, ...prevN]);
+            }
+            next[p.id] = { stock: p.stock, price: p.price };
+          }
+        }
+        return changed ? next : snap;
+      });
+    };
+    check();
+    const iv = setInterval(check, 15000);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedProducts, syncedStores]);
+
+  const areaOfOrder = (ord: Order) => {
+    if (ord.deliveryCoords) return ord.deliveryCoords;
+    if (ord.address) {
+      const m = ord.address.match(/(Dhanmondi|Gulshan|Banani|Mirpur|Motijheel|Uttara|Badda|Tejgaon|Farmgate|Shahbagh)/i);
+      if (m) return { lat: AREA_COORDS[m[1]][0], lng: AREA_COORDS[m[1]][1] };
+    }
+    return { lat: 23.7539, lng: 90.3836 };
+  };
+  const pickupOfOrder = (ord: Order) => {
+    if (ord.pickupCoords) return ord.pickupCoords;
+    const st = syncedStores.find(s => s.name === ord.storeName);
+    return st ? st.pickup : { lat: 23.7806, lng: 90.4009 };
+  };
+
+  // Real live-driver tracking — uses the exact same admin liveDrivers sim.
+  const liveDriverOf = (ord: Order) => {
+    if (ord.driverId) {
+      const exact = liveDrivers.find(d => d.id === ord.driverId);
+      if (exact) return exact;
+    }
+    const pk = pickupOfOrder(ord);
+    let best: LiveDriverSim | null = null;
+    let bestD = Infinity;
+    for (const d of liveDrivers) {
+      if (d.status === 'Offline') continue;
+      const dd = Math.pow(d.lat - pk.lat, 2) + Math.pow(d.lng - pk.lng, 2);
+      if (dd < bestD) { bestD = dd; best = d; }
+    }
+    return best;
+  };
+
+  const trackingDriver = trackingOrder ? liveDriverOf(trackingOrder) : null;
+
+  const liveProgressOf = (ord: Order) => {
+    const drv = liveDriverOf(ord);
+    const pk = pickupOfOrder(ord);
+    const dv = areaOfOrder(ord);
+    if (!drv) return statusProgressFloor(ord.status);
+    const total = Math.sqrt(Math.pow(dv.lat - pk.lat, 2) + Math.pow(dv.lng - pk.lng, 2)) || 1;
+    const left = Math.sqrt(Math.pow(dv.lat - drv.lat, 2) + Math.pow(dv.lng - drv.lng, 2));
+    const p = Math.min(1, 1 - left / total);
+    return Math.max(statusProgressFloor(ord.status), p);
+  };
+
+  const trackProgress = useMemo(() => {
+    const floor = statusProgressFloor(trackingOrder?.status);
+    if (floor >= 1) return 1;
+    if (!trackingOrder || !trackingDriver) return floor;
+    const pk = pickupOfOrder(trackingOrder);
+    const dv = areaOfOrder(trackingOrder);
+    const total = Math.sqrt(Math.pow(dv.lat - pk.lat, 2) + Math.pow(dv.lng - pk.lng, 2)) || 1;
+    const left = Math.sqrt(Math.pow(dv.lat - trackingDriver.lat, 2) + Math.pow(dv.lng - trackingDriver.lng, 2));
+    return Math.max(floor, Math.min(1, 1 - left / total));
+  }, [trackingOrder, trackingDriver]);
+
+  const trackVeh: LiveVeh | null = useMemo(() => {
+    if (!trackingOrder) return null;
+    const dv = areaOfOrder(trackingOrder);
+    const pk = pickupOfOrder(trackingOrder);
+    const drv = trackingDriver;
+    if (!drv) return null;
+    return {
+      id: `TRK-${trackingOrder.id}`,
+      name: drv.name,
+      status: trackProgress >= 0.9 ? 'Delivered' : 'On-Delivery',
+      vehicleType: drv.vehicleType || 'Bike',
+      dest: 'Customer',
+      speed: trackProgress >= 0.9 ? 0 : drv.speed,
+      lat: drv.lat, lng: drv.lng, tLat: drv.tLat, tLng: drv.tLng,
+      roadName: drv.roadName,
+      restLat: pk.lat, restLng: pk.lng, restName: trackingOrder.storeName,
+      custLat: dv.lat, custLng: dv.lng, custName: (trackingOrder.address || deliveryAddress).split(',').pop()?.trim() || 'Your Address'
+    };
+  }, [trackingOrder, trackingDriver, trackProgress]);
+
+  const etaMins = Math.max(1, Math.round((parseInt(trackingOrder?.estimatedMinutes ? String(trackingOrder.estimatedMinutes) : '35') || 35) * (1 - trackProgress)));
+  const activeStepIdx = ETA_STEPS.filter(s => trackProgress >= s.min).length - 1;
+
+  // Auto-advance order status from rider progress + auto notifications (self-sufficient customer demo)
+  const ordersRef = useRef(orders);
+  ordersRef.current = orders;
+  const driversRef = useRef(liveDrivers);
+  driversRef.current = liveDrivers;
+  const silentUpdateRef = useRef(onSilentUpdateOrder);
+  silentUpdateRef.current = onSilentUpdateOrder;
+  const storesRef = useRef(syncedStores);
+  storesRef.current = syncedStores;
+  const autoNotifiedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const cur = ordersRef.current;
+      const drvs = driversRef.current;
+      const sts = storesRef.current;
+      cur.forEach(o => {
+        if (o.status === 'Completed' || o.status === 'Cancelled') return;
+        if (!['Confirmed', 'Processing', 'Ongoing', 'Pending'].includes(o.status)) return;
+        const pk = o.pickupCoords || (() => { const st = sts.find(s => s.name === o.storeName); return st ? st.pickup : { lat: 23.7806, lng: 90.4009 }; })();
+        const dv = o.deliveryCoords || (o.address ? (() => { const m = o.address.match(/(Dhanmondi|Gulshan|Banani|Mirpur|Motijheel|Uttara|Badda|Tejgaon|Farmgate|Shahbagh)/i); return m ? { lat: AREA_COORDS[m[1]][0], lng: AREA_COORDS[m[1]][1] } : { lat: 23.7539, lng: 90.3836 }; })() : { lat: 23.7539, lng: 90.3836 });
+        let drv = null;
+        if (o.driverId) drv = drvs.find(d => d.id === o.driverId) || null;
+        if (!drv) {
+          let best: LiveDriverSim | null = null;
+          let bestD = Infinity;
+          for (const d of drvs) {
+            if (d.status === 'Offline') continue;
+            const dd = Math.pow(d.lat - pk.lat, 2) + Math.pow(d.lng - pk.lng, 2);
+            if (dd < bestD) { bestD = dd; best = d; }
+          }
+          drv = best;
+        }
+        if (!drv) return;
+        const total = Math.sqrt(Math.pow(dv.lat - pk.lat, 2) + Math.pow(dv.lng - pk.lng, 2)) || 1;
+        const left = Math.sqrt(Math.pow(dv.lat - drv.lat, 2) + Math.pow(dv.lng - drv.lng, 2));
+        const p = Math.min(1, 1 - left / total);
+        const next = p < 0.3 ? 'Confirmed' : p < 0.62 ? 'Processing' : 'Ongoing';
+        if (next !== o.status && silentUpdateRef.current) {
+          silentUpdateRef.current({ ...o, status: next });
+          const nKey = `${o.id}:${next}`;
+          if (!autoNotifiedRef.current.has(nKey)) {
+            autoNotifiedRef.current.add(nKey);
+            const notif = next === 'Ongoing'
+              ? { title: '🛵 Order On The Way!', body: `Order #${o.id} from ${o.storeName} is now with your rider.`, emoji: '🛵' }
+              : next === 'Processing'
+              ? { title: '👨‍🍳 Preparing Your Order', body: `${o.storeName} is preparing order #${o.id}.`, emoji: '👨‍🍳' }
+              : { title: '✅ Order Confirmed', body: `Order #${o.id} confirmed. Rider is heading to ${o.storeName}.`, emoji: '📦' };
+            setCustomerNotifs(prev => [{ id: `CN-${Date.now().toString().slice(-4)}`, title: notif.title, body: notif.body, emoji: notif.emoji, time: 'Just now', read: false }, ...prev]);
+          }
+        }
+        if (p >= 0.9 && o.status !== 'Completed') {
+          const nearKey = `${o.id}:near`;
+          if (!autoNotifiedRef.current.has(nearKey)) {
+            autoNotifiedRef.current.add(nearKey);
+            setCustomerNotifs(prev => [{ id: `CN-${Date.now().toString().slice(-4)}`, title: '🔔 Rider Is Nearby!', body: `Order #${o.id} is arriving. Keep your delivery PIN ${o.deliveryPin || '—'} ready.`, emoji: '🔔', time: 'Just now', read: false }, ...prev]);
+          }
+        }
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleAddAddressSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAddrStreet) return;
+    const newAddrObj: SavedAddress = {
+      id: `ADDR-${Date.now().toString().slice(-3)}`,
+      title: newAddrTitle, address: newAddrStreet, area: newAddrArea, phone: newAddrPhone,
+      isDefault: addresses.length === 0
+    };
+    setAddresses(prev => [...prev, newAddrObj]);
+    setIsAddingAddress(false);
+    setNewAddrStreet('');
+    showToast('New delivery address saved successfully!', 'success');
+  };
+
+  const handleAddPaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPayAccount) return;
+    setPaymentMethods(prev => [...prev, {
+      id: `PAY-${Date.now().toString().slice(-3)}`, type: newPayType, accountName: customerProfile.name, accountNumber: newPayAccount, isDefault: false,
+      pin: newPayType === 'Card' ? undefined : String(Math.floor(10000 + Math.random() * 90000))
+    }]);
+    setIsAddingPayment(false);
+    setNewPayAccount('');
+    showToast(`${newPayType} account linked successfully!`, 'success');
+  };
+
+  const handleWalletTopUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    const num = parseFloat(topUpAmount);
+    if (isNaN(num) || num <= 0) return;
+    if (num > bankBalance) {
+      showToast(`Insufficient bank balance — you have ৳${bankBalance.toLocaleString()}`, 'info');
+      return;
+    }
+    setBankBalance(prev => prev - num);
+    setWalletBalance(prev => prev + num);
+    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Completed' }, ...prev]);
+    showToast(`Successfully added ৳${num} to your Smart Wallet!`, 'success');
+  };
+
+  const handleCreateTicketSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketSubject || !ticketDetail) return;
+    setTickets(prev => [{
+      id: `TCK-${Math.floor(100 + Math.random() * 900)}`, subject: ticketSubject, category: ticketCategory, status: 'In Progress', date: 'Just now', lastMessage: ticketDetail
+    }, ...prev]);
+    setIsNewTicketModal(false);
+    setTicketSubject('');
+    setTicketDetail('');
+    showToast('Support ticket submitted! Agent assigned.', 'success');
+  };
+
+  const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+
+  const navItems: { key: typeof activeNav; label: string; icon: React.ReactNode; badge?: number }[] = [
+    { key: 'Home', label: T.home, icon: <Home className="w-4 h-4" /> },
+    { key: 'Orders', label: T.orders, icon: <Store className="w-4 h-4" /> },
+    { key: 'My Orders', label: T.myOrders, icon: <Package className="w-4 h-4" />, badge: orders.length },
+    { key: 'Favorites', label: T.favorites, icon: <Heart className="w-4 h-4 text-red-500 fill-red-500" />, badge: favoriteStoreIds.length },
+    { key: 'Addresses', label: T.addresses, icon: <Map className="w-4 h-4" /> },
+    { key: 'Payments', label: T.payments, icon: <CreditCard className="w-4 h-4" /> },
+    { key: 'Wallet', label: T.wallet, icon: <Wallet className="w-4 h-4" /> },
+    { key: 'Coupons', label: T.coupons, icon: <Ticket className="w-4 h-4 text-amber-500" /> },
+    { key: 'Help', label: T.help, icon: <HelpCircle className="w-4 h-4" /> },
+    { key: 'Settings', label: T.settings, icon: <Settings className="w-4 h-4" /> },
+  ];
+
+  return (
+    <div className={`min-h-screen bg-slate-100 font-sans text-gray-800 flex flex-col ${darkMode ? 'cs-dark' : ''}`}>
+      {darkMode && (
+        <style>{`
+          .cs-dark { filter: invert(1) hue-rotate(180deg); background: #0b1220 !important; }
+          .cs-dark img, .cs-dark video, .cs-dark .leaflet-container, .cs-dark .leaflet-tile-pane, .cs-dark .leaflet-pane { filter: invert(1) hue-rotate(180deg); }
+          .cs-dark .leaflet-tile { filter: invert(1) hue-rotate(180deg) !important; }
+        `}</style>
+      )}
+      {/* HEADER */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
+        <div className="max-w-[1500px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-6 shrink-0">
+            <div onClick={() => setActiveNav('Home')} className="flex items-center space-x-2.5 cursor-pointer">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black shadow-md">
+                <ShoppingBag className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-lg font-black text-gray-900 tracking-tight block leading-none">Smart Shop</span>
+                <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest">{T.brandTag}</span>
+              </div>
+            </div>
+            <div className="hidden lg:flex items-center space-x-1.5 bg-gray-100 hover:bg-gray-200/80 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 cursor-pointer transition-colors border border-gray-200">
+              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Dhanmondi, Dhaka</span>
+              <ChevronDown className="w-3 h-3 text-gray-500" />
+            </div>
+          </div>
+
+          <div className="flex-1 max-w-xl hidden md:flex items-center relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => { if (searchQuery) setActiveNav('Orders'); }}
+              placeholder={T.searchPlaceholder}
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-gray-800 placeholder-gray-400 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 text-gray-400 hover:text-gray-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-3 shrink-0">
+            <button
+              onClick={() => setActiveNav('Wallet')}
+              className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
+            >
+              <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>৳{walletBalance.toLocaleString()}</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${tier.key === 'gold' ? 'bg-amber-400 text-amber-900' : tier.key === 'silver' ? 'bg-slate-300 text-slate-800' : 'bg-gray-200 text-gray-600'}`}>{tier.icon} {tier.label}</span>
+            </button>
+
+            <div className="relative">
+              <button
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors relative cursor-pointer"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadNotifCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center border-2 border-white">{unreadNotifCount}</span>
+                )}
+              </button>
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs z-50 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold">
+                    <span className="text-gray-900">{T.notifications}</span>
+                    <span onClick={() => { setCustomerNotifs(prev => prev.map(n => ({ ...n, read: true }))); showToast(T.markAllRead, 'info'); }} className="text-[10px] text-emerald-600 cursor-pointer">{T.markAllRead}</span>
+                  </div>
+                  <div className="py-2 space-y-2 max-h-56 overflow-y-auto">
+                    {customerNotifs.length === 0 ? (
+                      <p className="text-gray-400 py-2 text-center">No notifications</p>
+                    ) : customerNotifs.map(n => (
+                      <div key={n.id} className={`p-2 rounded-lg text-[11px] border ${n.read ? 'bg-gray-50 border-gray-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                        <p className={`font-bold ${n.read ? 'text-gray-800' : 'text-emerald-900'}`}>{n.emoji} {n.title}</p>
+                        <p className={`text-[10px] ${n.read ? 'text-gray-500' : 'text-emerald-700'}`}>{n.body}</p>
+                        <p className="text-[9px] text-gray-400 mt-0.5">{n.time}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Cart drawer button */}
+            <button
+              onClick={() => setIsCartDrawerOpen(true)}
+              className="relative p-2 text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {cartCount > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-emerald-600 text-white rounded-full text-[9px] font-black flex items-center justify-center border-2 border-white">{cartCount}</span>
+              )}
+            </button>
+
+            {/* Language toggle */}
+            <button
+              onClick={() => { setLang(l => (l === 'en' ? 'bn' : 'en')); showToast(lang === 'en' ? 'ভাষা পরিবর্তন হয়েছে' : 'Language switched to English', 'info'); }}
+              className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer flex items-center space-x-1.5"
+              title={T.language}
+            >
+              <Languages className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">{T.language}</span>
+            </button>
+
+            {/* Dark mode toggle */}
+            <button
+              onClick={() => { setDarkMode(d => !d); showToast(darkMode ? 'Light mode on' : 'Dark mode on', 'info'); }}
+              className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer flex items-center space-x-1.5"
+              title={darkMode ? 'Light mode' : 'Dark mode'}
+            >
+              {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-indigo-500" />}
+              <span className="hidden sm:inline">{darkMode ? 'Light' : 'Dark'}</span>
+            </button>
+
+            <div className="relative">
+              <button
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="flex items-center space-x-2.5 p-1 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <div className={`w-8 h-8 rounded-full ${hashColor(customerProfile.name)} text-white font-black flex items-center justify-center text-xs border-2 border-emerald-500/40`}>
+                  {initialsOf(customerProfile.name)}
+                </div>
+                <span className="text-xs font-bold text-gray-800 hidden sm:inline-block">{customerProfile.name}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+              </button>
+              {isProfileOpen && (
+                <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-200 p-2 text-xs z-50 space-y-1">
+                  <div className="p-2 border-b border-gray-100">
+                    <p className="font-bold text-gray-900">{customerProfile.name}</p>
+                    <p className="text-[10px] text-gray-500">{customerProfile.email}</p>
+                  </div>
+                  <button onClick={() => { setActiveNav('Settings'); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-gray-700 font-semibold hover:bg-gray-100 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
+                    <Settings className="w-4 h-4 text-gray-500" /><span>My Account Settings</span>
+                  </button>
+                  <button onClick={() => { onReturnToAdmin(); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-emerald-700 font-bold hover:bg-emerald-50 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" /><span>Return to Admin Panel</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={onReturnToAdmin}
+              className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /><span>Admin Portal</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* BODY */}
+      <div className="max-w-[1500px] w-full mx-auto flex-1 flex pb-16 md:pb-0">
+        {/* SIDEBAR */}
+        <aside className="w-60 bg-white border-r border-gray-200 p-4 shrink-0 hidden md:flex flex-col justify-between">
+          <div className="space-y-6">
+            <nav className="space-y-1 text-xs">
+              {navItems.map(item => (
+                <button
+                  key={item.key}
+                  onClick={() => setActiveNav(item.key)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    activeNav === item.key ? 'bg-emerald-50 text-emerald-600 font-black' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">{item.icon}<span>{item.label}</span></div>
+                  {item.key === 'My Orders' && !!item.badge && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold">{item.badge}</span>
+                  )}
+                  {item.key === 'Wallet' && (
+                    <span className="text-[10px] font-mono text-emerald-700 font-bold">৳{walletBalance.toLocaleString()}</span>
+                  )}
+                  {item.key === 'Favorites' && !!item.badge && (
+                    <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 text-[10px] font-bold">{item.badge}</span>
+                  )}
+                  {item.key === 'Coupons' && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black uppercase">4 Active</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-3 relative overflow-hidden">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+                <Truck className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-emerald-900">{T.freeDelivery}</h4>
+                <p className="text-[10px] text-emerald-700 mt-0.5">{T.freeDeliverySub}</p>
+              </div>
+              <button
+                onClick={() => { setSelectedCategory('All'); setActiveNav('Orders'); showToast('Browsing free delivery stores', 'info'); }}
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+              >
+                {T.shopNow}
+              </button>
+            </div>
+
+            <div className={`rounded-2xl p-4 space-y-2.5 relative overflow-hidden text-white ${tier.key === 'gold' ? 'bg-gradient-to-br from-amber-500 to-amber-700' : tier.key === 'silver' ? 'bg-gradient-to-br from-slate-500 to-slate-700' : 'bg-gradient-to-br from-gray-700 to-gray-900'}`}>
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg">{tier.icon}</div>
+                <span className="px-2 py-0.5 rounded-md bg-white/20 text-[9px] font-black uppercase tracking-wider">{tier.label}</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-black">{T.loyaltyTier}</h4>
+                <p className="text-[10px] text-white/80 mt-0.5">{T.earnPerOrder} · {tier.cashbackPct}%</p>
+              </div>
+              <div className="h-1.5 bg-white/25 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-white rounded-full transition-all"
+                  style={{ width: `${Math.min(100, Math.round((totalSpend / (LOYALTY_TIERS[tier.key === 'gold' ? 2 : tier.key === 'silver' ? 2 : 1].minSpend)) * 100))}%` }}
+                />
+              </div>
+              <p className="text-[9px] text-white/75">Total spend: ৳{totalSpend.toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 space-y-1">
+            <button
+              onClick={onReturnToAdmin}
+              className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 text-gray-500" /><span>{T.exitCustomer}</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* MAIN CONTENT */}
+        <main className="flex-1 p-4 lg:p-6 space-y-6 overflow-y-auto">
+          {/* ============ HOME LANDING ============ */}
+          {activeNav === 'Home' && (
+            <div className="space-y-6">
+              {/* Banner carousel */}
+              <div className="relative rounded-3xl overflow-hidden h-44 sm:h-52 shadow-lg">
+                {BANNERS.map((b, i) => (
+                  <div
+                    key={i}
+                    className={`absolute inset-0 bg-gradient-to-r ${b.bg} transition-opacity duration-700 flex items-center justify-between px-6 sm:px-10 ${i === bannerIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                  >
+                    <div className="text-white space-y-2">
+                      <span className="text-3xl">{b.emoji}</span>
+                      <h2 className="text-xl sm:text-2xl font-black tracking-tight">{b.title}</h2>
+                      <p className="text-xs sm:text-sm text-white/85 font-medium">{b.sub}</p>
+                      <button
+                        onClick={() => setActiveNav('Orders')}
+                        className="mt-2 px-4 py-2 bg-white text-gray-900 text-xs font-black rounded-xl shadow-md hover:bg-gray-100 transition-colors cursor-pointer flex items-center space-x-1.5"
+                      >
+                        <span>{b.cta}</span><ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-1.5">
+                  {BANNERS.map((_, i) => (
+                    <button key={i} onClick={() => setBannerIdx(i)} className={`h-1.5 rounded-full transition-all cursor-pointer ${i === bannerIdx ? 'w-5 bg-white' : 'w-1.5 bg-white/50'}`} />
+                  ))}
+                </div>
+                <button onClick={() => setBannerIdx((bannerIdx - 1 + BANNERS.length) % BANNERS.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/25 text-white flex items-center justify-center hover:bg-black/40 cursor-pointer">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button onClick={() => setBannerIdx((bannerIdx + 1) % BANNERS.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/25 text-white flex items-center justify-center hover:bg-black/40 cursor-pointer">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Category quick chips */}
+              <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
+                {CATEGORIES.map((cat) => {
+                  const isSelected = selectedCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => { setSelectedCategory(cat); setActiveNav('Orders'); }}
+                      className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                        isSelected ? 'bg-green-600 text-white shadow-md shadow-green-600/20' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Popular stores */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-amber-500" /><span>{T.popularNearYou}</span>
+                  </h2>
+                  <p className="text-xs text-gray-500">{T.popularSub}</p>
+                </div>
+                <button onClick={() => setActiveNav('Orders')} className="text-xs font-bold text-emerald-700 hover:underline flex items-center space-x-1">
+                  <span>{T.viewAll}</span><ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {syncedStores.slice(0, 4).map((store) => {
+                  const isFav = favoriteStoreIds.includes(store.id);
+                  return (
+                    <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative">
+                      <div>
+                        <div className="relative h-36 overflow-hidden bg-gray-100">
+                          <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
+                          <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
+                            <Heart className={`w-4 h-4 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
+                          </button>
+                        </div>
+                        <div className="p-4 space-y-2">
+                          <h3 className="font-bold text-gray-900 text-sm group-hover:text-emerald-600 transition-colors">{store.name}</h3>
+                          <div className="flex items-center justify-between text-[11px] text-gray-600">
+                            <div className="flex items-center space-x-1">
+                              <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                              <span className="font-bold text-gray-900">{displayRating(store)}</span>
+                              <span className="text-gray-400">({store.reviewsCount})</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Clock className="w-3.5 h-3.5 text-gray-400" /><span>{store.deliveryTime}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4 pt-0">
+                        <button onClick={() => openStore(store)} className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
+                          Order Now
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Offers strip */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                {[
+                  { icon: <Store className="w-5 h-5" />, title: T.wideRange, sub: T.wideRangeSub },
+                  { icon: <Truck className="w-5 h-5" />, title: T.fastDelivery, sub: T.fastDeliverySub },
+                  { icon: <Shield className="w-5 h-5" />, title: T.securePay, sub: T.securePaySub },
+                  { icon: <Gift className="w-5 h-5" />, title: T.bestOffers, sub: T.bestOffersSub },
+                ].map((f, i) => (
+                  <div key={i} className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">{f.icon}</div>
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-900">{f.title}</h4>
+                      <p className="text-[11px] text-gray-500 mt-0.5">{f.sub}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ============ ORDERS (STORE CATALOG) ============ */}
+          {activeNav === 'Orders' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200">
+                <div>
+                  <div className="flex items-center space-x-2 text-xs text-gray-500 font-medium">
+                    <span>{T.home}</span><span>&gt;</span><span>{T.orders}</span><span>&gt;</span>
+                    <span className="text-gray-900 font-bold">{T.allStores}</span>
+                  </div>
+                  <h1 className="text-2xl font-black text-gray-900 tracking-tight mt-1">{searchQuery ? T.searchResults : T.orders}</h1>
+                  <p className="text-xs text-gray-500 mt-0.5">{searchQuery ? `"${searchQuery}"` : ''} {filteredStores.length} {T.storeMatches.toLowerCase()} delivering to Dhanmondi</p>
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => showToast('Free delivery filter active on orders above ৳500', 'info')}
+                    className="flex items-center space-x-2 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Filter className="w-3.5 h-3.5 text-gray-500" /><span>{T.filter}</span>
+                  </button>
+                  <div className="flex items-center space-x-2 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 shadow-xs">
+                    <span className="text-gray-400 font-normal">{T.sortBy}</span>
+                    <select
+                      value={sortBy}
+                      onChange={(e: any) => setSortBy(e.target.value)}
+                      className="bg-transparent font-bold text-gray-900 outline-none cursor-pointer"
+                    >
+                      <option value="Recommended">{T.recommended}</option>
+                      <option value="Rating">{T.highestRating}</option>
+                      <option value="Fastest">{T.fastestDelivery}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                      selectedCategory === cat ? 'bg-green-600 text-white shadow-md shadow-green-600/20' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {searchQuery && (
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-gray-900 flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-amber-500" /><span>{T.searchResults} · "{searchQuery}"</span>
+                    </h3>
+                    <button onClick={() => setSearchQuery('')} className="text-[10px] font-bold text-emerald-700 hover:underline flex items-center space-x-1 cursor-pointer">
+                      <X className="w-3 h-3" /><span>{T.cancel}</span>
+                    </button>
+                  </div>
+
+                  {/* Product matches */}
+                  {(() => {
+                    const q = searchQuery.toLowerCase();
+                    const storeMatches = syncedStores.filter(s => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q) || s.subtext.toLowerCase().includes(q));
+                    const prodMatches: Array<{ store: StoreDef; product: StoreProduct }> = [];
+                    for (const s of syncedStores) {
+                      for (const p of s.catalog) {
+                        if (p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)) prodMatches.push({ store: s, product: p });
+                      }
+                    }
+                    if (prodMatches.length === 0 && storeMatches.length === 0) {
+                      return (
+                        <div className="text-center py-6">
+                          <Search className="w-8 h-8 text-gray-300 mx-auto" />
+                          <p className="text-xs font-bold text-gray-700 mt-2">{T.noResults}</p>
+                          <p className="text-[10px] text-gray-500">{T.noResultsSub}</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        {prodMatches.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{prodMatches.length} {T.productMatches}</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {prodMatches.slice(0, 6).map(({ store, product }) => (
+                                <button key={`${store.id}-${product.id}`} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-white border border-gray-200 rounded-xl p-2.5 text-left hover:border-emerald-300 hover:shadow-sm transition-all cursor-pointer">
+                                  <img src={product.image} alt={product.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-gray-900 truncate">{product.name}</p>
+                                    <p className="text-[10px] text-gray-500">{store.name}</p>
+                                    <p className="text-[11px] font-black text-emerald-700 font-mono">৳{product.price} <span className="text-[9px] text-gray-400 font-normal">/ {product.unit}</span></p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {storeMatches.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{storeMatches.length} {T.storeMatches}</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {storeMatches.map(store => (
+                                <button key={store.id} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-white border border-gray-200 rounded-xl p-2.5 text-left hover:border-emerald-300 hover:shadow-sm transition-all cursor-pointer">
+                                  <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-gray-900">{store.name}</p>
+                                    <p className="text-[10px] text-gray-500">{store.category} · ⭐ {displayRating(store)}</p>
+                                    <p className="text-[10px] font-bold text-emerald-700">{store.deliveryTime}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {filteredStores.map((store) => {
+                  const isFav = favoriteStoreIds.includes(store.id);
+                  return (
+                    <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative">
+                      <div>
+                        <div className="relative h-40 overflow-hidden bg-gray-100">
+                          <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
+                          <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
+                            <Heart className={`w-4 h-4 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
+                          </button>
+                        </div>
+                        <div className="p-4 space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-7 h-7 rounded-lg ${store.logoBg} flex items-center justify-center font-black text-xs shrink-0 shadow-xs`}>{store.logoText.charAt(0)}</div>
+                            <div>
+                              <h3 className="font-bold text-gray-900 text-sm group-hover:text-emerald-600 transition-colors">{store.name}</h3>
+                              <p className="text-[11px] text-gray-500">{store.subtext}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-gray-600 pt-2 border-t border-gray-100">
+                            <div className="flex items-center space-x-1">
+                              <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                              <span className="font-bold text-gray-900">{displayRating(store)}</span>
+                              <span className="text-gray-400">({store.reviewsCount})</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Clock className="w-3.5 h-3.5 text-gray-400" /><span>{store.deliveryTime}</span>
+                            </div>
+                            <span className="font-bold text-emerald-700">৳{store.deliveryFee} Delivery</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4 pt-0">
+                        <button onClick={() => openStore(store)} className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
+                          Order Now
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {filteredStores.length === 0 && (
+                <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-xs space-y-3">
+                  <Search className="w-12 h-12 text-gray-300 mx-auto" />
+                  <h3 className="text-sm font-bold text-gray-800">{T.noResults}</h3>
+                  <p className="text-xs text-gray-500">{T.noResultsSub}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============ MY ORDERS ============ */}
+          {activeNav === 'My Orders' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">{T.myOrderHistory}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{T.orderHistorySub}</p>
+                </div>
+                <button onClick={() => setActiveNav('Orders')} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs">
+                  {T.browseStores}
+                </button>
+              </div>
+
+              {orders.length === 0 ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-xs space-y-3">
+                  <Package className="w-12 h-12 text-gray-300 mx-auto" />
+                  <h3 className="text-sm font-bold text-gray-800">{T.noOrders}</h3>
+                  <p className="text-xs text-gray-500">{T.noOrdersSub}</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orders.map((ord) => {
+                    const active = ord.status === 'Ongoing' || ord.status === 'Processing' || ord.status === 'Confirmed' || ord.status === 'Pending';
+                    const completed = ord.status === 'Completed';
+                    const cancelled = ord.status === 'Cancelled';
+                    return (
+                      <div key={ord.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-emerald-200 transition-colors">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center space-x-3 flex-wrap gap-y-1">
+                            <span className="font-mono text-xs font-bold text-gray-500">#{ord.id}</span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              completed ? 'bg-emerald-100 text-emerald-800' :
+                              cancelled ? 'bg-red-100 text-red-800' :
+                              active ? 'bg-amber-100 text-amber-800 animate-pulse' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>{ord.status}</span>
+                            {ord.estimatedMinutes && active && (
+                              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold">~{ord.estimatedMinutes} min</span>
+                            )}
+                          </div>
+                          <h4 className="text-sm font-bold text-gray-900">{ord.storeName}</h4>
+                          <p className="text-xs text-gray-500">{ord.date} {ord.time ? `• ${ord.time}` : ''} • {T.paymentMethod}: {ord.paymentMethod}</p>
+                          <p className="text-xs text-gray-600 font-medium flex items-center space-x-1">
+                            <MapPin className="w-3 h-3 text-gray-400" /><span>{ord.address || deliveryAddress}</span>
+                          </p>
+                          {active && (() => {
+                            const drv = liveDriverOf(ord);
+                            if (!drv) return null;
+                            const prog = liveProgressOf(ord);
+                            return (
+                              <div className="pt-1 space-y-1">
+                                <div className="flex items-center space-x-2">
+                                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[8px] font-black border border-emerald-200 shrink-0">
+                                    {drv.name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()}
+                                  </span>
+                                  <span className="text-[10px] text-gray-500 font-medium">
+                                    {drv.name} · {drv.vehicleType || 'Bike'} · <span className="text-emerald-600 font-bold font-mono">{Math.round(prog * 100)}%</span>
+                                  </span>
+                                </div>
+                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden w-48">
+                                  <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Math.round(prog * 100)}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <div className="flex items-center space-x-3 border-t md:border-t-0 md:border-l border-gray-100 pt-3 md:pt-0 md:pl-6 justify-between md:justify-end flex-wrap gap-y-2">
+                          <div className="text-right pr-2">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase">{T.totalAmount}</p>
+                            <p className="text-base font-black text-gray-900 font-mono">৳{ord.amount.toLocaleString()}</p>
+                          </div>
+                          <button onClick={() => setReceiptOrder(ord)} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5">
+                            <Printer className="w-3.5 h-3.5 text-gray-500" /><span>{T.receipt}</span>
+                          </button>
+                          {active ? (
+                            <div className="flex items-center space-x-2">
+                              {ord.status === 'Ongoing' && (
+                                <button onClick={() => setCancelConfirmId(ord.id)} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-red-200">
+                                  <X className="w-3.5 h-3.5" /><span>{T.cancelOrder}</span>
+                                </button>
+                              )}
+                              <button onClick={() => setTrackingOrder(ord)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs flex items-center space-x-1.5">
+                                <Navigation className="w-3.5 h-3.5" /><span>{T.trackDelivery}</span>
+                              </button>
+                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-red-200">
+                                <AlertCircle className="w-3.5 h-3.5" /><span>Report</span>
+                              </button>
+                            </div>
+                          ) : cancelled ? (
+                            <div className="flex items-center space-x-2">
+                              <button onClick={() => showToast('This order has been cancelled', 'info')} className="px-4 py-2 bg-gray-200 text-gray-500 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5">
+                                <X className="w-3.5 h-3.5" /><span>{T.cancelled}</span>
+                              </button>
+                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-red-200">
+                                <AlertCircle className="w-3.5 h-3.5" /><span>Report</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <button onClick={() => { reorder(ord); }} className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-emerald-200">
+                                <RotateCcw className="w-3.5 h-3.5" /><span>{T.reOrder}</span>
+                              </button>
+                              <button onClick={() => setRateOrder(ord)} className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-amber-200">
+                                <Star className="w-3.5 h-3.5" /><span>Rate Store</span>
+                              </button>
+                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-red-200">
+                                <AlertCircle className="w-3.5 h-3.5" /><span>Report</span>
+                              </button>
+                              <button onClick={() => showToast('Order already delivered', 'info')} className="px-4 py-2 bg-gray-200 text-gray-500 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5">
+                                <CheckCircle className="w-3.5 h-3.5" /><span>{T.delivered}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============ FAVORITES ============ */}
+          {activeNav === 'Favorites' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">Saved Favorite Stores</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Quick access to your most-loved outlets</p>
+              </div>
+              {favoriteStoreIds.length === 0 ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-xs space-y-3">
+                  <Heart className="w-12 h-12 text-gray-300 mx-auto" />
+                  <h3 className="text-sm font-bold text-gray-800">No favorite stores added</h3>
+                  <p className="text-xs text-gray-500">Tap the heart icon on any store card to add it to your favorites list.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  {syncedStores.filter(s => favoriteStoreIds.includes(s.id)).map((store) => (
+                    <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all p-4 space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-xl object-cover" />
+                        <div>
+                          <h4 className="font-bold text-sm text-gray-900">{store.name}</h4>
+                          <p className="text-[11px] text-gray-500">{store.category} • ⭐ {displayRating(store)}</p>
+                        </div>
+                      </div>
+                      <button onClick={() => openStore(store)} className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all">
+                        Order Now
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============ ADDRESSES ============ */}
+          {activeNav === 'Addresses' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">Saved Addresses</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Manage your delivery locations for faster checkout</p>
+                </div>
+                <button onClick={() => setIsAddingAddress(!isAddingAddress)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-2">
+                  <Plus className="w-4 h-4" /><span>Add New Address</span>
+                </button>
+              </div>
+
+              {isAddingAddress && (
+                <form onSubmit={handleAddAddressSubmit} className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-sm space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800">New Address Details</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Title Label</label>
+                      <input type="text" value={newAddrTitle} onChange={(e) => setNewAddrTitle(e.target.value)} placeholder="Home / Office / Parents" className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" required />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Phone Number</label>
+                      <input type="text" value={newAddrPhone} onChange={(e) => setNewAddrPhone(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 font-mono" required />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Street Address / Flat / Building</label>
+                      <input type="text" value={newAddrStreet} onChange={(e) => setNewAddrStreet(e.target.value)} placeholder="House 12, Road 4, Block B" className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" required />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Area / Thana / City</label>
+                      <input type="text" value={newAddrArea} onChange={(e) => setNewAddrArea(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" required />
+                    </div>
+                  </div>
+                  <div className="flex space-x-2 pt-2">
+                    <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">Save Address</button>
+                    <button type="button" onClick={() => setIsAddingAddress(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Cancel</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {addresses.map((addr) => (
+                  <div key={addr.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs relative flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-gray-900 flex items-center space-x-2">
+                          <MapPin className="w-4 h-4 text-emerald-600" /><span>{addr.title}</span>
+                        </span>
+                        {addr.isDefault && <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">Default Address</span>}
+                      </div>
+                      <p className="text-xs text-gray-700 font-medium">{addr.address}</p>
+                      <p className="text-xs text-gray-500">{addr.area}</p>
+                      <p className="text-xs text-gray-500 font-mono">📱 {addr.phone}</p>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs font-bold">
+                      <button onClick={() => { setDeliveryAddress(`${addr.address}, ${addr.area}`); showToast(`Set ${addr.title} as active delivery address`, 'info'); }} className="text-emerald-700 hover:underline">
+                        Use for Orders
+                      </button>
+                      <button onClick={() => { setAddresses(prev => prev.filter(a => a.id !== addr.id)); showToast('Address deleted', 'info'); }} className="text-red-600 hover:text-red-700">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ============ PAYMENTS ============ */}
+          {activeNav === 'Payments' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">Payment Methods</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Linked bKash, Nagad mobile banking & bank cards</p>
+                </div>
+                <button onClick={() => setIsAddingPayment(!isAddingPayment)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-2">
+                  <Plus className="w-4 h-4" /><span>Link Payment Account</span>
+                </button>
+              </div>
+
+              {isAddingPayment && (
+                <form onSubmit={handleAddPaymentSubmit} className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-sm space-y-4 text-xs">
+                  <h3 className="font-black uppercase tracking-wider text-emerald-800">Link New Method</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Account Type</label>
+                      <select value={newPayType} onChange={(e: any) => setNewPayType(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none">
+                        <option value="bKash">bKash Mobile Wallet</option>
+                        <option value="Nagad">Nagad Mobile Wallet</option>
+                        <option value="Card">Visa / Mastercard</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Account Number / Card Info</label>
+                      <input type="text" placeholder="017XXXXXXXX or Card Number" value={newPayAccount} onChange={(e) => setNewPayAccount(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none font-mono" required />
+                    </div>
+                  </div>
+                  <div className="flex space-x-2 pt-1">
+                    <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold">Link Account</button>
+                    <button type="button" onClick={() => setIsAddingPayment(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl font-bold">Cancel</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paymentMethods.map((pm) => (
+                  <div key={pm.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase ${
+                          pm.type === 'bKash' ? 'bg-pink-100 text-pink-700' : pm.type === 'Nagad' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                        }`}>{pm.type}</span>
+                        {pm.isDefault && <span className="text-[10px] font-bold text-emerald-600">Default Method</span>}
+                      </div>
+                      <p className="text-sm font-bold text-gray-900">{pm.accountName}</p>
+                      <p className="text-xs font-mono text-gray-500">{pm.accountNumber}</p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
+                      <button onClick={() => { setPaymentMethod(pm.type as any); showToast(`Selected ${pm.type} as primary checkout method`, 'info'); }} className="text-emerald-700 font-bold">
+                        Set as Active
+                      </button>
+                      <button onClick={() => { setPaymentMethods(prev => prev.filter(p => p.id !== pm.id)); showToast('Payment account unlinked', 'info'); }} className="text-red-500 font-bold">
+                        Unlink
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ============ WALLET ============ */}
+          {activeNav === 'Wallet' && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-emerald-700 to-teal-800 rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Smart Shop Cash Wallet</span>
+                  <p className="text-3xl font-black font-mono">৳{walletBalance.toLocaleString()}</p>
+                  <p className="text-[11px] text-emerald-100">Use instant wallet balance for 1-click order checkout!</p>
+                </div>
+                <div className="shrink-0 space-y-2">
+                  <div className="bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-xl text-[11px] text-emerald-100 flex items-center justify-between space-x-4">
+                    <span>Linked Bank (DBBL)</span>
+                    <b className="font-mono">৳{bankBalance.toLocaleString()}</b>
+                  </div>
+                  <form onSubmit={handleWalletTopUp} className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl flex items-center space-x-2">
+                    <input type="number" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} className="w-24 bg-white text-gray-900 font-mono font-bold text-xs p-2 rounded-xl outline-none" placeholder="Amount" />
+                    <button type="submit" className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer transition-colors">+ Top Up</button>
+                  </form>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs space-y-4">
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Wallet Transaction History</h3>
+                <div className="divide-y divide-gray-100">
+                  {walletTransactions.map((tx) => (
+                    <div key={tx.id} className="py-3 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-bold text-gray-900">{tx.type}</p>
+                        <p className="text-[10px] text-gray-400">{tx.date} • {tx.id}</p>
+                      </div>
+                      <div className="text-right font-mono font-bold">
+                        <span className={tx.amount > 0 ? 'text-emerald-600' : 'text-gray-800'}>
+                          {tx.amount > 0 ? `+৳${tx.amount}` : `-৳${Math.abs(tx.amount)}`}
+                        </span>
+                        <span className="block text-[9px] text-gray-400">{tx.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Referral program */}
+              <div className="bg-gradient-to-r from-indigo-700 to-violet-800 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+                <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/10" />
+                <div className="space-y-4 relative">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center"><Share2 className="w-5 h-5" /></div>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-wider">Refer & Earn</h3>
+                      <p className="text-[11px] text-indigo-200">Share your code — you & your friend both get ৳100 wallet cashback</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 bg-white/15 border border-dashed border-white/30 rounded-xl px-4 py-3 font-mono font-black tracking-[0.2em] text-lg text-center select-all">
+                      {referralState.code}
+                    </div>
+                    <button
+                      onClick={() => { navigator.clipboard?.writeText(referralState.code); showToast('Referral code copied to clipboard!', 'success'); }}
+                      className="px-4 py-3 bg-white text-indigo-800 font-black text-xs rounded-xl shadow-md hover:bg-indigo-50 transition-colors cursor-pointer flex items-center space-x-1.5"
+                    >
+                      <Copy className="w-3.5 h-3.5" /><span>Copy</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-indigo-200">Friends referred: <b className="text-white">{referralState.redeemed}</b></span>
+                    <span className="text-indigo-200">Earned: <b className="text-white font-mono">৳{referralState.earned}</b></span>
+                  </div>
+                  <button
+                    onClick={redeemReferral}
+                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-black rounded-xl transition-all cursor-pointer"
+                  >
+                    🎁 Simulate Friend Using My Code (+৳100)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============ COUPONS ============ */}
+          {activeNav === 'Coupons' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">Active Promo Vouchers</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Apply discount codes to save big on your groceries and food orders</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {COUPONS.map((cp) => (
+                  <div key={cp.code} className="bg-white border border-dashed border-emerald-300 rounded-2xl p-5 shadow-xs flex items-center justify-between bg-emerald-50/30">
+                    <div className="space-y-1">
+                      <span className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-mono font-black text-xs">{cp.code}</span>
+                      <h4 className="font-bold text-sm text-gray-900 pt-1">{cp.discountText}</h4>
+                      <p className="text-xs text-gray-500">{cp.desc}</p>
+                      <p className="text-[10px] text-gray-400 font-mono">Min order ৳{cp.minOrder} • Expires {cp.validTill}</p>
+                    </div>
+                    <button
+                      onClick={() => { setCopiedCoupon(cp.code); handleApplyCouponCode(cp.code); setTimeout(() => setCopiedCoupon(null), 3000); }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer shrink-0 flex items-center space-x-1"
+                    >
+                      {copiedCoupon === cp.code ? (<><Check className="w-3.5 h-3.5" /><span>Applied</span></>) : (<><Copy className="w-3.5 h-3.5" /><span>Use Code</span></>)}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ============ HELP ============ */}
+          {activeNav === 'Help' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">Help & Customer Support</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Submit support tickets or resolve delivery questions</p>
+                </div>
+                <button onClick={() => setIsNewTicketModal(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-2">
+                  <Plus className="w-4 h-4" /><span>Open Support Ticket</span>
+                </button>
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-gray-400">Your Support Requests</h3>
+                {tickets.map((tck) => (
+                  <div key={tck.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-gray-500">{tck.id}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${tck.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{tck.status}</span>
+                    </div>
+                    <h4 className="font-bold text-xs text-gray-900">{tck.subject}</h4>
+                    <p className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-xl border border-gray-100">"{tck.lastMessage}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ============ SETTINGS ============ */}
+          {activeNav === 'Settings' && (
+            <div className="space-y-6 max-w-xl">
+              <div>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">Customer Account Settings</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Update personal details and notification preferences</p>
+              </div>
+              <form onSubmit={(e) => { e.preventDefault(); setCustomerProfile({ ...customerProfile, name: customerProfile.name, email: customerProfile.email }); showToast('Account settings updated successfully!', 'success'); }} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Full Name</label>
+                  <input type="text" value={customerProfile.name} onChange={(e) => setCustomerProfile({ ...customerProfile, name: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Email Address</label>
+                  <input type="email" value={customerProfile.email} onChange={(e) => setCustomerProfile({ ...customerProfile, email: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                </div>
+                <div className="pt-2 space-y-3 border-t border-gray-100">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="font-bold text-gray-800">SMS Order Status Alerts</span>
+                    <input type="checkbox" checked={customerProfile.sms} onChange={(e) => setCustomerProfile({ ...customerProfile, sms: e.target.checked })} className="w-4 h-4 accent-emerald-600" />
+                  </label>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="font-bold text-gray-800">Email Order Receipts</span>
+                    <input type="checkbox" checked={customerProfile.emailNotif} onChange={(e) => setCustomerProfile({ ...customerProfile, emailNotif: e.target.checked })} className="w-4 h-4 accent-emerald-600" />
+                  </label>
+                </div>
+                <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all">Save Changes</button>
+              </form>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* MOBILE BOTTOM NAV */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 md:hidden grid grid-cols-5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+        {[
+          { key: 'Home' as const, label: 'Home', icon: <Home className="w-5 h-5" /> },
+          { key: 'Orders' as const, label: 'Orders', icon: <Store className="w-5 h-5" /> },
+          { key: 'My Orders' as const, label: 'Orders', icon: <Package className="w-5 h-5" /> },
+          { key: 'Wallet' as const, label: 'Wallet', icon: <Wallet className="w-5 h-5" /> },
+          { key: 'Settings' as const, label: 'Account', icon: <Settings className="w-5 h-5" /> },
+        ].map((item) => (
+          <button
+            key={item.key}
+            onClick={() => setActiveNav(item.key)}
+            className={`flex flex-col items-center justify-center py-2.5 text-[9px] font-bold transition-colors cursor-pointer ${activeNav === item.key ? 'text-emerald-600' : 'text-gray-400'}`}
+          >
+            {item.icon}
+            <span className="mt-0.5">{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* ============ STORE MENU & CHECKOUT MODAL ============ */}
+      {selectedStore && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-6xl w-full shadow-2xl border border-gray-200 overflow-hidden sm:my-8 max-h-[92vh] flex flex-col">
+            <div className="relative h-32 sm:h-40 bg-gray-900 shrink-0">
+              <img src={selectedStore.image} alt={selectedStore.name} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-50" />
+              <div className="absolute top-3 right-3 flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    const admin = stores.find(s => s.name.toLowerCase() === selectedStore.name.toLowerCase());
+                    onLaunchMerchantStore(admin ? admin.id : selectedStore.id);
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-xs text-gray-900 text-[11px] font-black hover:bg-white transition-colors cursor-pointer flex items-center space-x-1.5 shadow-md"
+                >
+                  <StoreIcon className="w-3.5 h-3.5 text-emerald-600" /><span>{T.merchantPortal}</span>
+                </button>
+                <button onClick={() => setSelectedStore(null)} className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="absolute bottom-3 left-4 text-white flex items-end gap-3">
+                <div className={`hidden sm:flex w-14 h-14 rounded-2xl ${selectedStore.logoBg} items-center justify-center font-black text-lg shadow-lg border-2 border-white/40`}>
+                  {selectedStore.logoText.charAt(0)}
+                </div>
+                <div>
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${selectedStore.badgeColor}`}>{selectedStore.category}</span>
+                  <h2 className="text-xl font-black mt-0.5">{selectedStore.name}</h2>
+                  <p className="text-[11px] text-gray-300 flex items-center space-x-2">
+                    <span className="flex items-center space-x-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" /><b>{selectedStore.rating}</b></span>
+                    <span>•</span><Clock className="w-3 h-3" /><span>{selectedStore.deliveryTime}</span>
+                    <span>•</span><span>৳{selectedStore.deliveryFee} delivery</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Product grid */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none flex-1">
+                    {['All', ...Array.from(new Set(selectedStore.catalog.map(p => p.category)))].map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setStoreCat(cat)}
+                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 transition-all cursor-pointer ${
+                          storeCat === cat ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="relative hidden sm:block">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={storeSearch}
+                      onChange={(e) => setStoreSearch(e.target.value)}
+                      placeholder="Search menu..."
+                      className="w-44 bg-gray-100 border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:bg-white focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {selectedStore.catalog
+                    .filter(p => storeCat === 'All' || p.category === storeCat)
+                    .filter(p => p.name.toLowerCase().includes(storeSearch.toLowerCase()))
+                    .map((prod) => {
+                      const inCart = cart.find(i => i.product.id === prod.id);
+                      return (
+                        <div key={prod.id} className={`border rounded-2xl overflow-hidden bg-white transition-all ${prod.status === 'Out of Stock' ? 'opacity-55 border-gray-200' : 'border-gray-200 hover:border-emerald-300 hover:shadow-md'}`}>
+                          <div className="relative h-32 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
+                            <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" loading="lazy" className="w-full h-full object-cover" />
+                            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                              prod.status === 'In Stock' ? 'bg-emerald-600 text-white' : prod.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'
+                            }`}>{prod.status}</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleWatch(prod.id); }}
+                              title={watchedProducts.includes(prod.id) ? 'Remove price alert' : 'Set price-drop alert'}
+                              className={`absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center transition-colors cursor-pointer shadow-md ${watchedProducts.includes(prod.id) ? 'text-amber-500' : 'text-gray-500 hover:text-amber-500'}`}
+                            >
+                              <BellPlus className={`w-3.5 h-3.5 ${watchedProducts.includes(prod.id) ? 'fill-amber-400' : ''}`} />
+                            </button>
+                          </div>
+                          <div className="p-3 space-y-1.5">
+                            <h4 className="font-bold text-xs text-gray-900 leading-snug cursor-pointer hover:text-emerald-700" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>{prod.name}</h4>
+                            <p className="text-[10px] text-gray-500 line-clamp-1">{prod.desc}</p>
+                            <div className="flex items-center justify-between pt-1">
+                              <div>
+                                <span className="font-mono font-black text-emerald-700 text-sm">৳{prod.price}</span>
+                                <span className="text-[10px] text-gray-400 ml-1">/ {prod.unit}</span>
+                              </div>
+                              {prod.status === 'Out of Stock' ? (
+                                <span className="text-[10px] font-bold text-gray-400 px-3 py-1.5">Unavailable</span>
+                              ) : inCart ? (
+                                <div className="flex items-center space-x-2 bg-green-600 text-white rounded-lg px-2 py-1">
+                                  <button onClick={() => handleUpdateQty(prod.id, -1)} className="text-white hover:text-green-200 cursor-pointer"><Minus className="w-3 h-3" /></button>
+                                  <span className="font-mono font-bold text-xs w-4 text-center">{inCart.quantity}</span>
+                                  <button onClick={() => handleAddToCart(prod)} className="text-white hover:text-green-200 cursor-pointer"><Plus className="w-3 h-3" /></button>
+                                </div>
+                              ) : (
+                                <button onClick={() => handleAddToCart(prod)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
+                                  <Plus className="w-3 h-3" /><span>Add</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Cart & checkout */}
+              <div className="space-y-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+                  <h3 className="text-xs font-black uppercase text-gray-800 tracking-wider flex items-center justify-between">
+                    <span>{T.yourBasket}</span>
+                    <span className="text-[10px] text-emerald-600 font-bold">{cartCount} {T.items}</span>
+                  </h3>
+                  {cart.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">{T.basketEmpty}</p>
+                  ) : (
+                    <div className="divide-y divide-gray-200 space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {cart.map((item) => (
+                        <div key={item.product.id} className="pt-2 flex items-center justify-between text-xs">
+                          <div className="flex-1 pr-2">
+                            <span className="font-bold text-gray-900 block">{item.product.name}</span>
+                            <span className="text-[10px] text-gray-500">৳{item.product.price} / {item.product.unit}</span>
+                          </div>
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <div className="flex items-center space-x-1 border border-gray-300 rounded-lg bg-white px-1.5 py-0.5">
+                              <button onClick={() => handleUpdateQty(item.product.id, -1)} className="text-gray-500 hover:text-gray-800 cursor-pointer"><Minus className="w-3 h-3" /></button>
+                              <span className="font-mono font-bold text-xs text-gray-800 w-4 text-center">{item.quantity}</span>
+                              <button onClick={() => handleAddToCart(item.product)} className="text-gray-500 hover:text-gray-800 cursor-pointer"><Plus className="w-3 h-3" /></button>
+                            </div>
+                            <span className="font-mono font-bold text-gray-900 w-12 text-right">৳{item.product.price * item.quantity}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="pt-3 border-t border-gray-200 flex items-center space-x-2">
+                    <div className="relative flex-1">
+                      <Tag className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input type="text" value={couponInput} onChange={(e) => setCouponInput(e.target.value)} placeholder={T.couponCode}
+                        className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs font-mono uppercase outline-none focus:border-emerald-500" />
+                    </div>
+                    <button type="button" onClick={() => handleApplyCouponCode()} className="px-3.5 py-2 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-black transition-colors cursor-pointer">{T.apply}</button>
+                  </div>
+                  {!appliedCoupon && (() => {
+                    const best = COUPONS.filter(c => cartSubtotal >= c.minOrder && c.code !== 'SMARTSHOP').sort((a, b) => (b.discountValue || 0) - (a.discountValue || 0))[0];
+                    if (!best) return null;
+                    return (
+                      <button
+                        onClick={() => { if (best.isFreeShip) { setAppliedCoupon({ code: best.code, discount: 0, isFreeShip: true }); showToast(`Coupon ${best.code} applied: Free Delivery!`, 'success'); } else { setAppliedCoupon({ code: best.code, discount: best.discountValue }); showToast(`Coupon ${best.code} applied: ৳${best.discountValue} discount!`, 'success'); } }}
+                        className="w-full p-2 bg-amber-50 border border-amber-200 rounded-xl text-[10px] font-bold text-amber-800 flex items-center justify-between cursor-pointer hover:bg-amber-100 transition-colors"
+                      >
+                        <span className="flex items-center space-x-1.5"><BadgePercent className="w-3.5 h-3.5" /><span>{T.bestCoupon}: <span className="font-mono">{best.code}</span></span></span>
+                        <span className="text-amber-700 underline">{T.apply}</span>
+                      </button>
+                    );
+                  })()}
+                  {appliedCoupon && (
+                    <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex justify-between items-center">
+                      <span>🎉 Coupon '{appliedCoupon.code}' applied</span>
+                      <button onClick={() => setAppliedCoupon(null)} className="text-red-600 hover:underline cursor-pointer">Remove</button>
+                    </div>
+                  )}
+
+                  <div className="pt-3 border-t border-gray-200 text-xs space-y-1.5 font-medium">
+                    <div className="flex justify-between text-gray-600"><span>{T.subtotal}</span><span className="font-mono">৳{cartSubtotal}</span></div>
+                    <div className="flex justify-between text-gray-600"><span>{T.delivery}</span><span className="font-mono">{deliveryCharge === 0 ? T.freeShip : `৳${deliveryCharge}`}</span></div>
+                    <div className="flex justify-between text-gray-600"><span>{T.vat}</span><span className="font-mono">৳{vatTax}</span></div>
+                    {couponDiscountAmount > 0 && (
+                      <div className="flex justify-between text-emerald-600 font-bold"><span>{T.promoDiscount}</span><span className="font-mono">-৳{couponDiscountAmount}</span></div>
+                    )}
+                    <div className="flex justify-between text-sm font-black text-gray-900 pt-1 border-t border-gray-200">
+                      <span>{T.grandTotal}</span><span className="font-mono text-emerald-700">৳{cartGrandTotal}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3 text-xs">
+                  <h3 className="font-black uppercase tracking-wider text-gray-800">{T.deliveryDetails}</h3>
+
+                  {/* Schedule toggle */}
+                  <div>
+                    <div className="flex items-center space-x-2 mb-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setIsScheduled(false)}
+                        className={`flex-1 py-1.5 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${!isScheduled ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        ⚡ {T.home === 'হোম' ? 'এখনই' : 'Deliver Now'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsScheduled(true)}
+                        className={`flex-1 py-1.5 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center space-x-1 ${isScheduled ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        <CalendarClock className="w-3 h-3" /><span>{T.home === 'হোম' ? 'পরবর্তী সময়ে' : 'Schedule Later'}</span>
+                      </button>
+                    </div>
+                    {isScheduled && (
+                      <select
+                        value={scheduleSlot}
+                        onChange={(e) => setScheduleSlot(e.target.value)}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-800 outline-none focus:border-emerald-500"
+                      >
+                        {SCHEDULE_SLOTS.map(slot => <option key={slot} value={slot}>{slot}</option>)}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Mini map for delivery pin */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1 flex items-center justify-between">
+                      <span className="flex items-center space-x-1"><LocateFixed className="w-3 h-3 text-emerald-600" /><span>📍 {T.deliveryAddress} {lang === 'bn' ? '(মানচিত্রে পিন দিন)' : '(tap the map)'}</span></span>
+                      {deliveryPin && <button type="button" onClick={() => setDeliveryPin(null)} className="text-red-500 hover:underline font-bold">{T.cancel}</button>}
+                    </label>
+                    <div className="h-36 rounded-xl overflow-hidden border border-gray-200 relative z-0">
+                      <LeafletMap vehicles={[]} zoomTo={13} marker={deliveryPin} onMapClick={(lat, lng) => { setDeliveryPin({ lat, lng }); }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.deliveryAddress}</label>
+                    <input type="text" list="saved-addrs" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-800 outline-none focus:border-emerald-500" />
+                    <datalist id="saved-addrs">
+                      {addresses.map(a => <option key={a.id} value={`${a.address}, ${a.area}`} />)}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.contactPhone}</label>
+                    <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-800 outline-none focus:border-emerald-500 font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">{T.paymentMethod}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['bKash', 'Nagad', 'Cash on Delivery', 'Card', 'Split (Wallet + bKash)'] as const).map((method) => (
+                        <button
+                          type="button"
+                          key={method}
+                          onClick={() => setPaymentMethod(method)}
+                          className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${method === 'Split (Wallet + bKash)' ? 'col-span-2' : ''} ${
+                            paymentMethod === method ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {method}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handlePlaceCustomerOrder}
+                    disabled={cart.length === 0}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
+                  >
+                    <Zap className="w-4 h-4" /><span>{T.placeOrder} (৳{cartGrandTotal})</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ PAYMENT FLOW MODAL ============ */}
+      {payModal && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs animate-in fade-in duration-200">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="flex items-center space-x-2">
+                {payModal === 'bKash' && <div className="w-8 h-8 rounded-lg bg-pink-500 text-white flex items-center justify-center font-black text-xs">bK</div>}
+                {payModal === 'Nagad' && <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center font-black text-xs">Ng</div>}
+                {payModal === 'Card' && <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center"><CreditCard className="w-4 h-4" /></div>}
+                {payModal === 'COD' && <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center"><Banknote className="w-4 h-4" /></div>}
+                {payModal === 'Split (Wallet + bKash)' && <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>}
+                <div>
+                  <h3 className="font-black text-gray-900 text-sm">
+                    {payModal === 'bKash' ? 'Pay with bKash' : payModal === 'Nagad' ? 'Pay with Nagad' : payModal === 'Card' ? 'Card Payment' : payModal === 'Split (Wallet + bKash)' ? 'Split Payment' : 'Cash on Delivery'}
+                  </h3>
+                  <p className="text-[10px] text-gray-500">Secure payment via NexaGo Pay Gateway</p>
+                </div>
+              </div>
+              <button onClick={() => setPayModal(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-gray-500 uppercase font-bold">Amount to pay</p>
+                <p className="text-2xl font-black font-mono text-gray-900">৳{cartGrandTotal}</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center"><Lock className="w-4 h-4" /></div>
+            </div>
+
+            {payModal === 'bKash' || payModal === 'Nagad' ? (() => {
+              const payAccount = paymentMethods.find(p => p.type === payModal);
+              const expectedPin = payAccount?.pin || '12345';
+              return (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{payModal} Account</label>
+                  <input type="text" value={payAccount?.accountNumber || '01712-345678'} readOnly className="w-full bg-gray-100 border border-gray-200 rounded-xl p-2.5 font-mono text-gray-700 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Enter {payModal} PIN</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="• • • • •"
+                    maxLength={5}
+                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-center text-lg tracking-[0.5em] font-mono outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1 flex items-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>Demo PIN for this account: <b className="text-gray-600 font-mono">{expectedPin}</b></span></p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (pinInput.length < 5) { showToast('Enter your 5-digit PIN', 'info'); return; }
+                    if (pinInput !== expectedPin) { showToast(`Incorrect PIN — the correct PIN is ${expectedPin}`, 'info'); return; }
+                    showToast(`${payModal} payment of ৳${cartGrandTotal} successful`, 'success');
+                    confirmPayment();
+                  }}
+                  className="w-full py-3 bg-pink-600 hover:bg-pink-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  Confirm & Pay ৳{cartGrandTotal}
+                </button>
+              </div>
+              );
+            })(              ) : payModal === 'Split (Wallet + bKash)' ? (
+                <div className="space-y-3">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-800 space-y-1.5">
+                    <div className="flex justify-between font-bold"><span>Wallet balance</span><span className="font-mono">৳{walletBalance.toLocaleString()}</span></div>
+                    <div className="flex justify-between font-bold text-gray-900"><span>Order total</span><span className="font-mono">৳{cartGrandTotal}</span></div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Pay from Wallet</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={Math.min(walletBalance, cartGrandTotal)}
+                      value={splitWalletAmount}
+                      onChange={(e) => setSplitWalletAmount(Math.max(0, Math.min(Number(e.target.value) || 0, walletBalance, cartGrandTotal)))}
+                      className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Remaining <b className="font-mono">৳{Math.max(0, cartGrandTotal - splitWalletAmount)}</b> will be paid via bKash.</p>
+                  </div>
+                  {cartGrandTotal - splitWalletAmount > 0 && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">bKash PIN (for ৳{Math.max(0, cartGrandTotal - splitWalletAmount)})</label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        value={splitPinInput}
+                        onChange={(e) => setSplitPinInput(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="• • • • •"
+                        maxLength={5}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-center tracking-[0.5em] font-mono outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">Demo PIN: <b className="text-gray-600 font-mono">{(paymentMethods.find(p => p.type === 'bKash')?.pin) || '12345'}</b></p>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (splitWalletAmount <= 0) { showToast('Choose an amount from wallet', 'info'); return; }
+                      const bPin = paymentMethods.find(p => p.type === 'bKash')?.pin || '12345';
+                      if (cartGrandTotal - splitWalletAmount > 0 && splitPinInput !== bPin) { showToast(`Incorrect bKash PIN — the correct PIN is ${bPin}`, 'info'); return; }
+                      showToast(`Split payment: ৳${splitWalletAmount} wallet + ৳${cartGrandTotal - splitWalletAmount} bKash`, 'success');
+                      confirmPayment();
+                    }}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
+                  >
+                    Pay ৳{splitWalletAmount} wallet + ৳{Math.max(0, cartGrandTotal - splitWalletAmount)} bKash
+                  </button>
+                </div>
+              ) : payModal === 'Card' ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Card Number</label>
+                  <input type="text" value={cardInfo.number} onChange={(e) => setCardInfo({ ...cardInfo, number: e.target.value.replace(/[^0-9 ]/g, '') })} placeholder="4242 4242 4242 4242" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Cardholder Name</label>
+                  <input type="text" value={cardInfo.name} onChange={(e) => setCardInfo({ ...cardInfo, name: e.target.value })} placeholder="RAHIM KHAN" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono uppercase outline-none focus:border-emerald-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Expiry</label>
+                    <input type="text" value={cardInfo.expiry} onChange={(e) => setCardInfo({ ...cardInfo, expiry: e.target.value.replace(/[^0-9/]/g, '') })} placeholder="12/28" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">CVV</label>
+                    <input type="password" value={cardInfo.cvv} onChange={(e) => setCardInfo({ ...cardInfo, cvv: e.target.value.replace(/[^0-9]/g, '') })} placeholder="•••" maxLength={3} className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500" />
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (cardInfo.number.replace(/\s/g, '').length < 16) { showToast('Enter a valid 16-digit card number', 'info'); return; }
+                    if (!cardInfo.name.trim()) { showToast('Enter the cardholder name', 'info'); return; }
+                    const expMatch = cardInfo.expiry.match(/^(\d{2})\/(\d{2})$/);
+                    if (!expMatch) { showToast('Enter expiry as MM/YY', 'info'); return; }
+                    const mm = parseInt(expMatch[1], 10);
+                    const yy = 2000 + parseInt(expMatch[2], 10);
+                    if (mm < 1 || mm > 12) { showToast('Invalid expiry month', 'info'); return; }
+                    if (yy < 2026 || (yy === 2026 && mm < 8)) { showToast('This card is expired', 'info'); return; }
+                    if (cardInfo.cvv.length < 3) { showToast('Enter the 3-digit CVV', 'info'); return; }
+                    showToast('Card payment of ৳' + cartGrandTotal + ' successful', 'success');
+                    confirmPayment();
+                  }}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  Pay ৳{cartGrandTotal}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 font-bold flex items-center space-x-2">
+                  <Banknote className="w-4 h-4 shrink-0" /><span>Pay ৳{cartGrandTotal} in cash when your order arrives.</span>
+                </div>
+                <p className="text-[11px] text-gray-500">Your driver will collect the exact amount on delivery. Please keep the cash ready.</p>
+                <button onClick={confirmPayment} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer">
+                  Confirm Cash on Delivery
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============ LIVE TRACKING MODAL ============ */}
+      {trackingOrder && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 shadow-2xl border border-gray-200 space-y-4 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div>
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{T.liveTracking}</span>
+                <h3 className="text-base font-black text-gray-900">Order #{trackingOrder.id} · {trackingOrder.storeName}</h3>
+                <div className="flex items-center space-x-2 mt-1">
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${trackingOrder.status === 'Ongoing' ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>{trackingOrder.status}</span>
+                  {trackingOrder.scheduledSlot && <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-bold flex items-center space-x-1"><CalendarClock className="w-3 h-3" /><span>{trackingOrder.scheduledSlot}</span></span>}
+                </div>
+              </div>
+              <button onClick={() => setTrackingOrder(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+
+            {/* Real Leaflet map */}
+            <div className="relative z-0 h-56 sm:h-64 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+              <LeafletMap
+                vehicles={trackVeh ? [trackVeh] : []}
+                zoomTo={13}
+                trackingId={trackVeh ? trackVeh.id : null}
+                pickup={trackingOrder ? { ...pickupOfOrder(trackingOrder), label: trackingOrder.storeName } : null}
+                dropoff={trackingOrder ? { ...areaOfOrder(trackingOrder), label: (trackingOrder.address || deliveryAddress).split(',').pop()?.trim() || 'Your Address' } : null}
+              />
+              <div className="absolute top-2 left-2 z-[500] px-2.5 py-1 bg-gray-900/85 text-white text-[10px] font-bold rounded-lg flex items-center space-x-1.5">
+                {trackProgress >= 1 ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> : <Bike className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />}
+                <span>{trackProgress >= 1 ? T.delivered : `${etaMins} ${T.minsAway}`}</span>
+              </div>
+              {!trackingDriver && (
+                <div className="absolute bottom-2 left-2 z-[500] px-2.5 py-1 bg-amber-500/90 text-white text-[10px] font-bold rounded-lg">
+                  ⚠️ No online rider — searching for nearest available courier...
+                </div>
+              )}
+            </div>
+
+            {/* Timeline */}
+            <div className="space-y-1">
+              {ETA_STEPS.map((step, i) => {
+                const done = trackProgress >= step.min;
+                const isActive = activeStepIdx === i && trackProgress < 1;
+                return (
+                  <div key={i} className="flex items-start space-x-3 py-1.5">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 border-2 ${
+                        done ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-gray-300 text-gray-400'
+                      }`}>
+                        {done ? <Check className="w-3 h-3" /> : <span>{i + 1}</span>}
+                      </div>
+                      {i < ETA_STEPS.length - 1 && <div className={`w-0.5 h-6 ${done ? 'bg-emerald-400' : 'bg-gray-200'}`} />}
+                    </div>
+                    <div className="pt-0.5">
+                      <p className={`text-xs font-black ${isActive ? 'text-emerald-700' : done ? 'text-gray-900' : 'text-gray-400'}`}>
+                        {step.label} {isActive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" />}
+                      </p>
+                      <p className="text-[10px] text-gray-500">{step.desc}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Driver card */}
+            {trackingDriver && (
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-9 h-9 rounded-full ${hashColor(trackingDriver.name)} text-white font-bold flex items-center justify-center text-[11px]`}>
+                    {initialsOf(trackingDriver.name)}
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">{T.courierDriver}: {trackingDriver.name}</p>
+                    <p className="text-[10px] text-gray-500 font-mono">{trackingDriver.vehicleType}: {trackingDriver.id} · 📍 {trackVeh?.roadName || T.atStore}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button onClick={() => setChatOrderId(trackingOrder.id)} className="p-2 bg-gray-900 text-white rounded-lg hover:bg-black cursor-pointer" title="Chat with rider">
+                    <MessageCircle className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => showToast(`${T.callDriver} ${trackingDriver.name}`, 'info')} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 cursor-pointer">
+                    <Phone className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Delivery PIN verification */}
+            {trackProgress >= 0.9 && trackingOrder.status !== 'Completed' && (
+              <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center space-y-2">
+                <p className="text-xs font-black text-emerald-900 flex items-center justify-center space-x-1.5">
+                  <Lock className="w-3.5 h-3.5" /><span>Driver at your door — verify to complete delivery</span>
+                </p>
+                <p className="text-[10px] text-emerald-700">Share this 4-digit PIN with the rider to confirm:</p>
+                <p className="font-mono text-3xl font-black tracking-[0.4em] text-emerald-800">{trackingOrder.deliveryPin || '----'}</p>
+                <button onClick={() => confirmDelivery(trackingOrder)} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2">
+                  <CheckCircle className="w-4 h-4" /><span>Confirm Delivery</span>
+                </button>
+              </div>
+            )}
+
+            <div className="flex space-x-2">
+              <button onClick={() => setTrackingOrder(null)} className="flex-1 py-2.5 bg-gray-900 text-white font-bold text-xs rounded-xl hover:bg-black transition-colors cursor-pointer">
+                {T.closeTracking}
+              </button>
+              <button onClick={() => { setReportOrder(trackingOrder); setReportReason('Wrong item received'); setReportNote(''); }} className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5">
+                <AlertCircle className="w-3.5 h-3.5" /><span>Report</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ RECEIPT MODAL ============ */}
+      {receiptOrder && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs font-mono">
+            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+              <span className="font-bold text-gray-900">Official Order Receipt</span>
+              <button onClick={() => setReceiptOrder(null)}><X className="w-4 h-4" /></button>
+            </div>
+            <div className="text-center space-y-2">
+              <div className="flex flex-col items-center justify-center space-y-1.5 py-1">
+                <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center shadow-xs border-2 border-black print:bg-black print:text-white print:border-black">
+                  <svg className="w-7 h-7 fill-current" viewBox="0 0 24 24">
+                    <path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm7 17H5V8h2v2c0 .55.45 1 1 1s1-.45 1-1V8h6v2c0 .55.45 1 1 1s1-.45 1-1V8h2v12z" />
+                  </svg>
+                </div>
+                <div className="flex items-center space-x-1.5 text-[9px] font-black tracking-widest uppercase text-black print:text-black">
+                  <span>★</span><span>SMART SHOP BRAND</span><span>★</span>
+                </div>
+              </div>
+              <h4 className="font-black text-sm text-gray-900 uppercase print:text-black">{receiptOrder.storeName}</h4>
+              <p className="text-[10px] text-gray-500 print:text-black">Order ID: #{receiptOrder.id}</p>
+              <p className="text-[10px] text-gray-500 print:text-black">Date: {receiptOrder.date} {receiptOrder.time ? `• ${receiptOrder.time}` : ''}</p>
+            </div>
+            <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200">
+              <QRCodeSVG
+                value={JSON.stringify({
+                  orderId: receiptOrder.id,
+                  store: receiptOrder.storeName,
+                  customer: receiptOrder.customerName,
+                  amount: receiptOrder.amount,
+                  paymentMethod: receiptOrder.paymentMethod
+                })}
+                size={110}
+              />
+              <p className="text-[9px] text-gray-500 font-sans mt-2">Scan for warehouse verification</p>
+            </div>
+            <div className="border-t border-b border-gray-200 py-2 space-y-1">
+              <div className="flex justify-between"><span>Customer:</span><span className="font-bold">{receiptOrder.customerName}</span></div>
+              <div className="flex justify-between"><span>Payment:</span><span className="font-bold">{receiptOrder.paymentMethod}</span></div>
+              {receiptOrder.scheduledSlot && receiptOrder.scheduledSlot !== 'ASAP (Fastest)' ? (
+                <div className="flex justify-between"><span>Scheduled:</span><span className="font-bold">{receiptOrder.scheduledSlot}</span></div>
+              ) : null}
+              {receiptOrder.deliveryPin ? (
+                <div className="flex justify-between"><span>Delivery PIN:</span><span className="font-bold tracking-[0.25em]">{receiptOrder.deliveryPin}</span></div>
+              ) : null}
+              {receiptOrder.itemCount ? (
+                <div className="flex justify-between"><span>Items:</span><span className="font-bold">{receiptOrder.itemCount} pcs</span></div>
+              ) : null}
+              {receiptOrder.deliveryCharge ? (
+                <div className="flex justify-between"><span>Delivery:</span><span className="font-bold">৳{receiptOrder.deliveryCharge}</span></div>
+              ) : null}
+              <div className="flex justify-between text-sm font-black text-gray-900 pt-1">
+                <span>Total Amount:</span><span>৳{receiptOrder.amount}</span>
+              </div>
+            </div>
+            <button onClick={() => { window.print(); }} className="w-full py-2 bg-emerald-600 text-white rounded-xl font-sans font-bold text-xs">
+              Print Receipt
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============ SUPPORT TICKET MODAL ============ */}
+      {isNewTicketModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <form onSubmit={handleCreateTicketSubmit} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+              <h3 className="font-black text-sm text-gray-900">Open Customer Support Ticket</h3>
+              <button type="button" onClick={() => setIsNewTicketModal(false)}><X className="w-4 h-4" /></button>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Issue Category</label>
+              <select value={ticketCategory} onChange={(e) => setTicketCategory(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none">
+                <option value="Order Delivery">Order Delivery Delay</option>
+                <option value="Payment / Refund">Payment / Wallet Refund</option>
+                <option value="Missing Item">Missing or Damaged Item</option>
+                <option value="General Query">General Query</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Subject</label>
+              <input type="text" required placeholder="Brief summary of the problem" value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Detailed Description</label>
+              <textarea required rows={3} placeholder="Describe your issue in detail..." value={ticketDetail} onChange={(e) => setTicketDetail(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none" />
+            </div>
+            <button type="submit" className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-md">Submit Ticket</button>
+          </form>
+        </div>
+      )}
+
+      {/* ============ PRODUCT DETAIL + REVIEWS MODAL ============ */}
+      {detailProduct && (
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200">
+            <div className="relative h-56 bg-gray-100">
+              <img src={detailProduct.image} alt={detailProduct.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              <button onClick={() => setDetailProduct(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer"><X className="w-4 h-4" /></button>
+              <span className={`absolute bottom-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase ${detailProduct.status === 'In Stock' ? 'bg-emerald-600 text-white' : detailProduct.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'}`}>{detailProduct.status}</span>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">{detailStoreName} · {detailProduct.category}</p>
+                <h3 className="text-lg font-black text-gray-900">{detailProduct.name}</h3>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="font-mono font-black text-emerald-700 text-xl">৳{detailProduct.price} <span className="text-xs text-gray-400 font-normal">/ {detailProduct.unit}</span></p>
+                  <div className="flex items-center space-x-1">
+                    {[1, 2, 3, 4, 5].map(r => {
+                      const agg = productReviews.filter(pr => pr.productId === detailProduct.id);
+                      const avg = agg.length ? agg.reduce((s, x) => s + x.rating, 0) / agg.length : 4;
+                      return <Star key={r} className={`w-3.5 h-3.5 ${r <= Math.round(avg) ? 'text-amber-500 fill-amber-500' : 'text-gray-300'}`} />;
+                    })}
+                    <span className="text-xs font-bold text-gray-700 ml-1">
+                      {(() => { const agg = productReviews.filter(pr => pr.productId === detailProduct.id); return agg.length ? (agg.reduce((s, x) => s + x.rating, 0) / agg.length).toFixed(1) : '4.0'; })()}
+                    </span>
+                    <span className="text-[10px] text-gray-400">({productReviews.filter(pr => pr.productId === detailProduct.id).length} {T.reviews.toLowerCase()})</span>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-600 leading-relaxed">{detailProduct.desc}</p>
+
+              {/* Reviews */}
+              <div className="border-t border-gray-100 pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-gray-800">{T.reviews}</h4>
+                  <span className="text-[10px] text-gray-500">{productReviews.filter(pr => pr.productId === detailProduct.id).length} reviews</span>
+                </div>
+                {productReviews.filter(pr => pr.productId === detailProduct.id).slice(0, 3).map(rev => (
+                  <div key={rev.id} className="bg-gray-50 rounded-xl p-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-gray-900 flex items-center space-x-1.5">
+                        <span className={`w-5 h-5 rounded-full ${hashColor(rev.user)} text-white text-[9px] font-bold flex items-center justify-center`}>{initialsOf(rev.user)}</span>
+                        {rev.user}
+                      </span>
+                      <span className="text-[9px] text-gray-400">{rev.date}</span>
+                    </div>
+                    <div className="flex space-x-0.5">
+                      {[1, 2, 3, 4, 5].map(r => <Star key={r} className={`w-3 h-3 ${r <= rev.rating ? 'text-amber-500 fill-amber-500' : 'text-gray-300'}`} />)}
+                    </div>
+                    <p className="text-[11px] text-gray-600">{rev.comment}</p>
+                  </div>
+                ))}
+                {productReviews.filter(pr => pr.productId === detailProduct.id).length === 0 && (
+                  <p className="text-[11px] text-gray-400">No reviews yet — be the first to review this product.</p>
+                )}
+
+                {/* Write review */}
+                <div className="border border-gray-200 rounded-xl p-3 space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-700">{T.writeReview}</p>
+                  <div className="flex items-center space-x-1">
+                    {[1, 2, 3, 4, 5].map(r => (
+                      <button key={r} onClick={() => setNewReviewRating(r)} className="cursor-pointer">
+                        <Star className={`w-5 h-5 ${r <= newReviewRating ? 'text-amber-500 fill-amber-500' : 'text-gray-300 hover:text-amber-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={newReviewText}
+                    onChange={(e) => setNewReviewText(e.target.value)}
+                    placeholder="Share your experience with this product..."
+                    className="w-full p-2 border border-gray-300 rounded-xl text-[11px] outline-none focus:border-emerald-500 resize-none"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!newReviewText.trim()) { showToast('Write a short review first', 'info'); return; }
+                      setProductReviews(prev => [{
+                        id: `REV-${Date.now().toString().slice(-4)}`, productId: detailProduct.id,
+                        user: customerProfile.name, rating: newReviewRating, comment: newReviewText.trim(), date: 'Just now'
+                      }, ...prev]);
+                      setNewReviewText('');
+                      setNewReviewRating(5);
+                      showToast('Review submitted — thank you!', 'success');
+                    }}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    {T.submitReview}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={() => { handleAddToCart(detailProduct); }}
+                disabled={detailProduct.status === 'Out of Stock'}
+                className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <Plus className="w-4 h-4" /><span>{detailProduct.status === 'Out of Stock' ? 'Unavailable' : T.addToCart} · ৳{detailProduct.price}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ CART DRAWER ============ */}
+      {isCartDrawerOpen && (
+        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-xs flex justify-end">
+          <div onClick={() => setIsCartDrawerOpen(false)} className="absolute inset-0" />
+          <div className="relative w-full max-w-sm bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-sm font-black text-gray-900 flex items-center space-x-2">
+                <ShoppingCart className="w-4 h-4 text-emerald-600" /><span>{T.cartDrawer}</span>
+                <span className="text-[10px] text-gray-400 font-bold">({cartCount} {T.items.toLowerCase()})</span>
+              </h3>
+              <button onClick={() => setIsCartDrawerOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-4 h-4 text-gray-500" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {cart.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-3">
+                  <ShoppingCart className="w-12 h-12 text-gray-300" />
+                  <p className="text-xs font-bold text-gray-700">{T.emptyCart}</p>
+                  <p className="text-[10px] text-gray-400">{T.emptyCartSub}</p>
+                  <button onClick={() => { setIsCartDrawerOpen(false); setActiveNav('Orders'); }} className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl cursor-pointer">{T.browseStores}</button>
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div key={item.product.id} className="flex items-center space-x-3 bg-gray-50 border border-gray-200 rounded-xl p-2.5">
+                    <img src={item.product.image} alt={item.product.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">{item.product.name}</p>
+                      <p className="text-[10px] text-gray-500">৳{item.product.price} / {item.product.unit}</p>
+                      <div className="flex items-center space-x-1.5 mt-1 border border-gray-300 rounded-lg bg-white w-fit px-1.5 py-0.5">
+                        <button onClick={() => handleUpdateQty(item.product.id, -1)} className="text-gray-500 cursor-pointer"><Minus className="w-3 h-3" /></button>
+                        <span className="font-mono font-bold text-[11px] text-gray-800 w-4 text-center">{item.quantity}</span>
+                        <button onClick={() => handleAddToCart(item.product)} className="text-gray-500 cursor-pointer"><Plus className="w-3 h-3" /></button>
+                      </div>
+                    </div>
+                    <span className="font-mono font-black text-gray-900 text-xs">৳{item.product.price * item.quantity}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            {cart.length > 0 && (
+              <div className="p-4 border-t border-gray-200 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 font-bold">{T.grandTotal}</span>
+                  <span className="font-mono font-black text-emerald-700">৳{cartGrandTotal}</span>
+                </div>
+                <button onClick={() => { setIsCartDrawerOpen(false); if (selectedStore) setSelectedStore(selectedStore); else setActiveNav('Orders'); showToast(T.goToCart, 'info'); }} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer">
+                  {selectedStore ? T.checkout : T.browseStores}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============ RIDER CHAT MODAL ============ */}
+      {chatOrderId && (
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-200 flex flex-col max-h-[80vh] animate-in fade-in duration-200">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                {(() => {
+                  const ord = orders.find(o => o.id === chatOrderId);
+                  const drv = ord ? liveDriverOf(ord) : null;
+                  return (
+                    <>
+                      <div className={`w-9 h-9 rounded-full ${hashColor(drv ? drv.name : 'Rider')} text-white font-bold flex items-center justify-center text-[11px]`}>
+                        {initialsOf(drv ? drv.name : 'Rider')}
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-gray-900">{drv ? drv.name : 'Rider'} · {ord?.storeName}</p>
+                        <p className="text-[10px] text-emerald-600 font-bold flex items-center space-x-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /><span>Online · replies instantly</span></p>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+              <button onClick={() => setChatOrderId(null)} className="p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-4 h-4 text-gray-500" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[240px]">
+              {(chatMessages[chatOrderId] || []).length === 0 && (
+                <p className="text-[11px] text-gray-400 text-center py-6">Start a conversation with your courier rider.</p>
+              )}
+              {(chatMessages[chatOrderId] || []).map(m => (
+                <div key={m.id} className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-[11px] shadow-sm ${m.from === 'me' ? 'bg-emerald-600 text-white rounded-br-md' : 'bg-gray-100 text-gray-800 rounded-bl-md'}`}>
+                    <p>{m.text}</p>
+                    <p className={`text-[8px] mt-0.5 ${m.from === 'me' ? 'text-emerald-200' : 'text-gray-400'}`}>{m.time}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="p-3 border-t border-gray-100 flex items-center space-x-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') sendChatMessage(); }}
+                placeholder={lang === 'bn' ? 'বার্তা লিখুন...' : 'Type a message...'}
+                className="flex-1 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-emerald-500"
+              />
+              <button onClick={sendChatMessage} className="p-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 cursor-pointer">
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ ORDER REPORT MODAL ============ */}
+      {reportOrder && (
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 animate-in fade-in duration-200">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto"><AlertCircle className="w-6 h-6" /></div>
+            <div>
+              <h3 className="text-sm font-black text-gray-900">Report an issue</h3>
+              <p className="text-xs text-gray-500 mt-1">Order <span className="font-mono font-bold">#{reportOrder.id}</span> · {reportOrder.storeName}</p>
+            </div>
+            <div className="space-y-1.5">
+              {['Wrong item received', 'Missing item', 'Poor food quality', 'Late delivery', 'Damaged packaging', 'Overcharged', 'Other'].map(r => (
+                <button key={r} onClick={() => setReportReason(r)} className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold cursor-pointer border ${reportReason === r ? 'bg-red-50 border-red-400 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-700 hover:border-gray-300'}`}>
+                  <span>{r}</span>{reportReason === r && <Check className="w-3.5 h-3.5 text-red-500" />}
+                </button>
+              ))}
+            </div>
+            <textarea
+              rows={2}
+              value={reportNote}
+              onChange={(e) => setReportNote(e.target.value)}
+              placeholder="Add details (optional) — e.g. ordered 2 but got 1…"
+              className="w-full p-2.5 border border-gray-300 rounded-xl text-xs outline-none focus:border-red-500 resize-none"
+            />
+            <div className="space-y-2">
+              <button onClick={() => { if (onReport) onReport({ orderId: reportOrder.id, reason: reportReason, note: reportNote }); setReportOrder(null); showToast(`Report submitted for #${reportOrder.id} — admin notified ✓`, 'success'); }} className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
+                Submit Report to Admin
+              </button>
+              <button onClick={() => setReportOrder(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ STORE RATING MODAL ============ */}
+      {rateOrder && (
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center animate-in fade-in duration-200">
+            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto"><Star className="w-6 h-6 fill-amber-400 text-amber-400" /></div>
+            <div>
+              <h3 className="text-sm font-black text-gray-900">Rate {rateOrder.storeName}</h3>
+              <p className="text-xs text-gray-500 mt-1">How was your experience with this store?</p>
+            </div>
+            <div className="flex items-center justify-center space-x-1.5">
+              {[1, 2, 3, 4, 5].map(r => (
+                <button key={r} onClick={() => setRateVal(r)} className="cursor-pointer">
+                  <Star className={`w-8 h-8 ${r <= rateVal ? 'text-amber-500 fill-amber-500' : 'text-gray-300 hover:text-amber-300'}`} />
+                </button>
+              ))}
+            </div>
+            <textarea
+              rows={2}
+              value={rateComment}
+              onChange={(e) => setRateComment(e.target.value)}
+              placeholder="Share what you liked (optional)..."
+              className="w-full p-2.5 border border-gray-300 rounded-xl text-xs outline-none focus:border-emerald-500 resize-none"
+            />
+            <div className="space-y-2">
+              <button onClick={submitStoreRating} className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
+                Submit {rateVal}-Star Rating
+              </button>
+              <button onClick={() => setRateOrder(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ CANCEL ORDER CONFIRM ============ */}
+      {cancelConfirmId && (
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center animate-in fade-in duration-200">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto"><Trash2 className="w-5 h-5" /></div>
+            <div>
+              <h3 className="text-sm font-black text-gray-900">{T.confirmCancelTitle}</h3>
+              <p className="text-xs text-gray-500 mt-1">{T.confirmCancelBody}</p>
+              <p className="text-[10px] font-mono text-gray-400 mt-1">Order #{cancelConfirmId}</p>
+            </div>
+            <div className="space-y-2">
+              <button onClick={confirmCancelOrder} className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer">{T.yesCancel}</button>
+              <button onClick={() => setCancelConfirmId(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.keepOrder}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FOOTER */}
+      <footer className="bg-white border-t border-gray-200 py-4 px-6 text-center text-xs text-gray-500 hidden md:block">
+        <p>© 2026 Smart Shop E-Commerce Platform by NexaGo BD. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+};

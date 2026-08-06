@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NexaGo Remote — Share Screen</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #0b0f17; color: #e5e7eb; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .card { background: #131a26; border: 1px solid #232c3d; border-radius: 16px; padding: 32px; width: 100%; max-width: 460px; text-align: center; }
+  .logo { color: #f97316; font-weight: 800; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+  h1 { font-size: 20px; margin: 12px 0 6px; color: #fff; }
+  p.sub { font-size: 13px; color: #9ca3af; margin-bottom: 20px; }
+  .code { font-family: ui-monospace, monospace; font-size: 22px; font-weight: 700; letter-spacing: 2px; background: #0b0f17; border: 1px solid #232c3d; border-radius: 10px; padding: 12px; margin-bottom: 20px; color: #fbbf24; }
+  button { width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+  button.primary { background: #f97316; color: #fff; }
+  button.primary:hover { opacity: .9; }
+  button.stop { background: #ef4444; color: #fff; display: none; }
+  .status { margin-top: 16px; font-size: 13px; color: #6b7280; }
+  .status.live { color: #34d399; font-weight: 700; }
+  video { display: none; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">NexaGo Remote</div>
+  <h1>Share your screen</h1>
+  <p class="sub">An admin wants to view this device to help you. Your screen stays visible only while this tab is open.</p>
+  <div class="code" id="code">--</div>
+  <button class="primary" id="shareBtn">Start Sharing</button>
+  <button class="stop" id="stopBtn">Stop Sharing</button>
+  <div class="status" id="status">Connecting to relay…</div>
+  <div class="status hidden" id="connStatus" style="color:#fbbf24;font-weight:700;">● Connecting to admin…</div>
+  <div class="status" id="deviceInfo"></div>
+</div>
+<video id="preview" autoplay muted playsinline></video>
+
+<script>
+(function () {
+  const qs = new URLSearchParams(location.search);
+  const room = (qs.get('room') || '').toUpperCase().trim();
+  const codeEl = document.getElementById('code');
+  const statusEl = document.getElementById('status');
+  const connStatusEl = document.getElementById('connStatus');
+  const deviceInfoEl = document.getElementById('deviceInfo');
+  const shareBtn = document.getElementById('shareBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const video = document.getElementById('preview');
+
+  let ws = null;
+  let pc = null;
+  let localStream = null;
+  let sharing = false;
+
+  if (room) codeEl.textContent = room;
+  const relay = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+
+  function connect() {
+    ws = new WebSocket(relay);
+  ws.onopen = () => {
+    statusEl.textContent = 'Connected — ready to share';
+    ws.send(JSON.stringify({ type: 'join', room, role: 'share' }));
+    const ua = navigator.userAgent;
+    const isIOS = /iPhone|iPad|iPod/.test(ua);
+    const isAndroid = /Android/.test(ua);
+    const browser = isIOS ? 'iOS Safari' : isAndroid ? (ua.indexOf('Chrome') > -1 ? 'Android Chrome' : 'Android browser') : ua.indexOf('Firefox') > -1 ? 'Firefox' : ua.indexOf('Edg') > -1 ? 'Edge' : ua.indexOf('Chrome') > -1 ? 'Chrome' : 'Browser';
+    const os = isIOS ? 'iOS' : isAndroid ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Unknown';
+    ws.send(JSON.stringify({ type: 'device', info: { os, browser, isMobile: isIOS || isAndroid, isIOS } }));
+    deviceInfoEl.textContent = 'Device: ' + os + ' · ' + browser;
+    if (isIOS && !window.isSecureContext) {
+      statusEl.textContent = 'Screen sharing needs HTTPS — this link is insecure.';
+    }
+  };
+    ws.onmessage = (ev) => {
+      let m;
+      try { m = JSON.parse(ev.data); } catch { return; }
+      if (m.type === 'joined') {
+        if (!window.isSecureContext) {
+          shareBtn.disabled = true;
+          statusEl.textContent = 'Screen sharing needs a secure (HTTPS) page — reload this link over HTTPS.';
+        } else if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+          shareBtn.disabled = true;
+          statusEl.textContent = 'This browser cannot share its screen. Use Chrome on a computer or Android, or the NexaGo native app on iPhone.';
+        } else {
+          shareBtn.disabled = false;
+          statusEl.textContent = 'Session ready';
+        }
+      } else if (m.type === 'error') {
+        statusEl.textContent = m.message;
+      } else if (m.type === 'peer-status') {
+        if (m.role === 'admin') {
+          connStatusEl.classList.toggle('hidden', !m.online);
+        }
+      } else if (m.type === 'offer' && m.from === 'admin') {
+        handleOffer(m);
+      } else if (m.type === 'ice' && m.from === 'admin') {
+        if (pc) pc.addIceCandidate(JSON.parse(m.candidate)).catch(function(){});
+      }
+    };
+    ws.onclose = () => {
+      statusEl.textContent = 'Disconnected from relay';
+      if (sharing) stopSharing();
+    };
+  }
+
+  async function handleOffer(m) {
+    if (!pc || !localStream) return;
+    await pc.setRemoteDescription(m.sdp);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    if (ws) ws.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription, room }));
+  }
+
+  async function startSharing() {
+    try {
+      localStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 15, max: 30 } },
+        audio: false
+      });
+    } catch (e) {
+      statusEl.textContent = 'Sharing cancelled or not available: ' + (e.name || '');
+      return;
+    }
+    sharing = true;
+    video.srcObject = localStream;
+    shareBtn.style.display = 'none';
+    stopBtn.style.display = 'block';
+    statusEl.textContent = 'Sharing — waiting for admin…';
+    statusEl.classList.add('live');
+
+    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+    pc.onicecandidate = (e) => {
+      if (e.candidate && ws) ws.send(JSON.stringify({ type: 'ice', candidate: JSON.stringify(e.candidate), room }));
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') statusEl.textContent = '● Admin is viewing your screen';
+      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') statusEl.textContent = 'Connection dropped — check network';
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    if (ws) ws.send(JSON.stringify({ type: 'offer', sdp: pc.localDescription, room }));
+  }
+
+  function stopSharing() {
+    sharing = false;
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    if (pc) { pc.close(); pc = null; }
+    shareBtn.style.display = 'block';
+    stopBtn.style.display = 'none';
+    statusEl.classList.remove('live');
+    statusEl.textContent = 'Sharing stopped';
+  }
+
+  shareBtn.addEventListener('click', startSharing);
+  stopBtn.addEventListener('click', stopSharing);
+
+  if (!room) {
+    statusEl.textContent = 'Missing room code. Use the link provided by the admin.';
+    shareBtn.disabled = true;
+  } else {
+    connect();
+  }
+})();
+</script>
+</body>
+</html>
