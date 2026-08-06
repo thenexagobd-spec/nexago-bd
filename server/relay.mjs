@@ -95,7 +95,10 @@ wss.on('connection', (ws, req) => {
       if (!roomId || roomId.length < 4) { ws.send(JSON.stringify({ type: 'error', message: 'Invalid room code' })); return; }
       const room = roomFor(roomId);
       if (role === 'share') {
-        if (room.share) { ws.send(JSON.stringify({ type: 'error', message: 'This room is already sharing' })); return; }
+        if (room.share && room.share !== ws) {
+          try { room.share.send(JSON.stringify({ type: 'error', message: 'Replaced by a new share connection' })); room.share.close(4001, 'replaced'); } catch { /* ignore */ }
+          room.share = null;
+        }
         room.share = ws;
       } else {
         room.admin = ws;

@@ -60,8 +60,10 @@
   const ua = navigator.userAgent;
   const isIOS = /iPhone|iPad|iPod/.test(ua);
   const isAndroid = /Android/.test(ua);
+  const isAndroidFirefox = isAndroid && /Firefox|FxiOS/.test(ua);
   const isWebView = /wv\b|WebView|Crosswalk|Line\/|FBAN|FBAV|Instagram|WhatsApp|Messenger|MicroMessenger/.test(ua);
-  const canShare = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  const chromeVer = (ua.match(/Chrome\/(\d+)/) || [])[1];
+  const canShare = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) && !isAndroidFirefox;
 
   function sendStatus(state, message) {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'status', state, message }));
@@ -86,7 +88,7 @@
   ws.onopen = () => {
     statusEl.textContent = 'Connected — ready to share';
     ws.send(JSON.stringify({ type: 'join', room, role: 'share' }));
-    const browser = isIOS ? 'iOS Safari' : isAndroid ? (ua.indexOf('Chrome') > -1 ? 'Android Chrome' : (isWebView ? 'In-app browser' : 'Android browser')) : ua.indexOf('Firefox') > -1 ? 'Firefox' : ua.indexOf('Edg') > -1 ? 'Edge' : ua.indexOf('Chrome') > -1 ? 'Chrome' : 'Browser';
+    const browser = isIOS ? 'iOS Safari' : isAndroid ? (isAndroidFirefox ? 'Firefox (Android)' : (ua.indexOf('Chrome') > -1 ? (chromeVer && Number(chromeVer) < 72 ? 'Old Chrome' : 'Android Chrome') : (isWebView ? 'In-app browser' : 'Android browser'))) : ua.indexOf('Firefox') > -1 ? 'Firefox' : ua.indexOf('Edg') > -1 ? 'Edge' : ua.indexOf('Chrome') > -1 ? 'Chrome' : 'Browser';
     const os = isIOS ? 'iOS' : isAndroid ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Unknown';
     ws.send(JSON.stringify({ type: 'device', info: { os, browser, isMobile: isIOS || isAndroid, isIOS, isWebView, ua, gdm: canShare } }));
     deviceInfoEl.textContent = 'Device: ' + os + ' · ' + browser;
@@ -100,7 +102,10 @@
       if (m.type === 'joined') {
         if (!canShare) {
           shareBtn.disabled = true;
-          if (isWebView) {
+          if (isAndroidFirefox) {
+            showChromeBtn();
+            sendStatus('unsupported', 'Firefox on Android cannot share the screen. Tap "Open in Chrome" to continue in Google Chrome.');
+          } else if (isWebView) {
             showChromeBtn();
             sendStatus('unsupported', 'This is an in-app browser (WhatsApp/Messenger). Tap "Open in Chrome" (or ⋮ → Open in Chrome) to continue, then start sharing.');
           } else if (isIOS) {
