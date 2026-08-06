@@ -53,6 +53,17 @@
   let localStream = null;
   let sharing = false;
 
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/.test(ua);
+  const isAndroid = /Android/.test(ua);
+  const isWebView = /wv\b|WebView|Crosswalk|Line\/|FBAN|FBAV|Instagram|WhatsApp|Messenger|MicroMessenger/.test(ua);
+  const canShare = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+
+  function sendStatus(state, message) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'status', state, message }));
+    statusEl.textContent = message;
+  }
+
   if (room) codeEl.textContent = room;
   const relay = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 
@@ -61,30 +72,32 @@
   ws.onopen = () => {
     statusEl.textContent = 'Connected — ready to share';
     ws.send(JSON.stringify({ type: 'join', room, role: 'share' }));
-    const ua = navigator.userAgent;
-    const isIOS = /iPhone|iPad|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const browser = isIOS ? 'iOS Safari' : isAndroid ? (ua.indexOf('Chrome') > -1 ? 'Android Chrome' : 'Android browser') : ua.indexOf('Firefox') > -1 ? 'Firefox' : ua.indexOf('Edg') > -1 ? 'Edge' : ua.indexOf('Chrome') > -1 ? 'Chrome' : 'Browser';
+    const browser = isIOS ? 'iOS Safari' : isAndroid ? (ua.indexOf('Chrome') > -1 ? 'Android Chrome' : (isWebView ? 'In-app browser' : 'Android browser')) : ua.indexOf('Firefox') > -1 ? 'Firefox' : ua.indexOf('Edg') > -1 ? 'Edge' : ua.indexOf('Chrome') > -1 ? 'Chrome' : 'Browser';
     const os = isIOS ? 'iOS' : isAndroid ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Unknown';
-    ws.send(JSON.stringify({ type: 'device', info: { os, browser, isMobile: isIOS || isAndroid, isIOS } }));
+    ws.send(JSON.stringify({ type: 'device', info: { os, browser, isMobile: isIOS || isAndroid, isIOS, isWebView } }));
     deviceInfoEl.textContent = 'Device: ' + os + ' · ' + browser;
     if (isIOS && !window.isSecureContext) {
-      statusEl.textContent = 'Screen sharing needs HTTPS — this link is insecure.';
+      sendStatus('unsupported', 'Screen sharing needs HTTPS — this link is insecure.');
     }
   };
     ws.onmessage = (ev) => {
       let m;
       try { m = JSON.parse(ev.data); } catch { return; }
       if (m.type === 'joined') {
-        if (!window.isSecureContext) {
+        if (!canShare) {
           shareBtn.disabled = true;
-          statusEl.textContent = 'Screen sharing needs a secure (HTTPS) page — reload this link over HTTPS.';
-        } else if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-          shareBtn.disabled = true;
-          statusEl.textContent = 'This browser cannot share its screen. Use Chrome on a computer or Android, or the NexaGo native app on iPhone.';
+          if (isWebView) {
+            sendStatus('unsupported', 'This is an in-app browser (WhatsApp/Messenger). Tap the ⋮ or ⋯ menu and choose "Open in Chrome" to continue, then start sharing.');
+          } else if (isIOS) {
+            sendStatus('unsupported', 'iPhone Safari cannot share its screen. Use Chrome on a computer or an Android phone, or the NexaGo native app.');
+          } else if (!window.isSecureContext) {
+            sendStatus('unsupported', 'Screen sharing needs a secure (HTTPS) page — reload this link over HTTPS.');
+          } else {
+            sendStatus('unsupported', 'This browser cannot share its screen. Install or open Google Chrome, then retry this link.');
+          }
         } else {
           shareBtn.disabled = false;
-          statusEl.textContent = 'Session ready';
+          sendStatus('ready', 'Session ready — tap Start Sharing to continue.');
         }
       } else if (m.type === 'error') {
         statusEl.textContent = m.message;
@@ -113,30 +126,43 @@
   }
 
   async function startSharing() {
+    if (!canShare) {
+      sendStatus('unsupported', 'Screen sharing is not available in this browser/app.');
+      return;
+    }
     try {
+      sendStatus('picker', 'Choose the screen/app to share…');
       localStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: { ideal: 15, max: 30 } },
         audio: false
       });
     } catch (e) {
-      statusEl.textContent = 'Sharing cancelled or not available: ' + (e.name || '');
+      sendStatus('error', 'Sharing cancelled or not available: ' + (e.name || ''));
       return;
     }
     sharing = true;
     video.srcObject = localStream;
     shareBtn.style.display = 'none';
     stopBtn.style.display = 'block';
-    statusEl.textContent = 'Sharing — waiting for admin…';
+    statusEl.textContent = 'Sharing — connecting to admin…';
     statusEl.classList.add('live');
+    sendStatus('sharing', 'Sharing — connecting to admin…');
 
-    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+      ]
+    });
     localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
     pc.onicecandidate = (e) => {
       if (e.candidate && ws) ws.send(JSON.stringify({ type: 'ice', candidate: JSON.stringify(e.candidate), room }));
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') statusEl.textContent = '● Admin is viewing your screen';
-      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') statusEl.textContent = 'Connection dropped — check network';
+      if (pc.connectionState === 'connected') sendStatus('live', '● Admin is viewing your screen');
+      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') sendStatus('error', 'Connection dropped — check network, retry from Chrome');
     };
 
     const offer = await pc.createOffer();
@@ -151,7 +177,7 @@
     shareBtn.style.display = 'block';
     stopBtn.style.display = 'none';
     statusEl.classList.remove('live');
-    statusEl.textContent = 'Sharing stopped';
+    sendStatus('stopped', 'Sharing stopped — tap Start Sharing again to resume.');
   }
 
   shareBtn.addEventListener('click', startSharing);

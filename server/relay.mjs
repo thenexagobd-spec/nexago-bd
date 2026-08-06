@@ -118,6 +118,8 @@ wss.on('connection', (ws, req) => {
       target.send(JSON.stringify({ type: msg.type, sdp: msg.sdp, candidate: msg.candidate, from: role }));
     } else if (msg.type === 'device' && role === 'share') {
       target.send(JSON.stringify({ type: 'device', info: msg.info }));
+    } else if (msg.type === 'status' && role === 'share') {
+      target.send(JSON.stringify({ type: 'status', state: msg.state, message: msg.message }));
     }
   });
 

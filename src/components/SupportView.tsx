@@ -828,6 +828,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
   const [realSession, setRealSession] = useState<{ code: string; shareUrl: string; status: 'idle' | 'waiting' | 'sharing' | 'live' | 'offline' | 'error' }>({ code: '', shareUrl: '', status: 'idle' });
   const [realStream, setRealStream] = useState<MediaStream | null>(null);
   const [peerDevice, setPeerDevice] = useState<{ os?: string; browser?: string; isMobile?: boolean } | null>(null);
+  const [shareStatus, setShareStatus] = useState<{ state: string; message: string } | null>(null);
   const realWsRef = useRef<WebSocket | null>(null);
   const realPcRef = useRef<RTCPeerConnection | null>(null);
   const realVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -2903,6 +2904,8 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
           if (m.role === 'share') setRealSession(s => ({ ...s, status: m.online ? 'sharing' : 'waiting' }));
         } else if (m.type === 'device') {
           setPeerDevice(m.info || null);
+        } else if (m.type === 'status') {
+          setShareStatus(m.message ? { state: m.state, message: m.message } : null);
         } else if (m.type === 'offer' && m.from === 'share') {
           handleRealOffer(m.sdp);
         } else if (m.type === 'ice' && m.from === 'share') {
@@ -2936,7 +2939,14 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
       });
   };
   const handleRealOffer = async (sdp: any) => {
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+      ]
+    });
     realPcRef.current = pc;
     pc.onicecandidate = (e) => {
       if (e.candidate && realWsRef.current) realWsRef.current.send(JSON.stringify({ type: 'ice', candidate: JSON.stringify(e.candidate), room: realSession.code, from: 'admin' }));
@@ -2963,6 +2973,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
     if (realWsRef.current) { try { realWsRef.current.close(); } catch { /* ignore */ } realWsRef.current = null; }
     if (realStream) { realStream.getTracks().forEach(t => t.stop()); setRealStream(null); }
     setPeerDevice(null);
+    setShareStatus(null);
     setRealSession({ code: '', shareUrl: '', status: 'idle' });
     setTechAudit(prev => [{ action: 'Real remote session ended', detail: `Closed room ${realSession.code || '—'}`, time: nowTime() }, ...prev]);
   };
@@ -5164,8 +5175,9 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                     ) : (
                       <>
                         <Loader2 className="w-8 h-8 text-amber-400 animate-spin mb-2" />
-                        <p className="text-xs font-bold text-amber-300">Waiting for the user…</p>
-                        <p className="text-[10px] text-gray-500 mt-1">Send the share link to the target device. Once they click Share Screen, their real screen appears here.</p>
+                        <p className="text-xs font-bold text-amber-300">{shareStatus && shareStatus.state === 'unsupported' ? 'User blocked' : shareStatus && shareStatus.state === 'error' ? 'Share failed' : 'Waiting for the user…'}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">{shareStatus && shareStatus.state !== 'ready' ? shareStatus.message : 'Send the share link to the target device. Once they tap Share Screen, their real screen appears here.'}</p>
+                        <p className="text-[10px] text-gray-600 mt-1.5">Important: if the link opens inside WhatsApp/Messenger, the user must tap ⋮ → "Open in Chrome" first — the in-app browser cannot share the screen.</p>
                       </>
                     )}
                   </div>
