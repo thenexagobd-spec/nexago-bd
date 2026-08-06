@@ -827,7 +827,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
   const [launchedApp, setLaunchedApp] = useState<{ name: string; stage: number; steps: Array<{ label: string; status: 'waiting' | 'running' | 'ok' | 'warn' }>; issues: string[]; booted: boolean } | null>(null);
   const [realSession, setRealSession] = useState<{ code: string; shareUrl: string; status: 'idle' | 'waiting' | 'sharing' | 'live' | 'offline' | 'error' }>({ code: '', shareUrl: '', status: 'idle' });
   const [realStream, setRealStream] = useState<MediaStream | null>(null);
-  const [peerDevice, setPeerDevice] = useState<{ os?: string; browser?: string; isMobile?: boolean; isWebView?: boolean; ua?: string; gdm?: boolean } | null>(null);
+  const [peerDevice, setPeerDevice] = useState<{ os?: string; browser?: string; isMobile?: boolean; isWebView?: boolean; ua?: string; gdm?: boolean; secure?: boolean; mediaDevices?: boolean } | null>(null);
   const [shareStatus, setShareStatus] = useState<{ state: string; message: string } | null>(null);
   const realWsRef = useRef<WebSocket | null>(null);
   const realPcRef = useRef<RTCPeerConnection | null>(null);
@@ -5118,7 +5118,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                         </div>
                       )}
                       {peerDevice && peerDevice.ua && (
-                        <div className="text-[8px] text-gray-600 font-mono leading-tight break-all" title={peerDevice.ua}>UA: {peerDevice.ua}<span className="text-gray-500"> · getDisplayMedia: {peerDevice.gdm ? 'yes' : 'NO'}</span></div>
+                        <div className="text-[8px] text-gray-600 font-mono leading-tight break-all" title={peerDevice.ua}>UA: {peerDevice.ua}<span className="text-gray-500"> · https: {peerDevice.secure ? 'yes' : 'NO'} · mediaDevices: {peerDevice.mediaDevices ? 'yes' : 'NO'} · getDisplayMedia: {peerDevice.gdm ? 'yes' : 'NO'}</span></div>
                       )}
                       <div className="flex items-center justify-between text-[9px] text-gray-400">
                         <span>Stream</span>
@@ -5178,7 +5178,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                     ) : (
                       <>
                         <Loader2 className="w-8 h-8 text-amber-400 animate-spin mb-2" />
-                        <p className="text-xs font-bold text-amber-300">{shareStatus && shareStatus.state === 'unsupported' ? 'User blocked' : shareStatus && shareStatus.state === 'error' ? 'Share failed' : 'Waiting for the user…'}</p>
+                        <p className="text-xs font-bold text-amber-300">{shareStatus && shareStatus.state === 'unsupported' ? 'Needs Google Chrome' : shareStatus && shareStatus.state === 'error' ? 'Share failed' : 'Waiting for the user…'}</p>
                         <p className="text-[10px] text-gray-500 mt-1">{shareStatus && shareStatus.state !== 'ready' ? shareStatus.message : 'Send the share link to the target device. Once they tap Share Screen, their real screen appears here.'}</p>
                         <p className="text-[10px] text-gray-600 mt-1.5">Important: if the link opens inside WhatsApp/Messenger, the user must tap ⋮ → "Open in Chrome" first — the in-app browser cannot share the screen.</p>
                       </>
