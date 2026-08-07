@@ -270,15 +270,15 @@ const LS_KEYS = {
   favs: 'ss_favs',
   addr: 'ss_addr',
   pays: 'ss_pays',
-  wallet: 'ss_wallet',
-  wtxn: 'ss_wtxn',
+  wallet: 'ss_wallet_v2',
+  wtxn: 'ss_wtxn_v2',
   profile: 'ss_profile',
-  tickets: 'ss_tickets',
+  tickets: 'ss_tickets_v2',
   cart: 'ss_cart',
   lang: 'ss_lang',
-  notifs: 'ss_notifs',
+  notifs: 'ss_notifs_v2',
   reviews: 'ss_reviews',
-  spend: 'ss_spend',
+  spend: 'ss_spend_v2',
   chat: 'ss_chat',
   storeRatings: 'ss_store_ratings',
   watched: 'ss_watched',
@@ -593,6 +593,37 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [activeNav, setActiveNav] = useState<
     'Home' | 'Orders' | 'My Orders' | 'Favorites' | 'Addresses' | 'Payments' | 'Wallet' | 'Coupons' | 'Help' | 'Settings'
   >('Home');
+
+  // Browser-style back / forward navigation across customer pages
+  const navStackRef = useRef<string[]>(['Home']);
+  const navPosRef = useRef(0);
+  const skipPushRef = useRef(false);
+  const [, forceNavTick] = useState(0);
+  useEffect(() => {
+    if (skipPushRef.current) { skipPushRef.current = false; return; }
+    const stack = navStackRef.current;
+    const pos = navPosRef.current;
+    if (stack[pos] === activeNav) return;
+    const next = stack.slice(0, pos + 1);
+    next.push(activeNav);
+    navStackRef.current = next;
+    navPosRef.current = next.length - 1;
+    forceNavTick(t => t + 1);
+  }, [activeNav]);
+  const navBack = () => {
+    if (navPosRef.current <= 0) return;
+    skipPushRef.current = true;
+    navPosRef.current -= 1;
+    setActiveNav(navStackRef.current[navPosRef.current]);
+  };
+  const navForward = () => {
+    if (navPosRef.current >= navStackRef.current.length - 1) return;
+    skipPushRef.current = true;
+    navPosRef.current += 1;
+    setActiveNav(navStackRef.current[navPosRef.current]);
+  };
+  const navCanBack = navPosRef.current > 0;
+  const navCanForward = navPosRef.current < navStackRef.current.length - 1;
 
   const [lang, setLang] = useState<Lang>(() => getStoredData(LS_KEYS.lang, 'en'));
   useEffect(() => setStoredData(LS_KEYS.lang, lang), [lang]);
@@ -909,11 +940,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast('Your cart is empty. Add items to order!', 'info');
       return;
     }
-    const active = orders.some(o => o.status !== 'Completed' && o.status !== 'Cancelled');
-    if (active) {
-      showToast('You already have an active order — complete it before placing a new one.', 'info');
-      return;
-    }
     if (paymentMethod === 'bKash' || paymentMethod === 'Nagad' || paymentMethod === 'Card' || paymentMethod === 'Split (Wallet + bKash)') {
       setPayModal(paymentMethod);
       setPinInput('');
@@ -970,10 +996,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   };
 
   const reorder = (ord: Order) => {
-    if (orders.some(o => o.status !== 'Completed' && o.status !== 'Cancelled')) {
-      showToast('Complete your current order before re-ordering.', 'info');
-      return;
-    }
     const store = syncedStores.find(s => s.name === ord.storeName) || syncedStores[0];
     setSelectedStore(store);
     setStoreCat('All');
@@ -1324,28 +1346,60 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   return (
     <div className="cs-glass min-h-screen bg-gradient-to-br from-slate-100 via-emerald-50/60 to-slate-200 font-sans text-gray-800 flex flex-col">
       <style>{`
+        .cs-glass { scrollbar-gutter: stable; }
+        .cs-glass main { scrollbar-gutter: stable; overflow-y: auto; }
+        .cs-glass main::-webkit-scrollbar { width: 8px; }
+        .cs-glass main::-webkit-scrollbar-thumb { background: rgba(6,78,59,0.18); border-radius: 8px; }
         .cs-glass .glass-bar, .cs-glass aside {
           background: rgba(255,255,255,0.72) !important;
-          backdrop-filter: blur(18px) saturate(160%);
-          -webkit-backdrop-filter: blur(18px) saturate(160%);
-          border-color: rgba(255,255,255,0.65) !important;
+          backdrop-filter: blur(20px) saturate(180%);
+          -webkit-backdrop-filter: blur(20px) saturate(180%);
+          border-color: rgba(255,255,255,0.7) !important;
+          box-shadow: 0 4px 24px rgba(6,78,59,0.08);
+        }
+        .cs-glass aside {
+          border-right: 1px solid rgba(255,255,255,0.7) !important;
+        }
+        .cs-glass main .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
+          background: rgba(255,255,255,0.6) !important;
+          backdrop-filter: blur(16px) saturate(160%);
+          -webkit-backdrop-filter: blur(16px) saturate(160%);
+          border-color: rgba(255,255,255,0.6) !important;
+          box-shadow: 0 12px 40px rgba(6,78,59,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
         }
         .cs-glass main .bg-white {
-          background: rgba(255,255,255,0.62) !important;
-          backdrop-filter: blur(14px) saturate(150%);
-          -webkit-backdrop-filter: blur(14px) saturate(150%);
-          box-shadow: 0 8px 32px rgba(6,78,59,0.06);
+          box-shadow: 0 4px 18px rgba(6,78,59,0.05);
         }
-        .cs-glass main .bg-slate-50, .cs-glass main .bg-gray-50 {
-          background: rgba(255,255,255,0.45) !important;
+        .cs-glass main .bg-slate-50, .cs-glass main .bg-gray-50, .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 {
+          background: rgba(255,255,255,0.5) !important;
           backdrop-filter: blur(10px) saturate(140%);
           -webkit-backdrop-filter: blur(10px) saturate(140%);
         }
+        .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 { background: rgba(236,253,245,0.6) !important; }
+        .cs-glass button { -webkit-tap-highlight-color: transparent; }
       `}</style>
       {/* HEADER */}
       <header className="glass-bar bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
         <div className="max-w-[1500px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center space-x-6 shrink-0">
+            <div className="flex items-center space-x-1 mr-1">
+              <button
+                onClick={navBack}
+                disabled={!navCanBack}
+                title="Go back"
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${navCanBack ? 'bg-white/80 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 shadow-xs' : 'bg-white/40 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={navForward}
+                disabled={!navCanForward}
+                title="Go forward"
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${navCanForward ? 'bg-white/80 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 shadow-xs' : 'bg-white/40 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
             <div onClick={() => setActiveNav('Home')} className="flex items-center space-x-2.5 cursor-pointer">
               <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black shadow-md">
                 <ShoppingBag className="w-5 h-5" />
@@ -1400,19 +1454,28 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 )}
               </button>
               {isNotifOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs z-50 animate-in fade-in duration-200">
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs z-50">
                   <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold">
                     <span className="text-gray-900">{T.notifications}</span>
-                    <span onClick={() => { setCustomerNotifs(prev => prev.map(n => ({ ...n, read: true }))); showToast(T.markAllRead, 'info'); }} className="text-[10px] text-emerald-600 cursor-pointer">{T.markAllRead}</span>
+                    {unreadNotifCount > 0 && (
+                      <span onClick={() => { setCustomerNotifs(prev => prev.map(n => ({ ...n, read: true }))); showToast(T.markAllRead, 'info'); }} className="text-[10px] text-emerald-600 cursor-pointer">{T.markAllRead}</span>
+                    )}
                   </div>
-                  <div className="py-2 space-y-2 max-h-56 overflow-y-auto">
+                  <div className="py-2 space-y-2 max-h-60 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
                     {customerNotifs.length === 0 ? (
                       <p className="text-gray-400 py-2 text-center">No notifications</p>
                     ) : customerNotifs.map(n => (
-                      <div key={n.id} className={`p-2 rounded-lg text-[11px] border ${n.read ? 'bg-gray-50 border-gray-100' : 'bg-emerald-50 border-emerald-100'}`}>
-                        <p className={`font-bold ${n.read ? 'text-gray-800' : 'text-emerald-900'}`}>{n.emoji} {n.title}</p>
-                        <p className={`text-[10px] ${n.read ? 'text-gray-500' : 'text-emerald-700'}`}>{n.body}</p>
-                        <p className="text-[9px] text-gray-400 mt-0.5">{n.time}</p>
+                      <div
+                        key={n.id}
+                        onClick={() => setCustomerNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}
+                        className={`p-2.5 rounded-lg text-[11px] border cursor-pointer transition-colors ${n.read ? 'bg-gray-50 border-gray-100' : 'bg-emerald-50 border-emerald-100'}`}
+                      >
+                        <p className={`font-bold leading-snug ${n.read ? 'text-gray-800' : 'text-emerald-900'}`}>{n.emoji} {n.title}</p>
+                        <p className={`text-[10px] leading-snug mt-0.5 ${n.read ? 'text-gray-500' : 'text-emerald-700'}`}>{n.body}</p>
+                        <p className="text-[9px] text-gray-400 mt-1 flex items-center justify-between">
+                          <span>{n.time}</span>
+                          {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                        </p>
                       </div>
                     ))}
                   </div>
