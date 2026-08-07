@@ -1473,6 +1473,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   return (
     <div className="cs-glass min-h-screen bg-gradient-to-br from-slate-100 via-emerald-50/60 to-slate-200 font-sans text-gray-800 flex flex-col">
       <style>{`
+        html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
         .cs-glass { scrollbar-gutter: stable; }
         .cs-glass main { scrollbar-gutter: stable; overflow-y: auto; }
         .cs-glass main::-webkit-scrollbar { width: 8px; }
@@ -1488,14 +1489,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           border-right: 1px solid rgba(255,255,255,0.7) !important;
         }
         .cs-glass main .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
-          background: rgba(255,255,255,0.6) !important;
-          backdrop-filter: blur(16px) saturate(160%);
-          -webkit-backdrop-filter: blur(16px) saturate(160%);
-          border-color: rgba(255,255,255,0.6) !important;
-          box-shadow: 0 12px 40px rgba(6,78,59,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
+          background: rgba(255,255,255,0.58) !important;
+          backdrop-filter: blur(18px) saturate(170%);
+          -webkit-backdrop-filter: blur(18px) saturate(170%);
+          border-color: rgba(255,255,255,0.55) !important;
+          box-shadow: 0 8px 32px rgba(6,78,59,0.06), inset 0 1px 0 rgba(255,255,255,0.8);
+          border-radius: inherit;
         }
         .cs-glass main .bg-white {
-          box-shadow: 0 4px 18px rgba(6,78,59,0.05);
+          box-shadow: 0 4px 16px rgba(6,78,59,0.04);
         }
         .cs-glass main .bg-slate-50, .cs-glass main .bg-gray-50, .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 {
           background: rgba(255,255,255,0.5) !important;
@@ -1504,11 +1506,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         }
         .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 { background: rgba(236,253,245,0.6) !important; }
         .cs-glass .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
-          background: rgba(255,255,255,0.8) !important;
-          backdrop-filter: blur(26px) saturate(180%);
-          -webkit-backdrop-filter: blur(26px) saturate(180%);
+          background: rgba(255,255,255,0.82) !important;
+          backdrop-filter: blur(28px) saturate(190%);
+          -webkit-backdrop-filter: blur(28px) saturate(190%);
           border-color: rgba(255,255,255,0.6) !important;
-          box-shadow: 0 20px 60px rgba(2,44,34,0.18), inset 0 1px 0 rgba(255,255,255,0.8);
+          box-shadow: 0 20px 60px rgba(2,44,34,0.16), inset 0 1px 0 rgba(255,255,255,0.85);
+          border-radius: inherit;
         }
         .cs-glass header .bg-white:not(button):not(a) {
           background: rgba(255,255,255,0.86) !important;
@@ -1815,6 +1818,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <div>
                         <div className="relative h-24 overflow-hidden bg-gray-100">
                           <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/10 pointer-events-none" />
                           <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
                           <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
                             <Heart className={`w-3.5 h-3.5 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
@@ -1993,6 +1997,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <div>
                         <div className="relative h-24 overflow-hidden bg-gray-100">
                           <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/10 pointer-events-none" />
                           <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
                           <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
                             <Heart className={`w-3.5 h-3.5 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
@@ -2578,6 +2583,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         <div key={prod.id} className={`border rounded-2xl overflow-hidden bg-white transition-all ${prod.status === 'Out of Stock' ? 'opacity-55 border-gray-200' : 'border-gray-200 hover:border-emerald-300 hover:shadow-md'}`}>
                           <div className="relative h-32 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
                             <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" loading="lazy" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/10 pointer-events-none" />
                             <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-black uppercase ${
                               prod.status === 'In Stock' ? 'bg-emerald-600 text-white' : prod.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'
                             }`}>{prod.status}</span>
@@ -3207,6 +3213,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200">
             <div className="relative h-56 bg-gray-100">
               <img src={detailProduct.image} alt={detailProduct.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/5 pointer-events-none" />
               <button onClick={() => setDetailProduct(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer"><X className="w-4 h-4" /></button>
               <span className={`absolute bottom-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase ${detailProduct.status === 'In Stock' ? 'bg-emerald-600 text-white' : detailProduct.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'}`}>{detailProduct.status}</span>
             </div>
