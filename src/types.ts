@@ -33,6 +33,7 @@ export interface Order {
   source?: 'customer-app' | 'pos-dispatch' | 'counter';
   pickedUp?: boolean;
   extraStores?: string[];
+  placedAt?: number; // epoch ms — drives deterministic store→customer tracking progress
 }
 
 export type DriverDutyStatus = 'Online' | 'Offline' | 'On-Delivery';

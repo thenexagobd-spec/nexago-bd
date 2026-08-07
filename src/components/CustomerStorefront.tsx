@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ShoppingBag, Search, MapPin, Bell, Heart, CreditCard, Wallet, Ticket,
-  HelpCircle, Settings, LogOut, ChevronDown, ChevronLeft, ChevronRight, Filter, Star,
+  HelpCircle, Settings, ChevronDown, ChevronLeft, ChevronRight, Filter, Star,
   Clock, Truck, Shield, Gift, Store, Plus, Minus, CheckCircle, X,
   ShieldCheck, Home, Package, Map, Phone, Copy, Check, RefreshCw,
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
-  Sun, Moon, MessageCircle, BellPlus, Share2, LocateFixed, CalendarClock, AlertCircle
+  MessageCircle, BellPlus, Share2, LocateFixed, CalendarClock, AlertCircle, Link2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product } from '../types';
@@ -586,7 +586,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   onAddOrder,
   onUpdateOrder,
   onSilentUpdateOrder,
-  onReturnToAdmin,
   onLaunchMerchantStore,
   onReport,
   showToast,
@@ -654,10 +653,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   // Referral
   const [referralState, setReferralState] = useState(() => getStoredData(LS_KEYS.referral, { code: `NEXA-${['RAH', 'KAR', 'SMI', 'JAM', 'PRI', 'TAN'][Math.floor(Math.random() * 6)]}${Math.floor(1000 + Math.random() * 9000)}`, earned: 0, redeemed: 0 }));
   useEffect(() => setStoredData(LS_KEYS.referral, referralState), [referralState]);
-
-  // Dark mode
-  const [darkMode, setDarkMode] = useState<boolean>(() => getStoredData(LS_KEYS.dark, false));
-  useEffect(() => setStoredData(LS_KEYS.dark, darkMode), [darkMode]);
 
   const unreadNotifCount = customerNotifs.filter(n => !n.read).length;
   const tier = LOYALTY_TIERS.slice().reverse().find(t => totalSpend >= t.minSpend) || LOYALTY_TIERS[0];
@@ -1155,16 +1150,26 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     return Math.max(statusProgressFloor(ord.status), p);
   };
 
-  const trackProgress = useMemo(() => {
-    const floor = statusProgressFloor(trackingOrder?.status);
+  // Deterministic route progress: rider starts AT the store (0) → picks up → moves to the customer (1).
+  // Advances over the order's ETA window using placedAt, floored by status so a fresh order is never "delivered".
+  const routeProgressOf = (ord: Order | null | undefined) => {
+    if (!ord) return 0;
+    const floor = statusProgressFloor(ord.status);
     if (floor >= 1) return 1;
-    if (!trackingOrder || !trackingDriver) return floor;
-    const pk = pickupOfOrder(trackingOrder);
-    const dv = areaOfOrder(trackingOrder);
-    const total = Math.sqrt(Math.pow(dv.lat - pk.lat, 2) + Math.pow(dv.lng - pk.lng, 2)) || 1;
-    const left = Math.sqrt(Math.pow(dv.lat - trackingDriver.lat, 2) + Math.pow(dv.lng - trackingDriver.lng, 2));
-    return Math.max(floor, Math.min(1, 1 - left / total));
-  }, [trackingOrder, trackingDriver]);
+    const eta = Math.max(1, parseInt(String(ord.estimatedMinutes || 35), 10) || 35);
+    const elapsed = ord.placedAt ? (Date.now() - ord.placedAt) / 60000 : 0;
+    return Math.max(floor, Math.min(1, elapsed / eta));
+  };
+
+  // Rider position interpolated along the store→customer line so the shared link always shows
+  // the rider AT the store first and then heading to the customer's location after pickup.
+  const routePosOf = (ord: Order, p: number) => {
+    const pk = pickupOfOrder(ord);
+    const dv = areaOfOrder(ord);
+    return { lat: pk.lat + (dv.lat - pk.lat) * p, lng: pk.lng + (dv.lng - pk.lng) * p };
+  };
+
+  const trackProgress = useMemo(() => routeProgressOf(trackingOrder), [trackingOrder]);
 
   const trackVeh: LiveVeh | null = useMemo(() => {
     if (!trackingOrder) return null;
@@ -1172,6 +1177,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     const pk = pickupOfOrder(trackingOrder);
     const drv = trackingDriver;
     if (!drv) return null;
+    const pos = routePosOf(trackingOrder, trackProgress);
     return {
       id: `TRK-${trackingOrder.id}`,
       name: drv.name,
@@ -1179,8 +1185,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       vehicleType: drv.vehicleType || 'Bike',
       dest: 'Customer',
       speed: trackProgress >= 0.9 ? 0 : drv.speed,
-      lat: drv.lat, lng: drv.lng, tLat: drv.tLat, tLng: drv.tLng,
-      roadName: drv.roadName,
+      lat: pos.lat, lng: pos.lng, tLat: dv.lat, tLng: dv.lng,
+      roadName: trackProgress < 0.12 ? `${trackingOrder.storeName} pickup point` : 'En route to you',
       restLat: pk.lat, restLng: pk.lng, restName: trackingOrder.storeName,
       custLat: dv.lat, custLng: dv.lng, custName: (trackingOrder.address || deliveryAddress).split(',').pop()?.trim() || 'Your Address'
     };
@@ -1209,7 +1215,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         if (o.status === 'Completed' || o.status === 'Cancelled') return;
         if (!['Confirmed', 'Processing', 'Ongoing', 'Pending'].includes(o.status)) return;
         const pk = o.pickupCoords || (() => { const st = sts.find(s => s.name === o.storeName); return st ? st.pickup : { lat: 23.7806, lng: 90.4009 }; })();
-        const dv = o.deliveryCoords || (o.address ? (() => { const m = o.address.match(/(Dhanmondi|Gulshan|Banani|Mirpur|Motijheel|Uttara|Badda|Tejgaon|Farmgate|Shahbagh)/i); return m ? { lat: AREA_COORDS[m[1]][0], lng: AREA_COORDS[m[1]][1] } : { lat: 23.7539, lng: 90.3836 }; })() : { lat: 23.7539, lng: 90.3836 });
         let drv = null;
         if (o.driverId) drv = drvs.find(d => d.id === o.driverId) || null;
         if (!drv) {
@@ -1223,10 +1228,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           drv = best;
         }
         if (!drv) return;
-        const total = Math.sqrt(Math.pow(dv.lat - pk.lat, 2) + Math.pow(dv.lng - pk.lng, 2)) || 1;
-        const left = Math.sqrt(Math.pow(dv.lat - drv.lat, 2) + Math.pow(dv.lng - drv.lng, 2));
-        const p = Math.min(1, 1 - left / total);
-        const next = p < 0.3 ? 'Confirmed' : p < 0.62 ? 'Processing' : 'Ongoing';
+        // Route progress: rider at store (0) → pickup → customer (1)
+        const p = routeProgressOf(o);
+        const next = p < 0.35 ? 'Confirmed' : p < 0.7 ? 'Processing' : 'Ongoing';
         if (next !== o.status && silentUpdateRef.current) {
           silentUpdateRef.current({ ...o, status: next });
           const nKey = `${o.id}:${next}`;
@@ -1320,14 +1324,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   ];
 
   return (
-    <div className={`min-h-screen bg-slate-100 font-sans text-gray-800 flex flex-col ${darkMode ? 'cs-dark' : ''}`}>
-      {darkMode && (
-        <style>{`
-          .cs-dark { filter: invert(1) hue-rotate(180deg); background: #0b1220 !important; }
-          .cs-dark img, .cs-dark video, .cs-dark .leaflet-container, .cs-dark .leaflet-tile-pane, .cs-dark .leaflet-pane { filter: invert(1) hue-rotate(180deg); }
-          .cs-dark .leaflet-tile { filter: invert(1) hue-rotate(180deg) !important; }
-        `}</style>
-      )}
+    <div className="min-h-screen bg-slate-100 font-sans text-gray-800 flex flex-col">
       {/* HEADER */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
         <div className="max-w-[1500px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
@@ -1428,15 +1425,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </button>
 
             {/* Dark mode toggle */}
-            <button
-              onClick={() => { setDarkMode(d => !d); showToast(darkMode ? 'Light mode on' : 'Dark mode on', 'info'); }}
-              className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer flex items-center space-x-1.5"
-              title={darkMode ? 'Light mode' : 'Dark mode'}
-            >
-              {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-indigo-500" />}
-              <span className="hidden sm:inline">{darkMode ? 'Light' : 'Dark'}</span>
-            </button>
-
             <div className="relative">
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -1457,19 +1445,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <button onClick={() => { setActiveNav('Settings'); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-gray-700 font-semibold hover:bg-gray-100 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
                     <Settings className="w-4 h-4 text-gray-500" /><span>My Account Settings</span>
                   </button>
-                  <button onClick={() => { onReturnToAdmin(); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-emerald-700 font-bold hover:bg-emerald-50 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" /><span>Return to Admin Panel</span>
-                  </button>
                 </div>
               )}
             </div>
-
-            <button
-              onClick={onReturnToAdmin}
-              className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /><span>Admin Portal</span>
-            </button>
           </div>
         </div>
       </header>
@@ -1538,15 +1516,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </div>
               <p className="text-[9px] text-white/75">Total spend: ৳{totalSpend.toLocaleString()}</p>
             </div>
-          </div>
-
-          <div className="pt-4 border-t border-gray-100 space-y-1">
-            <button
-              onClick={onReturnToAdmin}
-              className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4 text-gray-500" /><span>{T.exitCustomer}</span>
-            </button>
           </div>
         </aside>
 
@@ -2778,24 +2747,62 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <button onClick={() => setTrackingOrder(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
 
-            {/* Real Leaflet map */}
-            <div className="relative z-0 h-56 sm:h-64 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-              <LeafletMap
-                vehicles={trackVeh ? [trackVeh] : []}
-                zoomTo={13}
-                trackingId={trackVeh ? trackVeh.id : null}
-                pickup={trackingOrder ? { ...pickupOfOrder(trackingOrder), label: trackingOrder.storeName } : null}
-                dropoff={trackingOrder ? { ...areaOfOrder(trackingOrder), label: (trackingOrder.address || deliveryAddress).split(',').pop()?.trim() || 'Your Address' } : null}
-              />
-              <div className="absolute top-2 left-2 z-[500] px-2.5 py-1 bg-gray-900/85 text-white text-[10px] font-bold rounded-lg flex items-center space-x-1.5">
-                {trackProgress >= 1 ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> : <Bike className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />}
-                <span>{trackProgress >= 1 ? T.delivered : `${etaMins} ${T.minsAway}`}</span>
+            {/* Track via link — the public customer site shows shareable links instead of the admin live map */}
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider flex items-center space-x-1.5">
+                  <Navigation className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Track via Link</span>
+                </p>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black">
+                  {trackProgress >= 1 ? T.delivered : `${etaMins} ${T.minsAway}`}
+                </span>
               </div>
-              {!trackingDriver && (
-                <div className="absolute bottom-2 left-2 z-[500] px-2.5 py-1 bg-amber-500/90 text-white text-[10px] font-bold rounded-lg">
+              {trackingDriver ? (
+                <>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&origin=${pickupOfOrder(trackingOrder).lat},${pickupOfOrder(trackingOrder).lng}&destination=${areaOfOrder(trackingOrder).lat},${areaOfOrder(trackingOrder).lng}&waypoints=${trackVeh ? trackVeh.lat : trackingDriver.lat},${trackVeh ? trackVeh.lng : trackingDriver.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full flex items-center justify-center space-x-2 py-2.5 bg-gray-900 text-white text-xs font-black rounded-xl hover:bg-black transition-colors"
+                  >
+                    <Navigation className="w-4 h-4 text-emerald-400" />
+                    <span>{trackProgress < 0.12 ? `Rider Arriving at ${trackingOrder.storeName} — tap to track` : `Track Rider (${trackingDriver.name}) — ${Math.round((1 - trackProgress) * 100)}% left`}</span>
+                  </a>
+                  <button
+                    onClick={() => { navigator.clipboard?.writeText(`https://www.google.com/maps/dir/?api=1&origin=${pickupOfOrder(trackingOrder).lat},${pickupOfOrder(trackingOrder).lng}&destination=${areaOfOrder(trackingOrder).lat},${areaOfOrder(trackingOrder).lng}&waypoints=${trackVeh ? trackVeh.lat : trackingDriver.lat},${trackVeh ? trackVeh.lng : trackingDriver.lng}`).then(() => showToast('Tracking link copied — share it to follow the rider live!', 'success')); }}
+                    className="w-full flex items-center justify-center space-x-2 py-2 border-2 border-dashed border-gray-300 text-gray-600 text-[10px] font-black rounded-xl hover:border-emerald-400 hover:text-emerald-700 transition-colors cursor-pointer"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>Copy Tracking Link</span>
+                  </button>
+                </>
+              ) : (
+                <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-bold">
                   ⚠️ No online rider — searching for nearest available courier...
                 </div>
               )}
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={`https://www.google.com/maps?q=${pickupOfOrder(trackingOrder).lat},${pickupOfOrder(trackingOrder).lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-emerald-400 hover:text-emerald-700 flex items-center justify-center space-x-1 transition-colors"
+                >
+                  <Store className="w-3 h-3" /><span>Store Location</span>
+                </a>
+                <a
+                  href={`https://www.google.com/maps?q=${areaOfOrder(trackingOrder).lat},${areaOfOrder(trackingOrder).lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-emerald-400 hover:text-emerald-700 flex items-center justify-center space-x-1 transition-colors"
+                >
+                  <MapPin className="w-3 h-3" /><span>Delivery Location</span>
+                </a>
+              </div>
+              <p className="text-[9px] text-gray-400 leading-relaxed">
+                Your rider's current position refreshes with each tap — the live fleet map is visible to the admin dashboard only.
+              </p>
             </div>
 
             {/* Timeline */}

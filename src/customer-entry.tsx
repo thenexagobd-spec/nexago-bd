@@ -13,11 +13,21 @@ import { createRoot } from 'react-dom/client';
 import { CustomerStorefront } from './components/CustomerStorefront';
 import { Order, Product } from './types';
 import { makeOrderId } from './types';
+import { useLiveDrivers } from './hooks/useLiveDrivers';
 import './index.css';
 
 const params = new URLSearchParams(window.location.search);
 const KEY = params.get('key') || 'nexago-main';
 const API_BASE = window.location.origin;
+
+// Simulated live GPS riders — the customer "Track Delivery" screen follows
+// the nearest online driver in real time (same engine as the admin Live Map).
+const SEED_DRIVERS = [
+  { id: 'DRV-1001', name: 'Rahim Khan', status: 'On-Delivery', vehicleType: 'Bike' },
+  { id: 'DRV-1002', name: 'Shakib Hasan', status: 'On-Delivery', vehicleType: 'Bike' },
+  { id: 'DRV-1003', name: 'Monirul Islam', status: 'Online', vehicleType: 'Bike' },
+  { id: 'DRV-1004', name: 'Karim Uddin', status: 'Online', vehicleType: 'Bike' },
+];
 
 const SEED_STORES = [
   { id: 'STR-01', name: 'Fresh Mart', address: 'Dhanmondi, Dhaka', status: 'Active', rating: 4.8, orders: 1240, category: 'Grocery' },
@@ -41,6 +51,7 @@ function PublicCustomerApp() {
   const [products, setProducts] = useState<Product[]>(SEED_PRODUCTS);
   const [orders, setOrders] = useState<Order[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const { liveDrivers } = useLiveDrivers(SEED_DRIVERS);
 
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
@@ -87,7 +98,8 @@ function PublicCustomerApp() {
       id,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      source: 'customer-app'
+      source: 'customer-app',
+      placedAt: Date.now()
     };
     setOrders(prev => [newOrder, ...prev]);
     postOrder(newOrder);
@@ -111,7 +123,7 @@ function PublicCustomerApp() {
         stores={stores}
         products={products}
         orders={orders}
-        liveDrivers={[]}
+        liveDrivers={liveDrivers}
         onAddOrder={handleAddOrder}
         onUpdateOrder={handleUpdateOrder}
         onSilentUpdateOrder={handleSilentUpdateOrder}
