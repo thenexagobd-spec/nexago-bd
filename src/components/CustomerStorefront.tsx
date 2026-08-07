@@ -253,6 +253,38 @@ const STORE_DEFS: StoreDef[] = [
 
 const CATEGORIES = ['All', 'Grocery', 'Supermarket', 'Restaurant', 'Fast Food', 'Bakery', 'Pharmacy', 'Fruits & Veg', 'Meat & Fish'];
 
+const CAT_BN: Record<string, string> = {
+  'All': 'সব',
+  'Grocery': 'বাজার',
+  'Supermarket': 'সুপারমার্কেট',
+  'Restaurant': 'রেস্তোরাঁ',
+  'Fast Food': 'ফাস্ট ফুড',
+  'Bakery': 'বেকারি',
+  'Pharmacy': 'ফার্মেসি',
+  'Fruits & Veg': 'ফল ও সবজি',
+  'Meat & Fish': 'মাংস ও মাছ',
+};
+
+const STATUS_BN: Record<string, string> = {
+  'In Stock': 'স্টকে আছে',
+  'Low Stock': 'স্টক কম',
+  'Out of Stock': 'স্টক নেই',
+  'Confirmed': 'নিশ্চিত হয়েছে',
+  'Processing': 'প্রসেস হচ্ছে',
+  'Ongoing': 'চলমান',
+  'Pending': 'অপেক্ষমাণ',
+  'Completed': 'সম্পন্ন',
+  'Cancelled': 'বাতিল',
+  'Delivered': 'ডেলিভারড',
+  'Order Confirmed': 'অর্ডার নিশ্চিত হয়েছে',
+  'Preparing at Store': 'দোকানে প্রস্তুত হচ্ছে',
+  'Out for Delivery': 'ডেলিভারির পথে',
+  'Store has accepted your order': 'দোকান আপনার অর্ডার গ্রহণ করেছে',
+  'Your items are being packed': 'আপনার পণ্যগুলো প্যাক করা হচ্ছে',
+  'Courier driver is on the way': 'কুরিয়ার ড্রাইভার পথে আছে',
+  'Order delivered to your door': 'অর্ডার আপনার দরজায় পৌঁছেছে',
+};
+
 const BANNERS = [
   { emoji: '🛒', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-500 to-teal-500', cta: 'Shop Now' },
   { emoji: '🍕', title: 'Free Delivery', sub: 'On all orders above ৳500', bg: 'from-orange-400 to-orange-400', cta: 'Order Food' },
@@ -629,6 +661,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [lang, setLang] = useState<Lang>(() => getStoredData(LS_KEYS.lang, 'en'));
   useEffect(() => setStoredData(LS_KEYS.lang, lang), [lang]);
   const T = T_DICT[lang];
+  const catLabel = (c: string) => (lang === 'bn' ? (CAT_BN[c] || c) : c);
+  const statusLabel = (s: string) => (lang === 'bn' ? (STATUS_BN[s] || s) : s);
 
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
@@ -1839,7 +1873,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         isSelected ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                       }`}
                     >
-                      {cat}
+                      {catLabel(cat)}
                     </button>
                   );
                 })}
@@ -1958,11 +1992,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer ${
                       selectedCategory === cat ? 'bg-green-600 text-white shadow-md shadow-green-600/20' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                     }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
+                    >
+                      {catLabel(cat)}
+                    </button>
+                  ))}
+                </div>
 
               {searchQuery && (
                 <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5 space-y-4">
@@ -2126,7 +2160,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               cancelled ? 'bg-red-100 text-red-800' :
                               active ? 'bg-amber-100 text-amber-800 animate-pulse' :
                               'bg-gray-100 text-gray-700'
-                            }`}>{ord.status}</span>
+                            }`}>{statusLabel(ord.status)}</span>
                             {ord.estimatedMinutes && active && (
                               <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold">~{ord.estimatedMinutes} min</span>
                             )}
@@ -2624,7 +2658,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
                             <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-black uppercase ${
                               prod.status === 'In Stock' ? 'bg-emerald-600 text-white' : prod.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'
-                            }`}>{prod.status}</span>
+                            }`}>{statusLabel(prod.status)}</span>
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleWatch(prod.id); }}
                               title={watchedProducts.includes(prod.id) ? 'Remove price alert' : 'Set price-drop alert'}
@@ -3095,9 +3129,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                     <div className="pt-0.5">
                       <p className={`text-xs font-black ${isActive ? 'text-emerald-700' : done ? 'text-gray-900' : 'text-gray-400'}`}>
-                        {step.label} {isActive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" />}
+                        {statusLabel(step.label)} {isActive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" />}
                       </p>
-                      <p className="text-[10px] text-gray-500">{step.desc}</p>
+                      <p className="text-[10px] text-gray-500">{statusLabel(step.desc)}</p>
                     </div>
                   </div>
                 );
@@ -3253,7 +3287,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <img src={detailProduct.image} alt={detailProduct.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/5 pointer-events-none" />
               <button onClick={() => setDetailProduct(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer"><X className="w-4 h-4" /></button>
-              <span className={`absolute bottom-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase ${detailProduct.status === 'In Stock' ? 'bg-emerald-600 text-white' : detailProduct.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'}`}>{detailProduct.status}</span>
+              <span className={`absolute bottom-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase ${detailProduct.status === 'In Stock' ? 'bg-emerald-600 text-white' : detailProduct.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'}`}>{statusLabel(detailProduct.status)}</span>
             </div>
             <div className="p-5 space-y-4">
               <div>
@@ -3342,7 +3376,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 disabled={detailProduct.status === 'Out of Stock'}
                 className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
               >
-                <Plus className="w-4 h-4" /><span>{detailProduct.status === 'Out of Stock' ? 'Unavailable' : T.addToCart} · ৳{detailProduct.price}</span>
+                <Plus className="w-4 h-4" /><span>{detailProduct.status === 'Out of Stock' ? (lang === 'bn' ? 'অনুপলব্ধ' : 'Unavailable') : T.addToCart} · ৳{detailProduct.price}</span>
               </button>
             </div>
           </div>
