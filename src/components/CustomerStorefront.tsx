@@ -1476,10 +1476,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   ];
 
   return (
-    <div className="cs-glass min-h-screen bg-slate-50 font-sans text-gray-800 flex flex-col overflow-x-hidden">
+    <div className="cs-glass min-h-screen font-sans text-gray-800 flex flex-col overflow-x-hidden">
       <style>{`
         html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-x: hidden; }
         .cs-glass { scrollbar-gutter: stable; }
+        .cs-glass {
+          background:
+            radial-gradient(circle at 15% 0%, rgba(167,243,208,0.55), transparent 45%),
+            radial-gradient(circle at 90% 25%, rgba(153,246,228,0.5), transparent 50%),
+            radial-gradient(circle at 35% 100%, rgba(186,230,253,0.5), transparent 45%),
+            #f8fafc;
+        }
         .cs-glass main { scrollbar-gutter: stable; overflow-y: auto; }
         .cs-glass main::-webkit-scrollbar { width: 8px; }
         .cs-glass main::-webkit-scrollbar-thumb { background: rgba(6,78,59,0.18); border-radius: 8px; }
@@ -1494,20 +1501,20 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           border-right: 1px solid rgba(255,255,255,0.6) !important;
         }
         .cs-glass main .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
-          background: rgba(255,255,255,0.65) !important;
-          backdrop-filter: blur(18px) saturate(170%);
-          -webkit-backdrop-filter: blur(18px) saturate(170%);
-          border-color: rgba(255,255,255,0.55) !important;
-          box-shadow: 0 8px 32px rgba(6,78,59,0.06), inset 0 1px 0 rgba(255,255,255,0.8);
+          background: rgba(255,255,255,0.55) !important;
+          backdrop-filter: blur(20px) saturate(180%);
+          -webkit-backdrop-filter: blur(20px) saturate(180%);
+          border-color: rgba(255,255,255,0.6) !important;
+          box-shadow: 0 8px 32px rgba(6,78,59,0.08), inset 0 1px 0 rgba(255,255,255,0.85);
           border-radius: inherit;
         }
         .cs-glass main .bg-white {
           box-shadow: 0 4px 16px rgba(6,78,59,0.04);
         }
         .cs-glass main .bg-slate-50, .cs-glass main .bg-gray-50, .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 {
-          background: rgba(255,255,255,0.5) !important;
-          backdrop-filter: blur(10px) saturate(140%);
-          -webkit-backdrop-filter: blur(10px) saturate(140%);
+          background: rgba(255,255,255,0.45) !important;
+          backdrop-filter: blur(14px) saturate(160%);
+          -webkit-backdrop-filter: blur(14px) saturate(160%);
         }
         .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 { background: rgba(236,253,245,0.6) !important; }
         .cs-glass .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
