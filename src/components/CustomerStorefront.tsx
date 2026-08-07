@@ -1559,7 +1559,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-0.5 sm:space-x-2 shrink-0 mr-2 sm:mr-8">
+          <div className="flex items-center space-x-0.5 sm:space-x-2 shrink-0">
             <button
               onClick={() => setActiveNav('Wallet')}
               className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
