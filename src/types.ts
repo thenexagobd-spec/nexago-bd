@@ -140,6 +140,14 @@ export interface PromotionBanner {
   startDate: string;
   endDate: string;
   clicks: number;
+  description?: string;
+  ctaLabel?: string;
+  link?: string;
+  placement?: 'home' | 'store' | 'popup' | 'app';
+  mediaType?: 'image' | 'video';
+  media?: string;
+  impressions?: number;
+  couponCode?: string;
 }
 
 export interface SupportTicket {

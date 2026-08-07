@@ -21,7 +21,7 @@ interface ProductInventoryViewProps {
 }
 
 const nowTimeLocal = nowTime;
-const emptyForm = () => ({ name: '', category: 'Fruits & Vegetables', sku: '', unit: 'pcs', stock: 0, cost: 0, price: 0, vat: 0, discount: 0, promoPrice: 0, supplier: '', supplierContact: '', reorderPoint: 5, image: '', expiry: '' });
+const emptyForm = () => ({ name: '', category: 'Fruits & Vegetables', sku: '', unit: 'pcs', stock: 0, cost: 0, price: 0, vat: 0, discount: 0, promoPrice: 0, supplier: '', supplierContact: '', reorderPoint: 5, image: '', expiry: '', description: '', tags: '', video: '', gallery: '' });
 
 const typePresets: Record<string, string> = {
   Restock: 'Manual restock',
@@ -263,6 +263,10 @@ export default function ProductInventoryView({ products, onProductsChange, showT
       unit: form.unit.trim() || 'pcs',
       image: form.image.trim() || fallbackImg,
       expiry: form.expiry || undefined,
+      description: form.description.trim() || undefined,
+      tags: form.tags.split(',').map((t: string) => t.trim()).filter(Boolean),
+      video: form.video.trim() || undefined,
+      gallery: form.gallery.split(',').map((s: string) => s.trim()).filter(Boolean),
       status: (Number(form.stock) || 0) <= 0 ? 'Out of Stock' : (Number(form.stock) || 0) <= (Number(form.reorderPoint) || 5) ? 'Low Stock' : 'In Stock',
       updatedAt: nowTimeLocal()
     };
@@ -283,7 +287,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
 
   const openEdit = (p: any) => {
     setEditing(p);
-    setForm({ name: p.name || '', category: p.category || '', sku: p.sku || '', unit: p.unit || 'pcs', stock: p.stock ?? 0, cost: p.cost ?? 0, price: p.price ?? 0, vat: p.vat ?? 0, discount: p.discount ?? 0, promoPrice: p.promoPrice ?? 0, supplier: p.supplier || '', supplierContact: p.supplierContact || '', reorderPoint: p.reorderPoint ?? 5, image: p.image || '', expiry: p.expiry || '' });
+    setForm({ name: p.name || '', category: p.category || '', sku: p.sku || '', unit: p.unit || 'pcs', stock: p.stock ?? 0, cost: p.cost ?? 0, price: p.price ?? 0, vat: p.vat ?? 0, discount: p.discount ?? 0, promoPrice: p.promoPrice ?? 0, supplier: p.supplier || '', supplierContact: p.supplierContact || '', reorderPoint: p.reorderPoint ?? 5, image: p.image || '', expiry: p.expiry || '', description: p.description || '', tags: (p.tags || []).join(', '), video: p.video || '', gallery: (p.gallery || []).join(', ') });
     setFormOpen(true);
   };
 
@@ -696,6 +700,14 @@ export default function ProductInventoryView({ products, onProductsChange, showT
                           <div className="min-w-0">
                             <p className="font-bold text-white truncate">{p.name}</p>
                             <p className="font-mono text-[9px] text-gray-500">{p.id}{p.sku ? ' · ' + p.sku : ''}{p.variants?.length ? <span className="text-brand-orange font-bold"> · {p.variants.length} var</span> : ''}</p>
+                            {(p.gallery?.length || p.video || p.description || p.tags?.length) && (
+                              <p className="text-[9px] text-gray-500 mt-0.5 flex items-center space-x-1">
+                                {p.gallery?.length ? <span className="px-1 bg-indigo-500/10 text-indigo-300 rounded">{p.gallery.length} photos</span> : null}
+                                {p.video ? <span className="px-1 bg-red-500/10 text-red-300 rounded">video</span> : null}
+                                {p.tags?.length ? <span className="px-1 bg-teal-500/10 text-teal-300 rounded">{p.tags.length} tags</span> : null}
+                                {p.description ? <span className="px-1 bg-gray-600/20 text-gray-400 rounded">desc</span> : null}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -817,6 +829,22 @@ export default function ProductInventoryView({ products, onProductsChange, showT
               <div className="md:col-span-2">
                 <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Image URL</label>
                 <input value={form.image} onChange={(e) => setForm(f => ({ ...f, image: e.target.value }))} placeholder="https://…" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Video URL (optional)</label>
+                <input value={form.video} onChange={(e) => setForm(f => ({ ...f, video: e.target.value }))} placeholder="https://…/product.mp4" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Description</label>
+                <textarea value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Product description — origin, storage, usage, nutritional notes…" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600 resize-none" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Tags (comma separated)</label>
+                <input value={form.tags} onChange={(e) => setForm(f => ({ ...f, tags: e.target.value }))} placeholder="organic, local, fresh, bestseller" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Gallery URLs (comma separated — extra photos)</label>
+                <input value={form.gallery} onChange={(e) => setForm(f => ({ ...f, gallery: e.target.value }))} placeholder="https://…/1.jpg, https://…/2.jpg" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
               </div>
             </div>
             {Number(form.price) > 0 && (

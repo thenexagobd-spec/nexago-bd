@@ -26,6 +26,7 @@ import EarningsView from './components/EarningsView';
 import FleetPromosView from './components/FleetPromosView';
 import InventoryView from './components/InventoryView';
 import ProductInventoryView from './components/ProductInventoryView';
+import PromoStudioView from './components/PromoStudioView';
 import StoreDashboardView from './components/StoreDashboardView';
 import DeliveryDashboardView from './components/DeliveryDashboardView';
 import { CustomerStorefront } from './components/CustomerStorefront';
@@ -1264,38 +1265,7 @@ export default function App() {
       case 'Promotions & Banners':
       case 'Banners':
         return (
-          <div className="space-y-6 fade-in">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Promotions & Promotional Banners</h3>
-                <p className="text-xs text-gray-400">Manage home banner carousel, discounts, and customer pushes</p>
-              </div>
-              <button 
-                onClick={() => showToast("Banner campaign uploaded and live on mobile apps!", "success")}
-                className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
-              >
-                + Add Promotional Banner
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {banners.map(b => (
-                <div key={b.id} className="bg-brand-card border border-brand-border rounded-xl p-5 space-y-3 relative">
-                  <div className="flex justify-between items-center">
-                    <span className="font-mono text-[10px] text-brand-orange font-bold uppercase">#{b.id}</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase">
-                      {b.status}
-                    </span>
-                  </div>
-                  <h4 className="text-sm font-black text-white">{b.title}</h4>
-                  <p className="text-xs text-gray-400">{b.subtitle}</p>
-                  <div className="flex items-center justify-between border-t border-brand-border/40 pt-3 text-[11px]">
-                    <span className="text-gray-400">Total Banner Clicks: <b className="text-brand-orange">{b.clicks}</b></span>
-                    <span className="text-gray-500">Expires: {b.endDate}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PromoStudioView banners={banners} onBannersChange={setBanners} showToast={showToast} />
         );
 
       case 'Notifications':
