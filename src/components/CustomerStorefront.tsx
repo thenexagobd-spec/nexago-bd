@@ -2610,7 +2610,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       return (
                         <div key={prod.id} className={`border rounded-2xl overflow-hidden bg-white transition-all ${prod.status === 'Out of Stock' ? 'opacity-55 border-gray-200' : 'border-gray-200 hover:border-emerald-300 hover:shadow-md'}`}>
                           <div className="relative h-32 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
-                            <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" loading="lazy" className="w-full h-full object-cover" />
+                            <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
                             <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-black uppercase ${
                               prod.status === 'In Stock' ? 'bg-emerald-600 text-white' : prod.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'
