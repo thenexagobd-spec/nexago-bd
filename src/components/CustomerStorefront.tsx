@@ -1576,7 +1576,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             )}
           </div>
 
-          <div className="flex items-center space-x-3 shrink-0">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
             <button
               onClick={() => setActiveNav('Wallet')}
               className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
@@ -1589,7 +1589,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="relative">
               <button
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors relative cursor-pointer"
+                className="w-9 h-9 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
               >
                 <Bell className="w-5 h-5" />
                 {unreadNotifCount > 0 && (
@@ -1626,10 +1626,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               )}
             </div>
 
-            {/* Cart drawer button */}
             <button
               onClick={() => setIsCartDrawerOpen(true)}
-              className="relative p-2 text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              className="w-9 h-9 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors relative cursor-pointer"
             >
               <ShoppingCart className="w-5 h-5" />
               {cartCount > 0 && (
@@ -1637,17 +1636,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               )}
             </button>
 
-            {/* Language toggle */}
             <button
               onClick={() => { setLang(l => (l === 'en' ? 'bn' : 'en')); showToast(lang === 'en' ? 'ভাষা পরিবর্তন হয়েছে' : 'Language switched to English', 'info'); }}
-              className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer flex items-center space-x-1.5"
+              className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-700 transition-colors cursor-pointer"
               title={T.language}
             >
-              <Languages className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">{T.language}</span>
+              <Languages className="w-4 h-4 text-emerald-600" />
             </button>
 
-            {/* Dark mode toggle */}
+            {/* Profile menu */}
             <div className="relative">
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -2457,7 +2454,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
           {/* ============ SETTINGS ============ */}
           {activeNav === 'Settings' && (
-            <div className="space-y-6 max-w-xl">
+            <div className="space-y-6 max-w-xl mx-auto">
               <div>
                 <h2 className="text-xl font-black text-gray-900 tracking-tight">Customer Account Settings</h2>
                 <p className="text-xs text-gray-500 mt-0.5">Update personal details and notification preferences</p>
