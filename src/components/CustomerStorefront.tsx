@@ -1575,59 +1575,74 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         /* ===== DARK MODE ===== */
         .cs-glass.cs-dark {
           background:
-            radial-gradient(circle at 12% 5%, rgba(6,78,59,0.35), transparent 42%),
-            radial-gradient(circle at 88% 18%, rgba(13,148,136,0.28), transparent 45%),
-            radial-gradient(circle at 75% 85%, rgba(14,116,144,0.25), transparent 40%),
-            radial-gradient(circle at 25% 95%, rgba(30,64,175,0.25), transparent 45%),
-            #0f172a;
+            radial-gradient(circle at 10% 0%, rgba(16,185,129,0.16), transparent 40%),
+            radial-gradient(circle at 90% 15%, rgba(45,212,191,0.12), transparent 45%),
+            radial-gradient(circle at 75% 90%, rgba(59,130,246,0.12), transparent 40%),
+            radial-gradient(circle at 20% 95%, rgba(139,92,246,0.1), transparent 45%),
+            linear-gradient(180deg, #0b1220 0%, #0f172a 60%, #111a2e 100%);
           color: #e2e8f0;
         }
         .cs-glass.cs-dark html, .cs-glass.cs-dark body { color-scheme: dark; }
         .cs-glass.cs-dark .glass-bar, .cs-glass.cs-dark aside, .cs-glass.cs-dark nav {
-          background: rgba(15,23,42,0.72) !important;
-          backdrop-filter: blur(26px) saturate(170%);
-          -webkit-backdrop-filter: blur(26px) saturate(170%);
+          background: rgba(11,18,32,0.8) !important;
+          backdrop-filter: blur(28px) saturate(170%);
+          -webkit-backdrop-filter: blur(28px) saturate(170%);
+          border-color: rgba(148,163,184,0.15) !important;
+          box-shadow: 0 4px 28px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .cs-glass.cs-dark aside { border-right: 1px solid rgba(148,163,184,0.15) !important; }
+        .cs-glass.cs-dark main .bg-white:not(a):not(input):not(select):not(textarea),
+        .cs-glass.cs-dark .fixed .bg-white:not(a):not(input):not(select):not(textarea),
+        .cs-glass.cs-dark header .bg-white:not(a),
+        .cs-glass.cs-dark .bg-white:not(a):not(input):not(select):not(textarea) {
+          background: rgba(20,30,52,0.78) !important;
+          backdrop-filter: blur(26px) saturate(175%);
+          -webkit-backdrop-filter: blur(26px) saturate(175%);
+          border-color: rgba(148,163,184,0.16) !important;
+          box-shadow: 0 14px 44px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+          border-radius: inherit;
+        }
+        .cs-glass.cs-dark .fixed .bg-white:not(a):not(input):not(select):not(textarea) {
+          background: rgba(15,24,42,0.95) !important;
+          backdrop-filter: blur(36px) saturate(180%);
+          -webkit-backdrop-filter: blur(36px) saturate(180%);
           border-color: rgba(148,163,184,0.18) !important;
-          box-shadow: 0 4px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+          box-shadow: 0 30px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
         }
-        .cs-glass.cs-dark aside { border-right: 1px solid rgba(148,163,184,0.18) !important; }
-        .cs-glass.cs-dark main .bg-white:not(button):not(a):not(input):not(select):not(textarea),
-        .cs-glass.cs-dark .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea),
-        .cs-glass.cs-dark header .bg-white:not(button):not(a),
-        .cs-glass.cs-dark .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
-          background: rgba(30,41,59,0.72) !important;
-          backdrop-filter: blur(24px) saturate(170%);
-          -webkit-backdrop-filter: blur(24px) saturate(170%);
-          border-color: rgba(148,163,184,0.18) !important;
-          box-shadow: 0 12px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+        .cs-glass.cs-dark button.bg-white, .cs-glass.cs-dark a.bg-white, .cs-glass.cs-dark .bg-white.cursor-pointer {
+          background: rgba(30,41,72,0.85) !important;
+          border-color: rgba(148,163,184,0.2) !important;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
         }
-        .cs-glass.cs-dark .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
-          background: rgba(30,41,59,0.9) !important;
-          backdrop-filter: blur(34px) saturate(180%);
-          -webkit-backdrop-filter: blur(34px) saturate(180%);
+        .cs-glass.cs-dark main .bg-slate-50, .cs-glass.cs-dark main .bg-gray-50, .cs-glass.cs-dark main .bg-gray-100, .cs-glass.cs-dark main .bg-gray-200 {
+          background: rgba(30,41,59,0.5) !important;
         }
-        .cs-glass.cs-dark main .bg-slate-50, .cs-glass.cs-dark main .bg-gray-50, .cs-glass.cs-dark main .bg-gray-100 {
+        .cs-glass.cs-dark main .bg-emerald-50, .cs-glass.cs-dark main .bg-emerald-50\/30 { background: rgba(6,78,59,0.38) !important; }
+        .cs-glass.cs-dark .bg-blue-50, .cs-glass.cs-dark .bg-amber-50, .cs-glass.cs-dark .bg-red-50, .cs-glass.cs-dark .bg-green-50, .cs-glass.cs-dark .bg-violet-50 {
           background: rgba(30,41,59,0.55) !important;
         }
-        .cs-glass.cs-dark main .bg-emerald-50, .cs-glass.cs-dark main .bg-emerald-50\/30 { background: rgba(6,78,59,0.4) !important; }
         .cs-glass.cs-dark .border-gray-200, .cs-glass.cs-dark .border-gray-100, .cs-glass.cs-dark .border-gray-300, .cs-glass.cs-dark .border-gray-400 {
-          border-color: rgba(148,163,184,0.2) !important;
+          border-color: rgba(148,163,184,0.18) !important;
         }
-        .cs-glass.cs-dark .text-gray-900, .cs-glass.cs-dark .text-gray-800, .cs-glass.cs-dark .text-gray-700, .cs-glass.cs-dark .text-gray-600 {
-          color: #e2e8f0 !important;
+        .cs-glass.cs-dark .text-gray-900, .cs-glass.cs-dark .text-gray-800, .cs-glass.cs-dark .text-gray-700, .cs-glass.cs-dark .text-gray-600, .cs-glass.cs-dark .text-slate-900, .cs-glass.cs-dark .text-slate-800, .cs-glass.cs-dark .text-slate-700, .cs-glass.cs-dark .text-slate-600 {
+          color: #f1f5f9 !important;
         }
-        .cs-glass.cs-dark .text-gray-500, .cs-glass.cs-dark .text-gray-400, .cs-glass.cs-dark .text-gray-300 {
-          color: #94a3b8 !important;
+        .cs-glass.cs-dark .text-gray-500, .cs-glass.cs-dark .text-gray-400, .cs-glass.cs-dark .text-gray-300, .cs-glass.cs-dark .text-slate-500, .cs-glass.cs-dark .text-slate-400 {
+          color: #9aa8bd !important;
+        }
+        .cs-glass.cs-dark .text-emerald-600, .cs-glass.cs-dark .text-emerald-700, .cs-glass.cs-dark .text-green-700 {
+          color: #34d399 !important;
         }
         .cs-glass.cs-dark input, .cs-glass.cs-dark select, .cs-glass.cs-dark textarea {
-          background: rgba(15,23,42,0.6) !important;
+          background: rgba(11,18,32,0.75) !important;
           color: #e2e8f0 !important;
           border-color: rgba(148,163,184,0.25) !important;
         }
         .cs-glass.cs-dark input::placeholder { color: #64748b; }
         .cs-glass.cs-dark .bg-gray-100, .cs-glass.cs-dark .bg-gray-50 { background: rgba(30,41,59,0.5) !important; }
         .cs-glass.cs-dark .bg-white\/90, .cs-glass.cs-dark .bg-white\/80, .cs-glass.cs-dark .bg-white\/70, .cs-glass.cs-dark .bg-white\/60, .cs-glass.cs-dark .bg-white\/40, .cs-glass.cs-dark .bg-white\/20, .cs-glass.cs-dark .bg-white\/10, .cs-glass.cs-dark .bg-white\/5 {
-          background: rgba(255,255,255,0.08) !important;
+          background: rgba(255,255,255,0.07) !important;
+          border-color: rgba(148,163,184,0.15) !important;
         }
         .cs-glass.cs-dark main::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); }
       `}</style>
