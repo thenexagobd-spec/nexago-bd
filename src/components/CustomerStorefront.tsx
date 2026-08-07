@@ -1576,7 +1576,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             )}
           </div>
 
-          <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
+          <div className="flex items-center space-x-0.5 sm:space-x-2 shrink-0">
             <button
               onClick={() => setActiveNav('Wallet')}
               className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
@@ -1589,11 +1589,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="relative">
               <button
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="w-9 h-9 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
               >
-                <Bell className="w-5 h-5" />
+                <Bell className="w-4 h-4" />
                 {unreadNotifCount > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center border-2 border-white">{unreadNotifCount}</span>
+                  <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[8px] font-black flex items-center justify-center border-2 border-white">{unreadNotifCount}</span>
                 )}
               </button>
               {isNotifOpen && (
@@ -1628,17 +1628,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
             <button
               onClick={() => setIsCartDrawerOpen(true)}
-              className="w-9 h-9 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors relative cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors relative cursor-pointer"
             >
-              <ShoppingCart className="w-5 h-5" />
+              <ShoppingCart className="w-4 h-4" />
               {cartCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-emerald-600 text-white rounded-full text-[9px] font-black flex items-center justify-center border-2 border-white">{cartCount}</span>
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-600 text-white rounded-full text-[8px] font-black flex items-center justify-center border-2 border-white">{cartCount}</span>
               )}
             </button>
 
             <button
               onClick={() => { setLang(l => (l === 'en' ? 'bn' : 'en')); showToast(lang === 'en' ? 'ভাষা পরিবর্তন হয়েছে' : 'Language switched to English', 'info'); }}
-              className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-700 transition-colors cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-700 transition-colors cursor-pointer"
               title={T.language}
             >
               <Languages className="w-4 h-4 text-emerald-600" />
@@ -1648,13 +1648,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="relative">
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center space-x-2.5 p-1 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                className="flex items-center space-x-1.5 sm:space-x-2 p-1 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
               >
-                <div className={`w-8 h-8 rounded-full ${hashColor(customerProfile.name)} text-white font-black flex items-center justify-center text-xs border-2 border-emerald-500/40`}>
+                <div className={`w-7 h-7 rounded-full ${hashColor(customerProfile.name)} text-white font-black flex items-center justify-center text-[10px] border-2 border-emerald-500/40`}>
                   {initialsOf(customerProfile.name)}
                 </div>
-                <span className="text-xs font-bold text-gray-800 hidden sm:inline-block">{customerProfile.name}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                <ChevronDown className="w-3 h-3 text-gray-500" />
               </button>
               {isProfileOpen && (
                 <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-200 p-2 text-xs z-50 space-y-1">
