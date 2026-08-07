@@ -1524,23 +1524,23 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       {/* HEADER */}
       <header className="glass-bar bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
         <div className="max-w-[1500px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-6 shrink-0">
-            <div className="flex items-center space-x-1 mr-1">
+          <div className="flex items-center space-x-3 md:space-x-6 shrink-0">
+            <div className="flex items-center space-x-0.5 sm:space-x-1 mr-0.5 sm:mr-1">
               <button
                 onClick={navBack}
                 disabled={!navCanBack}
                 title="Go back"
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${navCanBack ? 'bg-white/80 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 shadow-xs' : 'bg-white/40 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${navCanBack ? 'bg-white/80 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 shadow-xs' : 'bg-white/40 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
               <button
                 onClick={navForward}
                 disabled={!navCanForward}
                 title="Go forward"
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${navCanForward ? 'bg-white/80 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 shadow-xs' : 'bg-white/40 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${navCanForward ? 'bg-white/80 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 shadow-xs' : 'bg-white/40 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             </div>
             <div onClick={() => setActiveNav('Home')} className="flex items-center space-x-2.5 cursor-pointer">
@@ -1572,7 +1572,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="relative">
               <button
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
               >
                 <Bell className="w-4 h-4" />
                 {unreadNotifCount > 0 && (
