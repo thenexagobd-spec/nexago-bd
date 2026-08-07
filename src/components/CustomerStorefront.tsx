@@ -1471,9 +1471,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   ];
 
   return (
-    <div className="cs-glass min-h-screen bg-gradient-to-br from-slate-100 via-emerald-50/60 to-slate-200 font-sans text-gray-800 flex flex-col">
+    <div className="cs-glass min-h-screen bg-slate-50 font-sans text-gray-800 flex flex-col overflow-x-hidden">
       <style>{`
-        html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-x: hidden; }
         .cs-glass { scrollbar-gutter: stable; }
         .cs-glass main { scrollbar-gutter: stable; overflow-y: auto; }
         .cs-glass main::-webkit-scrollbar { width: 8px; }
