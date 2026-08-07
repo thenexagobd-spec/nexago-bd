@@ -11,6 +11,14 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        input: {
+          index: path.resolve(__dirname, 'index.html'),
+          customer: path.resolve(__dirname, 'customer.html'),
+        },
+      },
+    },
     server: {
       port: 3008,
       strictPort: true,

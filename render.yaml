@@ -3,7 +3,7 @@ services:
     name: nexago-relay
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && npm run build
     startCommand: node server/relay.mjs
     healthCheckPath: /health
     autoDeploy: true

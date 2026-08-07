@@ -77,11 +77,23 @@ function saveStore(key, obj) {
 }
 
 // Merge a client push into the stored state. Banner counters coming from the
-// live storefront (impressions/clicks) survive subsequent admin pushes.
+// live storefront (impressions/clicks) survive subsequent admin pushes, and
+// customer-placed orders + notifications are merged (union by id) so they
+// survive admin pushes too.
 function mergeState(stored, incoming) {
   const merged = { ...(stored.state || {}) };
-  for (const k of ['products', 'orders', 'notifications']) {
-    if (Array.isArray(incoming[k])) merged[k] = incoming[k];
+  if (Array.isArray(incoming.products)) merged.products = incoming.products;
+  if (Array.isArray(incoming.orders)) {
+    const existing = Array.isArray(merged.orders) ? merged.orders : [];
+    const byId = new Map(existing.map((o) => [o && o.id, o]));
+    for (const o of incoming.orders) if (o && o.id) byId.set(o.id, o);
+    merged.orders = Array.from(byId.values());
+  }
+  if (Array.isArray(incoming.notifications)) {
+    const existing = Array.isArray(merged.notifications) ? merged.notifications : [];
+    const byId = new Map(existing.map((n) => [n && n.id, n]));
+    for (const n of incoming.notifications) if (n && n.id) byId.set(n.id, n);
+    merged.notifications = Array.from(byId.values()).slice(0, 100);
   }
   if (Array.isArray(incoming.banners)) {
     const storedBanners = Array.isArray(merged.banners) ? merged.banners : [];
@@ -148,6 +160,27 @@ function readBody(req) {
   });
 }
 
+function serveDistFile(res, reqPath) {
+  const root = path.join(__dirname, '..', 'dist');
+  const file = path.normalize(path.join(root, reqPath.replace(/^\/+/, '')));
+  if (!file.startsWith(root)) return false;
+  try {
+    const data = fs.readFileSync(file);
+    const ext = path.extname(file).toLowerCase();
+    const mime = {
+      '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
+      '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json',
+      '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
+      '.map': 'application/json', '.jpg': 'image/jpeg', '.webp': 'image/webp'
+    }[ext] || 'application/octet-stream';
+    res.writeHead(200, { 'Content-Type': mime, ...corsHeaders });
+    res.end(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (url.pathname === '/' || url.pathname === '/share') {
@@ -160,6 +193,16 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url.pathname === '/store') {
+    // Prefer the built React customer storefront (dist/customer.html), else the simple fallback page
+    const built = path.join(__dirname, '..', 'dist', 'customer.html');
+    if (fs.existsSync(built)) {
+      fs.readFile(built, (err, data) => {
+        if (err) { res.writeHead(500); res.end('customer build missing'); return; }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders });
+        res.end(data);
+      });
+      return;
+    }
     const file = path.join(__dirname, 'storefront.html');
     fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(500); res.end('storefront page missing'); return; }
@@ -167,6 +210,10 @@ const server = http.createServer((req, res) => {
       res.end(data);
     });
     return;
+  }
+  // Built front-end static assets (from vite build)
+  if (url.pathname.startsWith('/assets/') || url.pathname === '/icon.svg' || url.pathname === '/vite.svg') {
+    if (serveDistFile(res, url.pathname)) return;
   }
 
   // ---- Live store REST API ----
@@ -213,6 +260,32 @@ const server = http.createServer((req, res) => {
       }
       sendJson(res, 200, { ok: true, counted: 'none' });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/order') {
+    readBody(req).then((body) => {
+      const store = loadStore(key);
+      const order = body && body.order;
+      if (!order || !order.id) { sendJson(res, 400, { ok: false, error: 'order.id required' }); return; }
+      const orders = Array.isArray(store.state.orders) ? store.state.orders : [];
+      const idx = orders.findIndex((o) => o && o.id === order.id);
+      if (idx >= 0) orders[idx] = order; else orders.unshift(order);
+      store.state.orders = orders;
+      const notifs = Array.isArray(store.state.notifications) ? store.state.notifications : [];
+      notifs.unshift({
+        id: 'NOTIF-' + Date.now(),
+        title: 'New Customer Order #' + order.id,
+        message: (order.customerName || 'Customer') + ' ordered from ' + (order.storeName || 'a store') + ' (৳' + Number(order.amount || 0).toLocaleString('en-IN') + ')',
+        type: 'order',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        read: false
+      });
+      store.state.notifications = notifs.slice(0, 100);
+      store.updatedAt = new Date().toISOString();
+      saveStore(key, store);
+      sendJson(res, 200, { ok: true, orderId: order.id });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String((e && e.message) || e) }));
     return;
   }
 
