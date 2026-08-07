@@ -254,10 +254,10 @@ const STORE_DEFS: StoreDef[] = [
 const CATEGORIES = ['All', 'Grocery', 'Supermarket', 'Restaurant', 'Fast Food', 'Bakery', 'Pharmacy', 'Fruits & Veg', 'Meat & Fish'];
 
 const BANNERS = [
-  { emoji: '🛒', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-600 to-teal-800', cta: 'Shop Now' },
-  { emoji: '🍕', title: 'Free Delivery', sub: 'On all orders above ৳500', bg: 'from-orange-500 to-red-600', cta: 'Order Food' },
-  { emoji: '💊', title: 'Medicine in 30 min', sub: 'MedPlus pharmacy now at your doorstep', bg: 'from-sky-600 to-blue-800', cta: 'Order Medicine' },
-  { emoji: '🥭', title: 'Fresh Fruits & Veg', sub: 'Farm-fresh daily from Fresh Valley', bg: 'from-green-600 to-emerald-800', cta: 'Buy Fresh' },
+  { emoji: '🛒', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-500 to-teal-600', cta: 'Shop Now' },
+  { emoji: '🍕', title: 'Free Delivery', sub: 'On all orders above ৳500', bg: 'from-orange-400 to-orange-600', cta: 'Order Food' },
+  { emoji: '💊', title: 'Medicine in 30 min', sub: 'MedPlus pharmacy now at your doorstep', bg: 'from-sky-500 to-blue-600', cta: 'Order Medicine' },
+  { emoji: '🥭', title: 'Fresh Fruits & Veg', sub: 'Farm-fresh daily from Fresh Valley', bg: 'from-green-500 to-emerald-600', cta: 'Buy Fresh' },
 ];
 
 const COUPONS = [
@@ -1683,7 +1683,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </button>
             </div>
 
-            <div className={`rounded-2xl p-4 space-y-2.5 relative overflow-hidden text-white ${tier.key === 'gold' ? 'bg-gradient-to-br from-amber-500 to-amber-700' : tier.key === 'silver' ? 'bg-gradient-to-br from-slate-500 to-slate-700' : 'bg-gradient-to-br from-gray-700 to-gray-900'}`}>
+            <div className={`rounded-2xl p-4 space-y-2.5 relative overflow-hidden text-white ${tier.key === 'gold' ? 'bg-gradient-to-br from-amber-400 to-amber-500' : tier.key === 'silver' ? 'bg-gradient-to-br from-slate-400 to-slate-500' : 'bg-gradient-to-br from-emerald-600 to-teal-600'}`}>
               <div className="flex items-center justify-between">
                 <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg">{tier.icon}</div>
                 <span className="px-2 py-0.5 rounded-md bg-white/20 text-[9px] font-black uppercase tracking-wider">{tier.label}</span>
@@ -2301,7 +2301,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           {/* ============ WALLET ============ */}
           {activeNav === 'Wallet' && (
             <div className="space-y-6">
-              <div className="bg-gradient-to-r from-emerald-700 to-teal-800 rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div className="space-y-1">
                   <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Smart Shop Cash Wallet</span>
                   <p className="text-3xl font-black font-mono">৳{walletBalance.toLocaleString()}</p>
