@@ -667,6 +667,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [rateOrder, setRateOrder] = useState<Order | null>(null);
   const [rateVal, setRateVal] = useState(5);
   const [rateComment, setRateComment] = useState('');
+  const [rateRiderOrder, setRateRiderOrder] = useState<Order | null>(null);
+  const [riderRateVal, setRiderRateVal] = useState(5);
+  const [riderRatings, setRiderRatings] = useState<Record<string, { driverName: string; score: number; note?: string }>>(() => getStoredData('ss_rider_ratings', {}) as Record<string, { driverName: string; score: number; note?: string }>);
+  useEffect(() => setStoredData('ss_rider_ratings', riderRatings), [riderRatings]);
+  const riderRatingOf = (driverName: string) => {
+    const all = (Object.values(riderRatings) as { driverName: string; score: number }[]).filter(r => r.driverName === driverName);
+    if (!all.length) return null;
+    return { avg: (all.reduce((s, r) => s + r.score, 0) / all.length).toFixed(1), count: all.length };
+  };
   const [reportOrder, setReportOrder] = useState<Order | null>(null);
   const [reportReason, setReportReason] = useState('Wrong item received');
   const [reportNote, setReportNote] = useState('');
@@ -760,8 +769,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const [walletBalance, setWalletBalance] = useState<number>(() => getStoredData(LS_KEYS.wallet, 0));
   useEffect(() => setStoredData(LS_KEYS.wallet, walletBalance), [walletBalance]);
-  const [topUpAmount, setTopUpAmount] = useState<string>('500');
-  const [walletTopUpMethod, setWalletTopUpMethod] = useState<'bKash' | 'Nagad' | 'Card'>('bKash');
+  const [addMoneyOpen, setAddMoneyOpen] = useState(false);
+  const [addMoneyStep, setAddMoneyStep] = useState<'method' | 'otp'>('method');
+  const [addMoneyMethod, setAddMoneyMethod] = useState<'bKash' | 'Nagad' | 'Card'>('bKash');
+  const [addMoneyAmount, setAddMoneyAmount] = useState('500');
+  const [addMoneyPhone, setAddMoneyPhone] = useState('');
+  const [addMoneyCard, setAddMoneyCard] = useState({ name: '', number: '', expiry: '', cvv: '' });
+  const [addMoneyOtp, setAddMoneyOtp] = useState('');
+  const [addMoneyOtpInput, setAddMoneyOtpInput] = useState('');
+  const [addMoneySentTo, setAddMoneySentTo] = useState('');
+  const [addMoneyError, setAddMoneyError] = useState('');
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>(() => getStoredData(LS_KEYS.wtxn, []));
   useEffect(() => setStoredData(LS_KEYS.wtxn, walletTransactions), [walletTransactions]);
   const [splitPinInput, setSplitPinInput] = useState('');
@@ -951,8 +968,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   };
 
   const confirmPayment = () => {
-    const targetStore = selectedStore;
-    if (!targetStore) return;
+    const targetStore = selectedStore || (cart[0] ? syncedStores.find(s => s.catalog.some(c => c.id === cart[0].product.id)) || null : null);
+    if (!targetStore) {
+      showToast('Please choose a store first to place your order.', 'info');
+      return;
+    }
     const areaMatch = deliveryAddress.match(/(Dhanmondi|Gulshan|Banani|Mirpur|Motijheel|Uttara|Badda|Tejgaon|Farmgate|Shahbagh)/i);
     const areaName = areaMatch ? areaMatch[1] : 'Dhanmondi';
     const dest = deliveryPin || AREA_COORDS[areaName] || [23.7539, 90.3836];
@@ -1031,10 +1051,25 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     onUpdateOrder({ ...ord, status: 'Completed' });
     setCustomerNotifs(prev => [{
       id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Delivery Confirmed',
-      body: `Order #${ord.id} marked delivered. Rate your store in My Orders!`, emoji: '🛵', time: 'Just now', read: false
+      body: `Order #${ord.id} marked delivered. Rate your rider and store!`, emoji: '🛵', time: 'Just now', read: false
     }, ...prev]);
     showToast('Delivery confirmed — thank you for shopping with Smart Shop!', 'success');
     setTrackingOrder(null);
+    setRateRiderOrder(ord);
+  };
+
+  const submitRiderRating = () => {
+    if (!rateRiderOrder) return;
+    const drv = liveDriverOf(rateRiderOrder);
+    const driverName = drv ? drv.name : rateRiderOrder.driverId || 'Your Rider';
+    setRiderRatings(prev => ({ ...prev, [rateRiderOrder.id]: { driverName, score: riderRateVal } }));
+    setCustomerNotifs(prev => [{
+      id: `CN-${Date.now().toString().slice(-4)}`, title: '⭐ Rider Rated!',
+      body: `You rated ${driverName} ${riderRateVal}★. Thank you for the feedback!`, emoji: '⭐', time: 'Just now', read: false
+    }, ...prev]);
+    setRateRiderOrder(null);
+    setRiderRateVal(5);
+    showToast(`${driverName} rated ${riderRateVal}★ — thanks for your feedback!`, 'success');
   };
 
   const sendChatMessage = () => {
@@ -1307,13 +1342,32 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     showToast(`${newPayType} account linked successfully!`, 'success');
   };
 
-  const handleWalletTopUp = (e: React.FormEvent) => {
-    e.preventDefault();
-    const num = parseFloat(topUpAmount);
-    if (isNaN(num) || num <= 0) return;
+  const sendAddMoneyOtp = () => {
+    const num = parseFloat(addMoneyAmount);
+    if (isNaN(num) || num <= 0) { setAddMoneyError('Enter a valid amount'); return; }
+    if (addMoneyMethod !== 'Card' && addMoneyPhone.trim().replace(/\D/g, '').length < 11) { setAddMoneyError('Enter a valid 11-digit phone number'); return; }
+    if (addMoneyMethod === 'Card' && (addMoneyCard.name.trim() === '' || addMoneyCard.number.trim().replace(/\D/g, '').length < 12 || addMoneyCard.expiry.trim() === '' || addMoneyCard.cvv.length < 3)) {
+      setAddMoneyError('Enter card holder name, 16-digit number, expiry & CVV'); return;
+    }
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    setAddMoneyOtp(otp);
+    setAddMoneyOtpInput('');
+    setAddMoneyError('');
+    setAddMoneySentTo(addMoneyMethod === 'Card' ? `card **** ${addMoneyCard.number.replace(/\D/g, '').slice(-4)}` : addMoneyPhone.trim());
+    setAddMoneyStep('otp');
+    showToast('OTP sent — check your phone / registered number', 'info');
+  };
+
+  const confirmAddMoney = () => {
+    const num = parseFloat(addMoneyAmount);
+    if (addMoneyOtpInput.trim() !== addMoneyOtp) { setAddMoneyError('Incorrect OTP — please check the code sent to you'); return; }
     setWalletBalance(prev => prev + num);
-    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: `Add Money (${walletTopUpMethod})`, amount: num, date: 'Just now', status: 'Completed' }, ...prev]);
-    showToast(`৳${num} added to your wallet via ${walletTopUpMethod}!`, 'success');
+    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: `Add Money (${addMoneyMethod})`, amount: num, date: 'Just now', status: 'Completed' }, ...prev]);
+    setAddMoneyOpen(false);
+    setAddMoneyStep('method');
+    setAddMoneyOtp('');
+    setAddMoneyOtpInput('');
+    showToast(`৳${num.toLocaleString()} added to your wallet via ${addMoneyMethod}!`, 'success');
   };
 
   const handleCreateTicketSubmit = (e: React.FormEvent) => {
@@ -1376,6 +1430,19 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           -webkit-backdrop-filter: blur(10px) saturate(140%);
         }
         .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 { background: rgba(236,253,245,0.6) !important; }
+        .cs-glass .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
+          background: rgba(255,255,255,0.8) !important;
+          backdrop-filter: blur(26px) saturate(180%);
+          -webkit-backdrop-filter: blur(26px) saturate(180%);
+          border-color: rgba(255,255,255,0.6) !important;
+          box-shadow: 0 20px 60px rgba(2,44,34,0.18), inset 0 1px 0 rgba(255,255,255,0.8);
+        }
+        .cs-glass header .bg-white:not(button):not(a) {
+          background: rgba(255,255,255,0.86) !important;
+          backdrop-filter: blur(22px) saturate(170%);
+          -webkit-backdrop-filter: blur(22px) saturate(170%);
+          border-color: rgba(255,255,255,0.65) !important;
+        }
         .cs-glass button { -webkit-tap-highlight-color: transparent; }
       `}</style>
       {/* HEADER */}
@@ -1667,35 +1734,35 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <span>{T.viewAll}</span><ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                 {syncedStores.slice(0, 4).map((store) => {
                   const isFav = favoriteStoreIds.includes(store.id);
                   return (
                     <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative">
                       <div>
-                        <div className="relative h-36 overflow-hidden bg-gray-100">
+                        <div className="relative h-24 overflow-hidden bg-gray-100">
                           <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
-                          <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
-                            <Heart className={`w-4 h-4 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
+                          <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
+                          <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
+                            <Heart className={`w-3.5 h-3.5 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
                           </button>
                         </div>
-                        <div className="p-4 space-y-2">
-                          <h3 className="font-bold text-gray-900 text-sm group-hover:text-emerald-600 transition-colors">{store.name}</h3>
-                          <div className="flex items-center justify-between text-[11px] text-gray-600">
+                        <div className="p-3 space-y-1.5">
+                          <h3 className="font-bold text-gray-900 text-xs group-hover:text-emerald-600 transition-colors line-clamp-1">{store.name}</h3>
+                          <div className="flex items-center justify-between text-[10px] text-gray-600">
                             <div className="flex items-center space-x-1">
-                              <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                              <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                               <span className="font-bold text-gray-900">{displayRating(store)}</span>
                               <span className="text-gray-400">({store.reviewsCount})</span>
                             </div>
                             <div className="flex items-center space-x-1">
-                              <Clock className="w-3.5 h-3.5 text-gray-400" /><span>{store.deliveryTime}</span>
+                              <Clock className="w-3 h-3 text-gray-400" /><span>{store.deliveryTime}</span>
                             </div>
                           </div>
                         </div>
                       </div>
-                      <div className="p-4 pt-0">
-                        <button onClick={() => openStore(store)} className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
+                      <div className="p-3 pt-0">
+                        <button onClick={() => openStore(store)} className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
                           Order Now
                         </button>
                       </div>
@@ -1845,42 +1912,42 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                 {filteredStores.map((store) => {
                   const isFav = favoriteStoreIds.includes(store.id);
                   return (
                     <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative">
                       <div>
-                        <div className="relative h-40 overflow-hidden bg-gray-100">
+                        <div className="relative h-24 overflow-hidden bg-gray-100">
                           <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
-                          <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
-                            <Heart className={`w-4 h-4 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
+                          <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
+                          <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
+                            <Heart className={`w-3.5 h-3.5 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
                           </button>
                         </div>
-                        <div className="p-4 space-y-2">
+                        <div className="p-3 space-y-1.5">
                           <div className="flex items-center space-x-2">
-                            <div className={`w-7 h-7 rounded-lg ${store.logoBg} flex items-center justify-center font-black text-xs shrink-0 shadow-xs`}>{store.logoText.charAt(0)}</div>
-                            <div>
-                              <h3 className="font-bold text-gray-900 text-sm group-hover:text-emerald-600 transition-colors">{store.name}</h3>
-                              <p className="text-[11px] text-gray-500">{store.subtext}</p>
+                            <div className={`w-6 h-6 rounded-lg ${store.logoBg} flex items-center justify-center font-black text-[10px] shrink-0 shadow-xs`}>{store.logoText.charAt(0)}</div>
+                            <div className="min-w-0">
+                              <h3 className="font-bold text-gray-900 text-xs group-hover:text-emerald-600 transition-colors line-clamp-1">{store.name}</h3>
+                              <p className="text-[10px] text-gray-500 line-clamp-1">{store.subtext}</p>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between text-[11px] text-gray-600 pt-2 border-t border-gray-100">
+                          <div className="flex items-center justify-between text-[10px] text-gray-600 pt-1.5 border-t border-gray-100">
                             <div className="flex items-center space-x-1">
-                              <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                              <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                               <span className="font-bold text-gray-900">{displayRating(store)}</span>
                               <span className="text-gray-400">({store.reviewsCount})</span>
                             </div>
                             <div className="flex items-center space-x-1">
-                              <Clock className="w-3.5 h-3.5 text-gray-400" /><span>{store.deliveryTime}</span>
+                              <Clock className="w-3 h-3 text-gray-400" /><span>{store.deliveryTime}</span>
                             </div>
-                            <span className="font-bold text-emerald-700">৳{store.deliveryFee} Delivery</span>
+                            <span className="font-bold text-emerald-700">৳{store.deliveryFee}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="p-4 pt-0">
-                        <button onClick={() => openStore(store)} className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
+                      <div className="p-3 pt-0">
+                        <button onClick={() => openStore(store)} className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
                           Order Now
                         </button>
                       </div>
@@ -1925,8 +1992,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     const completed = ord.status === 'Completed';
                     const cancelled = ord.status === 'Cancelled';
                     return (
-                      <div key={ord.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-emerald-200 transition-colors">
-                        <div className="space-y-1.5">
+                      <div key={ord.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-200 transition-colors">
+                        <div className="space-y-1">
                           <div className="flex items-center space-x-3 flex-wrap gap-y-1">
                             <span className="font-mono text-xs font-bold text-gray-500">#{ord.id}</span>
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -1940,9 +2007,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             )}
                           </div>
                           <h4 className="text-sm font-bold text-gray-900">{ord.storeName}</h4>
-                          <p className="text-xs text-gray-500">{ord.date} {ord.time ? `• ${ord.time}` : ''} • {T.paymentMethod}: {ord.paymentMethod}</p>
-                          <p className="text-xs text-gray-600 font-medium flex items-center space-x-1">
-                            <MapPin className="w-3 h-3 text-gray-400" /><span>{ord.address || deliveryAddress}</span>
+                          {ord.items && ord.items.length > 0 && (
+                            <p className="text-[10px] text-gray-500 truncate max-w-full">
+                              {ord.items.reduce((s, i) => s + i.quantity, 0)} items — {ord.items.map(i => `${i.name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}`).join(', ')}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-gray-500">{ord.date} {ord.time ? `• ${ord.time}` : ''} • {T.paymentMethod}: {ord.paymentMethod}</p>
+                          <p className="text-[10px] text-gray-600 font-medium flex items-center space-x-1">
+                            <MapPin className="w-3 h-3 text-gray-400" /><span className="truncate">{ord.address || deliveryAddress}</span>
                           </p>
                           {active && (() => {
                             const drv = liveDriverOf(ord);
@@ -1966,50 +2038,50 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           })()}
                         </div>
 
-                        <div className="flex items-center space-x-3 border-t md:border-t-0 md:border-l border-gray-100 pt-3 md:pt-0 md:pl-6 justify-between md:justify-end flex-wrap gap-y-2">
+                        <div className="flex items-center space-x-2 border-t md:border-t-0 md:border-l border-gray-100 pt-3 md:pt-0 md:pl-5 justify-between md:justify-end flex-wrap gap-y-1.5">
                           <div className="text-right pr-2">
                             <p className="text-[10px] font-bold text-gray-400 uppercase">{T.totalAmount}</p>
-                            <p className="text-base font-black text-gray-900 font-mono">৳{ord.amount.toLocaleString()}</p>
+                            <p className="text-sm font-black text-gray-900 font-mono">৳{ord.amount.toLocaleString()}</p>
                           </div>
-                          <button onClick={() => setReceiptOrder(ord)} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5">
-                            <Printer className="w-3.5 h-3.5 text-gray-500" /><span>{T.receipt}</span>
+                          <button onClick={() => setReceiptOrder(ord)} className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
+                            <Printer className="w-3 h-3 text-gray-500" /><span>{T.receipt}</span>
                           </button>
                           {active ? (
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1.5">
                               {ord.status === 'Ongoing' && (
-                                <button onClick={() => setCancelConfirmId(ord.id)} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-red-200">
-                                  <X className="w-3.5 h-3.5" /><span>{T.cancelOrder}</span>
+                                <button onClick={() => setCancelConfirmId(ord.id)} className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-red-200">
+                                  <X className="w-3 h-3" /><span>{T.cancelOrder}</span>
                                 </button>
                               )}
-                              <button onClick={() => setTrackingOrder(ord)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs flex items-center space-x-1.5">
-                                <Navigation className="w-3.5 h-3.5" /><span>{T.trackDelivery}</span>
+                              <button onClick={() => setTrackingOrder(ord)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs flex items-center space-x-1">
+                                <Navigation className="w-3 h-3" /><span>{T.trackDelivery}</span>
                               </button>
-                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-red-200">
-                                <AlertCircle className="w-3.5 h-3.5" /><span>Report</span>
+                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-red-200">
+                                <AlertCircle className="w-3 h-3" /><span>Report</span>
                               </button>
                             </div>
                           ) : cancelled ? (
-                            <div className="flex items-center space-x-2">
-                              <button onClick={() => showToast('This order has been cancelled', 'info')} className="px-4 py-2 bg-gray-200 text-gray-500 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5">
-                                <X className="w-3.5 h-3.5" /><span>{T.cancelled}</span>
+                            <div className="flex items-center space-x-1.5">
+                              <button onClick={() => showToast('This order has been cancelled', 'info')} className="px-3 py-1.5 bg-gray-200 text-gray-500 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
+                                <X className="w-3 h-3" /><span>{T.cancelled}</span>
                               </button>
-                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-red-200">
-                                <AlertCircle className="w-3.5 h-3.5" /><span>Report</span>
+                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-red-200">
+                                <AlertCircle className="w-3 h-3" /><span>Report</span>
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center space-x-2">
-                              <button onClick={() => { reorder(ord); }} className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-emerald-200">
-                                <RotateCcw className="w-3.5 h-3.5" /><span>{T.reOrder}</span>
+                            <div className="flex items-center space-x-1.5">
+                              <button onClick={() => { reorder(ord); }} className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-emerald-200">
+                                <RotateCcw className="w-3 h-3" /><span>{T.reOrder}</span>
                               </button>
-                              <button onClick={() => setRateOrder(ord)} className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-amber-200">
-                                <Star className="w-3.5 h-3.5" /><span>Rate Store</span>
+                              <button onClick={() => setRateOrder(ord)} className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-amber-200">
+                                <Star className="w-3 h-3" /><span>Rate</span>
                               </button>
-                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 border border-red-200">
-                                <AlertCircle className="w-3.5 h-3.5" /><span>Report</span>
+                              <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-red-200">
+                                <AlertCircle className="w-3 h-3" /><span>Report</span>
                               </button>
-                              <button onClick={() => showToast('Order already delivered', 'info')} className="px-4 py-2 bg-gray-200 text-gray-500 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5">
-                                <CheckCircle className="w-3.5 h-3.5" /><span>{T.delivered}</span>
+                              <button onClick={() => showToast('Order already delivered', 'info')} className="px-3 py-1.5 bg-gray-200 text-gray-500 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
+                                <CheckCircle className="w-3 h-3" /><span>{T.delivered}</span>
                               </button>
                             </div>
                           )}
@@ -2198,25 +2270,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <p className="text-3xl font-black font-mono">৳{walletBalance.toLocaleString()}</p>
                   <p className="text-[11px] text-emerald-100">Use instant wallet balance for 1-click order checkout!</p>
                 </div>
-                <div className="shrink-0 space-y-2 w-full sm:w-72">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200">Add Money</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['bKash', 'Nagad', 'Card'] as const).map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => setWalletTopUpMethod(m)}
-                        className={`py-2 rounded-xl text-center font-black text-[10px] transition-all cursor-pointer ${
-                          walletTopUpMethod === m ? 'bg-emerald-500 text-white shadow-md' : 'bg-white/10 border border-white/20 text-emerald-100 hover:bg-white/20'
-                        }`}
-                      >
-                        {m === 'bKash' ? 'bKash' : m === 'Nagad' ? 'Nagad' : 'Card'}
-                      </button>
-                    ))}
-                  </div>
-                  <form onSubmit={handleWalletTopUp} className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl flex items-center space-x-2">
-                    <input type="number" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} className="w-24 bg-white text-gray-900 font-mono font-bold text-xs p-2 rounded-xl outline-none" placeholder="Amount" />
-                    <button type="submit" className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer transition-colors">+ Add Money</button>
-                  </form>
+                <div className="shrink-0 w-full sm:w-72">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200 mb-2">Smart Wallet</p>
+                  <button
+                    onClick={() => { setAddMoneyOpen(true); setAddMoneyStep('method'); setAddMoneyError(''); }}
+                    className="w-full py-3 bg-white text-emerald-800 font-black text-xs rounded-2xl shadow-lg hover:bg-emerald-50 transition-all cursor-pointer flex items-center justify-center space-x-2"
+                  >
+                    <Plus className="w-4 h-4" /><span>Add Money</span>
+                  </button>
+                  <p className="text-[9px] text-emerald-100 mt-2">Card or bKash / Nagad with OTP verification</p>
                 </div>
               </div>
 
@@ -2368,10 +2430,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ STORE MENU & CHECKOUT MODAL ============ */}
       {selectedStore && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-6xl w-full shadow-2xl border border-gray-200 overflow-hidden sm:my-8 max-h-[92vh] flex flex-col">
-            <div className="relative h-32 sm:h-40 bg-gray-900 shrink-0">
-              <img src={selectedStore.image} alt={selectedStore.name} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-50" />
+            <div className="relative h-32 sm:h-40 bg-gradient-to-r from-emerald-700 to-teal-800 shrink-0">
+              <img src={selectedStore.image} alt={selectedStore.name} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-45" />
               <div className="absolute top-3 right-3 flex items-center space-x-2">
                 <button
                   onClick={() => {
@@ -2664,7 +2726,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ PAYMENT FLOW MODAL ============ */}
       {payModal && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs animate-in fade-in duration-200">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
@@ -2828,7 +2890,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ LIVE TRACKING MODAL ============ */}
       {trackingOrder && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-2xl w-full p-5 shadow-2xl border border-gray-200 space-y-4 animate-in fade-in duration-200">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div>
@@ -2856,8 +2918,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               {trackingDriver && (
                 <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-bold text-gray-700">
                   <span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">{initialsOf(trackingDriver.name)}</span>
-                  <span>
+                  <span className="min-w-0">
                     {T.courierDriver}: <b>{trackingDriver.name}</b> · {trackingDriver.vehicleType}
+                    {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="ml-1 text-amber-500">★ {rr.avg} <span className="text-gray-400">({rr.count})</span></span> : null; })()}
                   </span>
                 </div>
               )}
@@ -2918,7 +2981,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     {initialsOf(trackingDriver.name)}
                   </div>
                   <div>
-                    <p className="font-bold text-gray-900">{T.courierDriver}: {trackingDriver.name}</p>
+                    <p className="font-bold text-gray-900">{T.courierDriver}: {trackingDriver.name} {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="text-amber-500">★ {rr.avg}</span> : null; })()}</p>
                     <p className="text-[10px] text-gray-500 font-mono">{trackingDriver.vehicleType}: {trackingDriver.id} · {trackProgress < 0.12 ? 'At store — picking up your order' : 'En route to you'}</p>
                   </div>
                 </div>
@@ -2961,7 +3024,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ RECEIPT MODAL ============ */}
       {receiptOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs font-mono">
             <div className="flex justify-between items-center border-b border-gray-200 pb-2">
               <span className="font-bold text-gray-900">Official Order Receipt</span>
@@ -3023,7 +3086,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ SUPPORT TICKET MODAL ============ */}
       {isNewTicketModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <form onSubmit={handleCreateTicketSubmit} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs">
             <div className="flex justify-between items-center border-b border-gray-100 pb-2">
               <h3 className="font-black text-sm text-gray-900">Open Customer Support Ticket</h3>
@@ -3053,7 +3116,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ PRODUCT DETAIL + REVIEWS MODAL ============ */}
       {detailProduct && (
-        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[70] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200">
             <div className="relative h-56 bg-gray-100">
               <img src={detailProduct.image} alt={detailProduct.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
@@ -3156,7 +3219,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ CART DRAWER ============ */}
       {isCartDrawerOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-xs flex justify-end">
+        <div className="fixed inset-0 z-[70] bg-slate-900/30 backdrop-blur-sm flex justify-end">
           <div onClick={() => setIsCartDrawerOpen(false)} className="absolute inset-0" />
           <div className="relative w-full max-w-sm bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
@@ -3198,8 +3261,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <span className="text-gray-600 font-bold">{T.grandTotal}</span>
                   <span className="font-mono font-black text-emerald-700">৳{cartGrandTotal}</span>
                 </div>
-                <button onClick={() => { setIsCartDrawerOpen(false); if (selectedStore) setSelectedStore(selectedStore); else setActiveNav('Orders'); showToast(T.goToCart, 'info'); }} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer">
-                  {selectedStore ? T.checkout : T.browseStores}
+                <button onClick={() => {
+                  setIsCartDrawerOpen(false);
+                  const st = selectedStore || (cart[0] ? syncedStores.find(s => s.catalog.some(c => c.id === cart[0].product.id)) || null : null);
+                  if (st) setSelectedStore(st); else setActiveNav('Orders');
+                  showToast(st ? T.goToCart : T.browseStores, 'info');
+                }} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer">
+                  {T.checkout}
                 </button>
               </div>
             )}
@@ -3209,7 +3277,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ RIDER CHAT MODAL ============ */}
       {chatOrderId && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 z-[80] bg-slate-900/35 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-200 flex flex-col max-h-[80vh] animate-in fade-in duration-200">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
@@ -3263,7 +3331,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ ORDER REPORT MODAL ============ */}
       {reportOrder && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[80] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 animate-in fade-in duration-200">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto"><AlertCircle className="w-6 h-6" /></div>
             <div>
@@ -3296,7 +3364,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ STORE RATING MODAL ============ */}
       {rateOrder && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[80] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center animate-in fade-in duration-200">
             <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto"><Star className="w-6 h-6 fill-amber-400 text-amber-400" /></div>
             <div>
@@ -3327,9 +3395,38 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         </div>
       )}
 
+      {/* ============ RIDER RATING MODAL ============ */}
+      {rateRiderOrder && (
+        <div className="fixed inset-0 z-[82] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto"><Truck className="w-6 h-6" /></div>
+            <div>
+              <h3 className="text-sm font-black text-gray-900">Rate Your Rider</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {(() => { const d = liveDriverOf(rateRiderOrder); return d ? `How was ${d.name}'s delivery service?` : 'How was your delivery experience?'; })()}
+              </p>
+            </div>
+            <div className="flex items-center justify-center space-x-1.5">
+              {[1, 2, 3, 4, 5].map(r => (
+                <button key={r} onClick={() => setRiderRateVal(r)} className="cursor-pointer">
+                  <Star className={`w-9 h-9 ${r <= riderRateVal ? 'text-emerald-500 fill-emerald-500' : 'text-gray-300 hover:text-emerald-300'}`} />
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 font-bold">{riderRateVal}-star rating</p>
+            <div className="space-y-2">
+              <button onClick={submitRiderRating} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
+                Submit {riderRateVal}-Star Rating
+              </button>
+              <button onClick={() => setRateRiderOrder(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ============ CANCEL ORDER CONFIRM ============ */}
       {cancelConfirmId && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[80] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center animate-in fade-in duration-200">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto"><Trash2 className="w-5 h-5" /></div>
             <div>
@@ -3341,6 +3438,122 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <button onClick={confirmCancelOrder} className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer">{T.yesCancel}</button>
               <button onClick={() => setCancelConfirmId(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.keepOrder}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ ADD MONEY MODAL (real flow: card/bKash/Nagad + OTP) ============ */}
+      {addMoneyOpen && (
+        <div className="fixed inset-0 z-[84] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
+                <div>
+                  <h3 className="text-sm font-black text-gray-900">{addMoneyStep === 'otp' ? 'Verify OTP' : 'Add Money to Wallet'}</h3>
+                  <p className="text-[9px] text-gray-400">Current balance: ৳{walletBalance.toLocaleString()}</p>
+                </div>
+              </div>
+              <button onClick={() => setAddMoneyOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-4 h-4 text-gray-500" /></button>
+            </div>
+
+            {addMoneyStep === 'method' ? (
+              <>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Amount (৳)</label>
+                  <input
+                    type="number"
+                    value={addMoneyAmount}
+                    onChange={(e) => setAddMoneyAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 outline-none focus:border-emerald-500 font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">Payment Method</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['bKash', 'Nagad', 'Card'] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setAddMoneyMethod(m)}
+                        className={`py-2 rounded-xl border text-center font-black text-[10px] transition-all cursor-pointer ${addMoneyMethod === m ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {m === 'bKash' ? 'bKash' : m === 'Nagad' ? 'Nagad' : 'Card'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {addMoneyMethod !== 'Card' ? (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{addMoneyMethod} Account Number</label>
+                    <input
+                      type="tel"
+                      value={addMoneyPhone}
+                      onChange={(e) => setAddMoneyPhone(e.target.value)}
+                      placeholder="01XXXXXXXXX"
+                      className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Card Holder Name</label>
+                      <input type="text" value={addMoneyCard.name} onChange={(e) => setAddMoneyCard({ ...addMoneyCard, name: e.target.value })} placeholder="Name on card" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 outline-none focus:border-emerald-500" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Card Number</label>
+                      <input type="text" value={addMoneyCard.number} onChange={(e) => setAddMoneyCard({ ...addMoneyCard, number: e.target.value })} placeholder="1234 5678 9012 3456" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 outline-none focus:border-emerald-500 font-mono" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Expiry</label>
+                        <input type="text" value={addMoneyCard.expiry} onChange={(e) => setAddMoneyCard({ ...addMoneyCard, expiry: e.target.value })} placeholder="MM/YY" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 outline-none focus:border-emerald-500 font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">CVV</label>
+                        <input type="password" value={addMoneyCard.cvv} onChange={(e) => setAddMoneyCard({ ...addMoneyCard, cvv: e.target.value })} placeholder="•••" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 outline-none focus:border-emerald-500 font-mono" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
+
+                <button onClick={sendAddMoneyOtp} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
+                  Continue — Send OTP
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1.5">
+                  <p className="text-[10px] text-gray-500 font-bold">OTP sent to {addMoneySentTo}</p>
+                  <div className="bg-white border border-dashed border-emerald-300 rounded-lg px-3 py-2 font-mono font-black tracking-[0.25em] text-lg text-emerald-700 text-center select-all">
+                    {addMoneyOtp}
+                  </div>
+                  <p className="text-[9px] text-gray-400">Enter the 6-digit code to complete ৳{parseFloat(addMoneyAmount).toLocaleString()} top-up</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">OTP Code</label>
+                  <input
+                    type="text"
+                    value={addMoneyOtpInput}
+                    onChange={(e) => setAddMoneyOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-center text-gray-900 outline-none focus:border-emerald-500 font-mono font-black text-xl tracking-[0.4em]"
+                  />
+                </div>
+                {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
+                <div className="space-y-2">
+                  <button onClick={confirmAddMoney} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
+                    Verify & Add ৳{parseFloat(addMoneyAmount).toLocaleString()}
+                  </button>
+                  <button onClick={() => { setAddMoneyStep('method'); setAddMoneyError(''); }} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">
+                    {T.cancel}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
