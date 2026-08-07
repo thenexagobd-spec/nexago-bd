@@ -909,12 +909,45 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [customizeQty, setCustomizeQty] = useState(1);
   const [customizeNote, setCustomizeNote] = useState('');
   const [customizeExtra, setCustomizeExtra] = useState(false);
+  const [customizeWeight, setCustomizeWeight] = useState(1); // 0.5 | 1 | 2
+
+  const getProductCustomizations = (prod: StoreProduct): { label: string; key: string; choices: { label: string; multiplier: number; price: number }[] }[] => {
+    const opts: { label: string; key: string; choices: { label: string; multiplier: number; price: number }[] }[] = [];
+    const unit = prod.unit.toLowerCase();
+    if (['kg', 'ltr', 'g', 'l', 'litre', 'liter'].some(u => unit.includes(u))) {
+      const ul = unit.includes('ltr') || unit.includes('lit') || unit === 'l' ? 'L' : unit.includes('g') ? 'g' : 'kg';
+      opts.push({
+        label: ul === 'g' ? 'Weight' : ul === 'L' ? 'Volume' : 'Weight',
+        key: 'weight',
+        choices: ul === 'g' ? [
+          { label: `100${ul}`, multiplier: 0.1, price: Math.round(prod.price * 0.1) },
+          { label: `250${ul}`, multiplier: 0.25, price: Math.round(prod.price * 0.25) },
+          { label: `500${ul}`, multiplier: 0.5, price: Math.round(prod.price * 0.5) },
+          { label: `1 kg`, multiplier: 1, price: prod.price },
+        ] : [
+          { label: ul === 'L' ? `½ ${ul}` : `½ ${ul}`, multiplier: 0.5, price: Math.round(prod.price * 0.5) },
+          { label: ul === 'L' ? `1 ${ul}` : `1 ${ul}`, multiplier: 1, price: prod.price },
+          { label: ul === 'L' ? `2 ${ul}` : `2 ${ul}`, multiplier: 2, price: prod.price * 2 },
+        ],
+      });
+    }
+    return opts;
+  };
+
+  const computeCustomizeTotal = () => {
+    if (!customizeProd) return 0;
+    const opts = getProductCustomizations(customizeProd);
+    const weightOpt = opts.find(o => o.key === 'weight');
+    const mult = weightOpt ? (weightOpt.choices.find(c => c.multiplier === customizeWeight)?.multiplier || 1) : 1;
+    return Math.round(customizeProd.price * mult * customizeQty);
+  };
 
   const openCustomize = (prod: StoreProduct) => {
     setCustomizeProd(prod);
     setCustomizeQty(1);
     setCustomizeNote('');
     setCustomizeExtra(false);
+    setCustomizeWeight(1);
   };
 
   const handleCustomizeAdd = () => {
@@ -927,17 +960,20 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast('One store per order — complete your current order before adding from another store.', 'info');
       return;
     }
+    const opts = getProductCustomizations(customizeProd);
+    const weightChoice = opts.find(o => o.key === 'weight')?.choices.find(c => c.multiplier === customizeWeight);
     if (customizeQty > (customizeProd.stock || 99)) {
       showToast(`Only ${customizeProd.stock} available in stock`, 'info');
       return;
     }
-    const note = [customizeExtra ? 'Extra portion' : '', customizeNote.trim()].filter(Boolean).join(' · ');
+    const parts = [weightChoice ? weightChoice.label : '', customizeExtra ? 'Extra portion' : '', customizeNote.trim()].filter(Boolean);
+    const note = parts.join(' · ');
     setCart(prev => {
       const existing = prev.find(i => i.product.id === customizeProd.id);
       if (existing) return prev.map(i => i.product.id === customizeProd.id ? { ...i, quantity: i.quantity + customizeQty, note: note || i.note } : i);
       return [...prev, { product: customizeProd, quantity: customizeQty, note: note || undefined }];
     });
-    showToast(`${customizeProd.name} customized & added to cart`, 'success');
+    showToast(`${weightChoice ? `(${weightChoice.label}) ` : ''}${customizeProd.name} customized & added to cart`, 'success');
     setCustomizeProd(null);
   };
 
@@ -2565,14 +2601,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                                 <span className="text-[10px] font-bold text-gray-400 px-3 py-1.5">Unavailable</span>
                               ) : (
                                 <div className="flex items-center space-x-1.5 shrink-0">
-                                  {inCart ? (
-                                    <div className="flex items-center space-x-2 bg-green-600 text-white rounded-lg px-2 py-1">
+                                   {inCart ? (
+                                    <div className="flex items-center justify-center space-x-2 bg-green-600 text-white rounded-lg px-2 py-1 min-w-[80px]">
                                       <button onClick={() => handleUpdateQty(prod.id, -1)} className="text-white hover:text-green-200 cursor-pointer"><Minus className="w-3 h-3" /></button>
                                       <span className="font-mono font-bold text-xs w-4 text-center">{inCart.quantity}</span>
                                       <button onClick={() => handleAddToCart(prod)} className="text-white hover:text-green-200 cursor-pointer"><Plus className="w-3 h-3" /></button>
                                     </div>
                                   ) : (
-                                    <button onClick={() => handleAddToCart(prod)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
+                                    <button onClick={() => handleAddToCart(prod)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1 min-w-[80px]">
                                       <Plus className="w-3 h-3" /><span>Add</span>
                                     </button>
                                   )}
@@ -3610,16 +3646,20 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         </div>
       )}
 
-      {/* ============ CUSTOMIZE PRODUCT MODAL ============ */}
-      {customizeProd && (
+      {/* ============ CUSTOMIZE PRODUCT MODAL (product-specific options) ============ */}
+      {customizeProd && (() => {
+        const opts = getProductCustomizations(customizeProd);
+        const wChoices = opts.find(o => o.key === 'weight')?.choices || [];
+        const total = computeCustomizeTotal();
+        return (
         <div className="fixed inset-0 z-[86] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200 flex flex-col max-h-[90vh]">
             <div className="relative h-40 bg-gray-100 shrink-0">
               <img src={customizeProd.image} alt={customizeProd.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
               <button onClick={() => setCustomizeProd(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 text-gray-700 flex items-center justify-center hover:bg-white cursor-pointer shadow-md"><X className="w-4 h-4" /></button>
               <div className="absolute bottom-3 left-4 right-4">
-                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${customizeProd.badgeColor || 'bg-emerald-600 text-white'}`}>{customizeProd.category}</span>
+                <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-600 text-white">{customizeProd.category}</span>
                 <h3 className="text-lg font-black text-white mt-1 leading-tight">{customizeProd.name}</h3>
                 <p className="text-xs text-white/90"><span className="font-mono font-black">৳{customizeProd.price}</span> / {customizeProd.unit}</p>
               </div>
@@ -3627,6 +3667,28 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="p-5 space-y-4 overflow-y-auto">
               <p className="text-[11px] text-gray-500">{customizeProd.desc}</p>
 
+              {/* Weight/volume selector */}
+              {wChoices.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">{opts.find(o => o.key === 'weight')!.label}</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {wChoices.map((ch) => (
+                      <button
+                        key={ch.label}
+                        onClick={() => setCustomizeWeight(ch.multiplier)}
+                        className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer text-xs font-bold ${
+                          customizeWeight === ch.multiplier ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="block">{ch.label}</span>
+                        <span className="block text-[10px] text-gray-500 font-mono">৳{ch.price}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quantity */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">Quantity</label>
                 <div className="flex items-center space-x-3 border border-gray-300 rounded-xl w-fit px-2 py-1.5 bg-white">
@@ -3636,6 +3698,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </div>
               </div>
 
+              {/* Extra add-ons */}
               <div>
                 <label className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl p-3 cursor-pointer">
                   <span className="flex items-center space-x-2 text-xs font-bold text-emerald-800">
@@ -3647,32 +3710,39 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </label>
               </div>
 
+              {/* Special instructions */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">Special instructions</label>
                 <textarea
                   value={customizeNote}
                   onChange={(e) => setCustomizeNote(e.target.value)}
                   placeholder="e.g. less spicy, no onions, extra sauce…"
-                  rows={3}
+                  rows={2}
                   className="w-full bg-white border border-gray-300 rounded-xl p-3 text-xs text-gray-900 outline-none focus:border-emerald-500 resize-none"
                 />
               </div>
 
               <div className="flex items-center justify-between text-sm bg-gray-50 border border-gray-200 rounded-xl p-3">
-                <span className="font-bold text-gray-700">Total ({customizeQty} × ৳{customizeProd.price})</span>
-                <span className="font-mono font-black text-emerald-700">৳{(customizeProd.price * customizeQty).toLocaleString()}</span>
+                <span className="font-bold text-gray-700">Total</span>
+                <div className="text-right">
+                  {wChoices.length > 0 && (
+                    <span className="text-[10px] text-gray-500 font-mono block">{wChoices.find(c => c.multiplier === customizeWeight)?.label || '1'} × {customizeQty} qty</span>
+                  )}
+                  <span className="font-mono font-black text-emerald-700 text-lg">৳{total.toLocaleString()}</span>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <button onClick={handleCustomizeAdd} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer">
-                  Add to Cart — ৳{(customizeProd.price * customizeQty).toLocaleString()}
+                  Add to Cart — ৳{total.toLocaleString()}
                 </button>
                 <button onClick={() => setCustomizeProd(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.cancel}</button>
               </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* FOOTER */}
       <footer className="bg-white border-t border-gray-200 py-4 px-6 text-center text-xs text-gray-500 hidden md:block">
