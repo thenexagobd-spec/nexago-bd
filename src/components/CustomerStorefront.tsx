@@ -1484,44 +1484,42 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         .cs-glass main::-webkit-scrollbar { width: 8px; }
         .cs-glass main::-webkit-scrollbar-thumb { background: rgba(6,78,59,0.18); border-radius: 8px; }
         .cs-glass .glass-bar, .cs-glass aside {
-          background: rgba(255,255,255,0.65) !important;
-          backdrop-filter: blur(18px) saturate(170%);
-          -webkit-backdrop-filter: blur(18px) saturate(170%);
+          background: rgba(255,255,255,0.66) !important;
+          backdrop-filter: blur(22px) saturate(175%);
+          -webkit-backdrop-filter: blur(22px) saturate(175%);
           border-color: rgba(255,255,255,0.6) !important;
-          box-shadow: 0 4px 24px rgba(6,78,59,0.08);
+          box-shadow: 0 4px 24px rgba(6,78,59,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
         }
         .cs-glass aside {
           border-right: 1px solid rgba(255,255,255,0.6) !important;
         }
-        .cs-glass main .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
-          background: rgba(255,255,255,0.65) !important;
-          backdrop-filter: blur(18px) saturate(170%);
-          -webkit-backdrop-filter: blur(18px) saturate(170%);
+        .cs-glass .bg-white:not(button):not(a):not(input):not(select):not(textarea):not(label) {
+          background: rgba(255,255,255,0.66) !important;
+          backdrop-filter: blur(20px) saturate(170%);
+          -webkit-backdrop-filter: blur(20px) saturate(170%);
           border-color: rgba(255,255,255,0.55) !important;
-          box-shadow: 0 8px 32px rgba(6,78,59,0.06), inset 0 1px 0 rgba(255,255,255,0.8);
+          box-shadow: 0 8px 32px rgba(6,78,59,0.06), inset 0 1px 0 rgba(255,255,255,0.78);
           border-radius: inherit;
         }
-        .cs-glass main .bg-white {
-          box-shadow: 0 4px 16px rgba(6,78,59,0.04);
+        .cs-glass .bg-white { box-shadow: 0 4px 16px rgba(6,78,59,0.04); }
+        .cs-glass .bg-slate-50, .cs-glass .bg-gray-50, .cs-glass .bg-emerald-50, .cs-glass .bg-emerald-50\/30, .cs-glass .bg-blue-50, .cs-glass .bg-amber-50, .cs-glass .bg-red-50, .cs-glass .bg-violet-50 {
+          background: rgba(255,255,255,0.52) !important;
+          backdrop-filter: blur(12px) saturate(150%);
+          -webkit-backdrop-filter: blur(12px) saturate(150%);
         }
-        .cs-glass main .bg-slate-50, .cs-glass main .bg-gray-50, .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 {
-          background: rgba(255,255,255,0.5) !important;
-          backdrop-filter: blur(10px) saturate(140%);
-          -webkit-backdrop-filter: blur(10px) saturate(140%);
-        }
-        .cs-glass main .bg-emerald-50, .cs-glass main .bg-emerald-50\/30 { background: rgba(236,253,245,0.6) !important; }
-        .cs-glass .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
-          background: rgba(255,255,255,0.82) !important;
-          backdrop-filter: blur(28px) saturate(190%);
-          -webkit-backdrop-filter: blur(28px) saturate(190%);
+        .cs-glass .bg-emerald-50, .cs-glass .bg-emerald-50\/30 { background: rgba(236,253,245,0.62) !important; }
+        .cs-glass .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea):not(label) {
+          background: rgba(255,255,255,0.84) !important;
+          backdrop-filter: blur(30px) saturate(190%);
+          -webkit-backdrop-filter: blur(30px) saturate(190%);
           border-color: rgba(255,255,255,0.6) !important;
-          box-shadow: 0 20px 60px rgba(2,44,34,0.16), inset 0 1px 0 rgba(255,255,255,0.85);
+          box-shadow: 0 20px 60px rgba(2,44,34,0.16), inset 0 1px 0 rgba(255,255,255,0.88);
           border-radius: inherit;
         }
         .cs-glass header .bg-white:not(button):not(a) {
-          background: rgba(255,255,255,0.86) !important;
-          backdrop-filter: blur(22px) saturate(170%);
-          -webkit-backdrop-filter: blur(22px) saturate(170%);
+          background: rgba(255,255,255,0.88) !important;
+          backdrop-filter: blur(24px) saturate(180%);
+          -webkit-backdrop-filter: blur(24px) saturate(180%);
           border-color: rgba(255,255,255,0.65) !important;
         }
         .cs-glass button { -webkit-tap-highlight-color: transparent; }
