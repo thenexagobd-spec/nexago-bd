@@ -1479,17 +1479,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         .cs-glass main::-webkit-scrollbar { width: 8px; }
         .cs-glass main::-webkit-scrollbar-thumb { background: rgba(6,78,59,0.18); border-radius: 8px; }
         .cs-glass .glass-bar, .cs-glass aside {
-          background: rgba(255,255,255,0.72) !important;
-          backdrop-filter: blur(20px) saturate(180%);
-          -webkit-backdrop-filter: blur(20px) saturate(180%);
-          border-color: rgba(255,255,255,0.7) !important;
+          background: rgba(255,255,255,0.65) !important;
+          backdrop-filter: blur(18px) saturate(170%);
+          -webkit-backdrop-filter: blur(18px) saturate(170%);
+          border-color: rgba(255,255,255,0.6) !important;
           box-shadow: 0 4px 24px rgba(6,78,59,0.08);
         }
         .cs-glass aside {
-          border-right: 1px solid rgba(255,255,255,0.7) !important;
+          border-right: 1px solid rgba(255,255,255,0.6) !important;
         }
         .cs-glass main .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
-          background: rgba(255,255,255,0.58) !important;
+          background: rgba(255,255,255,0.65) !important;
           backdrop-filter: blur(18px) saturate(170%);
           -webkit-backdrop-filter: blur(18px) saturate(170%);
           border-color: rgba(255,255,255,0.55) !important;
