@@ -892,17 +892,22 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   };
 
   const handleUpdateQty = (productId: string, delta: number) => {
-    setCart(prev => prev.map(i => {
-      if (i.product.id === productId) {
-        const newQty = i.quantity + delta;
-        if (newQty > (i.product.stock || 99)) {
-          showToast(`Max stock for ${i.product.name} reached`, 'info');
-          return i;
+    setCart(prev => {
+      const updated = prev.map(i => {
+        if (i.product.id === productId) {
+          const newQty = i.quantity + delta;
+          if (newQty > (i.product.stock || 99)) {
+            showToast(`Max stock for ${i.product.name} reached`, 'info');
+            return i;
+          }
+          return { ...i, quantity: newQty };
         }
-        return newQty > 0 ? { ...i, quantity: newQty } : i;
-      }
-      return i;
-    }));
+        return i;
+      });
+      const removed = updated.find(i => i.product.id === productId && i.quantity <= 0);
+      if (removed) showToast(`${removed.product.name} removed from cart`, 'info');
+      return updated.filter(i => i.quantity > 0);
+    });
   };
 
   const [customizeProd, setCustomizeProd] = useState<StoreProduct | null>(null);
@@ -2547,15 +2552,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <img src={selectedStore.image} alt={selectedStore.name} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-20" />
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 via-teal-800/20 to-teal-600/10" />
               <div className="absolute top-3 right-3 flex items-center space-x-2">
-                <button
-                  onClick={() => {
-                    const admin = stores.find(s => s.name.toLowerCase() === selectedStore.name.toLowerCase());
-                    onLaunchMerchantStore(admin ? admin.id : selectedStore.id);
-                  }}
-                  className="px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-xs text-gray-900 text-[11px] font-black hover:bg-white transition-colors cursor-pointer flex items-center space-x-1.5 shadow-md"
-                >
-                  <StoreIcon className="w-3.5 h-3.5 text-emerald-600" /><span>{T.merchantPortal}</span>
-                </button>
                 <button onClick={() => setSelectedStore(null)} className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer transition-colors">
                   <X className="w-4 h-4" />
                 </button>
