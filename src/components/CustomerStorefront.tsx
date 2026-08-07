@@ -1523,7 +1523,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       `}</style>
       {/* HEADER */}
       <header className="glass-bar bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
-        <div className="max-w-[1500px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-2">
+        <div className="max-w-[1500px] mx-auto px-4 lg:px-6 h-16 flex items-center gap-2">
           <div className="flex items-center space-x-6 shrink-0">
             <div className="flex items-center space-x-1 mr-1">
               <button
