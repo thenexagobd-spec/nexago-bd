@@ -660,6 +660,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const [lang, setLang] = useState<Lang>(() => getStoredData(LS_KEYS.lang, 'en'));
   useEffect(() => setStoredData(LS_KEYS.lang, lang), [lang]);
+  const [dark, setDark] = useState<boolean>(() => getStoredData(LS_KEYS.dark, false));
+  useEffect(() => setStoredData(LS_KEYS.dark, dark), [dark]);
   const T = T_DICT[lang];
   const catLabel = (c: string) => (lang === 'bn' ? (CAT_BN[c] || c) : c);
   const statusLabel = (s: string) => (lang === 'bn' ? (STATUS_BN[s] || s) : s);
@@ -1510,7 +1512,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   ];
 
   return (
-    <div className="cs-glass min-h-screen font-sans text-gray-800 flex flex-col overflow-x-hidden">
+    <div className={`cs-glass min-h-screen font-sans text-gray-800 flex flex-col overflow-x-hidden ${dark ? 'cs-dark' : ''}`}>
       <style>{`
         html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-x: hidden; }
         .cs-glass { scrollbar-gutter: stable; }
@@ -1569,6 +1571,65 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           box-shadow: inset 0 -1px 0 rgba(255,255,255,0.5);
         }
         .cs-glass button { -webkit-tap-highlight-color: transparent; }
+
+        /* ===== DARK MODE ===== */
+        .cs-glass.cs-dark {
+          background:
+            radial-gradient(circle at 12% 5%, rgba(6,78,59,0.35), transparent 42%),
+            radial-gradient(circle at 88% 18%, rgba(13,148,136,0.28), transparent 45%),
+            radial-gradient(circle at 75% 85%, rgba(14,116,144,0.25), transparent 40%),
+            radial-gradient(circle at 25% 95%, rgba(30,64,175,0.25), transparent 45%),
+            #0f172a;
+          color: #e2e8f0;
+        }
+        .cs-glass.cs-dark html, .cs-glass.cs-dark body { color-scheme: dark; }
+        .cs-glass.cs-dark .glass-bar, .cs-glass.cs-dark aside, .cs-glass.cs-dark nav {
+          background: rgba(15,23,42,0.72) !important;
+          backdrop-filter: blur(26px) saturate(170%);
+          -webkit-backdrop-filter: blur(26px) saturate(170%);
+          border-color: rgba(148,163,184,0.18) !important;
+          box-shadow: 0 4px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        .cs-glass.cs-dark aside { border-right: 1px solid rgba(148,163,184,0.18) !important; }
+        .cs-glass.cs-dark main .bg-white:not(button):not(a):not(input):not(select):not(textarea),
+        .cs-glass.cs-dark .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea),
+        .cs-glass.cs-dark header .bg-white:not(button):not(a),
+        .cs-glass.cs-dark .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
+          background: rgba(30,41,59,0.72) !important;
+          backdrop-filter: blur(24px) saturate(170%);
+          -webkit-backdrop-filter: blur(24px) saturate(170%);
+          border-color: rgba(148,163,184,0.18) !important;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .cs-glass.cs-dark .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea) {
+          background: rgba(30,41,59,0.9) !important;
+          backdrop-filter: blur(34px) saturate(180%);
+          -webkit-backdrop-filter: blur(34px) saturate(180%);
+        }
+        .cs-glass.cs-dark main .bg-slate-50, .cs-glass.cs-dark main .bg-gray-50, .cs-glass.cs-dark main .bg-gray-100 {
+          background: rgba(30,41,59,0.55) !important;
+        }
+        .cs-glass.cs-dark main .bg-emerald-50, .cs-glass.cs-dark main .bg-emerald-50\/30 { background: rgba(6,78,59,0.4) !important; }
+        .cs-glass.cs-dark .border-gray-200, .cs-glass.cs-dark .border-gray-100, .cs-glass.cs-dark .border-gray-300, .cs-glass.cs-dark .border-gray-400 {
+          border-color: rgba(148,163,184,0.2) !important;
+        }
+        .cs-glass.cs-dark .text-gray-900, .cs-glass.cs-dark .text-gray-800, .cs-glass.cs-dark .text-gray-700, .cs-glass.cs-dark .text-gray-600 {
+          color: #e2e8f0 !important;
+        }
+        .cs-glass.cs-dark .text-gray-500, .cs-glass.cs-dark .text-gray-400, .cs-glass.cs-dark .text-gray-300 {
+          color: #94a3b8 !important;
+        }
+        .cs-glass.cs-dark input, .cs-glass.cs-dark select, .cs-glass.cs-dark textarea {
+          background: rgba(15,23,42,0.6) !important;
+          color: #e2e8f0 !important;
+          border-color: rgba(148,163,184,0.25) !important;
+        }
+        .cs-glass.cs-dark input::placeholder { color: #64748b; }
+        .cs-glass.cs-dark .bg-gray-100, .cs-glass.cs-dark .bg-gray-50 { background: rgba(30,41,59,0.5) !important; }
+        .cs-glass.cs-dark .bg-white\/90, .cs-glass.cs-dark .bg-white\/80, .cs-glass.cs-dark .bg-white\/70, .cs-glass.cs-dark .bg-white\/60, .cs-glass.cs-dark .bg-white\/40, .cs-glass.cs-dark .bg-white\/20, .cs-glass.cs-dark .bg-white\/10, .cs-glass.cs-dark .bg-white\/5 {
+          background: rgba(255,255,255,0.08) !important;
+        }
+        .cs-glass.cs-dark main::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); }
       `}</style>
       {/* HEADER */}
       <header className="glass-bar bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
@@ -2541,6 +2602,20 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div>
                 <h2 className="text-xl font-black text-gray-900 tracking-tight">Customer Account Settings</h2>
                 <p className="text-xs text-gray-500 mt-0.5">Update personal details and notification preferences</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="font-bold text-gray-800 flex items-center space-x-2">
+                    <span className="text-base">{dark ? '🌙' : '☀️'}</span><span>{dark ? 'Dark Mode' : 'Light Mode'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setDark(!dark); showToast(dark ? 'Light mode enabled' : 'Dark mode enabled', 'success'); }}
+                    className={`relative w-12 h-7 rounded-full transition-colors cursor-pointer ${dark ? 'bg-emerald-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all ${dark ? 'left-[22px]' : 'left-0.5'}`} />
+                  </button>
+                </label>
               </div>
               <form onSubmit={(e) => { e.preventDefault(); setCustomerProfile({ ...customerProfile, name: customerProfile.name, email: customerProfile.email }); showToast('Account settings updated successfully!', 'success'); }} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
                 <div>
