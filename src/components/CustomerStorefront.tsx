@@ -6,7 +6,8 @@ import {
   ShieldCheck, Home, Package, Map, Phone, Copy, Check, RefreshCw,
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
-  MessageCircle, BellPlus, Share2, LocateFixed, CalendarClock, AlertCircle, Link2
+  MessageCircle, BellPlus, Share2, LocateFixed, CalendarClock, AlertCircle, Link2,
+  SlidersHorizontal
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product } from '../types';
@@ -730,7 +731,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [favoriteStoreIds, setFavoriteStoreIds] = useState<string[]>(() => getStoredData(LS_KEYS.favs, ['S1', 'S3']));
   useEffect(() => setStoredData(LS_KEYS.favs, favoriteStoreIds), [favoriteStoreIds]);
 
-  const [cart, setCart] = useState<Array<{ product: StoreProduct; quantity: number }>>(() => getStoredData(LS_KEYS.cart, []));
+  const [cart, setCart] = useState<Array<{ product: StoreProduct; quantity: number; note?: string }>>(() => getStoredData(LS_KEYS.cart, []));
   useEffect(() => setStoredData(LS_KEYS.cart, cart), [cart]);
 
   const [selectedStore, setSelectedStore] = useState<StoreDef | null>(null);
@@ -902,6 +903,42 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       }
       return i;
     }));
+  };
+
+  const [customizeProd, setCustomizeProd] = useState<StoreProduct | null>(null);
+  const [customizeQty, setCustomizeQty] = useState(1);
+  const [customizeNote, setCustomizeNote] = useState('');
+  const [customizeExtra, setCustomizeExtra] = useState(false);
+
+  const openCustomize = (prod: StoreProduct) => {
+    setCustomizeProd(prod);
+    setCustomizeQty(1);
+    setCustomizeNote('');
+    setCustomizeExtra(false);
+  };
+
+  const handleCustomizeAdd = () => {
+    if (!customizeProd) return;
+    if (customizeProd.status === 'Out of Stock') {
+      showToast(`${customizeProd.name} is out of stock`, 'info');
+      return;
+    }
+    if (cart.length > 0 && storeOfProduct(cart[0].product.id) && storeOfProduct(cart[0].product.id) !== storeOfProduct(customizeProd.id)) {
+      showToast('One store per order — complete your current order before adding from another store.', 'info');
+      return;
+    }
+    if (customizeQty > (customizeProd.stock || 99)) {
+      showToast(`Only ${customizeProd.stock} available in stock`, 'info');
+      return;
+    }
+    const note = [customizeExtra ? 'Extra portion' : '', customizeNote.trim()].filter(Boolean).join(' · ');
+    setCart(prev => {
+      const existing = prev.find(i => i.product.id === customizeProd.id);
+      if (existing) return prev.map(i => i.product.id === customizeProd.id ? { ...i, quantity: i.quantity + customizeQty, note: note || i.note } : i);
+      return [...prev, { product: customizeProd, quantity: customizeQty, note: note || undefined }];
+    });
+    showToast(`${customizeProd.name} customized & added to cart`, 'success');
+    setCustomizeProd(null);
   };
 
   const handleApplyCouponCode = (codeToApply?: string) => {
@@ -2303,17 +2340,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </div>
 
               {/* Referral program */}
-              <div className="bg-gradient-to-r from-indigo-700 to-violet-800 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/10" />
+                <div className="absolute -bottom-8 -left-6 w-40 h-40 rounded-full bg-emerald-300/20" />
                 <div className="space-y-4 relative">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center"><ShieldCheck className="w-5 h-5 text-emerald-300" /></div>
+                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center"><ShieldCheck className="w-5 h-5 text-emerald-200" /></div>
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-wider">Secure Wallet</h3>
-                      <p className="text-[11px] text-indigo-200">Every transaction is protected. Add money with bKash, Nagad or Card and pay in one tap.</p>
+                      <p className="text-[11px] text-emerald-100">Every transaction is protected. Add money with bKash, Nagad or Card and pay in one tap.</p>
                     </div>
                   </div>
-                  <p className="text-[11px] text-indigo-200/80">Your balance is safe with Smart Shop. Order payments and cashback update instantly in your transaction history.</p>
+                  <p className="text-[11px] text-emerald-100/80">Your balance is safe with Smart Shop. Order payments and cashback update instantly in your transaction history.</p>
                 </div>
               </div>
             </div>
@@ -2432,8 +2470,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       {selectedStore && (
         <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-6xl w-full shadow-2xl border border-gray-200 overflow-hidden sm:my-8 max-h-[92vh] flex flex-col">
-            <div className="relative h-32 sm:h-40 bg-gradient-to-r from-emerald-700 to-teal-800 shrink-0">
-              <img src={selectedStore.image} alt={selectedStore.name} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-45" />
+            <div className="relative h-32 sm:h-40 bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-500 shrink-0">
+              <img src={selectedStore.image} alt={selectedStore.name} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-20" />
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 via-teal-800/20 to-teal-600/10" />
               <div className="absolute top-3 right-3 flex items-center space-x-2">
                 <button
                   onClick={() => {
@@ -2524,16 +2563,27 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               </div>
                               {prod.status === 'Out of Stock' ? (
                                 <span className="text-[10px] font-bold text-gray-400 px-3 py-1.5">Unavailable</span>
-                              ) : inCart ? (
-                                <div className="flex items-center space-x-2 bg-green-600 text-white rounded-lg px-2 py-1">
-                                  <button onClick={() => handleUpdateQty(prod.id, -1)} className="text-white hover:text-green-200 cursor-pointer"><Minus className="w-3 h-3" /></button>
-                                  <span className="font-mono font-bold text-xs w-4 text-center">{inCart.quantity}</span>
-                                  <button onClick={() => handleAddToCart(prod)} className="text-white hover:text-green-200 cursor-pointer"><Plus className="w-3 h-3" /></button>
-                                </div>
                               ) : (
-                                <button onClick={() => handleAddToCart(prod)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
-                                  <Plus className="w-3 h-3" /><span>Add</span>
-                                </button>
+                                <div className="flex items-center space-x-1.5 shrink-0">
+                                  {inCart ? (
+                                    <div className="flex items-center space-x-2 bg-green-600 text-white rounded-lg px-2 py-1">
+                                      <button onClick={() => handleUpdateQty(prod.id, -1)} className="text-white hover:text-green-200 cursor-pointer"><Minus className="w-3 h-3" /></button>
+                                      <span className="font-mono font-bold text-xs w-4 text-center">{inCart.quantity}</span>
+                                      <button onClick={() => handleAddToCart(prod)} className="text-white hover:text-green-200 cursor-pointer"><Plus className="w-3 h-3" /></button>
+                                    </div>
+                                  ) : (
+                                    <button onClick={() => handleAddToCart(prod)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
+                                      <Plus className="w-3 h-3" /><span>Add</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => openCustomize(prod)}
+                                    title="Customize this item"
+                                    className="px-2 py-1.5 border border-emerald-600 text-emerald-700 bg-white text-[10px] font-bold rounded-lg hover:bg-emerald-50 transition-all cursor-pointer flex items-center space-x-1 shrink-0"
+                                  >
+                                    <SlidersHorizontal className="w-3 h-3" /><span>Customize</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -2558,6 +2608,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         <div key={item.product.id} className="pt-2 flex items-center justify-between text-xs">
                           <div className="flex-1 pr-2">
                             <span className="font-bold text-gray-900 block">{item.product.name}</span>
+                            {item.note && <span className="text-[9px] text-amber-600 font-bold block truncate">✎ {item.note}</span>}
                             <span className="text-[10px] text-gray-500">৳{item.product.price} / {item.product.unit}</span>
                           </div>
                           <div className="flex items-center space-x-2 shrink-0">
@@ -2579,7 +2630,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <input type="text" value={couponInput} onChange={(e) => setCouponInput(e.target.value)} placeholder={T.couponCode}
                         className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs font-mono uppercase outline-none focus:border-emerald-500" />
                     </div>
-                    <button type="button" onClick={() => handleApplyCouponCode()} className="px-3.5 py-2 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-black transition-colors cursor-pointer">{T.apply}</button>
+                    <button type="button" onClick={() => handleApplyCouponCode()} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer">{T.apply}</button>
                   </div>
                   {!appliedCoupon && (() => {
                     const best = COUPONS.filter(c => cartSubtotal >= c.minOrder && c.code !== 'SMARTSHOP').sort((a, b) => (b.discountValue || 0) - (a.discountValue || 0))[0];
@@ -2986,7 +3037,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button onClick={() => setChatOrderId(trackingOrder.id)} className="p-2 bg-gray-900 text-white rounded-lg hover:bg-black cursor-pointer" title="Chat with rider">
+                  <button onClick={() => setChatOrderId(trackingOrder.id)} className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer" title="Chat with rider">
                     <MessageCircle className="w-4 h-4" />
                   </button>
                   <button onClick={() => showToast(`${T.callDriver} ${trackingDriver.name}`, 'info')} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 cursor-pointer">
@@ -3011,7 +3062,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             )}
 
             <div className="flex space-x-2">
-              <button onClick={() => setTrackingOrder(null)} className="flex-1 py-2.5 bg-gray-900 text-white font-bold text-xs rounded-xl hover:bg-black transition-colors cursor-pointer">
+              <button onClick={() => setTrackingOrder(null)} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer">
                 {T.closeTracking}
               </button>
               <button onClick={() => { setReportOrder(trackingOrder); setReportReason('Wrong item received'); setReportNote(''); }} className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5">
@@ -3243,6 +3294,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <img src={item.product.image} alt={item.product.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-gray-900 truncate">{item.product.name}</p>
+                      {item.note && <p className="text-[9px] text-amber-600 font-bold truncate mt-0.5">✎ {item.note}</p>}
                       <p className="text-[10px] text-gray-500">৳{item.product.price} / {item.product.unit}</p>
                       <div className="flex items-center space-x-1.5 mt-1 border border-gray-300 rounded-lg bg-white w-fit px-1.5 py-0.5">
                         <button onClick={() => handleUpdateQty(item.product.id, -1)} className="text-gray-500 cursor-pointer"><Minus className="w-3 h-3" /></button>
@@ -3554,6 +3606,70 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ============ CUSTOMIZE PRODUCT MODAL ============ */}
+      {customizeProd && (
+        <div className="fixed inset-0 z-[86] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="relative h-40 bg-gray-100 shrink-0">
+              <img src={customizeProd.image} alt={customizeProd.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <button onClick={() => setCustomizeProd(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 text-gray-700 flex items-center justify-center hover:bg-white cursor-pointer shadow-md"><X className="w-4 h-4" /></button>
+              <div className="absolute bottom-3 left-4 right-4">
+                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${customizeProd.badgeColor || 'bg-emerald-600 text-white'}`}>{customizeProd.category}</span>
+                <h3 className="text-lg font-black text-white mt-1 leading-tight">{customizeProd.name}</h3>
+                <p className="text-xs text-white/90"><span className="font-mono font-black">৳{customizeProd.price}</span> / {customizeProd.unit}</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <p className="text-[11px] text-gray-500">{customizeProd.desc}</p>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">Quantity</label>
+                <div className="flex items-center space-x-3 border border-gray-300 rounded-xl w-fit px-2 py-1.5 bg-white">
+                  <button onClick={() => setCustomizeQty(q => Math.max(1, q - 1))} className="p-1 text-gray-600 hover:text-emerald-600 cursor-pointer"><Minus className="w-4 h-4" /></button>
+                  <span className="font-mono font-black text-sm text-gray-900 w-6 text-center">{customizeQty}</span>
+                  <button onClick={() => setCustomizeQty(q => Math.min(customizeProd.stock || 99, q + 1))} className="p-1 text-gray-600 hover:text-emerald-600 cursor-pointer"><Plus className="w-4 h-4" /></button>
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl p-3 cursor-pointer">
+                  <span className="flex items-center space-x-2 text-xs font-bold text-emerald-800">
+                    <Sparkles className="w-4 h-4 text-amber-500" /><span>Extra portion / add-ons</span>
+                  </span>
+                  <button onClick={() => setCustomizeExtra(e => !e)} className={`w-9 h-5 rounded-full transition-colors cursor-pointer ${customizeExtra ? 'bg-emerald-600' : 'bg-gray-300'}`}>
+                    <span className={`block w-4 h-4 rounded-full bg-white shadow transform transition-transform ${customizeExtra ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </button>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">Special instructions</label>
+                <textarea
+                  value={customizeNote}
+                  onChange={(e) => setCustomizeNote(e.target.value)}
+                  placeholder="e.g. less spicy, no onions, extra sauce…"
+                  rows={3}
+                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-xs text-gray-900 outline-none focus:border-emerald-500 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-sm bg-gray-50 border border-gray-200 rounded-xl p-3">
+                <span className="font-bold text-gray-700">Total ({customizeQty} × ৳{customizeProd.price})</span>
+                <span className="font-mono font-black text-emerald-700">৳{(customizeProd.price * customizeQty).toLocaleString()}</span>
+              </div>
+
+              <div className="space-y-2">
+                <button onClick={handleCustomizeAdd} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer">
+                  Add to Cart — ৳{(customizeProd.price * customizeQty).toLocaleString()}
+                </button>
+                <button onClick={() => setCustomizeProd(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.cancel}</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
