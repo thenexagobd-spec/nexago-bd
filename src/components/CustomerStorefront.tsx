@@ -1559,7 +1559,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 max-w-xl hidden md:flex items-center relative">
+          <div className="hidden md:flex items-center relative w-48 lg:w-72">
             <Search className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
             <input
               type="text"
