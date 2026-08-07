@@ -1516,11 +1516,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         }
         .cs-glass .bg-emerald-50, .cs-glass .bg-emerald-50\/30 { background: rgba(236,253,245,0.62) !important; }
         .cs-glass .fixed .bg-white:not(button):not(a):not(input):not(select):not(textarea):not(label) {
-          background: rgba(255,255,255,0.86) !important;
-          backdrop-filter: blur(32px) saturate(190%);
-          -webkit-backdrop-filter: blur(32px) saturate(190%);
-          border-color: rgba(255,255,255,0.6) !important;
-          box-shadow: 0 20px 60px rgba(2,44,34,0.16), inset 0 1px 0 rgba(255,255,255,0.88);
+          background: #ffffff !important;
+          backdrop-filter: none;
+          -webkit-backdrop-filter: none;
+          border-color: #e5e7eb !important;
+          box-shadow: 0 20px 60px rgba(2,44,34,0.16);
           border-radius: inherit;
         }
         .cs-glass header .bg-white:not(button):not(a) {
