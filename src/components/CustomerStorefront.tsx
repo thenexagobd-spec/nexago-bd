@@ -1654,26 +1654,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         </div>
       </header>
 
-      {/* SEARCH BAR — sticky below header */}
-      <div className="glass-bar bg-white border-b border-gray-200 sticky top-16 z-30 shadow-xs hidden md:flex items-center justify-center px-4 py-2">
-        <div className="relative w-full max-w-xl">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => { if (searchQuery) setActiveNav('Orders'); }}
-            placeholder={T.searchPlaceholder}
-            className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-gray-800 placeholder-gray-400 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* BODY */}
       <div className="max-w-[1500px] w-full mx-auto flex-1 flex pb-16 md:pb-0">
         {/* SIDEBAR */}
@@ -1778,6 +1758,29 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <button onClick={() => setBannerIdx((bannerIdx + 1) % BANNERS.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/25 text-white flex items-center justify-center hover:bg-black/40 cursor-pointer">
                   <ChevronRight className="w-4 h-4" />
                 </button>
+              </div>
+
+              {/* Search box — between banner & categories */}
+              <div className="relative max-w-xl mx-auto w-full -mt-3">
+                <div className="bg-white shadow-lg border border-gray-200/80 rounded-2xl flex items-center px-4 py-3 gap-3">
+                  <Search className="w-5 h-5 text-gray-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => { if (searchQuery) setActiveNav('Orders'); }}
+                    placeholder={T.searchPlaceholder}
+                    className="flex-1 bg-transparent text-sm font-medium text-gray-800 placeholder-gray-400 outline-none"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 cursor-pointer">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center space-x-1.5">
+                    <Search className="w-3.5 h-3.5" /><span>Search</span>
+                  </button>
+                </div>
               </div>
 
               {/* Category quick chips */}
