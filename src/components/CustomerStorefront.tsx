@@ -254,10 +254,10 @@ const STORE_DEFS: StoreDef[] = [
 const CATEGORIES = ['All', 'Grocery', 'Supermarket', 'Restaurant', 'Fast Food', 'Bakery', 'Pharmacy', 'Fruits & Veg', 'Meat & Fish'];
 
 const BANNERS = [
-  { emoji: '🛒', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-500 to-teal-600', cta: 'Shop Now' },
-  { emoji: '🍕', title: 'Free Delivery', sub: 'On all orders above ৳500', bg: 'from-orange-400 to-orange-600', cta: 'Order Food' },
-  { emoji: '💊', title: 'Medicine in 30 min', sub: 'MedPlus pharmacy now at your doorstep', bg: 'from-sky-500 to-blue-600', cta: 'Order Medicine' },
-  { emoji: '🥭', title: 'Fresh Fruits & Veg', sub: 'Farm-fresh daily from Fresh Valley', bg: 'from-green-500 to-emerald-600', cta: 'Buy Fresh' },
+  { emoji: '🛒', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-500 to-teal-500', cta: 'Shop Now' },
+  { emoji: '🍕', title: 'Free Delivery', sub: 'On all orders above ৳500', bg: 'from-orange-400 to-orange-400', cta: 'Order Food' },
+  { emoji: '💊', title: 'Medicine in 30 min', sub: 'MedPlus pharmacy now at your doorstep', bg: 'from-sky-500 to-sky-400', cta: 'Order Medicine' },
+  { emoji: '🥭', title: 'Fresh Fruits & Veg', sub: 'Farm-fresh daily from Fresh Valley', bg: 'from-green-500 to-emerald-400', cta: 'Buy Fresh' },
 ];
 
 const COUPONS = [
@@ -1767,6 +1767,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                   </div>
                 ))}
+                <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-white/85 via-white/40 to-transparent pointer-events-none" />
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-1.5">
                   {BANNERS.map((_, i) => (
                     <button key={i} onClick={() => setBannerIdx(i)} className={`h-1.5 rounded-full transition-all cursor-pointer ${i === bannerIdx ? 'w-5 bg-white' : 'w-1.5 bg-white/50'}`} />
@@ -1789,7 +1790,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       key={cat}
                       onClick={() => { setSelectedCategory(cat); setActiveNav('Orders'); }}
                       className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                        isSelected ? 'bg-green-600 text-white shadow-md shadow-green-600/20' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                        isSelected ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                       }`}
                     >
                       {cat}
@@ -1818,7 +1819,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <div>
                         <div className="relative h-24 overflow-hidden bg-gray-100">
                           <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                          <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/10 pointer-events-none" />
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
                           <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
                           <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
                             <Heart className={`w-3.5 h-3.5 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
@@ -1839,7 +1840,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         </div>
                       </div>
                       <div className="p-3 pt-0">
-                        <button onClick={() => openStore(store)} className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
+                        <button onClick={() => openStore(store)} className="w-full py-2 bg-emerald-400 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
                           Order Now
                         </button>
                       </div>
@@ -1997,7 +1998,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <div>
                         <div className="relative h-24 overflow-hidden bg-gray-100">
                           <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                          <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/10 pointer-events-none" />
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
                           <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
                           <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
                             <Heart className={`w-3.5 h-3.5 ${isFav ? 'text-red-500 fill-red-500' : ''}`} />
@@ -2025,7 +2026,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         </div>
                       </div>
                       <div className="p-3 pt-0">
-                        <button onClick={() => openStore(store)} className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
+                        <button onClick={() => openStore(store)} className="w-full py-2 bg-emerald-400 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-bold tracking-wide transition-all cursor-pointer shadow-xs active:scale-[0.98]">
                           Order Now
                         </button>
                       </div>
@@ -2583,7 +2584,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         <div key={prod.id} className={`border rounded-2xl overflow-hidden bg-white transition-all ${prod.status === 'Out of Stock' ? 'opacity-55 border-gray-200' : 'border-gray-200 hover:border-emerald-300 hover:shadow-md'}`}>
                           <div className="relative h-32 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
                             <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" loading="lazy" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/10 pointer-events-none" />
+                            <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
                             <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-black uppercase ${
                               prod.status === 'In Stock' ? 'bg-emerald-600 text-white' : prod.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'
                             }`}>{prod.status}</span>
@@ -2608,13 +2609,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               ) : (
                                 <div className="flex items-center space-x-1.5 shrink-0">
                                    {inCart ? (
-                                    <div className="flex items-center justify-center space-x-2 bg-green-600 text-white rounded-lg px-2 py-1 min-w-[80px]">
+                                    <div className="flex items-center justify-center space-x-2 bg-emerald-500 text-white rounded-lg px-2 py-1 min-w-[80px]">
                                       <button onClick={() => handleUpdateQty(prod.id, -1)} className="text-white hover:text-green-200 cursor-pointer"><Minus className="w-3 h-3" /></button>
                                       <span className="font-mono font-bold text-xs w-4 text-center">{inCart.quantity}</span>
                                       <button onClick={() => handleAddToCart(prod)} className="text-white hover:text-green-200 cursor-pointer"><Plus className="w-3 h-3" /></button>
                                     </div>
                                   ) : (
-                                    <button onClick={() => handleAddToCart(prod)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1 min-w-[80px]">
+                                    <button onClick={() => handleAddToCart(prod)} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1 min-w-[80px]">
                                       <Plus className="w-3 h-3" /><span>Add</span>
                                     </button>
                                   )}
