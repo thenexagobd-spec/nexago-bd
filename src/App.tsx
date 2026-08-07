@@ -249,6 +249,7 @@ export default function App() {
   const [storeKey, setStoreKey] = useState<string>(() => localStorage.getItem('sd_store_key') || 'nexago-main');
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'online' | 'offline'>('idle');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [profile, setProfile] = useState(() => getStoredData('sd_store_profile', { storeName: 'Smart Shop', storeSub: 'NexaGo BD Delivery', whatsapp: '' }));
   const apiBase = ((import.meta.env.VITE_RELAY_BASE as string) || window.location.origin).replace(/\/+$/, '');
   const storefrontUrl = `${apiBase}/store?key=${encodeURIComponent(storeKey)}`;
 
@@ -258,11 +259,19 @@ export default function App() {
     localStorage.setItem('sd_store_key', k);
   };
 
+  const handleProfileChange = (p: { storeName: string; storeSub: string; whatsapp: string }) => {
+    const next = { storeName: p.storeName.trim() || 'Smart Shop', storeSub: p.storeSub.trim() || 'NexaGo BD Delivery', whatsapp: p.whatsapp.trim() };
+    setProfile(next);
+    setStoredData('sd_store_profile', next);
+    showToast('Store branding saved — pushed to customer site', 'success');
+  };
+
   const pushState = async (silent = false) => {
     try {
       const payload = {
         version: 1,
         updatedAt: new Date().toISOString(),
+        profile,
         products,
         banners,
         orders,
@@ -1416,6 +1425,8 @@ export default function App() {
             storefrontUrl={storefrontUrl}
             syncState={syncState}
             lastSyncAt={lastSyncAt}
+            profile={profile}
+            onProfileChange={handleProfileChange}
             onPush={() => pushState(false)}
             onPull={pullState}
             onReset={handleResetCloud}

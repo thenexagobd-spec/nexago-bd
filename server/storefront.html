@@ -35,6 +35,9 @@
     width: 32px; height: 32px; border-radius: 9px; background: var(--orange);
     display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #fff;
   }
+  .brand-txt { display: flex; flex-direction: column; line-height: 1.15; }
+  .brand-txt .name { font-size: 15px; font-weight: 800; color: #fff; }
+  .brand-txt .sub { font-size: 9px; font-weight: 700; color: var(--orange); text-transform: uppercase; letter-spacing: .5px; }
   .live-pill {
     display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700;
     color: #34d399; background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.25);
@@ -126,8 +129,11 @@
 <header class="top">
   <div class="top-inner">
     <div class="brand">
-      <div class="logo">N</div>
-      <span id="storeName">NexaGo Live Store</span>
+      <div class="logo">S</div>
+      <div class="brand-txt">
+        <span class="name" id="storeName">Smart Shop</span>
+        <span class="sub" id="storeSub">NexaGo BD Delivery</span>
+      </div>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
       <span id="livePill" class="live-pill"><span class="dot"></span><span id="liveText">Connecting</span></span>
@@ -147,17 +153,29 @@
   </div>
 </div>
 
-<footer>© 2026 The NexaGo BD — Live Storefront. Prices shown in BDT (৳). Order via WhatsApp.</footer>
+<footer><span id="footerLine">Smart Shop</span> — © 2026 NexaGo BD Delivery. Prices shown in BDT (৳). Order via WhatsApp.</footer>
 <div id="toast" class="toast"></div>
 
 <script>
   var API_BASE = location.origin;
   var KEY = new URLSearchParams(location.search).get('key') || 'default';
-  var SHOP_WHATSAPP = ''; // optional fixed order number, e.g. '8801XXXXXXXXX'; leave blank to use banner link / copy
+  var SHOP_WHATSAPP = '';
   var seenImpressions = {};
   var slideIdx = 0;
   var timer = null;
   var data = null;
+
+  function applyProfile(profile) {
+    var p = profile || {};
+    var name = p.storeName || 'Smart Shop';
+    var sub = p.storeSub || 'NexaGo BD Delivery';
+    document.getElementById('storeName').textContent = name;
+    document.getElementById('storeSub').textContent = sub;
+    document.title = name + ' — ' + sub;
+    document.querySelector('.brand .logo').textContent = (name.trim().charAt(0) || 'S').toUpperCase();
+    document.getElementById('footerLine').textContent = name;
+    SHOP_WHATSAPP = p.whatsapp || '';
+  }
 
   function setLive(ok, text) {
     var pill = document.getElementById('livePill');
@@ -278,7 +296,7 @@
       .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
       .then(function (d) {
         data = d;
-        document.getElementById('storeName').textContent = 'NexaGo Live Store';
+        applyProfile(d.profile);
         setLive(true, 'Live');
         var upd = d.updatedAt ? new Date(d.updatedAt).toLocaleString() : 'never synced yet';
         document.getElementById('updatedLine').textContent = 'Live data · last synced ' + upd + (manual ? ' · refreshed now' : '');
@@ -294,7 +312,6 @@
 
   loadData(false);
   setInterval(function () { loadData(false); }, 30000);
-  document.title = 'NexaGo Live Store';
 </script>
 </body>
 </html>

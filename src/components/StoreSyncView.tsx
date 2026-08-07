@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { CloudUpload, DownloadCloud, RefreshCw, Copy, ExternalLink, Globe, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CloudUpload, DownloadCloud, RefreshCw, Copy, ExternalLink, Globe, Trash2, CheckCircle2, AlertTriangle, Store } from 'lucide-react';
 
 interface StoreSyncViewProps {
   storeKey: string;
@@ -12,6 +12,8 @@ interface StoreSyncViewProps {
   storefrontUrl: string;
   syncState: 'idle' | 'syncing' | 'online' | 'offline';
   lastSyncAt: string | null;
+  profile: { storeName: string; storeSub: string; whatsapp: string };
+  onProfileChange: (p: { storeName: string; storeSub: string; whatsapp: string }) => void;
   onPush: () => void;
   onPull: () => void;
   onReset: () => void;
@@ -24,12 +26,17 @@ export default function StoreSyncView({
   storefrontUrl,
   syncState,
   lastSyncAt,
+  profile,
+  onProfileChange,
   onPush,
   onPull,
   onReset,
   showToast
 }: StoreSyncViewProps) {
   const [copied, setCopied] = useState(false);
+  const [name, setName] = useState(profile.storeName);
+  const [sub, setSub] = useState(profile.storeSub);
+  const [whatsapp, setWhatsapp] = useState(profile.whatsapp);
 
   const statusMeta = {
     idle: { label: 'Not connected yet', cls: 'text-gray-400 bg-gray-600/10 border-gray-600/30', dot: 'bg-gray-400' },
@@ -158,6 +165,54 @@ export default function StoreSyncView({
             >
               <RefreshCw className="w-3.5 h-3.5 mr-1" /> Open storefront
             </a>
+          </div>
+        </div>
+
+        {/* Branding card */}
+        <div className="lg:col-span-2 bg-brand-card border border-brand-border rounded-xl p-5 space-y-4 shadow-sm">
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2 border-b border-brand-border/60 pb-2.5">
+            <Store className="w-4 h-4 text-brand-orange" />
+            <span>Store Branding (shown on customer site)</span>
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Store Name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Smart Shop"
+                className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Sub-brand / Tagline</label>
+              <input
+                value={sub}
+                onChange={(e) => setSub(e.target.value)}
+                placeholder="NexaGo BD Delivery"
+                className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">WhatsApp Order Number</label>
+              <input
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="8801XXXXXXXXX"
+                className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            The WhatsApp number powers the "Order via WhatsApp" buttons on the customer site. Leave blank to keep the buttons (message opens without a pre-filled shop number).
+          </p>
+          <div className="flex justify-end">
+            <button
+              onClick={() => onProfileChange({ storeName: name, storeSub: sub, whatsapp })}
+              className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[11px] font-bold cursor-pointer"
+            >
+              Save branding & publish
+            </button>
           </div>
         </div>
       </div>

@@ -94,11 +94,16 @@ function mergeState(stored, incoming) {
       };
     });
   }
+  if (incoming.profile && typeof incoming.profile === 'object') merged.profile = incoming.profile;
   return { version: 1, updatedAt: new Date().toISOString(), state: merged };
 }
 
 function storefrontView(state) {
   const now = new Date().toISOString().slice(0, 10);
+  const profile = Object.assign(
+    { storeName: 'Smart Shop', storeSub: 'NexaGo BD Delivery', whatsapp: '' },
+    (state.profile && typeof state.profile === 'object') ? state.profile : {}
+  );
   const banners = (Array.isArray(state.banners) ? state.banners : [])
     .filter((b) => b && b.status === 'Active' && (!b.startDate || b.startDate <= now) && (!b.endDate || b.endDate >= now))
     .map((b) => ({
@@ -131,7 +136,7 @@ function storefrontView(state) {
       tags: Array.isArray(p.tags) ? p.tags.filter(Boolean) : []
     }))
     .filter((p) => p.name);
-  return { banners, products };
+  return { profile, banners, products };
 }
 
 function readBody(req) {
