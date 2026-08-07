@@ -1559,23 +1559,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </div>
           </div>
 
-          <div className="hidden md:flex items-center relative w-48 lg:w-72">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => { if (searchQuery) setActiveNav('Orders'); }}
-              placeholder={T.searchPlaceholder}
-              className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-gray-800 placeholder-gray-400 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-3 text-gray-400 hover:text-gray-600">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
           <div className="flex items-center space-x-0.5 sm:space-x-2 shrink-0">
             <button
               onClick={() => setActiveNav('Wallet')}
@@ -1670,6 +1653,26 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           </div>
         </div>
       </header>
+
+      {/* SEARCH BAR — sticky below header */}
+      <div className="glass-bar bg-white border-b border-gray-200 sticky top-16 z-30 shadow-xs hidden md:flex items-center justify-center px-4 py-2">
+        <div className="relative w-full max-w-xl">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => { if (searchQuery) setActiveNav('Orders'); }}
+            placeholder={T.searchPlaceholder}
+            className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-gray-800 placeholder-gray-400 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* BODY */}
       <div className="max-w-[1500px] w-full mx-auto flex-1 flex pb-16 md:pb-0">
