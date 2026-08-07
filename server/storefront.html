@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NexaGo Live Store</title>
+<style>
+  :root {
+    --orange: #f97316;
+    --orange-h: #ea580c;
+    --dark: #080e17;
+    --card: #0c1624;
+    --border: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+  header.top {
+    position: sticky; top: 0; z-index: 40;
+    background: rgba(8,14,23,.9); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .top-inner {
+    max-width: 1100px; margin: 0 auto; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px; }
+  .brand .logo {
+    width: 32px; height: 32px; border-radius: 9px; background: var(--orange);
+    display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #fff;
+  }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700;
+    color: #34d399; background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.25);
+    padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: .5px;
+  }
+  .live-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: #34d399; animation: pulse 1.4s infinite; }
+  .live-pill.offline { color: #f87171; background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.25); }
+  .live-pill.offline .dot { background: #f87171; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .refresh-btn {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    font-size: 11px; font-weight: 700; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  }
+  .refresh-btn:hover { border-color: var(--orange); color: var(--orange); }
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  .updated { font-size: 10px; color: var(--muted); margin-bottom: 14px; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 13px; }
+
+  /* Banner carousel */
+  .carousel { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 28px; background: var(--card); }
+  .slides { position: relative; min-height: 200px; }
+  .slide { position: absolute; inset: 0; display: none; }
+  .slide.active { display: block; }
+  .slide img, .slide video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .slide-media { width: 100%; height: 100%; position: relative; }
+  .slide-media img, .slide-media video { min-height: 200px; max-height: 320px; }
+  .slide-content {
+    position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 22px; background: linear-gradient(180deg, transparent 20%, rgba(2,6,12,.88) 90%);
+  }
+  .slide-content .coupon {
+    display: inline-block; background: rgba(249,115,22,.15); border: 1px dashed var(--orange);
+    color: var(--orange); font-size: 10px; font-weight: 800; letter-spacing: 1px;
+    padding: 3px 9px; border-radius: 6px; margin-bottom: 8px; width: fit-content;
+  }
+  .slide-content h2 { font-size: 22px; font-weight: 800; color: #fff; line-height: 1.2; }
+  .slide-content p { font-size: 12px; color: #cbd5e1; margin-top: 4px; max-width: 560px; }
+  .slide-cta {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; width: fit-content;
+    background: var(--orange); color: #fff; font-size: 12px; font-weight: 700;
+    padding: 9px 16px; border-radius: 9px; text-decoration: none;
+  }
+  .slide-cta:hover { background: var(--orange-h); }
+  .dots { position: absolute; bottom: 12px; right: 14px; display: flex; gap: 6px; z-index: 5; }
+  .dots button { width: 8px; height: 8px; border-radius: 50%; border: none; background: rgba(255,255,255,.35); cursor: pointer; }
+  .dots button.active { background: var(--orange); }
+
+  /* Products */
+  .section-title { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+  .section-sub { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .card .img { height: 140px; background: #0a1524; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .card .img img { width: 100%; height: 100%; object-fit: cover; }
+  .card .img .ph { color: #334155; font-size: 11px; font-weight: 700; }
+  .card .body { padding: 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .card .cat { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--orange); }
+  .card h3 { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.3; }
+  .card .desc { font-size: 10px; color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tags span { font-size: 9px; font-weight: 600; color: #5eead4; background: rgba(20,184,166,.1); border: 1px solid rgba(20,184,166,.2); padding: 2px 6px; border-radius: 5px; }
+  .stock-line { font-size: 10px; font-weight: 700; }
+  .stock-line.ok { color: #34d399; }
+  .stock-line.low { color: #fbbf24; }
+  .stock-line.out { color: #f87171; }
+  .price-row { display: flex; align-items: baseline; gap: 8px; margin-top: auto; }
+  .price { font-size: 16px; font-weight: 800; color: var(--orange); }
+  .mrp { font-size: 11px; color: #64748b; text-decoration: line-through; }
+  .order-btn {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    background: #16a34a; color: #fff; font-size: 11px; font-weight: 800;
+    padding: 9px; border-radius: 9px; text-decoration: none; margin-top: 10px;
+  }
+  .order-btn:hover { background: #15803d; }
+  .order-btn.off { background: #334155; pointer-events: none; }
+
+  footer { border-top: 1px solid var(--border); padding: 18px; text-align: center; font-size: 10px; color: #64748b; }
+  .toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: #0f1c2e; border: 1px solid var(--border); color: #fff; font-size: 12px;
+    padding: 10px 16px; border-radius: 10px; display: none; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+  @media (max-width: 560px) {
+    .slide-content h2 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="logo">N</div>
+      <span id="storeName">NexaGo Live Store</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span id="livePill" class="live-pill"><span class="dot"></span><span id="liveText">Connecting</span></span>
+      <button class="refresh-btn" onclick="loadData(true)">Refresh</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <p class="updated" id="updatedLine">Loading live catalog…</p>
+  <div id="carousel" class="carousel" style="display:none;"></div>
+  <h2 class="section-title">Fresh Groceries & Essentials</h2>
+  <p class="section-sub" id="productCount">—</p>
+  <div id="products" class="grid"></div>
+  <div id="emptyBox" class="empty" style="display:none;">
+    No products published yet. Use the admin panel &gt; Products to add items, then hit "Sync" — they appear here instantly.
+  </div>
+</div>
+
+<footer>© 2026 The NexaGo BD — Live Storefront. Prices shown in BDT (৳). Order via WhatsApp.</footer>
+<div id="toast" class="toast"></div>
+
+<script>
+  var API_BASE = location.origin;
+  var KEY = new URLSearchParams(location.search).get('key') || 'default';
+  var SHOP_WHATSAPP = ''; // optional fixed order number, e.g. '8801XXXXXXXXX'; leave blank to use banner link / copy
+  var seenImpressions = {};
+  var slideIdx = 0;
+  var timer = null;
+  var data = null;
+
+  function setLive(ok, text) {
+    var pill = document.getElementById('livePill');
+    pill.className = 'live-pill' + (ok ? '' : ' offline');
+    document.getElementById('liveText').textContent = text || (ok ? 'Live' : 'Offline');
+  }
+
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { t.style.display = 'none'; }, 2200);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function trackEvent(type, bannerId) {
+    try {
+      fetch(API_BASE + '/api/events?key=' + encodeURIComponent(KEY), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: type, bannerId: bannerId })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function showSlide(i) {
+    var slides = document.querySelectorAll('.slide');
+    var dots = document.querySelectorAll('.dots button');
+    if (!slides.length) return;
+    slideIdx = (i + slides.length) % slides.length;
+    slides.forEach(function (s, k) { s.classList.toggle('active', k === slideIdx); });
+    dots.forEach(function (d, k) { d.classList.toggle('active', k === slideIdx); });
+    var b = data.banners[slideIdx];
+    if (b && !seenImpressions[b.id]) { seenImpressions[b.id] = true; trackEvent('banner-impression', b.id); }
+    var media = slides[slideIdx].querySelector('video');
+    document.querySelectorAll('.slide video').forEach(function (v) { v.pause(); });
+    if (media) { try { media.play().catch(function () {}); } catch (e) {} }
+  }
+
+  function renderBanners(banners) {
+    var wrap = document.getElementById('carousel');
+    if (!banners.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    var html = '<div class="slides">' + banners.map(function (b, k) {
+      var media = b.mediaType === 'video' && b.media
+        ? '<video src="' + esc(b.media) + '" muted loop playsinline preload="metadata"></video>'
+        : '<img src="' + esc(b.media || b.imageUrl) + '" alt="' + esc(b.title) + '" loading="lazy" />';
+      return '<div class="slide' + (k === 0 ? ' active' : '') + '" data-idx="' + k + '">' +
+        '<div class="slide-media">' + media + '</div>' +
+        '<div class="slide-content">' +
+          (b.couponCode ? '<span class="coupon">COUPON: ' + esc(b.couponCode) + '</span>' : '') +
+          '<h2>' + esc(b.title) + '</h2>' +
+          (b.subtitle ? '<p>' + esc(b.subtitle) + '</p>' : '') +
+          '<a class="slide-cta" target="_blank" rel="noopener" href="' + esc(b.link || '#') + '">' + esc(b.ctaLabel || 'Shop Now') + ' →</a>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+    html += '<div class="dots">' + banners.map(function (_, k) {
+      return '<button class="' + (k === 0 ? 'active' : '') + '" onclick="showSlide(' + k + ')"></button>';
+    }).join('') + '</div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.slide-cta').forEach(function (a, k) {
+      a.addEventListener('click', function () { trackEvent('banner-click', banners[k].id); });
+    });
+    if (banners.length > 1) {
+      timer = setInterval(function () { showSlide(slideIdx + 1); }, 5000);
+    }
+    showSlide(0);
+  }
+
+  function stockState(p) {
+    if (p.stock <= 0) return '<span class="stock-line out">Out of stock</span>';
+    if (p.stock <= 10) return '<span class="stock-line low">Only ' + p.stock + ' left</span>';
+    return '<span class="stock-line ok">In stock</span>';
+  }
+
+  function orderHref(p) {
+    var num = (SHOP_WHATSAPP || '').replace(/[^0-9]/g, '');
+    var msg = 'Hi! I want to order from NexaGo:\n* ' + p.name + ' × 1\n Price: ৳' + (p.promoPrice || p.price) + '\n Please confirm.';
+    if (num) return 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg);
+    return 'https://wa.me/?text=' + encodeURIComponent(msg);
+  }
+
+  function renderProducts(products) {
+    var box = document.getElementById('products');
+    var empty = document.getElementById('emptyBox');
+    document.getElementById('productCount').textContent = products.length + ' items — prices in BDT (৳)';
+    if (!products.length) { box.innerHTML = ''; empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    box.innerHTML = products.map(function (p) {
+      var img = p.image || (p.gallery && p.gallery[0]) || '';
+      var tags = (p.tags || []).slice(0, 3).map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('');
+      var price = Number(p.promoPrice || p.price || 0).toLocaleString('en-IN');
+      var mrp = p.promoPrice ? '<span class="mrp">৳' + Number(p.price || 0).toLocaleString('en-IN') + '</span>' : '';
+      var soldOut = p.stock <= 0;
+      return '<div class="card">' +
+        '<div class="img">' + (img ? '<img src="' + esc(img) + '" alt="' + esc(p.name) + '" loading="lazy" />' : '<span class="ph">NO IMAGE</span>') + '</div>' +
+        '<div class="body">' +
+          '<span class="cat">' + esc(p.category || 'General') + '</span>' +
+          '<h3>' + esc(p.name) + '</h3>' +
+          (p.description ? '<p class="desc">' + esc(p.description) + '</p>' : '') +
+          (tags ? '<div class="tags">' + tags + '</div>' : '') +
+          stockState(p) +
+          '<div class="price-row"><span class="price">৳' + price + '</span>' + mrp + '</div>' +
+          '<a class="order-btn' + (soldOut ? ' off' : '') + '" target="_blank" rel="noopener" href="' + (soldOut ? '#' : orderHref(p)) + '">WhatsApp Order</a>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function loadData(manual) {
+    fetch(API_BASE + '/api/storefront?key=' + encodeURIComponent(KEY))
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function (d) {
+        data = d;
+        document.getElementById('storeName').textContent = 'NexaGo Live Store';
+        setLive(true, 'Live');
+        var upd = d.updatedAt ? new Date(d.updatedAt).toLocaleString() : 'never synced yet';
+        document.getElementById('updatedLine').textContent = 'Live data · last synced ' + upd + (manual ? ' · refreshed now' : '');
+        if (timer) clearInterval(timer);
+        renderBanners(d.banners || []);
+        renderProducts(d.products || []);
+      })
+      .catch(function (e) {
+        setLive(false, 'Offline');
+        document.getElementById('updatedLine').textContent = 'Could not reach the live store server: ' + e.message;
+      });
+  }
+
+  loadData(false);
+  setInterval(function () { loadData(false); }, 30000);
+  document.title = 'NexaGo Live Store';
+</script>
+</body>
+</html>

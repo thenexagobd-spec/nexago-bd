@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Order, Driver, Zone, User, Payment, Vehicle, PromotionBanner, SupportTicket, SystemNotification, ChatLogEntry, OrderReportEntry, makeOrderId
@@ -36,6 +36,9 @@ import MobileAppSimulator from './components/MobileAppSimulator';
 import MFSBusinessView from './components/MFSBusinessView';
 import PosSystem from './components/PosSystem';
 import VehiclesView from './components/VehiclesView';
+import StoreSyncView from './components/StoreSyncView';
+import KpiDashboardView from './components/KpiDashboardView';
+import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
@@ -43,7 +46,7 @@ import {
   Check, Calendar, BellOff, Box, FolderOpen, Store, ClipboardList, Ticket,
   BarChart3, ShieldCheck, MapPin, Star, Megaphone, ShieldAlert, Award, Download,
   Copy, ExternalLink, Plus, Link, Search, Mail, Trash2, Edit, MessageSquare, CheckCircle, XCircle, Clock, ArrowRight, Sparkles, TrendingUp, Printer, Globe, ShoppingBag,
-  Camera, QrCode, Smartphone, Wallet
+  Camera, QrCode, Smartphone, Wallet, CloudUpload
 } from 'lucide-react';
 
 export default function App() {
@@ -241,6 +244,113 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  // ===== LIVE STOREFRONT & CLOUD SYNC =====
+  const [storeKey, setStoreKey] = useState<string>(() => localStorage.getItem('sd_store_key') || 'nexago-main');
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'online' | 'offline'>('idle');
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const apiBase = ((import.meta.env.VITE_RELAY_BASE as string) || window.location.origin).replace(/\/+$/, '');
+  const storefrontUrl = `${apiBase}/store?key=${encodeURIComponent(storeKey)}`;
+
+  const handleStoreKeyChange = (key: string) => {
+    const k = key.trim() || 'nexago-main';
+    setStoreKey(k);
+    localStorage.setItem('sd_store_key', k);
+  };
+
+  const pushState = async (silent = false) => {
+    try {
+      const payload = {
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        products,
+        banners,
+        orders,
+        notifications
+      };
+      const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('http ' + res.status);
+      setLastSyncAt(new Date().toISOString());
+      setSyncState('online');
+      if (!silent) showToast('Data synced to live storefront — customers can see updates now', 'success');
+    } catch {
+      setSyncState('offline');
+      if (!silent) showToast('Sync failed — check your internet or server status', 'info');
+    }
+  };
+
+  const pullState = async () => {
+    setSyncState('syncing');
+    try {
+      const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`);
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      if (data && data.state && data.state.updatedAt && (data.state.products || data.state.banners)) {
+        if (Array.isArray(data.state.products) && data.state.products.length) setProducts(data.state.products);
+        if (Array.isArray(data.state.banners) && data.state.banners.length) setBanners(data.state.banners);
+        if (Array.isArray(data.state.orders)) setOrders(data.state.orders);
+        if (Array.isArray(data.state.notifications)) setNotifications(data.state.notifications);
+        setLastSyncAt(data.state.updatedAt);
+        setSyncState('online');
+        showToast('Pulled the latest cloud data for this store', 'success');
+      } else {
+        setSyncState('online');
+        await pushState(true);
+        showToast('No cloud data yet — local data published to the live storefront', 'success');
+      }
+    } catch {
+      setSyncState('offline');
+      showToast('Could not reach the sync server', 'info');
+    }
+  };
+
+  const handleResetCloud = async () => {
+    try {
+      await fetch(`${apiBase}/api/reset?key=${encodeURIComponent(storeKey)}`, { method: 'POST' });
+      setLastSyncAt(null);
+      setSyncState('idle');
+      showToast('Cloud copy cleared for this store key', 'info');
+    } catch {
+      showToast('Reset failed — server unreachable', 'info');
+    }
+  };
+
+  // Auto-push local changes to the live storefront (debounced)
+  const firstSyncRun = useRef(true);
+  useEffect(() => {
+    if (firstSyncRun.current) { firstSyncRun.current = false; return; }
+    const t = setTimeout(() => { pushState(true); }, 1500);
+    return () => clearTimeout(t);
+  }, [products, banners, orders, notifications]);
+
+  // On first load: pull the published cloud state
+  useEffect(() => { pullState(); }, []);
+
+  // Expiry auto-waste: batch expired → auto Waste (runs on load + every 6 hours)
+  useEffect(() => {
+    const runWaste = () => {
+      const res = runExpiryAutoWaste(products);
+      if (res.wasted.length) {
+        setProducts(res.products);
+        const total = res.wasted.reduce((s, w) => s + w.qty, 0);
+        res.wasted.forEach(w => {
+          handleAddNotification({
+            title: 'Expired stock auto-wasted',
+            message: `"${w.batch.productName}" (batch ${w.batch.batchCode}) — ${w.qty} unit(s) expired on ${w.batch.expiry}, auto-moved to Waste.`,
+            type: 'system'
+          });
+        });
+        showToast(`${total} unit(s) expired → auto-wasted`, 'info');
+      }
+    };
+    runWaste();
+    const iv = setInterval(runWaste, 6 * 60 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, [products]);
 
   // HANDLERS
   // Orders
@@ -639,6 +749,7 @@ export default function App() {
       { name: 'Zones & Areas', icon: MapPin, badgeCount: zones.length },
       { name: 'Vehicles Management', icon: Truck },
       { name: 'Promotions & Banners', icon: Megaphone, badgeCount: banners.length },
+      { name: 'KPI Dashboard', icon: TrendingUp },
 
       // --- PREVIOUS GROCERY STORE & CATALOG ADMIN ---
       { section: 'Store & Catalog Admin', name: 'Store Dashboard', icon: Store },
@@ -650,6 +761,7 @@ export default function App() {
       { name: 'Reviews', icon: Star },
       { name: 'Coupons', icon: Ticket },
       { name: 'Customer Storefront', icon: Globe },
+      { name: 'Live Store Sync', icon: CloudUpload },
 
       // --- SYSTEM OPERATIONS & FINANCE ---
       { section: 'Finance & System', name: 'Payments', icon: CreditCard },
@@ -667,7 +779,7 @@ export default function App() {
       return allItems.filter(item => 
         [
           'Dashboard', 'Mobile App Simulator', 'Users Management', 'Drivers Management', 'Orders Management', 
-          'Earnings & Payouts', 'Zones & Areas', 'Vehicles Management', 'Promotions & Banners',
+          'Earnings & Payouts', 'Zones & Areas', 'Vehicles Management', 'Promotions & Banners', 'KPI Dashboard',
           'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'Settings'
         ].includes(item.name)
       ).map((item) => {
@@ -683,7 +795,7 @@ export default function App() {
       return allItems.filter(item => 
         [
           'Store Dashboard', 'Products', 'Categories', 'Inventory', 
-          'Stores & Merchants', 'Staff Management', 'Reviews', 'Coupons', 'Customer Storefront',
+          'Stores & Merchants', 'Staff Management', 'Reviews', 'Coupons', 'Customer Storefront', 'Live Store Sync',
           'Payments', 'MFS Business & Settlement', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'Settings'
         ].includes(item.name)
       ).map((item) => {
@@ -1268,40 +1380,35 @@ export default function App() {
           <PromoStudioView banners={banners} onBannersChange={setBanners} showToast={showToast} />
         );
 
+      case 'KPI Dashboard':
+        return (
+          <KpiDashboardView products={products} orders={orders} onNavigate={setActiveTab} />
+        );
+
+      case 'Live Store Sync':
+        return (
+          <StoreSyncView
+            storeKey={storeKey}
+            onStoreKeyChange={handleStoreKeyChange}
+            storefrontUrl={storefrontUrl}
+            syncState={syncState}
+            lastSyncAt={lastSyncAt}
+            onPush={() => pushState(false)}
+            onPull={pullState}
+            onReset={handleResetCloud}
+            showToast={showToast}
+          />
+        );
+
       case 'Notifications':
         return (
-          <div className="space-y-6 fade-in">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Broadcast System Notifications</h3>
-                <p className="text-xs text-gray-400">Dispatch push alerts to drivers, clients, and store managers</p>
-              </div>
-              <button 
-                onClick={() => showToast("Push notification transmitted to 1,240 active app users!", "success")}
-                className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
-              >
-                + Broadcast Push Alert
-              </button>
-            </div>
-            <div className="space-y-3">
-              {notifications.map(n => (
-                <div key={n.id} className="bg-brand-card border border-brand-border rounded-xl p-4 flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-white text-xs">{n.title}</span>
-                      <span className="text-[10px] text-gray-500 font-mono">{n.time}</span>
-                    </div>
-                    <p className="text-xs text-gray-300 mt-1">{n.message}</p>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase shrink-0 ${
-                    n.read ? 'bg-gray-800 text-gray-400' : 'bg-brand-orange/20 text-brand-orange'
-                  }`}>
-                    {n.read ? 'Read' : 'Unread'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <NotificationsView
+            notifications={notifications}
+            onAddNotification={handleAddNotification}
+            onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+            onClearAll={handleClearAllNotifications}
+            onToggleRead={(id) => setNotifications(notifications.map(n => n.id === id ? { ...n, read: !n.read } : n))}
+          />
         );
 
       case 'Reports & Analytics':

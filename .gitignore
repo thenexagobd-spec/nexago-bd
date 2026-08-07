@@ -9,4 +9,5 @@ coverage/
 cloudflared.exe
 server/.public-url
 server/*.log
+server/data/
 ws-*.cjs

@@ -12,17 +12,22 @@ interface NotificationsViewProps {
   onAddNotification: (notification: Omit<SystemNotification, 'id' | 'time' | 'read'>) => void;
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
+  onToggleRead?: (id: string) => void;
 }
 
 export default function NotificationsView({
   notifications,
   onAddNotification,
   onMarkAllAsRead,
-  onClearAll
+  onClearAll,
+  onToggleRead
 }: NotificationsViewProps) {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [type, setType] = useState<SystemNotification['type']>('system');
+  const [filter, setFilter] = useState<'all' | SystemNotification['type']>('all');
+
+  const filtered = filter === 'all' ? notifications : notifications.filter(n => n.type === filter);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +64,27 @@ export default function NotificationsView({
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-1.5 pb-1">
+          {(['all', 'order', 'system', 'driver', 'payment'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all cursor-pointer ${
+                filter === f
+                  ? 'bg-brand-orange text-white shadow'
+                  : 'bg-brand-dark border border-brand-border text-gray-400 hover:text-white'
+              }`}
+            >
+              {f === 'all' ? 'All' : f}
+              <span className="ml-1 opacity-70">
+                {f === 'all' ? notifications.length : notifications.filter(n => n.type === f).length}
+              </span>
+            </button>
+          ))}
+        </div>
+
         <div className="space-y-3">
-          {notifications.map((notif) => (
+          {filtered.map((notif) => (
             <div
               key={notif.id}
               className={`p-4 rounded-xl border flex items-start space-x-3.5 transition-all ${
@@ -84,6 +108,15 @@ export default function NotificationsView({
                   <span className="text-[9px] text-gray-500 font-mono">{notif.time}</span>
                 </div>
                 <p className="text-xs text-gray-300 leading-relaxed">{notif.message}</p>
+                {!notif.read && onToggleRead && (
+                  <button
+                    onClick={() => onToggleRead(notif.id)}
+                    className="mt-1 text-[10px] font-bold text-brand-orange hover:text-white transition-colors cursor-pointer inline-flex items-center space-x-1"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>Mark as read</span>
+                  </button>
+                )}
               </div>
 
               {!notif.read && (
@@ -92,9 +125,9 @@ export default function NotificationsView({
             </div>
           ))}
 
-          {notifications.length === 0 && (
+          {filtered.length === 0 && (
             <div className="py-12 text-center text-xs text-gray-400 bg-brand-card border border-brand-border rounded-xl">
-              All caught up! No system notifications to display.
+              {filter === 'all' ? 'All caught up! No system notifications to display.' : 'No ' + filter + ' notifications.'}
             </div>
           )}
         </div>
