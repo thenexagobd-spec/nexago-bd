@@ -600,11 +600,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
-  const [customerNotifs, setCustomerNotifs] = useState<CustomerNotif[]>(() => getStoredData(LS_KEYS.notifs, [
-    { id: 'CN-1', title: 'Order On The Way!', body: 'Your Fresh Mart order is assigned to a courier driver.', emoji: '🛵', time: '2m ago', read: false },
-    { id: 'CN-2', title: '৳100 Discount Voucher', body: 'Use code EID2024 on any store above ৳500.', emoji: '🎉', time: '1h ago', read: false },
-    { id: 'CN-3', title: 'MedPlus 30-min delivery', body: 'Essential medicines now at your doorstep.', emoji: '💊', time: '3h ago', read: true },
-  ]));
+  const [customerNotifs, setCustomerNotifs] = useState<CustomerNotif[]>(() => getStoredData(LS_KEYS.notifs, []));
   useEffect(() => setStoredData(LS_KEYS.notifs, customerNotifs), [customerNotifs]);
 
   const [totalSpend, setTotalSpend] = useState<number>(() => getStoredData(LS_KEYS.spend, 0));
@@ -650,9 +646,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [watchSnapshot, setWatchSnapshot] = useState<Record<string, { stock: number; price: number }>>(() => getStoredData(LS_KEYS.watchSnap, {}));
   useEffect(() => setStoredData(LS_KEYS.watchSnap, watchSnapshot), [watchSnapshot]);
 
-  // Referral
-  const [referralState, setReferralState] = useState(() => getStoredData(LS_KEYS.referral, { code: `NEXA-${['RAH', 'KAR', 'SMI', 'JAM', 'PRI', 'TAN'][Math.floor(Math.random() * 6)]}${Math.floor(1000 + Math.random() * 9000)}`, earned: 0, redeemed: 0 }));
-  useEffect(() => setStoredData(LS_KEYS.referral, referralState), [referralState]);
 
   const unreadNotifCount = customerNotifs.filter(n => !n.read).length;
   const tier = LOYALTY_TIERS.slice().reverse().find(t => totalSpend >= t.minSpend) || LOYALTY_TIERS[0];
@@ -734,23 +727,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [newPayType, setNewPayType] = useState<'bKash' | 'Nagad' | 'Card'>('bKash');
   const [newPayAccount, setNewPayAccount] = useState('');
 
-  const [walletBalance, setWalletBalance] = useState<number>(() => getStoredData(LS_KEYS.wallet, 1250));
+  const [walletBalance, setWalletBalance] = useState<number>(() => getStoredData(LS_KEYS.wallet, 0));
   useEffect(() => setStoredData(LS_KEYS.wallet, walletBalance), [walletBalance]);
   const [topUpAmount, setTopUpAmount] = useState<string>('500');
-  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>(() => getStoredData(LS_KEYS.wtxn, [
-    { id: 'TXN-901', type: 'Top-Up', amount: 1000, date: 'May 20, 2026', status: 'Completed' },
-    { id: 'TXN-902', type: 'Cashback', amount: 50, date: 'May 18, 2026', status: 'Completed' },
-    { id: 'TXN-903', type: 'Order Payment', amount: -480, date: 'May 15, 2026', status: 'Completed' }
-  ]));
+  const [walletTopUpMethod, setWalletTopUpMethod] = useState<'bKash' | 'Nagad' | 'Card'>('bKash');
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>(() => getStoredData(LS_KEYS.wtxn, []));
   useEffect(() => setStoredData(LS_KEYS.wtxn, walletTransactions), [walletTransactions]);
-  const [bankBalance, setBankBalance] = useState<number>(() => getStoredData('ss_bank', 15000));
-  useEffect(() => setStoredData('ss_bank', bankBalance), [bankBalance]);
   const [splitPinInput, setSplitPinInput] = useState('');
 
-  const [tickets, setTickets] = useState<SupportTicketItem[]>(() => getStoredData(LS_KEYS.tickets, [
-    { id: 'TCK-104', subject: 'Delay in Fresh Mart delivery', category: 'Order Delivery', status: 'In Progress', date: 'May 19, 2026', lastMessage: 'Agent is contacting the delivery partner.' },
-    { id: 'TCK-102', subject: 'bKash payment cashback query', category: 'Payment / Refund', status: 'Resolved', date: 'May 10, 2026', lastMessage: 'Cashback ৳50 credited to your wallet.' }
-  ]));
+  const [tickets, setTickets] = useState<SupportTicketItem[]>(() => getStoredData(LS_KEYS.tickets, []));
   useEffect(() => setStoredData(LS_KEYS.tickets, tickets), [tickets]);
   const [isNewTicketModal, setIsNewTicketModal] = useState(false);
   const [ticketCategory, setTicketCategory] = useState('Order Delivery');
@@ -833,9 +818,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setCouponInput('');
   };
 
+  const storeOfProduct = (pid: string) => syncedStores.find(s => s.catalog.some(c => c.id === pid))?.name || '';
+
   const handleAddToCart = (prod: StoreProduct) => {
     if (prod.status === 'Out of Stock') {
       showToast(`${prod.name} is out of stock`, 'info');
+      return;
+    }
+    if (cart.length > 0 && storeOfProduct(cart[0].product.id) && storeOfProduct(cart[0].product.id) !== storeOfProduct(prod.id)) {
+      showToast('One store per order — complete your current order before adding from another store.', 'info');
       return;
     }
     const inCart = cart.find(i => i.product.id === prod.id);
@@ -918,6 +909,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast('Your cart is empty. Add items to order!', 'info');
       return;
     }
+    const active = orders.some(o => o.status !== 'Completed' && o.status !== 'Cancelled');
+    if (active) {
+      showToast('You already have an active order — complete it before placing a new one.', 'info');
+      return;
+    }
     if (paymentMethod === 'bKash' || paymentMethod === 'Nagad' || paymentMethod === 'Card' || paymentMethod === 'Split (Wallet + bKash)') {
       setPayModal(paymentMethod);
       setPinInput('');
@@ -974,6 +970,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   };
 
   const reorder = (ord: Order) => {
+    if (orders.some(o => o.status !== 'Completed' && o.status !== 'Cancelled')) {
+      showToast('Complete your current order before re-ordering.', 'info');
+      return;
+    }
     const store = syncedStores.find(s => s.name === ord.storeName) || syncedStores[0];
     setSelectedStore(store);
     setStoreCat('All');
@@ -1059,17 +1059,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast(has ? 'Removed price-drop alert' : 'Price-drop alert set for this product', 'info');
       return next;
     });
-  };
-
-  const redeemReferral = () => {
-    setWalletBalance(prev => prev + 100);
-    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: 100, date: 'Just now', status: 'Completed' }, ...prev]);
-    setReferralState(s => ({ ...s, earned: s.earned + 100, redeemed: s.redeemed + 1 }));
-    setCustomerNotifs(prev => [{
-      id: `CN-${Date.now().toString().slice(-4)}`, title: '🎁 Referral Reward',
-      body: 'Your friend used your code — ৳100 cashback added to wallet!', emoji: '🎁', time: 'Just now', read: false
-    }, ...prev]);
-    showToast('Referral redeemed — ৳100 cashback added!', 'success');
   };
 
   // Watched product price-drop / restock alert monitor
@@ -1256,10 +1245,24 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  const locateMe = () => {
+    if (!('geolocation' in navigator)) {
+      showToast('Geolocation is not available on this device', 'info');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setDeliveryPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        showToast('Current location pinned — drag to fine-tune', 'success');
+      },
+      () => showToast('Could not fetch location — drag the pin to place it manually', 'info'),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
   const handleAddAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAddrStreet) return;
-    const newAddrObj: SavedAddress = {
+    if (!newAddrStreet) return;    const newAddrObj: SavedAddress = {
       id: `ADDR-${Date.now().toString().slice(-3)}`,
       title: newAddrTitle, address: newAddrStreet, area: newAddrArea, phone: newAddrPhone,
       isDefault: addresses.length === 0
@@ -1286,14 +1289,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     e.preventDefault();
     const num = parseFloat(topUpAmount);
     if (isNaN(num) || num <= 0) return;
-    if (num > bankBalance) {
-      showToast(`Insufficient bank balance — you have ৳${bankBalance.toLocaleString()}`, 'info');
-      return;
-    }
-    setBankBalance(prev => prev - num);
     setWalletBalance(prev => prev + num);
-    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Completed' }, ...prev]);
-    showToast(`Successfully added ৳${num} to your Smart Wallet!`, 'success');
+    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: `Add Money (${walletTopUpMethod})`, amount: num, date: 'Just now', status: 'Completed' }, ...prev]);
+    showToast(`৳${num} added to your wallet via ${walletTopUpMethod}!`, 'success');
   };
 
   const handleCreateTicketSubmit = (e: React.FormEvent) => {
@@ -1324,9 +1322,28 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans text-gray-800 flex flex-col">
+    <div className="cs-glass min-h-screen bg-gradient-to-br from-slate-100 via-emerald-50/60 to-slate-200 font-sans text-gray-800 flex flex-col">
+      <style>{`
+        .cs-glass .glass-bar, .cs-glass aside {
+          background: rgba(255,255,255,0.72) !important;
+          backdrop-filter: blur(18px) saturate(160%);
+          -webkit-backdrop-filter: blur(18px) saturate(160%);
+          border-color: rgba(255,255,255,0.65) !important;
+        }
+        .cs-glass main .bg-white {
+          background: rgba(255,255,255,0.62) !important;
+          backdrop-filter: blur(14px) saturate(150%);
+          -webkit-backdrop-filter: blur(14px) saturate(150%);
+          box-shadow: 0 8px 32px rgba(6,78,59,0.06);
+        }
+        .cs-glass main .bg-slate-50, .cs-glass main .bg-gray-50 {
+          background: rgba(255,255,255,0.45) !important;
+          backdrop-filter: blur(10px) saturate(140%);
+          -webkit-backdrop-filter: blur(10px) saturate(140%);
+        }
+      `}</style>
       {/* HEADER */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
+      <header className="glass-bar bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
         <div className="max-w-[1500px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center space-x-6 shrink-0">
             <div onClick={() => setActiveNav('Home')} className="flex items-center space-x-2.5 cursor-pointer">
@@ -2118,14 +2135,24 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <p className="text-3xl font-black font-mono">৳{walletBalance.toLocaleString()}</p>
                   <p className="text-[11px] text-emerald-100">Use instant wallet balance for 1-click order checkout!</p>
                 </div>
-                <div className="shrink-0 space-y-2">
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-xl text-[11px] text-emerald-100 flex items-center justify-between space-x-4">
-                    <span>Linked Bank (DBBL)</span>
-                    <b className="font-mono">৳{bankBalance.toLocaleString()}</b>
+                <div className="shrink-0 space-y-2 w-full sm:w-72">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200">Add Money</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['bKash', 'Nagad', 'Card'] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setWalletTopUpMethod(m)}
+                        className={`py-2 rounded-xl text-center font-black text-[10px] transition-all cursor-pointer ${
+                          walletTopUpMethod === m ? 'bg-emerald-500 text-white shadow-md' : 'bg-white/10 border border-white/20 text-emerald-100 hover:bg-white/20'
+                        }`}
+                      >
+                        {m === 'bKash' ? 'bKash' : m === 'Nagad' ? 'Nagad' : 'Card'}
+                      </button>
+                    ))}
                   </div>
                   <form onSubmit={handleWalletTopUp} className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl flex items-center space-x-2">
                     <input type="number" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} className="w-24 bg-white text-gray-900 font-mono font-bold text-xs p-2 rounded-xl outline-none" placeholder="Amount" />
-                    <button type="submit" className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer transition-colors">+ Top Up</button>
+                    <button type="submit" className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer transition-colors">+ Add Money</button>
                   </form>
                 </div>
               </div>
@@ -2155,33 +2182,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/10" />
                 <div className="space-y-4 relative">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center"><Share2 className="w-5 h-5" /></div>
+                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center"><ShieldCheck className="w-5 h-5 text-emerald-300" /></div>
                     <div>
-                      <h3 className="text-sm font-black uppercase tracking-wider">Refer & Earn</h3>
-                      <p className="text-[11px] text-indigo-200">Share your code — you & your friend both get ৳100 wallet cashback</p>
+                      <h3 className="text-sm font-black uppercase tracking-wider">Secure Wallet</h3>
+                      <p className="text-[11px] text-indigo-200">Every transaction is protected. Add money with bKash, Nagad or Card and pay in one tap.</p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 bg-white/15 border border-dashed border-white/30 rounded-xl px-4 py-3 font-mono font-black tracking-[0.2em] text-lg text-center select-all">
-                      {referralState.code}
-                    </div>
-                    <button
-                      onClick={() => { navigator.clipboard?.writeText(referralState.code); showToast('Referral code copied to clipboard!', 'success'); }}
-                      className="px-4 py-3 bg-white text-indigo-800 font-black text-xs rounded-xl shadow-md hover:bg-indigo-50 transition-colors cursor-pointer flex items-center space-x-1.5"
-                    >
-                      <Copy className="w-3.5 h-3.5" /><span>Copy</span>
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-indigo-200">Friends referred: <b className="text-white">{referralState.redeemed}</b></span>
-                    <span className="text-indigo-200">Earned: <b className="text-white font-mono">৳{referralState.earned}</b></span>
-                  </div>
-                  <button
-                    onClick={redeemReferral}
-                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-black rounded-xl transition-all cursor-pointer"
-                  >
-                    🎁 Simulate Friend Using My Code (+৳100)
-                  </button>
+                  <p className="text-[11px] text-indigo-200/80">Your balance is safe with Smart Shop. Order payments and cashback update instantly in your transaction history.</p>
                 </div>
               </div>
             </div>
@@ -2277,7 +2284,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 md:hidden grid grid-cols-5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/70 backdrop-blur-xl border-t border-white/70 md:hidden grid grid-cols-5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
         {[
           { key: 'Home' as const, label: 'Home', icon: <Home className="w-5 h-5" /> },
           { key: 'Orders' as const, label: 'Orders', icon: <Store className="w-5 h-5" /> },
@@ -2514,14 +2521,39 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     )}
                   </div>
 
-                  {/* Mini map for delivery pin */}
+                  {/* Delivery pin map — tap, drag, or use your current location */}
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1 flex items-center justify-between">
-                      <span className="flex items-center space-x-1"><LocateFixed className="w-3 h-3 text-emerald-600" /><span>📍 {T.deliveryAddress} {lang === 'bn' ? '(মানচিত্রে পিন দিন)' : '(tap the map)'}</span></span>
+                      <span className="flex items-center space-x-1"><LocateFixed className="w-3 h-3 text-emerald-600" /><span>📍 {T.deliveryAddress} {lang === 'bn' ? '(পিন দিন)' : '(pin your location)'}</span></span>
                       {deliveryPin && <button type="button" onClick={() => setDeliveryPin(null)} className="text-red-500 hover:underline font-bold">{T.cancel}</button>}
                     </label>
                     <div className="h-36 rounded-xl overflow-hidden border border-gray-200 relative z-0">
-                      <LeafletMap vehicles={[]} zoomTo={13} marker={deliveryPin} onMapClick={(lat, lng) => { setDeliveryPin({ lat, lng }); }} />
+                      <LeafletMap
+                        vehicles={[]}
+                        zoomTo={13}
+                        marker={deliveryPin}
+                        markerDraggable
+                        onMapClick={(lat, lng) => { setDeliveryPin({ lat, lng }); }}
+                        onMarkerDrag={(lat, lng) => setDeliveryPin({ lat, lng })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5 gap-2">
+                      <button
+                        type="button"
+                        onClick={locateMe}
+                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5"
+                      >
+                        <LocateFixed className="w-3.5 h-3.5" /><span>Use my current location</span>
+                      </button>
+                      {deliveryPin && (
+                        <button
+                          type="button"
+                          onClick={() => showToast('Delivery pin saved — it cannot change after the order completes.', 'success')}
+                          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600" /><span>Pin saved</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -2747,39 +2779,23 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <button onClick={() => setTrackingOrder(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
 
-            {/* Track via link — the public customer site shows shareable links instead of the admin live map */}
+            {/* Location links — store pickup + customer's pinned delivery point (no live driver location) */}
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider flex items-center space-x-1.5">
-                  <Navigation className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Track via Link</span>
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Pickup & Delivery</span>
                 </p>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black">
                   {trackProgress >= 1 ? T.delivered : `${etaMins} ${T.minsAway}`}
                 </span>
               </div>
-              {trackingDriver ? (
-                <>
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&origin=${pickupOfOrder(trackingOrder).lat},${pickupOfOrder(trackingOrder).lng}&destination=${areaOfOrder(trackingOrder).lat},${areaOfOrder(trackingOrder).lng}&waypoints=${trackVeh ? trackVeh.lat : trackingDriver.lat},${trackVeh ? trackVeh.lng : trackingDriver.lng}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full flex items-center justify-center space-x-2 py-2.5 bg-gray-900 text-white text-xs font-black rounded-xl hover:bg-black transition-colors"
-                  >
-                    <Navigation className="w-4 h-4 text-emerald-400" />
-                    <span>{trackProgress < 0.12 ? `Rider Arriving at ${trackingOrder.storeName} — tap to track` : `Track Rider (${trackingDriver.name}) — ${Math.round((1 - trackProgress) * 100)}% left`}</span>
-                  </a>
-                  <button
-                    onClick={() => { navigator.clipboard?.writeText(`https://www.google.com/maps/dir/?api=1&origin=${pickupOfOrder(trackingOrder).lat},${pickupOfOrder(trackingOrder).lng}&destination=${areaOfOrder(trackingOrder).lat},${areaOfOrder(trackingOrder).lng}&waypoints=${trackVeh ? trackVeh.lat : trackingDriver.lat},${trackVeh ? trackVeh.lng : trackingDriver.lng}`).then(() => showToast('Tracking link copied — share it to follow the rider live!', 'success')); }}
-                    className="w-full flex items-center justify-center space-x-2 py-2 border-2 border-dashed border-gray-300 text-gray-600 text-[10px] font-black rounded-xl hover:border-emerald-400 hover:text-emerald-700 transition-colors cursor-pointer"
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                    <span>Copy Tracking Link</span>
-                  </button>
-                </>
-              ) : (
-                <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-bold">
-                  ⚠️ No online rider — searching for nearest available courier...
+              {trackingDriver && (
+                <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-bold text-gray-700">
+                  <span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">{initialsOf(trackingDriver.name)}</span>
+                  <span>
+                    {T.courierDriver}: <b>{trackingDriver.name}</b> · {trackingDriver.vehicleType}
+                  </span>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">
@@ -2797,11 +2813,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   rel="noreferrer"
                   className="px-2 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-emerald-400 hover:text-emerald-700 flex items-center justify-center space-x-1 transition-colors"
                 >
-                  <MapPin className="w-3 h-3" /><span>Delivery Location</span>
+                  <MapPin className="w-3 h-3" /><span>My Delivery Pin</span>
                 </a>
               </div>
               <p className="text-[9px] text-gray-400 leading-relaxed">
-                Your rider's current position refreshes with each tap — the live fleet map is visible to the admin dashboard only.
+                Your rider's live position is visible to the admin dashboard only. You can always open the store or your pinned delivery point on Google Maps.
               </p>
             </div>
 
@@ -2840,7 +2856,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                   <div>
                     <p className="font-bold text-gray-900">{T.courierDriver}: {trackingDriver.name}</p>
-                    <p className="text-[10px] text-gray-500 font-mono">{trackingDriver.vehicleType}: {trackingDriver.id} · 📍 {trackVeh?.roadName || T.atStore}</p>
+                    <p className="text-[10px] text-gray-500 font-mono">{trackingDriver.vehicleType}: {trackingDriver.id} · {trackProgress < 0.12 ? 'At store — picking up your order' : 'En route to you'}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">

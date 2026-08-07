@@ -149,11 +149,13 @@ export function nearestRoad(lat: number, lng: number): { name: string; d: number
   return best || { name: 'Unknown Road', d: 1 };
 }
 
-export default function LeafletMap({ vehicles, zoomTo, onVehicleClick, trackingId, onMapClick, marker, pickup, dropoff, googleDots }: {
+export default function LeafletMap({ vehicles, zoomTo, onVehicleClick, trackingId, onMapClick, marker, pickup, dropoff, googleDots, markerDraggable, onMarkerDrag }: {
   vehicles: LiveVeh[]; zoomTo: number; onVehicleClick?: (id: string) => void; trackingId?: string | null;
   onMapClick?: (lat: number, lng: number) => void; marker?: { lat: number; lng: number } | null;
   pickup?: { lat: number; lng: number; label?: string } | null; dropoff?: { lat: number; lng: number; label?: string } | null;
   googleDots?: boolean;
+  markerDraggable?: boolean;
+  onMarkerDrag?: (lat: number, lng: number) => void;
 }) {
   const divRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -329,7 +331,13 @@ export default function LeafletMap({ vehicles, zoomTo, onVehicleClick, trackingI
         iconSize: [30, 40],
         iconAnchor: [15, 40],
       });
-      L.marker([marker.lat, marker.lng], { icon: pinIcon }).addTo(layer);
+      const mk = L.marker([marker.lat, marker.lng], { icon: pinIcon, draggable: !!markerDraggable }).addTo(layer);
+      if (markerDraggable && onMarkerDrag) {
+        mk.on('dragend', (e) => {
+          const ll = (e.target as L.Marker).getLatLng();
+          onMarkerDrag(ll.lat, ll.lng);
+        });
+      }
       if (!fittedRef.current || fittedRef.current.lat !== marker.lat || fittedRef.current.lng !== marker.lng) {
         if (mapRef.current) {
           mapRef.current.setView([marker.lat, marker.lng], 14, { animate: true });
