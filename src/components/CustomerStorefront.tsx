@@ -1655,24 +1655,56 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       </header>
 
       {/* SEARCH BAR — always visible below header */}
+      {(() => {
+        const q = searchQuery.toLowerCase().trim();
+        const suggestions = q ? syncedStores.flatMap(s => s.catalog.filter(p => p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)).map(p => ({ product: p, store: s }))).slice(0, 8) : [];
+        const showSuggest = q.length > 0;
+        return (
       <div className="glass-bar bg-white border-b border-gray-200 sticky top-16 z-30 shadow-xs flex items-center justify-center px-4 py-2.5">
         <div className="relative w-full max-w-xl">
           <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); if (activeNav !== 'Orders') setActiveNav('Orders'); }}
             onFocus={() => setActiveNav('Orders')}
             placeholder={T.searchPlaceholder}
             className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-10 pr-10 py-2 text-xs font-medium text-gray-800 placeholder-gray-400 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
           />
           {searchQuery && (
-            <button onClick={() => { setSearchQuery(''); setActiveNav('Orders'); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer">
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           )}
+          {showSuggest && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
+              {suggestions.length > 0 ? (
+                suggestions.map((s, i) => (
+                  <div
+                    key={`${s.product.id}-${i}`}
+                    onClick={() => {
+                      setSearchQuery(s.product.name);
+                      openStore(s.store);
+                    }}
+                    className="flex items-center space-x-3 px-4 py-2.5 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
+                  >
+                    <img src={s.product.image} alt={s.product.name} referrerPolicy="no-referrer" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">{s.product.name}</p>
+                      <p className="text-[10px] text-gray-500 truncate">{s.store.name} · {s.product.category}</p>
+                    </div>
+                    <span className="text-[11px] font-mono font-black text-emerald-700 shrink-0">৳{s.product.price}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="px-4 py-3 text-xs text-gray-400 text-center">No products found for "{q}"</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
+        );
+      })()}
 
       {/* BODY */}
       <div className="max-w-[1500px] w-full mx-auto flex-1 flex pb-16 md:pb-0">
