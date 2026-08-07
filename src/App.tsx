@@ -319,6 +319,29 @@ export default function App() {
     }
   };
 
+  const seedCloudIfEmpty = async () => {
+    setSyncState('syncing');
+    try {
+      const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`);
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      const hasCloud = data && data.state && (
+        (Array.isArray(data.state.products) && data.state.products.length) ||
+        (Array.isArray(data.state.banners) && data.state.banners.length) ||
+        (Array.isArray(data.state.orders) && data.state.orders.length)
+      );
+      if (hasCloud) {
+        setLastSyncAt(data.state.updatedAt || null);
+        setSyncState('online');
+      } else {
+        setSyncState('online');
+        await pushState(true);
+      }
+    } catch {
+      setSyncState('offline');
+    }
+  };
+
   // Auto-push local changes to the live storefront (debounced)
   const firstSyncRun = useRef(true);
   useEffect(() => {
@@ -327,8 +350,8 @@ export default function App() {
     return () => clearTimeout(t);
   }, [products, banners, orders, notifications]);
 
-  // On first load: pull the published cloud state
-  useEffect(() => { pullState(); }, []);
+  // On first load: seed the cloud with local data if the cloud is empty (local stays authoritative)
+  useEffect(() => { seedCloudIfEmpty(); }, []);
 
   // Expiry auto-waste: batch expired → auto Waste (runs on load + every 6 hours)
   useEffect(() => {
