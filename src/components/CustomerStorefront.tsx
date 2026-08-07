@@ -1577,11 +1577,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="relative">
               <button
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:bg-gray-100 rounded-xl transition-colors relative cursor-pointer"
               >
                 <Bell className="w-4 h-4" />
                 {unreadNotifCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[8px] font-black flex items-center justify-center border-2 border-white">{unreadNotifCount}</span>
+                  <span className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 px-0.5 bg-red-500 text-white rounded-full text-[8px] font-black flex items-center justify-center border-2 border-white">{unreadNotifCount}</span>
                 )}
               </button>
               {isNotifOpen && (
@@ -1620,7 +1620,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             >
               <ShoppingCart className="w-4 h-4" />
               {cartCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-600 text-white rounded-full text-[8px] font-black flex items-center justify-center border-2 border-white">{cartCount}</span>
+                 <span className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 px-0.5 bg-emerald-600 text-white rounded-full text-[8px] font-black flex items-center justify-center border-2 border-white">{cartCount}</span>
               )}
             </button>
 
