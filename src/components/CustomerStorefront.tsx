@@ -68,7 +68,7 @@ interface SupportTicketItem {
   id: string;
   subject: string;
   category: string;
-  status: 'Open' | 'Resolved' | 'In Progress';
+  status: 'Open' | 'Resolved' | 'In Progress' | 'Under Review';
   date: string;
   lastMessage: string;
 }
@@ -1060,6 +1060,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         setCustomerNotifs(prev => [{
           id: `CN-${Date.now().toString().slice(-4)}`, title: '⏸ Order on Hold',
           body: `Payment for order #${ord.id} needs re-verification — your order is on hold${ord.paymentNote ? ` (${ord.paymentNote})` : ''}.`, emoji: '⏸', time: 'Just now', read: false
+        }, ...prev]);
+        // Auto-open a support ticket so the customer sees it "Under Review" in Help & Support
+        setTickets(prev => [{
+          id: `TCK-${Math.floor(100 + Math.random() * 900)}`,
+          subject: `Payment under review — order #${ord.id}`,
+          category: 'Payment Issue',
+          status: 'Under Review',
+          date: 'Just now',
+          lastMessage: `Our team is re-verifying your ${ord.paymentMethod} payment for order #${ord.id}. You will be notified once it is confirmed.`
         }, ...prev]);
       }
     }
@@ -2974,7 +2983,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <div key={tck.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-xs font-bold text-gray-500">{tck.id}</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${tck.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{tck.status}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        tck.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' :
+                        tck.status === 'Under Review' ? 'bg-blue-100 text-blue-800' :
+                        'bg-amber-100 text-amber-800'
+                      }`}>{tck.status}</span>
                     </div>
                     <h4 className="font-bold text-xs text-gray-900">{tck.subject}</h4>
                     <p className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-xl border border-gray-100">"{tck.lastMessage}"</p>
