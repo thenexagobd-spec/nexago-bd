@@ -7,7 +7,7 @@ import {
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
   MessageCircle, Share2, LocateFixed, CalendarClock, AlertCircle, Link2,
-  Camera, Send
+  Camera, Send, Headphones, ScrollText, RefreshCcw
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
@@ -999,6 +999,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [tickets, setTickets] = useState<SupportTicketItem[]>(() => getStoredData(LS_KEYS.tickets, []));
   useEffect(() => setStoredData(LS_KEYS.tickets, tickets), [tickets]);
   const [isNewTicketModal, setIsNewTicketModal] = useState(false);
+  const [policyModal, setPolicyModal] = useState<'terms' | 'privacy' | 'refund' | null>(null);
   const [ticketCategory, setTicketCategory] = useState('Order Delivery');
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketDetail, setTicketDetail] = useState('');
@@ -2428,14 +2429,46 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   { icon: <Shield className="w-5 h-5" />, title: T.securePay, sub: T.securePaySub },
                   { icon: <Gift className="w-5 h-5" />, title: T.bestOffers, sub: T.bestOffersSub },
                 ].map((f, i) => (
-                  <div key={i} className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">{f.icon}</div>
+                  <div key={i} className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">{f.icon}</div>
                     <div>
-                      <h4 className="text-xs font-bold text-gray-900">{f.title}</h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">{f.sub}</p>
+                      <h4 className="text-xs font-bold text-white">{f.title}</h4>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{f.sub}</p>
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Quick links / policies strip */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                <a href="mailto:support@nexagobd.com" className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs hover:border-emerald-500/50 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Headphones className="w-5 h-5" /></div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">সাপোর্ট</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">support@nexagobd.com</p>
+                  </div>
+                </a>
+                <button onClick={() => setPolicyModal('terms')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><ScrollText className="w-5 h-5" /></div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">টার্মস অ্যান্ড কন্ডিশনস</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">আমাদের নিয়মাবলি</p>
+                  </div>
+                </button>
+                <button onClick={() => setPolicyModal('privacy')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Lock className="w-5 h-5" /></div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">প্রাইভেসি পলিসি</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">আপনার তথ্য সুরক্ষিত</p>
+                  </div>
+                </button>
+                <button onClick={() => setPolicyModal('refund')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><RefreshCcw className="w-5 h-5" /></div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">রিফান্ড পলিসি</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">ফুল রিফান্ড গ্যারান্টি</p>
+                  </div>
+                </button>
               </div>
             </div>
           )}
@@ -4023,6 +4056,48 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </div>
             <button type="submit" className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-md">Submit Ticket</button>
           </form>
+        </div>
+      )}
+
+      {/* ============ TERMS / PRIVACY / REFUND POLICY MODAL ============ */}
+      {policyModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPolicyModal(null)}>
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 text-xs" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2 mb-3">
+              <h3 className="font-black text-sm text-gray-900">
+                {policyModal === 'terms' ? 'টার্মস অ্যান্ড কন্ডিশনস' : policyModal === 'privacy' ? 'প্রাইভেসি পলিসি' : 'রিফান্ড পলিসি'}
+              </h3>
+              <button onClick={() => setPolicyModal(null)} className="cursor-pointer text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-3 text-gray-700 leading-relaxed max-h-80 overflow-y-auto pr-1">
+              {policyModal === 'terms' && (
+                <>
+                  <p>১. অর্ডার নিশ্চিত হওয়ার পর পণ্যের মূল্য ও ডেলিভারি চার্জ প্রযোজ্য থাকবে।</p>
+                  <p>২. ডেলিভারি সময় শহরভেদে ৩০–৬০ মিনিটের মধ্যে হয়ে থাকে।</p>
+                  <p>৩. পেমেন্ট অ্যাডমিন যাচাই করার পরই অর্ডার ডেলিভারির জন্য ট্র্যাকিং খুলবে।</p>
+                  <p>৪. অ্যাপের মাধ্যমে ঘোষিত যেকোনো অফার ও ডিল সময়সাপেক্ষ পরিবর্তন হতে পারে।</p>
+                  <p>৫. ডেলিভারি ঠিকানা সঠিক না হলে পুনরায় ডেলিভারি চার্জ প্রযোজ্য হবে।</p>
+                  <p>৬. যেকোনো অভিযোগের জন্য ৪৮ ঘণ্টার মধ্যে আমাদের সাপোর্ট টিমের সাথে যোগাযোগ করুন।</p>
+                </>
+              )}
+              {policyModal === 'privacy' && (
+                <>
+                  <p>১. আপনার ব্যক্তিগত তথ্য (নাম, ঠিকানা, ফোন) শুধুমাত্র ডেলিভারি ও অর্ডার পরিচালনার জন্য ব্যবহৃত হয়।</p>
+                  <p>২. পেমেন্ট তথ্য এনক্রিপ্টেড পেমেন্ট গেটওয়ের মাধ্যমে নিরাপদে প্রসেস হয়।</p>
+                  <p>৩. আপনার অনুমতি ছাড়া তৃতীয় পক্ষের সাথে তথ্য শেয়ার করা হয় না।</p>
+                  <p>৪. আপনি যেকোনো সময় আমাদের সাপোর্ট টিমের কাছে তথ্য মুছে ফেলার অনুরোধ করতে পারবেন।</p>
+                </>
+              )}
+              {policyModal === 'refund' && (
+                <>
+                  <p>১. পণ্য ডেলিভারি না হওয়া বা অর্ডার ক্যান্সেল হলে পূর্ণ অর্থ ফেরত দেওয়া হয়।</p>
+                  <p>২. রিফান্ড যাচাই হওয়ার পর ২৪–৪৮ ঘণ্টার মধ্যে আপনার ওয়ালেট বা পেমেন্ট মেথডে ফেরত যাবে।</p>
+                  <p>৩. ভুল পণ্য বা ক্ষতিগ্রস্ত পণ্য পেলে ডেলিভারির ৪৮ ঘণ্টার মধ্যে রিপোর্ট করুন।</p>
+                  <p>৪. রিফান্ড রিপোর্ট অ্যাডমিন যাচাইয়ের পর অনুমোদিত হয়।</p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
