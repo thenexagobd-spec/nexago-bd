@@ -2675,7 +2675,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           <p className="text-[10px] text-gray-600 font-medium flex items-center space-x-1">
                             <MapPin className="w-3 h-3 text-gray-400" /><span className="truncate">{ord.address || deliveryAddress}</span>
                           </p>
-                          {active && !held && (() => {
+                          {active && !held && ord.paymentStatus !== 'Pending' && (() => {
                             const drv = liveDriverOf(ord);
                             if (!drv) return null;
                             const prog = liveProgressOf(ord);
@@ -2695,6 +2695,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               </div>
                             );
                           })()}
+                          {active && !held && ord.paymentStatus === 'Pending' && (
+                            <p className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-2 py-1 mt-1 w-fit font-semibold">
+                              ⏳ Tracking opens once admin verifies & approves your payment.
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex items-center space-x-2 border-t md:border-t-0 md:border-l border-gray-100 pt-3 md:pt-0 md:pl-5 justify-between md:justify-end flex-wrap gap-y-1.5">
@@ -2712,7 +2717,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                                   <X className="w-3 h-3" /><span>{T.cancelOrder}</span>
                                 </button>
                               )}
-                              {!held && (
+                              {!held && ord.paymentStatus !== 'Pending' && (
                                 <button onClick={() => setTrackingOrder(ord)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs flex items-center space-x-1">
                                   <Navigation className="w-3 h-3" /><span>{T.trackDelivery}</span>
                                 </button>
