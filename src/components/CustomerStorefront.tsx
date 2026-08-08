@@ -2120,11 +2120,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 )}
               </button>
               {isNotifOpen && (
-                <div className="fixed top-16 right-2 z-[60] w-[min(22rem,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-gray-200 p-3 text-xs" style={{ backdropFilter: 'blur(0px)' }}>
-                  <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold">
-                    <span className="text-gray-900">{T.notifications}</span>
+                <div className="fixed top-16 right-2 z-[60] w-[min(22rem,calc(100vw-1rem))] bg-[#0e1a2b] rounded-2xl shadow-2xl border border-[#162a45] p-3 text-xs" style={{ backdropFilter: 'blur(0px)' }}>
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10 font-bold">
+                    <span className="text-white">{T.notifications}</span>
                     {unreadNotifCount > 0 && (
-                      <span onClick={() => { setCustomerNotifs(prev => prev.map(n => ({ ...n, read: true }))); showToast(T.markAllRead, 'info'); }} className="text-[10px] text-emerald-600 cursor-pointer">{T.markAllRead}</span>
+                      <span onClick={() => { setCustomerNotifs(prev => prev.map(n => ({ ...n, read: true }))); showToast(T.markAllRead, 'info'); }} className="text-[10px] text-emerald-400 cursor-pointer">{T.markAllRead}</span>
                     )}
                   </div>
                   <div className="py-2 space-y-2 max-h-60 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
@@ -2134,13 +2134,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <div
                         key={n.id}
                         onClick={() => setCustomerNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}
-                        className={`p-2.5 rounded-lg text-[11px] border cursor-pointer transition-colors ${n.read ? 'bg-gray-50 border-gray-100' : 'bg-emerald-50 border-emerald-100'}`}
+                        className={`p-2.5 rounded-lg text-[11px] border cursor-pointer transition-colors ${n.read ? 'bg-white/5 border-white/10' : 'bg-emerald-500/15 border-emerald-500/30'}`}
                       >
-                        <p className={`font-bold leading-snug ${n.read ? 'text-gray-800' : 'text-emerald-900'}`}>{n.emoji} {n.title}</p>
-                        <p className={`text-[10px] leading-snug mt-0.5 ${n.read ? 'text-gray-500' : 'text-emerald-700'}`}>{n.body}</p>
-                        <p className="text-[9px] text-gray-400 mt-1 flex items-center justify-between">
+                        <p className={`font-bold leading-snug ${n.read ? 'text-gray-200' : 'text-white'}`}>{n.emoji} {n.title}</p>
+                        <p className={`text-[10px] leading-snug mt-0.5 ${n.read ? 'text-gray-400' : 'text-emerald-200'}`}>{n.body}</p>
+                        <p className="text-[9px] text-gray-500 mt-1 flex items-center justify-between">
                           <span>{n.time}</span>
-                          {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                          {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
                         </p>
                       </div>
                     ))}
