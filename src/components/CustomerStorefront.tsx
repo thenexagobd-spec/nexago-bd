@@ -3465,11 +3465,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
                   <div className="pt-3 border-t border-gray-200 flex items-center space-x-2">
                     <div className="relative flex-1">
-                      <Tag className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Tag className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input type="text" value={couponInput} onChange={(e) => setCouponInput(e.target.value)} placeholder={T.couponCode}
-                        className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs font-mono uppercase outline-none focus:border-emerald-500" />
+                        className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2.5 text-sm font-mono uppercase outline-none focus:border-emerald-500" />
                     </div>
-                    <button type="button" onClick={() => handleApplyCouponCode()} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer">{T.apply}</button>
+                    <button type="button" onClick={() => handleApplyCouponCode()} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all cursor-pointer">{T.apply}</button>
                   </div>
                   {!appliedCoupon && (() => {
                     const best = COUPONS.filter(c => cartSubtotal >= c.minOrder && c.code !== 'SMARTSHOP').sort((a, b) => (b.discountValue || 0) - (a.discountValue || 0))[0];
@@ -3477,15 +3477,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     return (
                       <button
                         onClick={() => { if (best.isFreeShip) { setAppliedCoupon({ code: best.code, discount: 0, isFreeShip: true }); showToast(`Coupon ${best.code} applied: Free Delivery!`, 'success'); } else { setAppliedCoupon({ code: best.code, discount: best.discountValue }); showToast(`Coupon ${best.code} applied: ৳${best.discountValue} discount!`, 'success'); } }}
-                        className="w-full p-2 bg-amber-50 border border-amber-200 rounded-xl text-[10px] font-bold text-amber-800 flex items-center justify-between cursor-pointer hover:bg-amber-100 transition-colors"
+                        className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800 flex items-center justify-between cursor-pointer hover:bg-amber-100 transition-colors"
                       >
-                        <span className="flex items-center space-x-1.5"><BadgePercent className="w-3.5 h-3.5" /><span>{T.bestCoupon}: <span className="font-mono">{best.code}</span></span></span>
+                        <span className="flex items-center space-x-1.5"><BadgePercent className="w-4 h-4" /><span>{T.bestCoupon}: <span className="font-mono">{best.code}</span></span></span>
                         <span className="text-amber-700 underline">{T.apply}</span>
                       </button>
                     );
                   })()}
                   {appliedCoupon && (
-                    <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex justify-between items-center">
+                    <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl text-sm font-bold flex justify-between items-center">
                       <span>🎉 Coupon '{appliedCoupon.code}' applied</span>
                       <button onClick={() => setAppliedCoupon(null)} className="text-red-600 hover:underline cursor-pointer">Remove</button>
                     </div>
