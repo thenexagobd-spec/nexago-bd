@@ -637,6 +637,21 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     last4Hint: 'Security check: last 4 digits must match your {m} number that sent the money.',
     numberOf: 'Number {i} of {n}',
     anotherNumber: 'Use another number',
+    accountSettings: 'Customer Account Settings',
+    accountSettingsSub: 'Update personal details and notification preferences',
+    tapCameraHint: 'Tap the camera icon to change your profile picture',
+    fullName: 'Full Name',
+    emailAddress: 'Email Address',
+    phoneNumber: 'Phone Number',
+    smsAlerts: 'SMS Order Status Alerts',
+    emailReceipts: 'Email Order Receipts',
+    pushAlerts: 'Push Notifications',
+    saveChanges: 'Save Changes',
+    changePassword: 'Change Password',
+    oldPassword: 'Current Password',
+    newPassword: 'New Password',
+    confirmPassword: 'Confirm New Password',
+    updatePassword: 'Update Password',
   },
   bn: {
     brandTag: 'নেক্সাগো বিডি ডেলিভারি',
@@ -806,6 +821,21 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     last4Hint: 'নিরাপত্তা চেক: শেষ ৪ সংখ্যা অবশ্যই আপনার {m} নম্বরের সাথে মেলাতে হবে।',
     numberOf: 'নম্বর {i} / {n}',
     anotherNumber: 'অন্য নম্বর ব্যবহার করুন',
+    accountSettings: 'কাস্টমার অ্যাকাউন্ট সেটিংস',
+    accountSettingsSub: 'ব্যক্তিগত তথ্য ও নোটিফিকেশন পছন্দ আপডেট করুন',
+    tapCameraHint: 'প্রোফাইল ছবি বদলাতে ক্যামেরা আইকনে ক্লিক করুন',
+    fullName: 'পুরো নাম',
+    emailAddress: 'ইমেইল ঠিকানা',
+    phoneNumber: 'ফোন নম্বর',
+    smsAlerts: 'SMS অর্ডার স্ট্যাটাস অ্যালার্ট',
+    emailReceipts: 'ইমেইল অর্ডার রিসিট',
+    pushAlerts: 'পুশ নোটিফিকেশন',
+    saveChanges: 'পরিবর্তন সংরক্ষণ করুন',
+    changePassword: 'পাসওয়ার্ড পরিবর্তন করুন',
+    oldPassword: 'বর্তমান পাসওয়ার্ড',
+    newPassword: 'নতুন পাসওয়ার্ড',
+    confirmPassword: 'নতুন পাসওয়ার্ড নিশ্চিত করুন',
+    updatePassword: 'পাসওয়ার্ড আপডেট করুন',
   },
 };
 
@@ -3244,9 +3274,36 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           {activeNav === 'Settings' && (
             <div className="space-y-6 max-w-xl mx-auto">
               <div>
-                <h2 className="text-xl font-black text-gray-900 tracking-tight">Customer Account Settings</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Update personal details and notification preferences</p>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">{T.accountSettings || 'Customer Account Settings'}</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{T.accountSettingsSub || 'Update personal details and notification preferences'}</p>
               </div>
+
+              {/* Profile picture + identity */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-xl font-black overflow-hidden shrink-0">
+                      {customerProfile.profilePic ? <img src={customerProfile.profilePic} alt={customerProfile.name} className="w-full h-full object-cover" /> : customerProfile.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <label className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center cursor-pointer shadow-md">
+                      <Camera className="w-3 h-3" />
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                        const f = e.target.files?.[0]; if (!f) return;
+                        const reader = new FileReader();
+                        reader.onload = () => setCustomerProfile({ ...customerProfile, profilePic: String(reader.result || '') });
+                        reader.readAsDataURL(f);
+                      }} />
+                    </label>
+                  </div>
+                  <div>
+                    <p className="font-black text-gray-900 text-sm">{customerProfile.name}</p>
+                    <p className="text-[10px] text-gray-500">{customerProfile.email} · {customerProfile.phone}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{T.tapCameraHint || 'Tap the camera icon to change your profile picture'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preferences toggles */}
               <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="font-bold text-gray-800 flex items-center space-x-2">
@@ -3260,27 +3317,69 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all ${dark ? 'left-[22px]' : 'left-0.5'}`} />
                   </button>
                 </label>
+                <label className="flex items-center justify-between cursor-pointer border-t border-gray-100 pt-4">
+                  <span className="font-bold text-gray-800 flex items-center space-x-2">
+                    <Languages className="w-4 h-4 text-gray-400" /><span>{lang === 'bn' ? 'ভাষা / Language' : 'Language / ভাষা'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setLang(l => (l === 'en' ? 'bn' : 'en')); showToast(lang === 'en' ? 'ভাষা পরিবর্তন হয়েছে' : 'Language switched to English', 'info'); }}
+                    className={`relative w-12 h-7 rounded-full transition-colors cursor-pointer ${lang === 'bn' ? 'bg-emerald-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all ${lang === 'bn' ? 'left-[22px]' : 'left-0.5'}`} />
+                  </button>
+                </label>
               </div>
-              <form onSubmit={(e) => { e.preventDefault(); setCustomerProfile({ ...customerProfile, name: customerProfile.name, email: customerProfile.email }); showToast('Account settings updated successfully!', 'success'); }} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
+
+              <form onSubmit={(e) => { e.preventDefault(); showToast('Account settings updated successfully!', 'success'); }} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Full Name</label>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.fullName || 'Full Name'}</label>
                   <input type="text" value={customerProfile.name} onChange={(e) => setCustomerProfile({ ...customerProfile, name: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Email Address</label>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.emailAddress || 'Email Address'}</label>
                   <input type="email" value={customerProfile.email} onChange={(e) => setCustomerProfile({ ...customerProfile, email: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.phoneNumber || 'Phone Number'}</label>
+                  <input type="tel" value={customerProfile.phone} onChange={(e) => setCustomerProfile({ ...customerProfile, phone: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
                 </div>
                 <div className="pt-2 space-y-3 border-t border-gray-100">
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="font-bold text-gray-800">SMS Order Status Alerts</span>
+                    <span className="font-bold text-gray-800">{T.smsAlerts || 'SMS Order Status Alerts'}</span>
                     <input type="checkbox" checked={customerProfile.sms} onChange={(e) => setCustomerProfile({ ...customerProfile, sms: e.target.checked })} className="w-4 h-4 accent-emerald-600" />
                   </label>
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="font-bold text-gray-800">Email Order Receipts</span>
+                    <span className="font-bold text-gray-800">{T.emailReceipts || 'Email Order Receipts'}</span>
                     <input type="checkbox" checked={customerProfile.emailNotif} onChange={(e) => setCustomerProfile({ ...customerProfile, emailNotif: e.target.checked })} className="w-4 h-4 accent-emerald-600" />
                   </label>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="font-bold text-gray-800">{T.pushAlerts || 'Push Notifications'}</span>
+                    <input type="checkbox" checked={customerProfile.pushNotif} onChange={(e) => setCustomerProfile({ ...customerProfile, pushNotif: e.target.checked })} className="w-4 h-4 accent-emerald-600" />
+                  </label>
                 </div>
-                <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all">Save Changes</button>
+                <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all">{T.saveChanges || 'Save Changes'}</button>
+              </form>
+
+              {/* Change password */}
+              <form onSubmit={(e) => { e.preventDefault(); if (!pwd.old || !pwd.fresh) { showToast('Please fill in all password fields', 'info'); return; } if (pwd.fresh !== pwd.confirm) { showToast('New password and confirm password do not match', 'info'); return; } setPwd({ old: '', fresh: '', confirm: '' }); showToast('Password changed successfully!', 'success'); }} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
+                <div className="flex items-center space-x-2">
+                  <Lock className="w-4 h-4 text-gray-400" />
+                  <h3 className="font-black text-gray-900 text-sm">{T.changePassword || 'Change Password'}</h3>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.oldPassword || 'Current Password'}</label>
+                  <input type="password" value={pwd.old} onChange={(e) => setPwd(p => ({ ...p, old: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.newPassword || 'New Password'}</label>
+                  <input type="password" value={pwd.fresh} onChange={(e) => setPwd(p => ({ ...p, fresh: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.confirmPassword || 'Confirm New Password'}</label>
+                  <input type="password" value={pwd.confirm} onChange={(e) => setPwd(p => ({ ...p, confirm: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                </div>
+                <button type="submit" className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl shadow-md transition-all">{T.updatePassword || 'Update Password'}</button>
               </form>
             </div>
           )}
