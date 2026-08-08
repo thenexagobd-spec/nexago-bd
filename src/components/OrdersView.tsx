@@ -705,6 +705,12 @@ export default function OrdersView({
                     <div>
                       <div className="font-semibold text-gray-200 text-[12px]">{order.customerName}</div>
                       <div className="text-[10px] text-gray-500 mt-0.5 font-mono">{order.customerPhone || '01711-223344'}</div>
+                      {order.customerNote && (
+                        <span className="flex items-center space-x-1 text-[9px] text-blue-300 mt-0.5 max-w-[160px]" title={order.customerNote}>
+                          <MessageCircle className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{order.customerNote}</span>
+                        </span>
+                      )}
                     </div>
                   </td>
 
@@ -1203,6 +1209,13 @@ export default function OrdersView({
                   </select>
                 </div>
               </div>
+
+              {editingOrder?.customerNote && (
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2">
+                  <p className="text-[9px] font-black text-blue-300 uppercase tracking-wider mb-1">Customer Order Note</p>
+                  <p className="text-xs text-blue-200">💬 {editingOrder.customerNote}</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Rider Instructions (Notes)</label>

@@ -23,6 +23,7 @@ export interface Order {
   itemCount?: number;
   parcelSize?: 'Small' | 'Medium' | 'Large';
   instructions?: string;
+  customerNote?: string;      // comment the customer wrote when placing the order
   deliveryCharge?: number;
   codAmount?: number;
   estimatedMinutes?: number;

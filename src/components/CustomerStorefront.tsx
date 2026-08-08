@@ -423,6 +423,7 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     contactPhone: 'Contact Phone',
     paymentMethod: 'Payment Method',
     placeOrder: 'Place Order',
+    orderNote: 'Order Note (optional)',
     yourBasket: 'Your Basket',
     items: 'Items',
     basketEmpty: 'Basket is empty. Add items from the menu.',
@@ -569,6 +570,7 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     contactPhone: 'যোগাযোগের নম্বর',
     paymentMethod: 'পেমেন্ট পদ্ধতি',
     placeOrder: 'অর্ডার করুন',
+    orderNote: 'অর্ডার নোট (ঐচ্ছিক)',
     yourBasket: 'আপনার ঝুড়ি',
     items: 'আইটেম',
     basketEmpty: 'ঝুড়ি খালি। মেনু থেকে পণ্য যোগ করুন।',
@@ -1211,6 +1213,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [customizeProd, setCustomizeProd] = useState<StoreProduct | null>(null);
   const [customizeQty, setCustomizeQty] = useState(1);
   const [customizeNote, setCustomizeNote] = useState('');
+  const [orderNote, setOrderNote] = useState('');
   const [customizeExtra, setCustomizeExtra] = useState(false);
   const [customizeWeight, setCustomizeWeight] = useState(1); // 0.5 | 1 | 2
 
@@ -1322,6 +1325,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       body: `Order ${orderBase.itemCount} item(s) from ${orderBase.storeName} — ${orderBase.priority || 'Normal'} delivery.`, emoji: '📦', time: 'Just now', read: false
     }, ...prev]);
     setCart([]);
+    setOrderNote('');
     setAppliedCoupon(null);
     setSelectedStore(null);
     setIsCartDrawerOpen(false);
@@ -1403,6 +1407,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       scheduledSlot: isScheduled ? scheduleSlot : undefined,
       deliveryPin: deliveryPinCode,
       splitWalletAmount: splitDeduct || undefined,
+      customerNote: orderNote.trim() || undefined,
       items: cart.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.price, quantity: i.quantity }))
     });
     if (isSendMoney && trxId) {
@@ -3311,6 +3316,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.contactPhone}</label>
                     <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-800 outline-none focus:border-emerald-500 font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.orderNote}</label>
+                    <textarea
+                      value={orderNote}
+                      onChange={(e) => setOrderNote(e.target.value)}
+                      placeholder={lang === 'bn' ? 'যেমন: দরজায় রেখে যান, বেল বাজান…' : 'e.g. leave at the door, ring the bell…'}
+                      rows={2}
+                      className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-800 outline-none focus:border-emerald-500 resize-none"
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">{T.paymentMethod}</label>
