@@ -755,7 +755,7 @@ export default function App() {
     setOrderReports(prev => {
       const existing = prev.find(r => r.orderId === rep.orderId && r.reason === rep.reason && r.time === timeNow);
       if (existing) return prev;
-      return [{ orderId: rep.orderId, reason: rep.reason, note: rep.note, time: timeNow }, ...prev];
+      return [{ orderId: rep.orderId, reason: rep.reason, note: rep.note, time: timeNow, status: 'Open' }, ...prev];
     });
     // Auto-create a linked Support Ticket for this report (only once per order)
     setSupportTickets(prev => {
@@ -774,6 +774,11 @@ export default function App() {
       return [newTicket, ...prev];
     });
     handleAddNotification({ title: '📢 Customer Report — ' + rep.orderId, message: `${rep.reason}${rep.note ? ' · ' + rep.note : ''}`, type: 'system' });
+  };
+
+  // Admin opens a customer report -> it becomes "Under Review" (customer then sees tracking paused)
+  const handleOpenReport = (orderId: string) => {
+    setOrderReports(prev => prev.map(r => r.orderId === orderId && r.status !== 'Resolved' ? { ...r, status: 'Under Review' } : r));
   };
 
   const handleMarkAllNotificationsAsRead = () => {
@@ -1184,6 +1189,7 @@ export default function App() {
         onReturnToAdmin={() => setActiveTab('Dashboard')}
         onLaunchMerchantStore={handleLaunchStore}
         onReport={handleOrderReport}
+        reports={orderReports}
         showToast={showToast}
       />
         );
@@ -3619,6 +3625,7 @@ export default function App() {
         onReturnToAdmin={() => setActiveTab('Dashboard')}
         onLaunchMerchantStore={handleLaunchStore}
         onReport={handleOrderReport}
+        reports={orderReports}
         showToast={showToast}
       />
     );
@@ -4062,7 +4069,13 @@ export default function App() {
           )}
 
           {activeTab === 'Order Tools Dashboard' && (
-            <OrderToolsDashboard orders={orders} onUpdateOrder={handleUpdateOrder} showToast={showToast} />
+            <OrderToolsDashboard
+              orders={orders}
+              onUpdateOrder={handleUpdateOrder}
+              reports={orderReports}
+              onOpenReport={handleOpenReport}
+              showToast={showToast}
+            />
           )}
 
           {(activeTab === 'Payments' || activeTab === 'Earnings & Payouts') && (

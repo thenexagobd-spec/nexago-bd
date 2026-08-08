@@ -35,6 +35,7 @@ interface CustomerStorefrontProps {
   onReturnToAdmin: () => void;
   onLaunchMerchantStore: (storeId: string) => void;
   onReport?: (report: { orderId: string; reason: string; note: string }) => void;
+  reports?: { orderId: string; status?: string }[];
   showToast: (message: string, type?: 'success' | 'info') => void;
 }
 
@@ -728,6 +729,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   onSilentUpdateOrder,
   onLaunchMerchantStore,
   onReport,
+  reports = [],
   showToast,
 }) => {
   const [activeNav, setActiveNav] = useState<
@@ -2576,6 +2578,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     const completed = ord.status === 'Completed';
                     const cancelled = ord.status === 'Cancelled';
                     const held = ord.paymentStatus === 'Rejected';
+                    const reportUnderReview = (oid: string) => reports.some(r => r.orderId === oid && r.status === 'Under Review');
                     const refR = refunds.find(r => r.orderId === ord.id);
                     return (
                       <div key={ord.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-200 transition-colors">
@@ -2614,7 +2617,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             {ord.paymentStatus === 'Rejected' && ord.rejectionReason && (
                               <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">Reason: {ord.rejectionReason}</span>
                             )}
-                            {held && (
+                            {reportUnderReview(ord.id) && (
                               <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">🛑 Tracking paused — payment under review</span>
                             )}
                           </div>

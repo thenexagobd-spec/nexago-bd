@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
+import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, OrderReportEntry } from '../types';
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
   ClipboardList, Check
@@ -21,12 +21,14 @@ const lsSet = (key: string, v: unknown) => {
 interface OrderToolsDashboardProps {
   orders: Order[];
   onUpdateOrder: (order: Order) => void;
+  reports?: OrderReportEntry[];
+  onOpenReport?: (orderId: string) => void;
   showToast?: (message: string, type?: 'success' | 'info') => void;
 }
 
-type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets';
+type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets' | 'reports';
 
-export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }: OrderToolsDashboardProps) {
+export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [], onOpenReport, showToast }: OrderToolsDashboardProps) {
   const [tab, setTab] = useState<ToolTab>('audit');
 
   const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>(() => lsGet('ss_admin_audit', []));
@@ -69,6 +71,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
 
   const tabs: { key: ToolTab; label: string; icon: any; badge?: number }[] = [
     { key: 'verify', label: 'Verify Payments', icon: ShieldCheck, badge: verifyPayments.length },
+    { key: 'reports', label: 'Payment Reports', icon: ClipboardList, badge: reports.filter(r => r.status === 'Open').length },
     { key: 'audit', label: 'Audit Log', icon: History, badge: auditLog.length },
     { key: 'refunds', label: 'Refund Requests', icon: Banknote, badge: refunds.filter(r => r.status === 'Requested').length },
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
@@ -182,6 +185,52 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============ PAYMENT REPORTS ============ */}
+        {tab === 'reports' && (
+          <div className="space-y-3">
+            <h3 className="font-black text-white text-sm flex items-center space-x-2"><ClipboardList className="w-4 h-4 text-brand-orange" /><span>Payment Reports</span></h3>
+            <p className="text-[10px] text-gray-400">Customer reports. Open a report to mark it Under Review — the customer then sees tracking paused on that order.</p>
+            {reports.length === 0 ? (
+              <p className="text-center text-[10px] text-gray-500 py-6 flex items-center justify-center space-x-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /><span>No reports yet.</span></p>
+            ) : (
+              <div className="space-y-2">
+                {reports.map((r, i) => {
+                  const order = orders.find(o => o.id === r.orderId);
+                  return (
+                    <div key={i} className={`bg-brand-dark/50 border rounded-xl p-3 space-y-2 ${r.status === 'Under Review' ? 'border-blue-500/40' : 'border-brand-border/50'}`}>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center space-x-2">
+                          <p className="text-gray-100 font-black text-xs font-mono">#{r.orderId}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                            r.status === 'Resolved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20' :
+                            r.status === 'Under Review' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/20' :
+                            'bg-amber-500/20 text-amber-300 border border-amber-500/20'
+                          }`}>{r.status || 'Open'}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {r.status === 'Open' && (
+                            <button
+                              onClick={() => { onOpenReport && onOpenReport(r.orderId); showToast && showToast(`Report for #${r.orderId} marked Under Review — customer tracking paused`, 'info'); }}
+                              className="px-3 py-1.5 bg-blue-500 hover:bg-blue-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                            >Open Report</button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-[10px] space-y-0.5">
+                        <p className="text-red-300 font-bold">{r.reason}</p>
+                        {r.note && <p className="text-gray-400">{r.note}</p>}
+                        <p className="text-gray-500">
+                          {order ? <><b className="text-gray-300">{order.customerName}</b> · {order.storeName} · <span className="font-mono text-white font-bold">৳{order.amount.toLocaleString()}</span> · {order.paymentMethod}</> : 'Unknown order'} · {r.time}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
