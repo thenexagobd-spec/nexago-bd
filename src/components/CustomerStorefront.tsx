@@ -838,13 +838,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [reSub, setReSub] = useState({ sender: '', trxId: '', amount: '', receipt: '', last4: '' });
   const openReSubmit = (order: Order) => {
     setReSubmitOrder(order);
-    setReSub({
-      sender: order.senderNumber || customerPhone.replace(/[^0-9]/g, ''),
-      trxId: order.trxId || '',
-      amount: order.amount ? String(order.amount) : '',
-      receipt: '',
-      last4: order.last4 || '',
-    });
+    setReSub({ sender: '', trxId: '', amount: '', receipt: '', last4: '' });
   };
   const handleReSubFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -857,7 +851,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const submitReSubmit = () => {
     if (!reSubmitOrder) return;
     if (!reSub.trxId || !reSub.amount) { showToast('Enter the TrxID and amount before resubmitting', 'info'); return; }
-    if (!reSub.receipt && !reSubmitOrder.receipt) { showToast('Upload the payment screenshot/receipt', 'info'); return; }
+    if (!reSub.receipt) { showToast('Upload a fresh payment screenshot/receipt', 'info'); return; }
     onUpdateOrder({
       ...reSubmitOrder,
       paymentStatus: 'Pending',
@@ -865,7 +859,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       senderNumber: reSub.sender,
       last4: reSub.last4,
       trxAmount: Number(reSub.amount),
-      receipt: reSub.receipt || reSubmitOrder.receipt,
+      receipt: reSub.receipt,
       paymentNote: 'Re-submitted by customer for re-verification',
     });
     // Old "Under Review" ticket for this order is cleared on the customer side (not saved)
@@ -4240,8 +4234,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <Camera className="w-4 h-4" /><span>{reSub.receipt || reSubmitOrder.receipt ? 'Change receipt' : 'Upload new screenshot'}</span>
                   <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleReSubFile} />
                 </label>
-                {(reSub.receipt || reSubmitOrder.receipt) && (
-                  <img src={reSub.receipt || reSubmitOrder.receipt} alt="receipt" className="mt-2 w-full h-24 object-cover rounded-xl border border-gray-200" />
+                {reSub.receipt && (
+                  <img src={reSub.receipt} alt="receipt" className="mt-2 w-full h-24 object-cover rounded-xl border border-gray-200" />
                 )}
               </div>
             </div>
