@@ -4030,8 +4030,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       {detailProduct && (
         <div className="fixed inset-0 z-[70] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200">
-            <div className="relative h-40 bg-gray-100">
-              <img src={detailProduct.image} alt={detailProduct.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+            <div className="relative h-40 bg-white">
+              <img src={detailProduct.image} alt={detailProduct.name} referrerPolicy="no-referrer" className="w-full h-full object-contain" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/5 pointer-events-none" />
               <button onClick={() => setDetailProduct(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer"><X className="w-4 h-4" /></button>
               <span className={`absolute bottom-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase ${detailProduct.status === 'In Stock' ? 'bg-emerald-600 text-white' : detailProduct.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'}`}>{statusLabel(detailProduct.status)}</span>
