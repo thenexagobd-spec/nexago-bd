@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ShoppingBag, Search, MapPin, Bell, Heart, CreditCard, Wallet, Ticket,
   HelpCircle, Settings, ChevronDown, ChevronLeft, ChevronRight, Filter, Star,
@@ -77,6 +77,7 @@ interface SupportTicketItem {
 interface StoreProduct {
   id: string;
   name: string;
+  nameBn?: string;
   price: number;
   category: string;
   stock: number;
@@ -89,6 +90,7 @@ interface StoreProduct {
 interface StoreDef {
   id: string;
   name: string;
+  nameBn?: string;
   subtext: string;
   category: string;
   badgeColor: string;
@@ -117,16 +119,16 @@ const AREA_COORDS: Record<string, [number, number]> = {
 };
 
 const AREA_NAMES_BN: Record<string, string> = {
-  'Dhanmondi': 'ধানমন্ডি',
-  'Gulshan': 'গুলশান',
-  'Banani': 'বনানী',
-  'Mirpur': 'মিরপুর',
-  'Motijheel': 'মতিঝিল',
-  'Uttara': 'উত্তরা',
-  'Badda': 'বাড্ডা',
-  'Tejgaon': 'তেজগাঁও',
-  'Farmgate': 'ফার্মগেট',
-  'Shahbagh': 'শাহবাগ',
+  'Dhanmondi': 'à¦§à¦¾à¦¨à¦®à¦¨à§à¦¡à¦¿',
+  'Gulshan': 'à¦—à§à¦²à¦¶à¦¾à¦¨',
+  'Banani': 'à¦¬à¦¨à¦¾à¦¨à§€',
+  'Mirpur': 'à¦®à¦¿à¦°à¦ªà§à¦°',
+  'Motijheel': 'à¦®à¦¤à¦¿à¦à¦¿à¦²',
+  'Uttara': 'à¦‰à¦¤à§à¦¤à¦°à¦¾',
+  'Badda': 'à¦¬à¦¾à¦¡à§à¦¡à¦¾',
+  'Tejgaon': 'à¦¤à§‡à¦œà¦—à¦¾à¦à¦“',
+  'Farmgate': 'à¦«à¦¾à¦°à§à¦®à¦—à§‡à¦Ÿ',
+  'Shahbagh': 'à¦¶à¦¾à¦¹à¦¬à¦¾à¦—',
 };
 
 // Approximate reverse-geocoder: nearest known Dhaka area for a lat/lng
@@ -180,7 +182,7 @@ const STORE_DEFS: StoreDef[] = [
     ]
   },
   {
-    id: 'S3', name: 'Spice Garden', subtext: 'Bangladeshi · Indian', category: 'Restaurant',
+    id: 'S3', name: 'Spice Garden', subtext: 'Bangladeshi Â· Indian', category: 'Restaurant',
     badgeColor: 'bg-red-600 text-white', rating: 4.7, reviewsCount: '320+',
     deliveryTime: '35-45 min', deliveryFee: 60,
     image: U('photo-1517248135467-4c7edcad34c4'), logoText: 'SG', logoBg: 'bg-red-100 text-red-800',
@@ -197,7 +199,7 @@ const STORE_DEFS: StoreDef[] = [
     ]
   },
   {
-    id: 'S4', name: 'Burger House', subtext: 'Fast Food · Burgers', category: 'Fast Food',
+    id: 'S4', name: 'Burger House', subtext: 'Fast Food Â· Burgers', category: 'Fast Food',
     badgeColor: 'bg-amber-600 text-white', rating: 4.4, reviewsCount: '150+',
     deliveryTime: '25-35 min', deliveryFee: 40,
     image: U('photo-1568901346375-23c9450c58cd'), logoText: 'BH', logoBg: 'bg-amber-100 text-amber-800',
@@ -260,7 +262,7 @@ const STORE_DEFS: StoreDef[] = [
     ]
   },
   {
-    id: 'S8', name: 'Cake Cottage', subtext: 'Bakery · Cakes', category: 'Bakery',
+    id: 'S8', name: 'Cake Cottage', subtext: 'Bakery Â· Cakes', category: 'Bakery',
     badgeColor: 'bg-purple-600 text-white', rating: 4.7, reviewsCount: '190+',
     deliveryTime: '25-35 min', deliveryFee: 40,
     image: U('photo-1578985545062-69928b1d9587'), logoText: 'CC', logoBg: 'bg-purple-100 text-purple-800',
@@ -277,52 +279,123 @@ const STORE_DEFS: StoreDef[] = [
   },
 ];
 
+const BN_NAMES: Record<string, string> = {
+  'Fresh Mart': 'à¦«à§à¦°à§‡à¦¶ à¦®à¦¾à¦°à§à¦Ÿ',
+  'Daily Shopper': 'à¦¡à§‡à¦‡à¦²à¦¿ à¦¶à¦ªà¦¾à¦°',
+  'Spice Garden': 'à¦¸à§à¦ªà¦¾à¦‡à¦¸ à¦—à¦¾à¦°à§à¦¡à§‡à¦¨',
+  'Burger House': 'à¦¬à¦¾à¦°à§à¦—à¦¾à¦° à¦¹à¦¾à¦‰à¦¸',
+  'MedPlus': 'à¦®à§‡à¦¡à¦ªà§à¦²à¦¾à¦¸',
+  'Fresh Valley': 'à¦«à§à¦°à§‡à¦¶ à¦­à§à¦¯à¦¾à¦²à¦¿',
+  'Meat Express': 'à¦®à¦¿à¦Ÿ à¦à¦•à§à¦¸à¦ªà§à¦°à§‡à¦¸',
+  'Cake Cottage': 'à¦•à§‡à¦• à¦•à¦Ÿà§‡à¦œ',
+  'Fresh Apples (Premium)': 'à¦¤à¦¾à¦œà¦¾ à¦†à¦ªà§‡à¦² (à¦ªà§à¦°à¦¿à¦®à¦¿à¦¯à¦¼à¦¾à¦®)',
+  'Organic Bananas': 'à¦…à¦°à§à¦—à¦¾à¦¨à¦¿à¦• à¦•à¦²à¦¾',
+  'Miniket Rice 5kg': 'à¦®à¦¿à¦¨à¦¿à¦•à§‡à¦Ÿ à¦šà¦¾à¦² à§« à¦•à§‡à¦œà¦¿',
+  'Whole Milk 1L': 'à¦«à§à¦² à¦•à§à¦°à¦¿à¦® à¦¦à§à¦§ à§§ à¦²à¦¿à¦Ÿà¦¾à¦°',
+  'Fresh Farm Eggs (Dozen)': 'à¦¤à¦¾à¦œà¦¾ à¦«à¦¾à¦°à§à¦® à¦¡à¦¿à¦® (à§§ à¦¡à¦œà¦¨)',
+  'Brown Bread 400g': 'à¦¬à§à¦°à¦¾à¦‰à¦¨ à¦¬à§à¦°à§‡à¦¡ à§ªà§¦à§¦ à¦—à§à¦°à¦¾à¦®',
+  'Tomatoes (Local)': 'à¦Ÿà¦®à§‡à¦Ÿà§‹ (à¦¦à§‡à¦¶à¦¿)',
+  'Onion (Local)': 'à¦ªà§‡à¦à¦¯à¦¼à¦¾à¦œ (à¦¦à§‡à¦¶à¦¿)',
+  'Soybean Oil 2L': 'à¦¸à¦¯à¦¼à¦¾à¦¬à¦¿à¦¨ à¦¤à§‡à¦² à§¨ à¦²à¦¿à¦Ÿà¦¾à¦°',
+  'White Sugar 1kg': 'à¦¸à¦¾à¦¦à¦¾ à¦šà¦¿à¦¨à¦¿ à§§ à¦•à§‡à¦œà¦¿',
+  'Toilet Paper 12 Roll': 'à¦Ÿà¦¯à¦¼à¦²à§‡à¦Ÿ à¦ªà§‡à¦ªà¦¾à¦° à§§à§¨ à¦°à§‹à¦²',
+  'Detergent Powder 1kg': 'à¦¡à¦¿à¦Ÿà¦¾à¦°à¦œà§‡à¦¨à§à¦Ÿ à¦ªà¦¾à¦‰à¦¡à¦¾à¦° à§§ à¦•à§‡à¦œà¦¿',
+  'Dishwash Liquid 500ml': 'à¦¡à¦¿à¦¶à¦“à¦¯à¦¼à¦¾à¦¶ à¦²à¦¿à¦•à§à¦‡à¦¡ à§«à§¦à§¦ à¦®à¦¿à¦²à¦¿',
+  'Shampoo 350ml': 'à¦¶à§à¦¯à¦¾à¦®à§à¦ªà§ à§©à§«à§¦ à¦®à¦¿à¦²à¦¿',
+  'Toothpaste 150g': 'à¦Ÿà§à¦¥à¦ªà§‡à¦¸à§à¦Ÿ à§§à§«à§¦ à¦—à§à¦°à¦¾à¦®',
+  'Bath Soap (3 Pack)': 'à¦¬à¦¾à¦¥ à¦¸à¦¾à¦¬à¦¾à¦¨ (à§© à¦ªà§à¦¯à¦¾à¦•)',
+  'Instant Noodles (5 Pack)': 'à¦‡à¦¨à¦¸à§à¦Ÿà§à¦¯à¦¾à¦¨à§à¦Ÿ à¦¨à§à¦¡à¦²à¦¸ (à§« à¦ªà§à¦¯à¦¾à¦•)',
+  'Family Biscuits 500g': 'à¦«à§à¦¯à¦¾à¦®à¦¿à¦²à¦¿ à¦¬à¦¿à¦¸à§à¦•à§à¦Ÿ à§«à§¦à§¦ à¦—à§à¦°à¦¾à¦®',
+  'Kacchi Biryani': 'à¦•à¦¾à¦šà§à¦šà¦¿ à¦¬à¦¿à¦°à¦¿à¦¯à¦¼à¦¾à¦¨à¦¿',
+  'Chicken Biryani': 'à¦šà¦¿à¦•à§‡à¦¨ à¦¬à¦¿à¦°à¦¿à¦¯à¦¼à¦¾à¦¨à¦¿',
+  'Beef Bhuna': 'à¦—à¦°à§à¦° à¦­à§à¦¨à¦¾',
+  'Tandoori Chicken (Half)': 'à¦¤à¦¨à§à¦¦à§à¦°à¦¿ à¦šà¦¿à¦•à§‡à¦¨ (à¦…à¦°à§à¦§à§‡à¦•)',
+  'Garlic Naan': 'à¦—à¦¾à¦°à§à¦²à¦¿à¦• à¦¨à¦¾à¦¨',
+  'Veg Curry & Rice': 'à¦¸à¦¬à¦œà¦¿ à¦¤à¦°à¦•à¦¾à¦°à¦¿ à¦“ à¦­à¦¾à¦¤',
+  'Misti Doi': 'à¦®à¦¿à¦·à§à¦Ÿà¦¿ à¦¦à¦‡',
+  'Lemon Mint Sharbat': 'à¦²à§‡à¦¬à§ à¦®à¦¿à¦¨à§à¦Ÿ à¦¶à¦°à¦¬à¦¤',
+  'Classic Beef Burger': 'à¦•à§à¦²à¦¾à¦¸à¦¿à¦• à¦¬à¦¿à¦« à¦¬à¦¾à¦°à§à¦—à¦¾à¦°',
+  'Zinger Chicken Burger': 'à¦œà¦¿à¦™à§à¦—à¦¾à¦° à¦šà¦¿à¦•à§‡à¦¨ à¦¬à¦¾à¦°à§à¦—à¦¾à¦°',
+  'French Fries (Large)': 'à¦«à§à¦°à§‡à¦žà§à¦š à¦«à§à¦°à¦¾à¦‡ (à¦²à¦¾à¦°à§à¦œ)',
+  'BBQ Wings (6 pc)': 'à¦¬à¦¿à¦¬à¦¿à¦•à¦¿à¦‰ à¦‰à¦‡à¦‚à¦¸ (à§¬ à¦ªà¦¿à¦¸)',
+  'Chocolate Shake': 'à¦šà¦•à¦²à§‡à¦Ÿ à¦¶à§‡à¦•',
+  'Cold Coffee': 'à¦•à§‹à¦²à§à¦¡ à¦•à¦«à¦¿',
+  'Cheese Fries': 'à¦šà¦¿à¦œ à¦«à§à¦°à¦¾à¦‡',
+  'Paracetamol 500mg (20)': 'à¦ªà§à¦¯à¦¾à¦°à¦¾à¦¸à¦¿à¦Ÿà¦¾à¦®à¦² à§«à§¦à§¦à¦®à¦¿à¦—à§à¦°à¦¾ (à§¨à§¦)',
+  'Vitamin C 1000mg (30)': 'à¦­à¦¿à¦Ÿà¦¾à¦®à¦¿à¦¨ à¦¸à¦¿ à§§à§¦à§¦à§¦à¦®à¦¿à¦—à§à¦°à¦¾ (à§©à§¦)',
+  'Digital Thermometer': 'à¦¡à¦¿à¦œà¦¿à¦Ÿà¦¾à¦² à¦¥à¦¾à¦°à§à¦®à§‹à¦®à¦¿à¦Ÿà¦¾à¦°',
+  'Antiseptic Bandage': 'à¦…à§à¦¯à¦¾à¦¨à§à¦Ÿà¦¿à¦¸à§‡à¦ªà¦Ÿà¦¿à¦• à¦¬à§à¦¯à¦¾à¦¨à§à¦¡à§‡à¦œ',
+  'Hand Sanitizer 100ml': 'à¦¹à§à¦¯à¦¾à¦¨à§à¦¡ à¦¸à§à¦¯à¦¾à¦¨à¦¿à¦Ÿà¦¾à¦‡à¦œà¦¾à¦° à§§à§¦à§¦ à¦®à¦¿à¦²à¦¿',
+  'BP Monitor (Digital)': 'à¦¬à¦¿à¦ªà¦¿ à¦®à¦¨à¦¿à¦Ÿà¦° (à¦¡à¦¿à¦œà¦¿à¦Ÿà¦¾à¦²)',
+  'Antacid 250ml': 'à¦…à§à¦¯à¦¾à¦¨à§à¦Ÿà¦¾à¦¸à¦¿à¦¡ à§¨à§«à§¦ à¦®à¦¿à¦²à¦¿',
+  'Ripe Mangoes (Alphonso)': 'à¦ªà¦¾à¦•à¦¾ à¦†à¦® (à¦†à¦²à¦«à¦¾à¦¨à¦¸à§‹)',
+  'Seedless Watermelon': 'à¦¬à§€à¦œà¦¬à¦¿à¦¹à§€à¦¨ à¦¤à¦°à¦®à§à¦œ',
+  'Cucumber': 'à¦¶à¦¸à¦¾',
+  'Carrot': 'à¦—à¦¾à¦œà¦°',
+  'Green Coriander': 'à¦§à¦¨à§‡à¦ªà¦¾à¦¤à¦¾',
+  'Ginger': 'à¦†à¦¦à¦¾',
+  'Strawberries': 'à¦¸à§à¦Ÿà§à¦°à¦¬à§‡à¦°à¦¿',
+  'Beef (Boneless)': 'à¦—à¦°à§à¦° à¦®à¦¾à¦‚à¦¸ (à¦¬à§‹à¦¨à¦²à§‡à¦¸)',
+  'Broiler Chicken': 'à¦¬à§à¦°à¦¯à¦¼à¦²à¦¾à¦° à¦®à§à¦°à¦—à¦¿',
+  'Rui Fish': 'à¦°à§à¦‡ à¦®à¦¾à¦›',
+  'Mutton (Boneless)': 'à¦–à¦¾à¦¸à¦¿à¦° à¦®à¦¾à¦‚à¦¸ (à¦¬à§‹à¦¨à¦²à§‡à¦¸)',
+  'Shrimp (Medium)': 'à¦šà¦¿à¦‚à¦¡à¦¼à¦¿ (à¦®à¦¾à¦à¦¾à¦°à¦¿)',
+  'Beef Liver': 'à¦—à¦°à§à¦° à¦•à¦²à¦¿à¦œà¦¾',
+  'Black Forest Cake': 'à¦¬à§à¦²à§à¦¯à¦¾à¦• à¦«à¦°à§‡à¦¸à§à¦Ÿ à¦•à§‡à¦•',
+  'Chocolate Truffle Cake': 'à¦šà¦•à¦²à§‡à¦Ÿ à¦Ÿà§à¦°à¦¾à¦«à¦² à¦•à§‡à¦•',
+  'Vanilla Cupcake': 'à¦­à§à¦¯à¦¾à¦¨à¦¿à¦²à¦¾ à¦•à¦¾à¦ªà¦•à§‡à¦•',
+  'Butter Croissant': 'à¦¬à¦¾à¦Ÿà¦¾à¦° à¦•à§à¦°à§‹à¦¯à¦¼à¦¾à¦¸à¦¾à¦',
+  'Chocolate Chip Cookie': 'à¦šà¦•à¦²à§‡à¦Ÿ à¦šà¦¿à¦ª à¦•à§à¦•à¦¿',
+  'Red Velvet Slice': 'à¦°à§‡à¦¡ à¦­à§‡à¦²à¦­à§‡à¦Ÿ à¦¸à§à¦²à¦¾à¦‡à¦¸',
+  'Brownie (4 pc)': 'à¦¬à§à¦°à¦¾à¦‰à¦¨à¦¿ (à§ª à¦ªà¦¿à¦¸)',
+};
+
 const CATEGORIES = ['All', 'Grocery', 'Supermarket', 'Restaurant', 'Fast Food', 'Bakery', 'Pharmacy', 'Fruits & Veg', 'Meat & Fish'];
 
 const CAT_BN: Record<string, string> = {
-  'All': 'সব',
-  'Grocery': 'বাজার',
-  'Supermarket': 'সুপারমার্কেট',
-  'Restaurant': 'রেস্তোরাঁ',
-  'Fast Food': 'ফাস্ট ফুড',
-  'Bakery': 'বেকারি',
-  'Pharmacy': 'ফার্মেসি',
-  'Fruits & Veg': 'ফল ও সবজি',
-  'Meat & Fish': 'মাংস ও মাছ',
+  'All': 'à¦¸à¦¬',
+  'Grocery': 'à¦¬à¦¾à¦œà¦¾à¦°',
+  'Supermarket': 'à¦¸à§à¦ªà¦¾à¦°à¦®à¦¾à¦°à§à¦•à§‡à¦Ÿ',
+  'Restaurant': 'à¦°à§‡à¦¸à§à¦¤à§‹à¦°à¦¾à¦',
+  'Fast Food': 'à¦«à¦¾à¦¸à§à¦Ÿ à¦«à§à¦¡',
+  'Bakery': 'à¦¬à§‡à¦•à¦¾à¦°à¦¿',
+  'Pharmacy': 'à¦«à¦¾à¦°à§à¦®à§‡à¦¸à¦¿',
+  'Fruits & Veg': 'à¦«à¦² à¦“ à¦¸à¦¬à¦œà¦¿',
+  'Meat & Fish': 'à¦®à¦¾à¦‚à¦¸ à¦“ à¦®à¦¾à¦›',
 };
 
 const STATUS_BN: Record<string, string> = {
-  'In Stock': 'স্টকে আছে',
-  'Low Stock': 'স্টক কম',
-  'Out of Stock': 'স্টক নেই',
-  'Confirmed': 'নিশ্চিত হয়েছে',
-  'Processing': 'প্রসেস হচ্ছে',
-  'Ongoing': 'চলমান',
-  'Pending': 'অপেক্ষমাণ',
-  'Completed': 'সম্পন্ন',
-  'Cancelled': 'বাতিল',
-  'Delivered': 'ডেলিভারড',
-  'Order Confirmed': 'অর্ডার নিশ্চিত হয়েছে',
-  'Preparing at Store': 'দোকানে প্রস্তুত হচ্ছে',
-  'Out for Delivery': 'ডেলিভারির পথে',
-  'Store has accepted your order': 'দোকান আপনার অর্ডার গ্রহণ করেছে',
-  'Your items are being packed': 'আপনার পণ্যগুলো প্যাক করা হচ্ছে',
-  'Courier driver is on the way': 'কুরিয়ার ড্রাইভার পথে আছে',
-  'Order delivered to your door': 'অর্ডার আপনার দরজায় পৌঁছেছে',
+  'In Stock': 'à¦¸à§à¦Ÿà¦•à§‡ à¦†à¦›à§‡',
+  'Low Stock': 'à¦¸à§à¦Ÿà¦• à¦•à¦®',
+  'Out of Stock': 'à¦¸à§à¦Ÿà¦• à¦¨à§‡à¦‡',
+  'Confirmed': 'à¦¨à¦¿à¦¶à§à¦šà¦¿à¦¤ à¦¹à¦¯à¦¼à§‡à¦›à§‡',
+  'Processing': 'à¦ªà§à¦°à¦¸à§‡à¦¸ à¦¹à¦šà§à¦›à§‡',
+  'Ongoing': 'à¦šà¦²à¦®à¦¾à¦¨',
+  'Pending': 'à¦…à¦ªà§‡à¦•à§à¦·à¦®à¦¾à¦£',
+  'Completed': 'à¦¸à¦®à§à¦ªà¦¨à§à¦¨',
+  'Cancelled': 'à¦¬à¦¾à¦¤à¦¿à¦²',
+  'Delivered': 'à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¡',
+  'Order Confirmed': 'à¦…à¦°à§à¦¡à¦¾à¦° à¦¨à¦¿à¦¶à§à¦šà¦¿à¦¤ à¦¹à¦¯à¦¼à§‡à¦›à§‡',
+  'Preparing at Store': 'à¦¦à§‹à¦•à¦¾à¦¨à§‡ à¦ªà§à¦°à¦¸à§à¦¤à§à¦¤ à¦¹à¦šà§à¦›à§‡',
+  'Out for Delivery': 'à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿à¦° à¦ªà¦¥à§‡',
+  'Store has accepted your order': 'à¦¦à§‹à¦•à¦¾à¦¨ à¦†à¦ªà¦¨à¦¾à¦° à¦…à¦°à§à¦¡à¦¾à¦° à¦—à§à¦°à¦¹à¦£ à¦•à¦°à§‡à¦›à§‡',
+  'Your items are being packed': 'à¦†à¦ªà¦¨à¦¾à¦° à¦ªà¦£à§à¦¯à¦—à§à¦²à§‹ à¦ªà§à¦¯à¦¾à¦• à¦•à¦°à¦¾ à¦¹à¦šà§à¦›à§‡',
+  'Courier driver is on the way': 'à¦•à§à¦°à¦¿à¦¯à¦¼à¦¾à¦° à¦¡à§à¦°à¦¾à¦‡à¦­à¦¾à¦° à¦ªà¦¥à§‡ à¦†à¦›à§‡',
+  'Order delivered to your door': 'à¦…à¦°à§à¦¡à¦¾à¦° à¦†à¦ªà¦¨à¦¾à¦° à¦¦à¦°à¦œà¦¾à¦¯à¦¼ à¦ªà§Œà¦à¦›à§‡à¦›à§‡',
 };
 
 const BANNERS = [
-  { emoji: '🛒', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-500 to-teal-500', cta: 'Shop Now' },
-  { emoji: '🍕', title: 'Free Delivery', sub: 'On all orders above ৳500', bg: 'from-orange-400 to-orange-400', cta: 'Order Food' },
-  { emoji: '💊', title: 'Medicine in 30 min', sub: 'MedPlus pharmacy now at your doorstep', bg: 'from-sky-500 to-sky-400', cta: 'Order Medicine' },
-  { emoji: '🥭', title: 'Fresh Fruits & Veg', sub: 'Farm-fresh daily from Fresh Valley', bg: 'from-green-500 to-emerald-400', cta: 'Buy Fresh' },
+  { emoji: 'ðŸ›’', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-500 to-teal-500', cta: 'Shop Now' },
+  { emoji: 'ðŸ•', title: 'Free Delivery', sub: 'On all orders above à§³500', bg: 'from-orange-400 to-orange-400', cta: 'Order Food' },
+  { emoji: 'ðŸ’Š', title: 'Medicine in 30 min', sub: 'MedPlus pharmacy now at your doorstep', bg: 'from-sky-500 to-sky-400', cta: 'Order Medicine' },
+  { emoji: 'ðŸ¥­', title: 'Fresh Fruits & Veg', sub: 'Farm-fresh daily from Fresh Valley', bg: 'from-green-500 to-emerald-400', cta: 'Buy Fresh' },
 ];
 
 const COUPONS = [
-  { code: 'EID2024', discountText: '৳100 Flat Discount', desc: 'On orders above ৳500 from any store', validTill: '31 Aug 2026', discountValue: 100, minOrder: 500 },
+  { code: 'EID2024', discountText: 'à§³100 Flat Discount', desc: 'On orders above à§³500 from any store', validTill: '31 Aug 2026', discountValue: 100, minOrder: 500 },
   { code: 'FREESHIP', discountText: 'Free Delivery', desc: '100% free delivery on all grocery orders', validTill: '15 Aug 2026', isFreeShip: true, discountValue: 0, minOrder: 200 },
-  { code: 'SUMMER15', discountText: '15% Off (max ৳150)', desc: 'On bakery & restaurant orders above ৳400', validTill: '10 Aug 2026', discountValue: 150, minOrder: 400 },
-  { code: 'SMARTSHOP', discountText: '৳50 Smart Cashback', desc: 'Direct cashback to your wallet', validTill: '31 Dec 2026', discountValue: 50, minOrder: 0 },
+  { code: 'SUMMER15', discountText: '15% Off (max à§³150)', desc: 'On bakery & restaurant orders above à§³400', validTill: '10 Aug 2026', discountValue: 150, minOrder: 400 },
+  { code: 'SMARTSHOP', discountText: 'à§³50 Smart Cashback', desc: 'Direct cashback to your wallet', validTill: '31 Dec 2026', discountValue: 50, minOrder: 0 },
 ];
 
 const LS_KEYS = {
@@ -352,7 +425,7 @@ const LS_KEYS = {
 };
 
 // Send Money merchant wallets come from the shared admin-managed config
-// (bKash / Nagad / Upay / Rocket) — the admin edits these from the Orders dashboard.
+// (bKash / Nagad / Upay / Rocket) â€” the admin edits these from the Orders dashboard.
 
 const TRX_RE = /^[A-Z0-9]{8,20}$/;
 const PAY_SESSION_MS = 10 * 60 * 1000;   // 10-minute payment window
@@ -366,10 +439,10 @@ interface FraudRecord { sender: string; attempts: number; blockedUntil: number; 
 
 const SCHEDULE_SLOTS = [
   'ASAP (Fastest)',
-  'Today · 2:00 PM – 4:00 PM',
-  'Today · 5:00 PM – 7:00 PM',
-  'Today · 7:00 PM – 9:00 PM',
-  'Tomorrow · 10:00 AM – 12:00 PM',
+  'Today Â· 2:00 PM â€“ 4:00 PM',
+  'Today Â· 5:00 PM â€“ 7:00 PM',
+  'Today Â· 7:00 PM â€“ 9:00 PM',
+  'Tomorrow Â· 10:00 AM â€“ 12:00 PM',
 ];
 
 interface ChatMsg { id: string; from: 'me' | 'rider'; text: string; time: string; }
@@ -412,7 +485,7 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     notifications: 'Notifications',
     markAllRead: 'Mark all read',
     freeDelivery: 'Free Delivery',
-    freeDeliverySub: 'On orders above ৳500',
+    freeDeliverySub: 'On orders above à§³500',
     shopNow: 'Shop Now',
     exitCustomer: 'Exit Customer Site',
     popularNearYou: 'Popular Near You',
@@ -427,6 +500,28 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     securePaySub: 'bKash, Nagad, COD & card options',
     bestOffers: 'Best Offers',
     bestOffersSub: 'Exclusive deals on every order',
+    support: 'Support',
+    supportSub: 'support@nexagobd.com',
+    terms: 'Terms & Conditions',
+    termsSub: 'Our rules & guidelines',
+    privacy: 'Privacy Policy',
+    privacySub: 'Your data is safe with us',
+    refund: 'Refund Policy',
+    refundSub: 'Full refund guarantee',
+    t1: '1. Order price and delivery charge apply once the order is confirmed.',
+    t2: '2. Delivery time is 30â€“60 minutes depending on your area.',
+    t3: '3. Tracking unlocks only after admin verifies and approves your payment.',
+    t4: '4. Offers and deals may change over time.',
+    t5: '5. A re-delivery charge applies if the delivery address is incorrect.',
+    t6: '6. Contact our support team within 48 hours for any complaint.',
+    p1: '1. Your personal info (name, address, phone) is used only for delivery and order management.',
+    p2: '2. Payment details are processed securely through an encrypted payment gateway.',
+    p3: '3. We never share your data with third parties without your consent.',
+    p4: '4. You can request data deletion from our support team at any time.',
+    r1: '1. Full refund is given if the product is not delivered or the order is cancelled.',
+    r2: '2. Refund reaches your wallet or payment method within 24â€“48 hours after verification.',
+    r3: '3. Report wrong or damaged products within 48 hours of delivery.',
+    r4: '4. Refund reports are approved after admin verification.',
     allStores: 'All Stores',
     filter: 'Filter',
     sortBy: 'Sort by',
@@ -489,7 +584,7 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     silver: 'Silver VIP',
     gold: 'Gold VIP',
     earnPerOrder: 'Cashback on every order',
-    language: 'বাংলা',
+    language: 'à¦¬à¦¾à¦‚à¦²à¦¾',
     merchantPortal: 'Merchant Portal',
     productDetails: 'Product Details',
     reviews: 'Reviews',
@@ -523,16 +618,16 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     copyNumber: 'Copy Number',
     completeWithin: 'Complete payment within',
     sessionExpired: 'Session expired',
-    expiredMsg: 'This payment window has expired to prevent fake orders. Your cart is untouched — start again to place a fresh order.',
+    expiredMsg: 'This payment window has expired to prevent fake orders. Your cart is untouched â€” start again to place a fresh order.',
     close: 'Close',
     yourNumber: 'Your {m} number (sender)',
-    sentAmount: 'Sent amount (must equal ৳{x})',
-    exactMatch: '✓ Exact amount matches',
-    amountMatch: 'Amount must match exactly ৳{x}',
-    reference: '📝 Send Money Reference',
+    sentAmount: 'Sent amount (must equal à§³{x})',
+    exactMatch: 'âœ“ Exact amount matches',
+    amountMatch: 'Amount must match exactly à§³{x}',
+    reference: 'ðŸ“ Send Money Reference',
     referenceHint: 'When sending, put this note in the reference box:',
     trxIdLabel: '{m} TrxID',
-    trxIdHint: '8–20 letters/digits from your SMS confirmation.',
+    trxIdHint: '8â€“20 letters/digits from your SMS confirmation.',
     receiptLabel: 'Payment receipt / screenshot',
     uploadReceipt: 'Upload screenshot',
     changeReceipt: 'Change receipt',
@@ -544,158 +639,180 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     anotherNumber: 'Use another number',
   },
   bn: {
-    brandTag: 'নেক্সাগো বিডি ডেলিভারি',
-    searchPlaceholder: 'দোকান, রেস্তোরাঁ, ফার্মেসি খুঁজুন...',
-    home: 'হোম',
-    orders: 'অর্ডার',
-    myOrders: 'আমার অর্ডার',
-    favorites: 'প্রিয়',
-    addresses: 'ঠিকানা',
-    payments: 'পেমেন্ট',
-    wallet: 'ওয়ালেট',
-    coupons: 'কুপন',
-    help: 'সাহায্য ও সাপোর্ট',
-    settings: 'সেটিংস',
-    notifications: 'নোটিফিকেশন',
-    markAllRead: 'সব পড়া হয়েছে',
-    freeDelivery: 'ফ্রি ডেলিভারি',
-    freeDeliverySub: '৳৫০০ এর উপরে অর্ডারে',
-    shopNow: 'কিনুন',
-    exitCustomer: 'কাস্টমার সাইট ত্যাগ করুন',
-    popularNearYou: 'আপনার কাছাকাছি জনপ্রিয়',
-    popularSub: 'আপনার এলাকার সেরা দোকানগুলো',
-    viewAll: 'সব দেখুন',
-    orderNow: 'অর্ডার করুন',
-    wideRange: 'বহু দোকান',
-    wideRangeSub: 'বাজার, রেস্তোরাঁ, ফার্মেসি ও আরও অনেক কিছু',
-    fastDelivery: 'দ্রুত ডেলিভারি',
-    fastDeliverySub: 'দরজায় দ্রুত ডেলিভারি',
-    securePay: 'নিরাপদ পেমেন্ট',
-    securePaySub: 'বিকাশ, নগদ, ক্যাশ ও কার্ড',
-    bestOffers: 'সেরা অফার',
-    bestOffersSub: 'প্রতিটি অর্ডারে এক্সক্লুসিভ ডিল',
-    allStores: 'সব দোকান',
-    filter: 'ফিল্টার',
-    sortBy: 'সাজান',
-    recommended: 'সুপারিশকৃত',
-    highestRating: 'সর্বোচ্চ রেটিং',
-    fastestDelivery: 'দ্রুততম ডেলিভারি',
-    myOrderHistory: 'আমার অর্ডার ইতিহাস',
-    orderHistorySub: 'সক্রিয় ডেলিভারি ট্র্যাক করুন, রসিদ QR দেখুন ও পুনরায় অর্ডার করুন',
-    browseStores: 'দোকান দেখুন',
-    noOrders: 'এখনো কোনো অর্ডার নেই',
-    noOrdersSub: 'আপনার প্রিয় দোকান থেকে পণ্য বেছে অর্ডার করুন।',
-    totalAmount: 'মোট পরিমাণ',
-    receipt: 'রসিদ',
-    trackDelivery: 'ডেলিভারি ট্র্যাক করুন',
-    delivered: 'ডেলিভারড',
-    reOrder: 'পুনরায় অর্ডার',
-    cancelOrder: 'অর্ডার বাতিল',
-    delivery: 'ডেলিভারি',
-    contactPhone: 'যোগাযোগের নম্বর',
-    paymentMethod: 'পেমেন্ট পদ্ধতি',
-    placeOrder: 'অর্ডার করুন',
-    orderNote: 'অর্ডার নোট (ঐচ্ছিক)',
-    yourBasket: 'আপনার ঝুড়ি',
-    items: 'আইটেম',
-    basketEmpty: 'ঝুড়ি খালি। মেনু থেকে পণ্য যোগ করুন।',
-    couponCode: 'কুপন কোড (EID2024)',
-    apply: 'প্রয়োগ',
-    subtotal: 'সাবটোটাল',
-    vat: 'ভ্যাট (৫%)',
-    promoDiscount: 'প্রোমো ডিসকাউন্ট',
-    grandTotal: 'সর্বমোট',
-    deliveryDetails: 'ডেলিভারি বিবরণ',
-    deliveryAddress: 'ডেলিভারি ঠিকানা',
-    savedAddresses: 'সংরক্ষিত ঠিকানা',
-    addNewAddress: 'নতুন ঠিকানা যোগ করুন',
-    newAddressDetails: 'নতুন ঠিকানার বিবরণ',
-    saveAddress: 'ঠিকানা সংরক্ষণ',
-    cancel: 'বাতিল',
-    defaultAddress: 'ডিফল্ট ঠিকানা',
-    useForOrders: 'অর্ডারে ব্যবহার করুন',
-    delete: 'মুছুন',
-    paymentMethods: 'পেমেন্ট পদ্ধতি',
-    linkPayment: 'পেমেন্ট অ্যাকাউন্ট লিংক',
-    walletBalance: 'ওয়ালেট ব্যালেন্স',
-    topUp: 'টপ-আপ',
-    noFavoriteStores: 'কোনো প্রিয় দোকান নেই',
-    liveTracking: 'লাইভ ডেলিভারি ট্র্যাকিং',
-    orderConfirmed: 'অর্ডার নিশ্চিত হয়েছে',
-    preparingAtStore: 'দোকানে প্রস্তুত হচ্ছে',
-    outForDelivery: 'ডেলিভারির পথে',
-    minsAway: 'মিনিট বাকি',
-    closeTracking: 'ট্র্যাকিং উইন্ডো বন্ধ করুন',
-    officialReceipt: 'অফিসিয়াল অর্ডার রসিদ',
-    printReceipt: 'রসিদ প্রিন্ট করুন',
-    viewStore: 'দোকান দেখুন',
-    goToCart: 'কার্ট দেখুন',
-    bestCoupon: 'আপনার জন্য সেরা কুপন',
-    loyaltyTier: 'আপনার রিওয়ার্ড লেভেল',
-    standard: 'স্ট্যান্ডার্ড মেম্বার',
-    silver: 'সিলভার ভিআইপি',
-    gold: 'গোল্ড ভিআইপি',
-    earnPerOrder: 'প্রতিটি অর্ডারে ক্যাশব্যাক',
+    brandTag: 'à¦¨à§‡à¦•à§à¦¸à¦¾à¦—à§‹ à¦¬à¦¿à¦¡à¦¿ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿',
+    searchPlaceholder: 'à¦¦à§‹à¦•à¦¾à¦¨, à¦°à§‡à¦¸à§à¦¤à§‹à¦°à¦¾à¦, à¦«à¦¾à¦°à§à¦®à§‡à¦¸à¦¿ à¦–à§à¦à¦œà§à¦¨...',
+    home: 'à¦¹à§‹à¦®',
+    orders: 'à¦…à¦°à§à¦¡à¦¾à¦°',
+    myOrders: 'à¦†à¦®à¦¾à¦° à¦…à¦°à§à¦¡à¦¾à¦°',
+    favorites: 'à¦ªà§à¦°à¦¿à¦¯à¦¼',
+    addresses: 'à¦ à¦¿à¦•à¦¾à¦¨à¦¾',
+    payments: 'à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ',
+    wallet: 'à¦“à¦¯à¦¼à¦¾à¦²à§‡à¦Ÿ',
+    coupons: 'à¦•à§à¦ªà¦¨',
+    help: 'à¦¸à¦¾à¦¹à¦¾à¦¯à§à¦¯ à¦“ à¦¸à¦¾à¦ªà§‹à¦°à§à¦Ÿ',
+    settings: 'à¦¸à§‡à¦Ÿà¦¿à¦‚à¦¸',
+    notifications: 'à¦¨à§‹à¦Ÿà¦¿à¦«à¦¿à¦•à§‡à¦¶à¦¨',
+    markAllRead: 'à¦¸à¦¬ à¦ªà¦¡à¦¼à¦¾ à¦¹à¦¯à¦¼à§‡à¦›à§‡',
+    freeDelivery: 'à¦«à§à¦°à¦¿ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿',
+    freeDeliverySub: 'à§³à§«à§¦à§¦ à¦à¦° à¦‰à¦ªà¦°à§‡ à¦…à¦°à§à¦¡à¦¾à¦°à§‡',
+    shopNow: 'à¦•à¦¿à¦¨à§à¦¨',
+    exitCustomer: 'à¦•à¦¾à¦¸à§à¦Ÿà¦®à¦¾à¦° à¦¸à¦¾à¦‡à¦Ÿ à¦¤à§à¦¯à¦¾à¦— à¦•à¦°à§à¦¨',
+    popularNearYou: 'à¦†à¦ªà¦¨à¦¾à¦° à¦•à¦¾à¦›à¦¾à¦•à¦¾à¦›à¦¿ à¦œà¦¨à¦ªà§à¦°à¦¿à¦¯à¦¼',
+    popularSub: 'à¦†à¦ªà¦¨à¦¾à¦° à¦à¦²à¦¾à¦•à¦¾à¦° à¦¸à§‡à¦°à¦¾ à¦¦à§‹à¦•à¦¾à¦¨à¦—à§à¦²à§‹',
+    viewAll: 'à¦¸à¦¬ à¦¦à§‡à¦–à§à¦¨',
+    orderNow: 'à¦…à¦°à§à¦¡à¦¾à¦° à¦•à¦°à§à¦¨',
+    wideRange: 'à¦¬à¦¹à§ à¦¦à§‹à¦•à¦¾à¦¨',
+    wideRangeSub: 'à¦¬à¦¾à¦œà¦¾à¦°, à¦°à§‡à¦¸à§à¦¤à§‹à¦°à¦¾à¦, à¦«à¦¾à¦°à§à¦®à§‡à¦¸à¦¿ à¦“ à¦†à¦°à¦“ à¦…à¦¨à§‡à¦• à¦•à¦¿à¦›à§',
+    fastDelivery: 'à¦¦à§à¦°à§à¦¤ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿',
+    fastDeliverySub: 'à¦¦à¦°à¦œà¦¾à¦¯à¦¼ à¦¦à§à¦°à§à¦¤ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿',
+    securePay: 'à¦¨à¦¿à¦°à¦¾à¦ªà¦¦ à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ',
+    securePaySub: 'à¦¬à¦¿à¦•à¦¾à¦¶, à¦¨à¦—à¦¦, à¦•à§à¦¯à¦¾à¦¶ à¦“ à¦•à¦¾à¦°à§à¦¡',
+    bestOffers: 'à¦¸à§‡à¦°à¦¾ à¦…à¦«à¦¾à¦°',
+    bestOffersSub: 'à¦ªà§à¦°à¦¤à¦¿à¦Ÿà¦¿ à¦…à¦°à§à¦¡à¦¾à¦°à§‡ à¦à¦•à§à¦¸à¦•à§à¦²à§à¦¸à¦¿à¦­ à¦¡à¦¿à¦²',
+    support: 'à¦¸à¦¾à¦ªà§‹à¦°à§à¦Ÿ',
+    supportSub: 'support@nexagobd.com',
+    terms: 'à¦Ÿà¦¾à¦°à§à¦®à¦¸ à¦…à§à¦¯à¦¾à¦¨à§à¦¡ à¦•à¦¨à§à¦¡à¦¿à¦¶à¦¨à¦¸',
+    termsSub: 'à¦†à¦®à¦¾à¦¦à§‡à¦° à¦¨à¦¿à¦¯à¦¼à¦®à¦¾à¦¬à¦²à¦¿',
+    privacy: 'à¦ªà§à¦°à¦¾à¦‡à¦­à§‡à¦¸à¦¿ à¦ªà¦²à¦¿à¦¸à¦¿',
+    privacySub: 'à¦†à¦ªà¦¨à¦¾à¦° à¦¤à¦¥à§à¦¯ à¦¸à§à¦°à¦•à§à¦·à¦¿à¦¤',
+    refund: 'à¦°à¦¿à¦«à¦¾à¦¨à§à¦¡ à¦ªà¦²à¦¿à¦¸à¦¿',
+    refundSub: 'à¦«à§à¦² à¦°à¦¿à¦«à¦¾à¦¨à§à¦¡ à¦—à§à¦¯à¦¾à¦°à¦¾à¦¨à§à¦Ÿà¦¿',
+    t1: 'à§§. à¦…à¦°à§à¦¡à¦¾à¦° à¦¨à¦¿à¦¶à§à¦šà¦¿à¦¤ à¦¹à¦“à¦¯à¦¼à¦¾à¦° à¦ªà¦° à¦ªà¦£à§à¦¯à§‡à¦° à¦®à§‚à¦²à§à¦¯ à¦“ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦šà¦¾à¦°à§à¦œ à¦ªà§à¦°à¦¯à§‹à¦œà§à¦¯ à¦¥à¦¾à¦•à¦¬à§‡à¥¤',
+    t2: 'à§¨. à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦¸à¦®à¦¯à¦¼ à¦¶à¦¹à¦°à¦­à§‡à¦¦à§‡ à§©à§¦â€“à§¬à§¦ à¦®à¦¿à¦¨à¦¿à¦Ÿà§‡à¦° à¦®à¦§à§à¦¯à§‡ à¦¹à¦¯à¦¼à§‡ à¦¥à¦¾à¦•à§‡à¥¤',
+    t3: 'à§©. à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦…à§à¦¯à¦¾à¦¡à¦®à¦¿à¦¨ à¦¯à¦¾à¦šà¦¾à¦‡ à¦•à¦°à¦¾à¦° à¦ªà¦°à¦‡ à¦…à¦°à§à¦¡à¦¾à¦° à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿à¦° à¦œà¦¨à§à¦¯ à¦Ÿà§à¦°à§à¦¯à¦¾à¦•à¦¿à¦‚ à¦–à§à¦²à¦¬à§‡à¥¤',
+    t4: 'à§ª. à¦…à§à¦¯à¦¾à¦ªà§‡à¦° à¦®à¦¾à¦§à§à¦¯à¦®à§‡ à¦˜à§‹à¦·à¦¿à¦¤ à¦¯à§‡à¦•à§‹à¦¨à§‹ à¦…à¦«à¦¾à¦° à¦“ à¦¡à¦¿à¦² à¦¸à¦®à¦¯à¦¼à¦¸à¦¾à¦ªà§‡à¦•à§à¦· à¦ªà¦°à¦¿à¦¬à¦°à§à¦¤à¦¨ à¦¹à¦¤à§‡ à¦ªà¦¾à¦°à§‡à¥¤',
+    t5: 'à§«. à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦ à¦¿à¦•à¦¾à¦¨à¦¾ à¦¸à¦ à¦¿à¦• à¦¨à¦¾ à¦¹à¦²à§‡ à¦ªà§à¦¨à¦°à¦¾à¦¯à¦¼ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦šà¦¾à¦°à§à¦œ à¦ªà§à¦°à¦¯à§‹à¦œà§à¦¯ à¦¹à¦¬à§‡à¥¤',
+    t6: 'à§¬. à¦¯à§‡à¦•à§‹à¦¨à§‹ à¦…à¦­à¦¿à¦¯à§‹à¦—à§‡à¦° à¦œà¦¨à§à¦¯ à§ªà§® à¦˜à¦£à§à¦Ÿà¦¾à¦° à¦®à¦§à§à¦¯à§‡ à¦†à¦®à¦¾à¦¦à§‡à¦° à¦¸à¦¾à¦ªà§‹à¦°à§à¦Ÿ à¦Ÿà¦¿à¦®à§‡à¦° à¦¸à¦¾à¦¥à§‡ à¦¯à§‹à¦—à¦¾à¦¯à§‹à¦— à¦•à¦°à§à¦¨à¥¤',
+    p1: 'à§§. à¦†à¦ªà¦¨à¦¾à¦° à¦¬à§à¦¯à¦•à§à¦¤à¦¿à¦—à¦¤ à¦¤à¦¥à§à¦¯ (à¦¨à¦¾à¦®, à¦ à¦¿à¦•à¦¾à¦¨à¦¾, à¦«à§‹à¦¨) à¦¶à§à¦§à§à¦®à¦¾à¦¤à§à¦° à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦“ à¦…à¦°à§à¦¡à¦¾à¦° à¦ªà¦°à¦¿à¦šà¦¾à¦²à¦¨à¦¾à¦° à¦œà¦¨à§à¦¯ à¦¬à§à¦¯à¦¬à¦¹à§ƒà¦¤ à¦¹à¦¯à¦¼à¥¤',
+    p2: 'à§¨. à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦¤à¦¥à§à¦¯ à¦à¦¨à¦•à§à¦°à¦¿à¦ªà§à¦Ÿà§‡à¦¡ à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦—à§‡à¦Ÿà¦“à¦¯à¦¼à§‡à¦° à¦®à¦¾à¦§à§à¦¯à¦®à§‡ à¦¨à¦¿à¦°à¦¾à¦ªà¦¦à§‡ à¦ªà§à¦°à¦¸à§‡à¦¸ à¦¹à¦¯à¦¼à¥¤',
+    p3: 'à§©. à¦†à¦ªà¦¨à¦¾à¦° à¦…à¦¨à§à¦®à¦¤à¦¿ à¦›à¦¾à¦¡à¦¼à¦¾ à¦¤à§ƒà¦¤à§€à¦¯à¦¼ à¦ªà¦•à§à¦·à§‡à¦° à¦¸à¦¾à¦¥à§‡ à¦¤à¦¥à§à¦¯ à¦¶à§‡à¦¯à¦¼à¦¾à¦° à¦•à¦°à¦¾ à¦¹à¦¯à¦¼ à¦¨à¦¾à¥¤',
+    p4: 'à§ª. à¦†à¦ªà¦¨à¦¿ à¦¯à§‡à¦•à§‹à¦¨à§‹ à¦¸à¦®à¦¯à¦¼ à¦†à¦®à¦¾à¦¦à§‡à¦° à¦¸à¦¾à¦ªà§‹à¦°à§à¦Ÿ à¦Ÿà¦¿à¦®à§‡à¦° à¦•à¦¾à¦›à§‡ à¦¤à¦¥à§à¦¯ à¦®à§à¦›à§‡ à¦«à§‡à¦²à¦¾à¦° à¦…à¦¨à§à¦°à§‹à¦§ à¦•à¦°à¦¤à§‡ à¦ªà¦¾à¦°à¦¬à§‡à¦¨à¥¤',
+    r1: 'à§§. à¦ªà¦£à§à¦¯ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦¨à¦¾ à¦¹à¦“à¦¯à¦¼à¦¾ à¦¬à¦¾ à¦…à¦°à§à¦¡à¦¾à¦° à¦•à§à¦¯à¦¾à¦¨à§à¦¸à§‡à¦² à¦¹à¦²à§‡ à¦ªà§‚à¦°à§à¦£ à¦…à¦°à§à¦¥ à¦«à§‡à¦°à¦¤ à¦¦à§‡à¦“à¦¯à¦¼à¦¾ à¦¹à¦¯à¦¼à¥¤',
+    r2: 'à§¨. à¦°à¦¿à¦«à¦¾à¦¨à§à¦¡ à¦¯à¦¾à¦šà¦¾à¦‡ à¦¹à¦“à¦¯à¦¼à¦¾à¦° à¦ªà¦° à§¨à§ªâ€“à§ªà§® à¦˜à¦£à§à¦Ÿà¦¾à¦° à¦®à¦§à§à¦¯à§‡ à¦†à¦ªà¦¨à¦¾à¦° à¦“à¦¯à¦¼à¦¾à¦²à§‡à¦Ÿ à¦¬à¦¾ à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦®à§‡à¦¥à¦¡à§‡ à¦«à§‡à¦°à¦¤ à¦¯à¦¾à¦¬à§‡à¥¤',
+    r3: 'à§©. à¦­à§à¦² à¦ªà¦£à§à¦¯ à¦¬à¦¾ à¦•à§à¦·à¦¤à¦¿à¦—à§à¦°à¦¸à§à¦¤ à¦ªà¦£à§à¦¯ à¦ªà§‡à¦²à§‡ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿à¦° à§ªà§® à¦˜à¦£à§à¦Ÿà¦¾à¦° à¦®à¦§à§à¦¯à§‡ à¦°à¦¿à¦ªà§‹à¦°à§à¦Ÿ à¦•à¦°à§à¦¨à¥¤',
+    r4: 'à§ª. à¦°à¦¿à¦«à¦¾à¦¨à§à¦¡ à¦°à¦¿à¦ªà§‹à¦°à§à¦Ÿ à¦…à§à¦¯à¦¾à¦¡à¦®à¦¿à¦¨ à¦¯à¦¾à¦šà¦¾à¦‡à¦¯à¦¼à§‡à¦° à¦ªà¦° à¦…à¦¨à§à¦®à§‹à¦¦à¦¿à¦¤ à¦¹à¦¯à¦¼à¥¤',
+    allStores: 'à¦¸à¦¬ à¦¦à§‹à¦•à¦¾à¦¨',
+    filter: 'à¦«à¦¿à¦²à§à¦Ÿà¦¾à¦°',
+    sortBy: 'à¦¸à¦¾à¦œà¦¾à¦¨',
+    recommended: 'à¦¸à§à¦ªà¦¾à¦°à¦¿à¦¶à¦•à§ƒà¦¤',
+    highestRating: 'à¦¸à¦°à§à¦¬à§‹à¦šà§à¦š à¦°à§‡à¦Ÿà¦¿à¦‚',
+    fastestDelivery: 'à¦¦à§à¦°à§à¦¤à¦¤à¦® à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿',
+    myOrderHistory: 'à¦†à¦®à¦¾à¦° à¦…à¦°à§à¦¡à¦¾à¦° à¦‡à¦¤à¦¿à¦¹à¦¾à¦¸',
+    orderHistorySub: 'à¦¸à¦•à§à¦°à¦¿à¦¯à¦¼ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦Ÿà§à¦°à§à¦¯à¦¾à¦• à¦•à¦°à§à¦¨, à¦°à¦¸à¦¿à¦¦ QR à¦¦à§‡à¦–à§à¦¨ à¦“ à¦ªà§à¦¨à¦°à¦¾à¦¯à¦¼ à¦…à¦°à§à¦¡à¦¾à¦° à¦•à¦°à§à¦¨',
+    browseStores: 'à¦¦à§‹à¦•à¦¾à¦¨ à¦¦à§‡à¦–à§à¦¨',
+    noOrders: 'à¦à¦–à¦¨à§‹ à¦•à§‹à¦¨à§‹ à¦…à¦°à§à¦¡à¦¾à¦° à¦¨à§‡à¦‡',
+    noOrdersSub: 'à¦†à¦ªà¦¨à¦¾à¦° à¦ªà§à¦°à¦¿à¦¯à¦¼ à¦¦à§‹à¦•à¦¾à¦¨ à¦¥à§‡à¦•à§‡ à¦ªà¦£à§à¦¯ à¦¬à§‡à¦›à§‡ à¦…à¦°à§à¦¡à¦¾à¦° à¦•à¦°à§à¦¨à¥¤',
+    totalAmount: 'à¦®à§‹à¦Ÿ à¦ªà¦°à¦¿à¦®à¦¾à¦£',
+    receipt: 'à¦°à¦¸à¦¿à¦¦',
+    trackDelivery: 'à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦Ÿà§à¦°à§à¦¯à¦¾à¦• à¦•à¦°à§à¦¨',
+    delivered: 'à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¡',
+    reOrder: 'à¦ªà§à¦¨à¦°à¦¾à¦¯à¦¼ à¦…à¦°à§à¦¡à¦¾à¦°',
+    cancelOrder: 'à¦…à¦°à§à¦¡à¦¾à¦° à¦¬à¦¾à¦¤à¦¿à¦²',
+    delivery: 'à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿',
+    contactPhone: 'à¦¯à§‹à¦—à¦¾à¦¯à§‹à¦—à§‡à¦° à¦¨à¦®à§à¦¬à¦°',
+    paymentMethod: 'à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦ªà¦¦à§à¦§à¦¤à¦¿',
+    placeOrder: 'à¦…à¦°à§à¦¡à¦¾à¦° à¦•à¦°à§à¦¨',
+    orderNote: 'à¦…à¦°à§à¦¡à¦¾à¦° à¦¨à§‹à¦Ÿ (à¦à¦šà§à¦›à¦¿à¦•)',
+    yourBasket: 'à¦†à¦ªà¦¨à¦¾à¦° à¦à§à¦¡à¦¼à¦¿',
+    items: 'à¦†à¦‡à¦Ÿà§‡à¦®',
+    basketEmpty: 'à¦à§à¦¡à¦¼à¦¿ à¦–à¦¾à¦²à¦¿à¥¤ à¦®à§‡à¦¨à§ à¦¥à§‡à¦•à§‡ à¦ªà¦£à§à¦¯ à¦¯à§‹à¦— à¦•à¦°à§à¦¨à¥¤',
+    couponCode: 'à¦•à§à¦ªà¦¨ à¦•à§‹à¦¡ (EID2024)',
+    apply: 'à¦ªà§à¦°à¦¯à¦¼à§‹à¦—',
+    subtotal: 'à¦¸à¦¾à¦¬à¦Ÿà§‹à¦Ÿà¦¾à¦²',
+    vat: 'à¦­à§à¦¯à¦¾à¦Ÿ (à§«%)',
+    promoDiscount: 'à¦ªà§à¦°à§‹à¦®à§‹ à¦¡à¦¿à¦¸à¦•à¦¾à¦‰à¦¨à§à¦Ÿ',
+    grandTotal: 'à¦¸à¦°à§à¦¬à¦®à§‹à¦Ÿ',
+    deliveryDetails: 'à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦¬à¦¿à¦¬à¦°à¦£',
+    deliveryAddress: 'à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦ à¦¿à¦•à¦¾à¦¨à¦¾',
+    savedAddresses: 'à¦¸à¦‚à¦°à¦•à§à¦·à¦¿à¦¤ à¦ à¦¿à¦•à¦¾à¦¨à¦¾',
+    addNewAddress: 'à¦¨à¦¤à§à¦¨ à¦ à¦¿à¦•à¦¾à¦¨à¦¾ à¦¯à§‹à¦— à¦•à¦°à§à¦¨',
+    newAddressDetails: 'à¦¨à¦¤à§à¦¨ à¦ à¦¿à¦•à¦¾à¦¨à¦¾à¦° à¦¬à¦¿à¦¬à¦°à¦£',
+    saveAddress: 'à¦ à¦¿à¦•à¦¾à¦¨à¦¾ à¦¸à¦‚à¦°à¦•à§à¦·à¦£',
+    cancel: 'à¦¬à¦¾à¦¤à¦¿à¦²',
+    defaultAddress: 'à¦¡à¦¿à¦«à¦²à§à¦Ÿ à¦ à¦¿à¦•à¦¾à¦¨à¦¾',
+    useForOrders: 'à¦…à¦°à§à¦¡à¦¾à¦°à§‡ à¦¬à§à¦¯à¦¬à¦¹à¦¾à¦° à¦•à¦°à§à¦¨',
+    delete: 'à¦®à§à¦›à§à¦¨',
+    paymentMethods: 'à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦ªà¦¦à§à¦§à¦¤à¦¿',
+    linkPayment: 'à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦…à§à¦¯à¦¾à¦•à¦¾à¦‰à¦¨à§à¦Ÿ à¦²à¦¿à¦‚à¦•',
+    walletBalance: 'à¦“à¦¯à¦¼à¦¾à¦²à§‡à¦Ÿ à¦¬à§à¦¯à¦¾à¦²à§‡à¦¨à§à¦¸',
+    topUp: 'à¦Ÿà¦ª-à¦†à¦ª',
+    noFavoriteStores: 'à¦•à§‹à¦¨à§‹ à¦ªà§à¦°à¦¿à¦¯à¦¼ à¦¦à§‹à¦•à¦¾à¦¨ à¦¨à§‡à¦‡',
+    liveTracking: 'à¦²à¦¾à¦‡à¦­ à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿ à¦Ÿà§à¦°à§à¦¯à¦¾à¦•à¦¿à¦‚',
+    orderConfirmed: 'à¦…à¦°à§à¦¡à¦¾à¦° à¦¨à¦¿à¦¶à§à¦šà¦¿à¦¤ à¦¹à¦¯à¦¼à§‡à¦›à§‡',
+    preparingAtStore: 'à¦¦à§‹à¦•à¦¾à¦¨à§‡ à¦ªà§à¦°à¦¸à§à¦¤à§à¦¤ à¦¹à¦šà§à¦›à§‡',
+    outForDelivery: 'à¦¡à§‡à¦²à¦¿à¦­à¦¾à¦°à¦¿à¦° à¦ªà¦¥à§‡',
+    minsAway: 'à¦®à¦¿à¦¨à¦¿à¦Ÿ à¦¬à¦¾à¦•à¦¿',
+    closeTracking: 'à¦Ÿà§à¦°à§à¦¯à¦¾à¦•à¦¿à¦‚ à¦‰à¦‡à¦¨à§à¦¡à§‹ à¦¬à¦¨à§à¦§ à¦•à¦°à§à¦¨',
+    officialReceipt: 'à¦…à¦«à¦¿à¦¸à¦¿à¦¯à¦¼à¦¾à¦² à¦…à¦°à§à¦¡à¦¾à¦° à¦°à¦¸à¦¿à¦¦',
+    printReceipt: 'à¦°à¦¸à¦¿à¦¦ à¦ªà§à¦°à¦¿à¦¨à§à¦Ÿ à¦•à¦°à§à¦¨',
+    viewStore: 'à¦¦à§‹à¦•à¦¾à¦¨ à¦¦à§‡à¦–à§à¦¨',
+    goToCart: 'à¦•à¦¾à¦°à§à¦Ÿ à¦¦à§‡à¦–à§à¦¨',
+    bestCoupon: 'à¦†à¦ªà¦¨à¦¾à¦° à¦œà¦¨à§à¦¯ à¦¸à§‡à¦°à¦¾ à¦•à§à¦ªà¦¨',
+    loyaltyTier: 'à¦†à¦ªà¦¨à¦¾à¦° à¦°à¦¿à¦“à¦¯à¦¼à¦¾à¦°à§à¦¡ à¦²à§‡à¦­à§‡à¦²',
+    standard: 'à¦¸à§à¦Ÿà§à¦¯à¦¾à¦¨à§à¦¡à¦¾à¦°à§à¦¡ à¦®à§‡à¦®à§à¦¬à¦¾à¦°',
+    silver: 'à¦¸à¦¿à¦²à¦­à¦¾à¦° à¦­à¦¿à¦†à¦‡à¦ªà¦¿',
+    gold: 'à¦—à§‹à¦²à§à¦¡ à¦­à¦¿à¦†à¦‡à¦ªà¦¿',
+    earnPerOrder: 'à¦ªà§à¦°à¦¤à¦¿à¦Ÿà¦¿ à¦…à¦°à§à¦¡à¦¾à¦°à§‡ à¦•à§à¦¯à¦¾à¦¶à¦¬à§à¦¯à¦¾à¦•',
     language: 'English',
-    merchantPortal: 'মার্চেন্ট পোর্টাল',
-    productDetails: 'পণ্যের বিবরণ',
-    reviews: 'রিভিউ',
-    writeReview: 'রিভিউ লিখুন',
-    submitReview: 'রিভিউ জমা দিন',
-    addToCart: 'যোগ করুন',
-    searchResults: 'সার্চ ফলাফল',
-    storeMatches: 'দোকান',
-    productMatches: 'পণ্য',
-    noResults: 'কোনো ফলাফল পাওয়া যায়নি',
-    noResultsSub: 'অন্য কীওয়ার্ড দিয়ে চেষ্টা করুন।',
-    cartDrawer: 'আপনার কার্ট',
-    checkout: 'চেকআউট',
-    emptyCart: 'আপনার কার্ট খালি',
-    emptyCartSub: 'দোকান ঘুরে কার্টে পণ্য যোগ করুন।',
-    confirmCancelTitle: 'এই অর্ডারটি বাতিল করবেন?',
-    confirmCancelBody: 'অর্ডারটি বাতিল হলে টাকা ওয়ালেটে ফেরত যাবে।',
-    yesCancel: 'হ্যাঁ, অর্ডার বাতিল',
-    keepOrder: 'অর্ডার রাখুন',
-    cancelled: 'বাতিল',
-    freeShip: 'ফ্রি',
-    callDriver: 'ড্রাইভারকে কল',
-    courierDriver: 'কুরিয়ার ড্রাইভার',
-    atStore: 'দোকানে',
-    assignedDriver: 'রাইডার নিয়োগ হয়েছে',
-    fromWallet: 'ওয়ালেট থেকে',
+    merchantPortal: 'à¦®à¦¾à¦°à§à¦šà§‡à¦¨à§à¦Ÿ à¦ªà§‹à¦°à§à¦Ÿà¦¾à¦²',
+    productDetails: 'à¦ªà¦£à§à¦¯à§‡à¦° à¦¬à¦¿à¦¬à¦°à¦£',
+    reviews: 'à¦°à¦¿à¦­à¦¿à¦‰',
+    writeReview: 'à¦°à¦¿à¦­à¦¿à¦‰ à¦²à¦¿à¦–à§à¦¨',
+    submitReview: 'à¦°à¦¿à¦­à¦¿à¦‰ à¦œà¦®à¦¾ à¦¦à¦¿à¦¨',
+    addToCart: 'à¦¯à§‹à¦— à¦•à¦°à§à¦¨',
+    searchResults: 'à¦¸à¦¾à¦°à§à¦š à¦«à¦²à¦¾à¦«à¦²',
+    storeMatches: 'à¦¦à§‹à¦•à¦¾à¦¨',
+    productMatches: 'à¦ªà¦£à§à¦¯',
+    noResults: 'à¦•à§‹à¦¨à§‹ à¦«à¦²à¦¾à¦«à¦² à¦ªà¦¾à¦“à¦¯à¦¼à¦¾ à¦¯à¦¾à¦¯à¦¼à¦¨à¦¿',
+    noResultsSub: 'à¦…à¦¨à§à¦¯ à¦•à§€à¦“à¦¯à¦¼à¦¾à¦°à§à¦¡ à¦¦à¦¿à¦¯à¦¼à§‡ à¦šà§‡à¦·à§à¦Ÿà¦¾ à¦•à¦°à§à¦¨à¥¤',
+    cartDrawer: 'à¦†à¦ªà¦¨à¦¾à¦° à¦•à¦¾à¦°à§à¦Ÿ',
+    checkout: 'à¦šà§‡à¦•à¦†à¦‰à¦Ÿ',
+    emptyCart: 'à¦†à¦ªà¦¨à¦¾à¦° à¦•à¦¾à¦°à§à¦Ÿ à¦–à¦¾à¦²à¦¿',
+    emptyCartSub: 'à¦¦à§‹à¦•à¦¾à¦¨ à¦˜à§à¦°à§‡ à¦•à¦¾à¦°à§à¦Ÿà§‡ à¦ªà¦£à§à¦¯ à¦¯à§‹à¦— à¦•à¦°à§à¦¨à¥¤',
+    confirmCancelTitle: 'à¦à¦‡ à¦…à¦°à§à¦¡à¦¾à¦°à¦Ÿà¦¿ à¦¬à¦¾à¦¤à¦¿à¦² à¦•à¦°à¦¬à§‡à¦¨?',
+    confirmCancelBody: 'à¦…à¦°à§à¦¡à¦¾à¦°à¦Ÿà¦¿ à¦¬à¦¾à¦¤à¦¿à¦² à¦¹à¦²à§‡ à¦Ÿà¦¾à¦•à¦¾ à¦“à¦¯à¦¼à¦¾à¦²à§‡à¦Ÿà§‡ à¦«à§‡à¦°à¦¤ à¦¯à¦¾à¦¬à§‡à¥¤',
+    yesCancel: 'à¦¹à§à¦¯à¦¾à¦, à¦…à¦°à§à¦¡à¦¾à¦° à¦¬à¦¾à¦¤à¦¿à¦²',
+    keepOrder: 'à¦…à¦°à§à¦¡à¦¾à¦° à¦°à¦¾à¦–à§à¦¨',
+    cancelled: 'à¦¬à¦¾à¦¤à¦¿à¦²',
+    freeShip: 'à¦«à§à¦°à¦¿',
+    callDriver: 'à¦¡à§à¦°à¦¾à¦‡à¦­à¦¾à¦°à¦•à§‡ à¦•à¦²',
+    courierDriver: 'à¦•à§à¦°à¦¿à¦¯à¦¼à¦¾à¦° à¦¡à§à¦°à¦¾à¦‡à¦­à¦¾à¦°',
+    atStore: 'à¦¦à§‹à¦•à¦¾à¦¨à§‡',
+    assignedDriver: 'à¦°à¦¾à¦‡à¦¡à¦¾à¦° à¦¨à¦¿à¦¯à¦¼à§‹à¦— à¦¹à¦¯à¦¼à§‡à¦›à§‡',
+    fromWallet: 'à¦“à¦¯à¦¼à¦¾à¦²à§‡à¦Ÿ à¦¥à§‡à¦•à§‡',
     // Payment instructions
-    amountToPay: 'পরিশোধের পরিমাণ',
-    secureVia: 'নেক্সাগো পে গেটওয়ে মাধ্যমে নিরাপদ পেমেন্ট',
-    sendMoneyTo: 'এই নম্বরে সেন্ড মানি করুন',
-    copyNumber: 'নম্বর কপি করুন',
-    completeWithin: 'এর মধ্যে পেমেন্ট সম্পন্ন করুন',
-    sessionExpired: 'সেশন শেষ',
-    expiredMsg: 'ফেক অর্ডার ঠেকাতে পেমেন্ট উইন্ডো শেষ হয়ে গেছে। আপনার কার্ট অপরিবর্তিত আছে — নতুন অর্ডার দিতে আবার শুরু করুন।',
-    close: 'বন্ধ করুন',
-    yourNumber: 'আপনার {m} নম্বর (প্রেরক)',
-    sentAmount: 'পাঠানো পরিমাণ (অবশ্যই ৳{x} হতে হবে)',
-    exactMatch: '✓ সঠিক পরিমাণ মিলেছে',
-    amountMatch: 'পরিমাণ অবশ্যই ৳{x} এর সাথে মেলাতে হবে',
-    reference: '📝 সেন্ড মানি রেফারেন্স',
-    referenceHint: 'পাঠানোর সময় রেফারেন্স বক্সে এই নোটটি লিখুন:',
+    amountToPay: 'à¦ªà¦°à¦¿à¦¶à§‹à¦§à§‡à¦° à¦ªà¦°à¦¿à¦®à¦¾à¦£',
+    secureVia: 'à¦¨à§‡à¦•à§à¦¸à¦¾à¦—à§‹ à¦ªà§‡ à¦—à§‡à¦Ÿà¦“à¦¯à¦¼à§‡ à¦®à¦¾à¦§à§à¦¯à¦®à§‡ à¦¨à¦¿à¦°à¦¾à¦ªà¦¦ à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ',
+    sendMoneyTo: 'à¦à¦‡ à¦¨à¦®à§à¦¬à¦°à§‡ à¦¸à§‡à¦¨à§à¦¡ à¦®à¦¾à¦¨à¦¿ à¦•à¦°à§à¦¨',
+    copyNumber: 'à¦¨à¦®à§à¦¬à¦° à¦•à¦ªà¦¿ à¦•à¦°à§à¦¨',
+    completeWithin: 'à¦à¦° à¦®à¦§à§à¦¯à§‡ à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦¸à¦®à§à¦ªà¦¨à§à¦¨ à¦•à¦°à§à¦¨',
+    sessionExpired: 'à¦¸à§‡à¦¶à¦¨ à¦¶à§‡à¦·',
+    expiredMsg: 'à¦«à§‡à¦• à¦…à¦°à§à¦¡à¦¾à¦° à¦ à§‡à¦•à¦¾à¦¤à§‡ à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦‰à¦‡à¦¨à§à¦¡à§‹ à¦¶à§‡à¦· à¦¹à¦¯à¦¼à§‡ à¦—à§‡à¦›à§‡à¥¤ à¦†à¦ªà¦¨à¦¾à¦° à¦•à¦¾à¦°à§à¦Ÿ à¦…à¦ªà¦°à¦¿à¦¬à¦°à§à¦¤à¦¿à¦¤ à¦†à¦›à§‡ â€” à¦¨à¦¤à§à¦¨ à¦…à¦°à§à¦¡à¦¾à¦° à¦¦à¦¿à¦¤à§‡ à¦†à¦¬à¦¾à¦° à¦¶à§à¦°à§ à¦•à¦°à§à¦¨à¥¤',
+    close: 'à¦¬à¦¨à§à¦§ à¦•à¦°à§à¦¨',
+    yourNumber: 'à¦†à¦ªà¦¨à¦¾à¦° {m} à¦¨à¦®à§à¦¬à¦° (à¦ªà§à¦°à§‡à¦°à¦•)',
+    sentAmount: 'à¦ªà¦¾à¦ à¦¾à¦¨à§‹ à¦ªà¦°à¦¿à¦®à¦¾à¦£ (à¦…à¦¬à¦¶à§à¦¯à¦‡ à§³{x} à¦¹à¦¤à§‡ à¦¹à¦¬à§‡)',
+    exactMatch: 'âœ“ à¦¸à¦ à¦¿à¦• à¦ªà¦°à¦¿à¦®à¦¾à¦£ à¦®à¦¿à¦²à§‡à¦›à§‡',
+    amountMatch: 'à¦ªà¦°à¦¿à¦®à¦¾à¦£ à¦…à¦¬à¦¶à§à¦¯à¦‡ à§³{x} à¦à¦° à¦¸à¦¾à¦¥à§‡ à¦®à§‡à¦²à¦¾à¦¤à§‡ à¦¹à¦¬à§‡',
+    reference: 'ðŸ“ à¦¸à§‡à¦¨à§à¦¡ à¦®à¦¾à¦¨à¦¿ à¦°à§‡à¦«à¦¾à¦°à§‡à¦¨à§à¦¸',
+    referenceHint: 'à¦ªà¦¾à¦ à¦¾à¦¨à§‹à¦° à¦¸à¦®à¦¯à¦¼ à¦°à§‡à¦«à¦¾à¦°à§‡à¦¨à§à¦¸ à¦¬à¦•à§à¦¸à§‡ à¦à¦‡ à¦¨à§‹à¦Ÿà¦Ÿà¦¿ à¦²à¦¿à¦–à§à¦¨:',
     trxIdLabel: '{m} TrxID',
-    trxIdHint: 'আপনার SMS কনফার্মেশনের ৮–২০ অক্ষর/সংখ্যা।',
-    receiptLabel: 'পেমেন্ট রিসিট / স্ক্রিনশট',
-    uploadReceipt: 'স্ক্রিনশট আপলোড করুন',
-    changeReceipt: 'রিসিট পরিবর্তন করুন',
-    submitVerify: 'যাচাইয়ের জন্য জমা দিন',
-    verificationNote: 'অ্যাডমিন আপনার TrxID ও পরিমাণ যাচাই করার পরেই অর্ডার নিশ্চিত হবে',
-    last4Label: 'শেষ ৪ সংখ্যা (আপনার {m} PIN)',
-    last4Hint: 'নিরাপত্তা চেক: শেষ ৪ সংখ্যা অবশ্যই আপনার {m} নম্বরের সাথে মেলাতে হবে।',
-    numberOf: 'নম্বর {i} / {n}',
-    anotherNumber: 'অন্য নম্বর ব্যবহার করুন',
+    trxIdHint: 'à¦†à¦ªà¦¨à¦¾à¦° SMS à¦•à¦¨à¦«à¦¾à¦°à§à¦®à§‡à¦¶à¦¨à§‡à¦° à§®â€“à§¨à§¦ à¦…à¦•à§à¦·à¦°/à¦¸à¦‚à¦–à§à¦¯à¦¾à¥¤',
+    receiptLabel: 'à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿ à¦°à¦¿à¦¸à¦¿à¦Ÿ / à¦¸à§à¦•à§à¦°à¦¿à¦¨à¦¶à¦Ÿ',
+    uploadReceipt: 'à¦¸à§à¦•à§à¦°à¦¿à¦¨à¦¶à¦Ÿ à¦†à¦ªà¦²à§‹à¦¡ à¦•à¦°à§à¦¨',
+    changeReceipt: 'à¦°à¦¿à¦¸à¦¿à¦Ÿ à¦ªà¦°à¦¿à¦¬à¦°à§à¦¤à¦¨ à¦•à¦°à§à¦¨',
+    submitVerify: 'à¦¯à¦¾à¦šà¦¾à¦‡à¦¯à¦¼à§‡à¦° à¦œà¦¨à§à¦¯ à¦œà¦®à¦¾ à¦¦à¦¿à¦¨',
+    verificationNote: 'à¦…à§à¦¯à¦¾à¦¡à¦®à¦¿à¦¨ à¦†à¦ªà¦¨à¦¾à¦° TrxID à¦“ à¦ªà¦°à¦¿à¦®à¦¾à¦£ à¦¯à¦¾à¦šà¦¾à¦‡ à¦•à¦°à¦¾à¦° à¦ªà¦°à§‡à¦‡ à¦…à¦°à§à¦¡à¦¾à¦° à¦¨à¦¿à¦¶à§à¦šà¦¿à¦¤ à¦¹à¦¬à§‡',
+    last4Label: 'à¦¶à§‡à¦· à§ª à¦¸à¦‚à¦–à§à¦¯à¦¾ (à¦†à¦ªà¦¨à¦¾à¦° {m} PIN)',
+    last4Hint: 'à¦¨à¦¿à¦°à¦¾à¦ªà¦¤à§à¦¤à¦¾ à¦šà§‡à¦•: à¦¶à§‡à¦· à§ª à¦¸à¦‚à¦–à§à¦¯à¦¾ à¦…à¦¬à¦¶à§à¦¯à¦‡ à¦†à¦ªà¦¨à¦¾à¦° {m} à¦¨à¦®à§à¦¬à¦°à§‡à¦° à¦¸à¦¾à¦¥à§‡ à¦®à§‡à¦²à¦¾à¦¤à§‡ à¦¹à¦¬à§‡à¥¤',
+    numberOf: 'à¦¨à¦®à§à¦¬à¦° {i} / {n}',
+    anotherNumber: 'à¦…à¦¨à§à¦¯ à¦¨à¦®à§à¦¬à¦° à¦¬à§à¦¯à¦¬à¦¹à¦¾à¦° à¦•à¦°à§à¦¨',
   },
 };
 
 const LOYALTY_TIERS = [
-  { key: 'standard' as const, label: 'Standard Member', minSpend: 0, cashbackPct: 1, color: 'bg-gray-600', icon: '★' },
-  { key: 'silver' as const, label: 'Silver VIP', minSpend: 3000, cashbackPct: 3, color: 'bg-slate-400', icon: '🥈' },
-  { key: 'gold' as const, label: 'Gold VIP', minSpend: 10000, cashbackPct: 5, color: 'bg-amber-500', icon: '🥇' },
+  { key: 'standard' as const, label: 'Standard Member', minSpend: 0, cashbackPct: 1, color: 'bg-gray-600', icon: 'â˜…' },
+  { key: 'silver' as const, label: 'Silver VIP', minSpend: 3000, cashbackPct: 3, color: 'bg-slate-400', icon: 'ðŸ¥ˆ' },
+  { key: 'gold' as const, label: 'Gold VIP', minSpend: 10000, cashbackPct: 5, color: 'bg-amber-500', icon: 'ðŸ¥‡' },
 ];
 
 const AVATAR_COLORS = ['bg-emerald-600', 'bg-orange-500', 'bg-blue-600', 'bg-rose-600', 'bg-violet-600', 'bg-teal-600', 'bg-amber-500', 'bg-indigo-600'];
@@ -798,6 +915,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const T = T_DICT[lang];
   const catLabel = (c: string) => (lang === 'bn' ? (CAT_BN[c] || c) : c);
   const statusLabel = (s: string) => (lang === 'bn' ? (STATUS_BN[s] || s) : s);
+  const nm = (n: string) => (lang === 'bn' ? (BN_NAMES[n] || n) : n);
 
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
@@ -850,10 +968,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [reportReason, setReportReason] = useState('Wrong item received');
   const [reportNote, setReportNote] = useState('');
 
-  // Open the report modal — held (payment rejected) orders get payment-specific reasons
+  // Open the report modal â€” held (payment rejected) orders get payment-specific reasons
   const openReportModal = (order: Order) => {
     setReportOrder(order);
-    setReportReason(order.paymentStatus === 'Rejected' ? 'Payment rejected — money not credited' : 'Wrong item received');
+    setReportReason(order.paymentStatus === 'Rejected' ? 'Payment rejected â€” money not credited' : 'Wrong item received');
     setReportNote('');
   };
 
@@ -867,7 +985,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const handleReSubFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_RECEIPT_BYTES) { showToast('Screenshot too large — max 2 MB', 'info'); return; }
+    if (file.size > MAX_RECEIPT_BYTES) { showToast('Screenshot too large â€” max 2 MB', 'info'); return; }
     const reader = new FileReader();
     reader.onload = () => setReSub(s => ({ ...s, receipt: String(reader.result || '') }));
     reader.readAsDataURL(file);
@@ -875,7 +993,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const submitReSubmit = () => {
     if (!reSubmitOrder) return;
     if (!reSub.trxId || !reSub.amount) { showToast('Enter the TrxID and amount before resubmitting', 'info'); return; }
-    if (Number(reSub.amount) !== reSubmitOrder.amount) { showToast(`Amount must match the order total ৳${reSubmitOrder.amount}`, 'info'); return; }
+    if (Number(reSub.amount) !== reSubmitOrder.amount) { showToast(`Amount must match the order total à§³${reSubmitOrder.amount}`, 'info'); return; }
     if (!reSub.receipt) { showToast('Upload a fresh payment screenshot/receipt', 'info'); return; }
     onUpdateOrder({
       ...reSubmitOrder,
@@ -890,7 +1008,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     // Old "Under Review" ticket for this order is cleared on the customer side (not saved)
     setTickets(prev => prev.filter(t => !t.subject.includes(`order #${reSubmitOrder.id}`)));
     setReSubmitOrder(null);
-    showToast(`Payment re-submitted for #${reSubmitOrder.id} — sent for review again`, 'success');
+    showToast(`Payment re-submitted for #${reSubmitOrder.id} â€” sent for review again`, 'success');
   };
 
   // Watched products for price-drop / restock alerts
@@ -1016,7 +1134,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [pinInput, setPinInput] = useState('');
   const [cardInfo, setCardInfo] = useState({ number: '', name: '', expiry: '', cvv: '' });
 
-  // Send Money flow (bKash/Nagad/Upay/Rocket) — numbers are admin-managed via shared config
+  // Send Money flow (bKash/Nagad/Upay/Rocket) â€” numbers are admin-managed via shared config
   const [sendMoney, setSendMoney] = useState({ sender: '', trxId: '', amount: '', receipt: '', note: '', last4: '' });
   const [walletConfig, setWalletConfig] = useState<WalletConfig>(() => getStoredData(WALLET_CONFIG_KEY, DEFAULT_WALLETS));
 
@@ -1088,7 +1206,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     const t = setInterval(() => {
       for (const o of orders) {
         if (o.paymentStatus === 'Pending' && o.placedAt && Date.now() - o.placedAt > PAY_AUTO_CANCEL_MS && (o.status === 'Pending' || o.status === 'Confirmed')) {
-          onSilentUpdateOrder?.({ ...o, status: 'Cancelled', paymentStatus: 'Rejected', paymentNote: 'Payment window expired — order auto-cancelled' });
+          onSilentUpdateOrder?.({ ...o, status: 'Cancelled', paymentStatus: 'Rejected', paymentNote: 'Payment window expired â€” order auto-cancelled' });
         }
       }
     }, 15000);
@@ -1104,8 +1222,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           if (age >= 5 * 60 * 1000 && age < PAY_AUTO_CANCEL_MS) {
             setReminded(prev => [...prev, o.id]);
             setCustomerNotifs(prev => [{
-              id: `CN-${Date.now().toString().slice(-4)}`, title: '⏰ Payment Reminder',
-              body: `You still have time to complete the payment for order #${o.id}. Finish your Send Money within the window or it auto-cancels.`, emoji: '⏰', time: 'Just now', read: false
+              id: `CN-${Date.now().toString().slice(-4)}`, title: 'â° Payment Reminder',
+              body: `You still have time to complete the payment for order #${o.id}. Finish your Send Money within the window or it auto-cancels.`, emoji: 'â°', time: 'Just now', read: false
             }, ...prev]);
           }
         }
@@ -1121,21 +1239,21 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       if ((ord.paymentStatus === 'Approved') && !seenCompletedRef.current.has(ord.id + '-pay-ok')) {
         seenCompletedRef.current.add(ord.id + '-pay-ok');
         setCustomerNotifs(prev => [{
-          id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Payment Approved',
-          body: `Payment for order #${ord.id} verified. Your order is confirmed!`, emoji: '✅', time: 'Just now', read: false
+          id: `CN-${Date.now().toString().slice(-4)}`, title: 'âœ… Payment Approved',
+          body: `Payment for order #${ord.id} verified. Your order is confirmed!`, emoji: 'âœ…', time: 'Just now', read: false
         }, ...prev]);
       }
       if ((ord.paymentStatus === 'Rejected') && !seenCompletedRef.current.has(ord.id + '-pay-no')) {
         seenCompletedRef.current.add(ord.id + '-pay-no');
         setCustomerNotifs(prev => [{
-          id: `CN-${Date.now().toString().slice(-4)}`, title: '⏸ Order on Hold',
-          body: `Payment for order #${ord.id} needs re-verification — your order is on hold${ord.paymentNote ? ` (${ord.paymentNote})` : ''}.`, emoji: '⏸', time: 'Just now', read: false
+          id: `CN-${Date.now().toString().slice(-4)}`, title: 'â¸ Order on Hold',
+          body: `Payment for order #${ord.id} needs re-verification â€” your order is on hold${ord.paymentNote ? ` (${ord.paymentNote})` : ''}.`, emoji: 'â¸', time: 'Just now', read: false
         }, ...prev]);
         // Auto-open a support ticket so the customer sees it "Under Review" in Help & Support
         // Old tickets for the same order are replaced (not accumulated) on the customer side
         setTickets(prev => [{
           id: `TCK-${Math.floor(100 + Math.random() * 900)}`,
-          subject: `Payment under review — order #${ord.id}`,
+          subject: `Payment under review â€” order #${ord.id}`,
           category: 'Payment Issue',
           status: 'Under Review',
           date: 'Just now',
@@ -1177,7 +1295,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const handleReceiptFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_RECEIPT_BYTES) { showToast('Screenshot too large — max 2 MB', 'info'); return; }
+    if (file.size > MAX_RECEIPT_BYTES) { showToast('Screenshot too large â€” max 2 MB', 'info'); return; }
     const reader = new FileReader();
     reader.onload = () => setSendMoney(s => ({ ...s, receipt: String(reader.result || '') }));
     reader.readAsDataURL(file);
@@ -1198,8 +1316,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       if ((ord.status === 'Completed') && !seenCompletedRef.current.has(ord.id)) {
         seenCompletedRef.current.add(ord.id);
         setCustomerNotifs(prev => [{
-          id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Order Delivered',
-          body: `Order #${ord.id} from ${ord.storeName} has been delivered. Enjoy!`, emoji: '🛵', time: 'Just now', read: false
+          id: `CN-${Date.now().toString().slice(-4)}`, title: 'âœ… Order Delivered',
+          body: `Order #${ord.id} from ${ord.storeName} has been delivered. Enjoy!`, emoji: 'ðŸ›µ', time: 'Just now', read: false
         }, ...prev]);
       }
     }
@@ -1227,7 +1345,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         showToast('Favorite store removed', 'info');
         return prev.filter(id => id !== storeId);
       }
-      showToast('Added to favorites ❤️', 'success');
+      showToast('Added to favorites â¤ï¸', 'success');
       return [...prev, storeId];
     });
   };
@@ -1251,11 +1369,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const handleAddToCart = (prod: StoreProduct) => {
     if (prod.status === 'Out of Stock') {
-      showToast(`${prod.name} is out of stock`, 'info');
+      showToast(`${nm(prod.name)} is out of stock`, 'info');
       return;
     }
     if (cart.length > 0 && storeOfProduct(cart[0].product.id) && storeOfProduct(cart[0].product.id) !== storeOfProduct(prod.id)) {
-      showToast('One store per order — complete your current order before adding from another store.', 'info');
+      showToast('One store per order â€” complete your current order before adding from another store.', 'info');
       return;
     }
     const inCart = cart.find(i => i.product.id === prod.id);
@@ -1268,7 +1386,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       if (existing) return prev.map(i => i.product.id === prod.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, { product: prod, quantity: 1 }];
     });
-    showToast(`${prod.name} added to cart`, 'info');
+    showToast(`${nm(prod.name)} added to cart`, 'info');
   };
 
   const handleUpdateQty = (productId: string, delta: number) => {
@@ -1277,7 +1395,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         if (i.product.id === productId) {
           const newQty = i.quantity + delta;
           if (newQty > (i.product.stock || 99)) {
-            showToast(`Max stock for ${i.product.name} reached`, 'info');
+            showToast(`Max stock for ${nm(i.product.name)} reached`, 'info');
             return i;
           }
           return { ...i, quantity: newQty };
@@ -1285,7 +1403,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         return i;
       });
       const removed = updated.find(i => i.product.id === productId && i.quantity <= 0);
-      if (removed) showToast(`${removed.product.name} removed from cart`, 'info');
+      if (removed) showToast(`${nm(removed.product.name)} removed from cart`, 'info');
       return updated.filter(i => i.quantity > 0);
     });
   };
@@ -1311,7 +1429,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           { label: `500${ul}`, multiplier: 0.5, price: Math.round(prod.price * 0.5) },
           { label: `1 kg`, multiplier: 1, price: prod.price },
         ] : [
-          { label: ul === 'L' ? `½ ${ul}` : `½ ${ul}`, multiplier: 0.5, price: Math.round(prod.price * 0.5) },
+          { label: ul === 'L' ? `Â½ ${ul}` : `Â½ ${ul}`, multiplier: 0.5, price: Math.round(prod.price * 0.5) },
           { label: ul === 'L' ? `1 ${ul}` : `1 ${ul}`, multiplier: 1, price: prod.price },
           { label: ul === 'L' ? `2 ${ul}` : `2 ${ul}`, multiplier: 2, price: prod.price * 2 },
         ],
@@ -1339,11 +1457,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const handleCustomizeAdd = () => {
     if (!customizeProd) return;
     if (customizeProd.status === 'Out of Stock') {
-      showToast(`${customizeProd.name} is out of stock`, 'info');
+      showToast(`${nm(customizeProd.name)} is out of stock`, 'info');
       return;
     }
     if (cart.length > 0 && storeOfProduct(cart[0].product.id) && storeOfProduct(cart[0].product.id) !== storeOfProduct(customizeProd.id)) {
-      showToast('One store per order — complete your current order before adding from another store.', 'info');
+      showToast('One store per order â€” complete your current order before adding from another store.', 'info');
       return;
     }
     const opts = getProductCustomizations(customizeProd);
@@ -1353,13 +1471,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     const parts = [weightChoice ? weightChoice.label : '', customizeExtra ? 'Extra portion' : '', customizeNote.trim()].filter(Boolean);
-    const note = parts.join(' · ');
+    const note = parts.join(' Â· ');
     setCart(prev => {
       const existing = prev.find(i => i.product.id === customizeProd.id);
       if (existing) return prev.map(i => i.product.id === customizeProd.id ? { ...i, quantity: i.quantity + customizeQty, note: note || i.note } : i);
       return [...prev, { product: customizeProd, quantity: customizeQty, note: note || undefined }];
     });
-    showToast(`${weightChoice ? `(${weightChoice.label}) ` : ''}${customizeProd.name} customized & added to cart`, 'success');
+    showToast(`${weightChoice ? `(${weightChoice.label}) ` : ''}${nm(customizeProd.name)} customized & added to cart`, 'success');
     setCustomizeProd(null);
   };
 
@@ -1372,7 +1490,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     if (cartSubtotal < found.minOrder) {
-      showToast(`Minimum order ৳${found.minOrder} required for ${code}`, 'info');
+      showToast(`Minimum order à§³${found.minOrder} required for ${code}`, 'info');
       return;
     }
     if (found.isFreeShip) {
@@ -1380,7 +1498,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast(`Coupon ${code} applied: Free Delivery!`, 'success');
     } else {
       setAppliedCoupon({ code: found.code, discount: found.discountValue });
-      showToast(`Coupon ${code} applied: ৳${found.discountValue} discount!`, 'success');
+      showToast(`Coupon ${code} applied: à§³${found.discountValue} discount!`, 'success');
     }
   };
 
@@ -1393,7 +1511,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       setTotalSpend(prev => prev + orderBase.amount);
       setCustomerNotifs(prev => [{
         id: `CN-${Date.now().toString().slice(-4)}`, title: `${tier.icon} ${tier.label} Cashback`,
-        body: `৳${cashback} cashback credited to your wallet.`, emoji: tier.icon, time: 'Just now', read: false
+        body: `à§³${cashback} cashback credited to your wallet.`, emoji: tier.icon, time: 'Just now', read: false
       }, ...prev]);
     }
     if (appliedCoupon?.code === 'SMARTSHOP') {
@@ -1401,8 +1519,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: 50, date: 'Just now', status: 'Completed' }, ...prev]);
     }
     setCustomerNotifs(prev => [{
-      id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Order Placed',
-      body: `Order ${orderBase.itemCount} item(s) from ${orderBase.storeName} — ${orderBase.priority || 'Normal'} delivery.`, emoji: '📦', time: 'Just now', read: false
+      id: `CN-${Date.now().toString().slice(-4)}`, title: 'âœ… Order Placed',
+      body: `Order ${orderBase.itemCount} item(s) from ${orderBase.storeName} â€” ${orderBase.priority || 'Normal'} delivery.`, emoji: 'ðŸ“¦', time: 'Just now', read: false
     }, ...prev]);
     setCart([]);
     setOrderNote('');
@@ -1465,7 +1583,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       status: isSendMoney ? 'Pending' : 'Confirmed',
       paymentMethod: isSendMoney
         ? `${payModal} (Send Money)`
-        : paymentMethod === 'Split (Wallet + bKash)' ? `Split (Wallet ৳${splitDeduct} + bKash ৳${cartGrandTotal - splitDeduct})` : paymentMethod,
+        : paymentMethod === 'Split (Wallet + bKash)' ? `Split (Wallet à§³${splitDeduct} + bKash à§³${cartGrandTotal - splitDeduct})` : paymentMethod,
       paymentStatus: isSendMoney ? 'Pending' : (paymentMethod === 'Cash on Delivery' ? 'COD' : 'Paid'),
       trxId: isSendMoney ? trxId : undefined,
       senderNumber: isSendMoney ? sendMoney.sender.replace(/[^0-9]/g, '') : undefined,
@@ -1497,24 +1615,24 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     resetPaySession();
     setIsScheduled(false);
     setDeliveryPin(null);
-    showToast(isSendMoney ? `Payment submitted — order #pending admin verification` : `Order placed successfully with ${targetStore.name}!`, isSendMoney ? 'info' : 'success');
+    showToast(isSendMoney ? `Payment submitted â€” order #pending admin verification` : `Order placed successfully with ${nm(targetStore.name)}!`, isSendMoney ? 'info' : 'success');
   };
 
   const confirmSendMoney = () => {
     if (!payModal) return;
     const sender = sendMoney.sender.replace(/[^0-9]/g, '');
     const trxId = (sendMoney.trxId || '').trim().toUpperCase();
-    if (payExpired) { showToast('Payment session expired — restart to place a fresh order', 'info'); return; }
-    if (fraudBlocked(sender)) { showToast('Too many invalid attempts — payment temporarily blocked. Try again in a few minutes.', 'info'); return; }
+    if (payExpired) { showToast('Payment session expired â€” restart to place a fresh order', 'info'); return; }
+    if (fraudBlocked(sender)) { showToast('Too many invalid attempts â€” payment temporarily blocked. Try again in a few minutes.', 'info'); return; }
     if (sender.length < 10) { showToast('Enter the 11-digit mobile number that sent the money', 'info'); registerFraudAttempt(sender); return; }
     const last4 = sendMoney.last4.replace(/[^0-9]/g, '');
     if (!/^\d{4}$/.test(last4)) { showToast('Enter the last 4 digits of the sending number for verification', 'info'); return; }
     if (!sender.endsWith(last4)) { showToast('Last 4 digits must match the last 4 digits of your sending number', 'info'); return; }
-    if (!TRX_RE.test(trxId)) { showToast(`Invalid ${payModal} TrxID — expected 8–20 letters/digits (e.g. ${WALLET_META[payModal as WalletKey].trxPlaceholder})`, 'info'); registerFraudAttempt(sender); return; }
-    if (trxUsed.some(t => t.trxId === trxId)) { showToast('This TrxID was already used — duplicate transactions are blocked', 'info'); registerFraudAttempt(sender); return; }
+    if (!TRX_RE.test(trxId)) { showToast(`Invalid ${payModal} TrxID â€” expected 8â€“20 letters/digits (e.g. ${WALLET_META[payModal as WalletKey].trxPlaceholder})`, 'info'); registerFraudAttempt(sender); return; }
+    if (trxUsed.some(t => t.trxId === trxId)) { showToast('This TrxID was already used â€” duplicate transactions are blocked', 'info'); registerFraudAttempt(sender); return; }
     if (!sendMoney.receipt) { showToast('Upload the payment screenshot/receipt before submitting', 'info'); return; }
     const claimed = parseFloat(sendMoney.amount) || 0;
-    if (Math.abs(claimed - cartGrandTotal) > 0.01) { showToast(`Sent amount must match exactly ৳${cartGrandTotal} — you entered ৳${claimed}`, 'info'); return; }
+    if (Math.abs(claimed - cartGrandTotal) > 0.01) { showToast(`Sent amount must match exactly à§³${cartGrandTotal} â€” you entered à§³${claimed}`, 'info'); return; }
     confirmPayment();
   };
 
@@ -1534,13 +1652,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       at: Date.now(),
     }, ...prev]);
     setCustomerNotifs(prev => [{
-      id: `CN-${Date.now().toString().slice(-4)}`, title: '↩ Refund Request Submitted',
-      body: `Refund of ৳${refundModal.amount} for order #${refundModal.id} is under review.`, emoji: '↩', time: 'Just now', read: false
+      id: `CN-${Date.now().toString().slice(-4)}`, title: 'â†© Refund Request Submitted',
+      body: `Refund of à§³${refundModal.amount} for order #${refundModal.id} is under review.`, emoji: 'â†©', time: 'Just now', read: false
     }, ...prev]);
     setRefundModal(null);
     setRefundReason('');
     setRefundNumber('');
-    showToast('Refund request submitted — admin will review soon', 'success');
+    showToast('Refund request submitted â€” admin will review soon', 'success');
   };
 
   const reorder = (ord: Order) => {
@@ -1556,7 +1674,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       if (p && p.status !== 'Out of Stock') restocked.push({ product: p, quantity: Math.min(it.quantity, p.stock || 1) });
     }
     if (restocked.length > 0) setCart(restocked);
-    showToast(`Re-order cart ready from ${store.name}`, 'success');
+    showToast(`Re-order cart ready from ${nm(store.name)}`, 'success');
   };
 
   const confirmCancelOrder = () => {
@@ -1567,10 +1685,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       setWalletBalance(prev => prev + ord.amount);
       setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Refund', amount: ord.amount, date: 'Just now', status: 'Completed' }, ...prev]);
       setCustomerNotifs(prev => [{
-        id: `CN-${Date.now().toString().slice(-4)}`, title: '↩️ Order Cancelled',
-        body: `Order #${ord.id} was cancelled. ৳${ord.amount} refunded to wallet.`, emoji: '↩️', time: 'Just now', read: false
+        id: `CN-${Date.now().toString().slice(-4)}`, title: 'â†©ï¸ Order Cancelled',
+        body: `Order #${ord.id} was cancelled. à§³${ord.amount} refunded to wallet.`, emoji: 'â†©ï¸', time: 'Just now', read: false
       }, ...prev]);
-      showToast(`Order #${ord.id} cancelled — ৳${ord.amount} refunded to wallet`, 'info');
+      showToast(`Order #${ord.id} cancelled â€” à§³${ord.amount} refunded to wallet`, 'info');
     }
     setCancelConfirmId(null);
   };
@@ -1581,12 +1699,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     const driverName = drv ? drv.name : rateRiderOrder.driverId || 'Your Rider';
     setRiderRatings(prev => ({ ...prev, [rateRiderOrder.id]: { driverName, score: riderRateVal } }));
     setCustomerNotifs(prev => [{
-      id: `CN-${Date.now().toString().slice(-4)}`, title: '⭐ Rider Rated!',
-      body: `You rated ${driverName} ${riderRateVal}★. Thank you for the feedback!`, emoji: '⭐', time: 'Just now', read: false
+      id: `CN-${Date.now().toString().slice(-4)}`, title: 'â­ Rider Rated!',
+      body: `You rated ${driverName} ${riderRateVal}â˜…. Thank you for the feedback!`, emoji: 'â­', time: 'Just now', read: false
     }, ...prev]);
     setRateRiderOrder(null);
     setRiderRateVal(5);
-    showToast(`${driverName} rated ${riderRateVal}★ — thanks for your feedback!`, 'success');
+    showToast(`${driverName} rated ${riderRateVal}â˜… â€” thanks for your feedback!`, 'success');
   };
 
   const sendChatMessage = () => {
@@ -1597,7 +1715,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setChatInput('');
     const rider = liveDriverOf(orders.find(o => o.id === chatOrderId) as Order);
     const autoReplies = [
-      `আপনার অর্ডারটি ${trackVeh?.roadName || 'পথে'} আছে, ${etaMins} মিনিটের মধ্যে পৌঁছাবে ইনশাআল্লাহ।`,
+      `à¦†à¦ªà¦¨à¦¾à¦° à¦…à¦°à§à¦¡à¦¾à¦°à¦Ÿà¦¿ ${trackVeh?.roadName || 'à¦ªà¦¥à§‡'} à¦†à¦›à§‡, ${etaMins} à¦®à¦¿à¦¨à¦¿à¦Ÿà§‡à¦° à¦®à¦§à§à¦¯à§‡ à¦ªà§Œà¦à¦›à¦¾à¦¬à§‡ à¦‡à¦¨à¦¶à¦¾à¦†à¦²à§à¦²à¦¾à¦¹à¥¤`,
       'Sure, I will deliver it to your door. Please keep the cash / PIN ready.',
       'I am on my way. If you need anything else, text me here anytime.',
     ];
@@ -1617,8 +1735,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return { ...prev, [key]: { total: agg.total + rateVal, count: agg.count + 1 } };
     });
     setCustomerNotifs(prev => [{
-      id: `CN-${Date.now().toString().slice(-4)}`, title: '⭐ Thank you for rating!',
-      body: `Your ${rateVal}-star rating for ${key} has been published.`, emoji: '⭐', time: 'Just now', read: false
+      id: `CN-${Date.now().toString().slice(-4)}`, title: 'â­ Thank you for rating!',
+      body: `Your ${rateVal}-star rating for ${key} has been published.`, emoji: 'â­', time: 'Just now', read: false
     }, ...prev]);
     setRateOrder(null);
     setRateComment('');
@@ -1652,9 +1770,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             if (restocked || priceDrop) {
               changed = true;
               setCustomerNotifs(prevN => [{
-                id: `CN-${Date.now().toString().slice(-4)}`, title: restocked ? '🔔 Back in Stock!' : '📉 Price Dropped!',
-                body: `${p.name} ${restocked ? 'is now available again' : `now ৳${p.price} (was ৳${prevSnap.price})`} at ${s.name}.`,
-                emoji: restocked ? '🔔' : '📉', time: 'Just now', read: false
+                id: `CN-${Date.now().toString().slice(-4)}`, title: restocked ? 'ðŸ”” Back in Stock!' : 'ðŸ“‰ Price Dropped!',
+                body: `${nm(p.name)} ${restocked ? 'is now available again' : `now à§³${p.price} (was à§³${prevSnap.price})`} at ${nm(s.name)}.`,
+                emoji: restocked ? 'ðŸ””' : 'ðŸ“‰', time: 'Just now', read: false
               }, ...prevN]);
             }
             next[p.id] = { stock: p.stock, price: p.price };
@@ -1683,7 +1801,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     return st ? st.pickup : { lat: 23.7806, lng: 90.4009 };
   };
 
-  // Real live-driver tracking — uses the exact same admin liveDrivers sim.
+  // Real live-driver tracking â€” uses the exact same admin liveDrivers sim.
   const liveDriverOf = (ord: Order) => {
     if (ord.driverId) {
       const exact = liveDrivers.find(d => d.id === ord.driverId);
@@ -1714,7 +1832,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     return Math.max(statusProgressFloor(ord.status), p);
   };
 
-  // Deterministic route progress: rider starts AT the store (0) → picks up → moves to the customer (1).
+  // Deterministic route progress: rider starts AT the store (0) â†’ picks up â†’ moves to the customer (1).
   // Advances over the order's ETA window using placedAt, floored by status so a fresh order is never "delivered".
   const routeProgressOf = (ord: Order | null | undefined) => {
     if (!ord) return 0;
@@ -1725,7 +1843,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     return Math.max(floor, Math.min(1, elapsed / eta));
   };
 
-  // Rider position interpolated along the store→customer line so the shared link always shows
+  // Rider position interpolated along the storeâ†’customer line so the shared link always shows
   // the rider AT the store first and then heading to the customer's location after pickup.
   const routePosOf = (ord: Order, p: number) => {
     const pk = pickupOfOrder(ord);
@@ -1792,7 +1910,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           drv = best;
         }
         if (!drv) return;
-        // Route progress: rider at store (0) → pickup → customer (1)
+        // Route progress: rider at store (0) â†’ pickup â†’ customer (1)
         const p = routeProgressOf(o);
         const next = p < 0.35 ? 'Confirmed' : p < 0.7 ? 'Processing' : 'Ongoing';
         if (next !== o.status && silentUpdateRef.current) {
@@ -1801,10 +1919,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           if (!autoNotifiedRef.current.has(nKey)) {
             autoNotifiedRef.current.add(nKey);
             const notif = next === 'Ongoing'
-              ? { title: '🛵 Order On The Way!', body: `Order #${o.id} from ${o.storeName} is now with your rider.`, emoji: '🛵' }
+              ? { title: 'ðŸ›µ Order On The Way!', body: `Order #${o.id} from ${o.storeName} is now with your rider.`, emoji: 'ðŸ›µ' }
               : next === 'Processing'
-              ? { title: '👨‍🍳 Preparing Your Order', body: `${o.storeName} is preparing order #${o.id}.`, emoji: '👨‍🍳' }
-              : { title: '✅ Order Confirmed', body: `Order #${o.id} confirmed. Rider is heading to ${o.storeName}.`, emoji: '📦' };
+              ? { title: 'ðŸ‘¨â€ðŸ³ Preparing Your Order', body: `${o.storeName} is preparing order #${o.id}.`, emoji: 'ðŸ‘¨â€ðŸ³' }
+              : { title: 'âœ… Order Confirmed', body: `Order #${o.id} confirmed. Rider is heading to ${o.storeName}.`, emoji: 'ðŸ“¦' };
             setCustomerNotifs(prev => [{ id: `CN-${Date.now().toString().slice(-4)}`, title: notif.title, body: notif.body, emoji: notif.emoji, time: 'Just now', read: false }, ...prev]);
           }
         }
@@ -1812,7 +1930,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           const nearKey = `${o.id}:near`;
           if (!autoNotifiedRef.current.has(nearKey)) {
             autoNotifiedRef.current.add(nearKey);
-            setCustomerNotifs(prev => [{ id: `CN-${Date.now().toString().slice(-4)}`, title: '🔔 Rider Is Nearby!', body: `Order #${o.id} is arriving. Keep your delivery PIN ${o.deliveryPin || '—'} ready.`, emoji: '🔔', time: 'Just now', read: false }, ...prev]);
+            setCustomerNotifs(prev => [{ id: `CN-${Date.now().toString().slice(-4)}`, title: 'ðŸ”” Rider Is Nearby!', body: `Order #${o.id} is arriving. Keep your delivery PIN ${o.deliveryPin || 'â€”'} ready.`, emoji: 'ðŸ””', time: 'Just now', read: false }, ...prev]);
           }
         }
       });
@@ -1828,15 +1946,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setDeliveryPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        // Auto-fill the delivery address text from the pinned location — in Bangla or English
+        // Auto-fill the delivery address text from the pinned location â€” in Bangla or English
         const area = nearestAreaOf(pos.coords.latitude, pos.coords.longitude);
         const addrText = lang === 'bn'
-          ? `আপনার বর্তমান অবস্থান, ${AREA_NAMES_BN[area]}, ঢাকা`
+          ? `à¦†à¦ªà¦¨à¦¾à¦° à¦¬à¦°à§à¦¤à¦®à¦¾à¦¨ à¦…à¦¬à¦¸à§à¦¥à¦¾à¦¨, ${AREA_NAMES_BN[area]}, à¦¢à¦¾à¦•à¦¾`
           : `Your current location, ${area}, Dhaka`;
         setDeliveryAddress(addrText);
-        showToast('Current location pinned — address updated', 'success');
+        showToast('Current location pinned â€” address updated', 'success');
       },
-      () => showToast('Could not fetch location — drag the pin to place it manually', 'info'),
+      () => showToast('Could not fetch location â€” drag the pin to place it manually', 'info'),
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
@@ -1879,19 +1997,19 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setAddMoneyError('');
     setAddMoneySentTo(addMoneyMethod === 'Card' ? `card **** ${addMoneyCard.number.replace(/\D/g, '').slice(-4)}` : addMoneyPhone.trim());
     setAddMoneyStep('otp');
-    showToast('OTP sent — check your phone / registered number', 'info');
+    showToast('OTP sent â€” check your phone / registered number', 'info');
   };
 
   const confirmAddMoney = () => {
     const num = parseFloat(addMoneyAmount);
-    if (addMoneyOtpInput.trim() !== addMoneyOtp) { setAddMoneyError('Incorrect OTP — please check the code sent to you'); return; }
+    if (addMoneyOtpInput.trim() !== addMoneyOtp) { setAddMoneyError('Incorrect OTP â€” please check the code sent to you'); return; }
     setWalletBalance(prev => prev + num);
     setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: `Add Money (${addMoneyMethod})`, amount: num, date: 'Just now', status: 'Completed' }, ...prev]);
     setAddMoneyOpen(false);
     setAddMoneyStep('method');
     setAddMoneyOtp('');
     setAddMoneyOtpInput('');
-    showToast(`৳${num.toLocaleString()} added to your wallet via ${addMoneyMethod}!`, 'success');
+    showToast(`à§³${num.toLocaleString()} added to your wallet via ${addMoneyMethod}!`, 'success');
   };
 
   const handleCreateTicketSubmit = (e: React.FormEvent) => {
@@ -2106,7 +2224,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 transition-colors cursor-pointer"
             >
               <Wallet className="w-3.5 h-3.5 text-emerald-400" />
-              <span>৳{walletBalance.toLocaleString()}</span>
+              <span>à§³{walletBalance.toLocaleString()}</span>
               <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${tier.key === 'gold' ? 'bg-amber-400 text-amber-900' : tier.key === 'silver' ? 'bg-slate-300 text-slate-800' : 'bg-white/10 text-gray-300'}`}>{tier.icon} {tier.label}</span>
             </button>
 
@@ -2161,7 +2279,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </button>
 
             <button
-              onClick={() => { setLang(l => (l === 'en' ? 'bn' : 'en')); showToast(lang === 'en' ? 'ভাষা পরিবর্তন হয়েছে' : 'Language switched to English', 'info'); }}
+              onClick={() => { setLang(l => (l === 'en' ? 'bn' : 'en')); showToast(lang === 'en' ? 'à¦­à¦¾à¦·à¦¾ à¦ªà¦°à¦¿à¦¬à¦°à§à¦¤à¦¨ à¦¹à¦¯à¦¼à§‡à¦›à§‡' : 'Language switched to English', 'info'); }}
               className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-700 transition-colors cursor-pointer"
               title={T.language}
             >
@@ -2195,10 +2313,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         </div>
       </header>
 
-      {/* SEARCH BAR — always visible below header */}
+      {/* SEARCH BAR â€” always visible below header */}
       {(() => {
         const q = searchQuery.toLowerCase().trim();
-        const suggestions = q ? syncedStores.flatMap(s => s.catalog.filter(p => p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)).map(p => ({ product: p, store: s }))).slice(0, 8) : [];
+        const suggestions = q ? syncedStores.flatMap(s => s.catalog.filter(p => p.name.toLowerCase().includes(q) || (BN_NAMES[p.name] || '').toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)).map(p => ({ product: p, store: s }))).slice(0, 8) : [];
         const showSuggest = q.length > 0;
         return (
       <div className="glass-bar bg-white border-b border-gray-200 sticky top-16 z-30 shadow-xs flex items-center justify-center px-4 py-2.5">
@@ -2229,12 +2347,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     }}
                     className="flex items-center space-x-3 px-4 py-2.5 hover:bg-emerald-500/10 cursor-pointer border-b border-white/10 last:border-0 transition-colors"
                   >
-                    <img src={s.product.image} alt={s.product.name} referrerPolicy="no-referrer" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                    <img src={s.product.image} alt={nm(s.product.name)} referrerPolicy="no-referrer" className="w-9 h-9 rounded-lg object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{s.product.name}</p>
-                      <p className="text-[10px] text-gray-400 truncate">{s.store.name} · {s.product.category}</p>
+                      <p className="text-xs font-bold text-white truncate">{nm(s.product.name)}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{nm(s.store.name)} Â· {s.product.category}</p>
                     </div>
-                    <span className="text-[11px] font-mono font-black text-emerald-400 shrink-0">৳{s.product.price}</span>
+                    <span className="text-[11px] font-mono font-black text-emerald-400 shrink-0">à§³{s.product.price}</span>
                   </div>
                 ))
               ) : (
@@ -2266,7 +2384,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold">{item.badge}</span>
                   )}
                   {item.key === 'Wallet' && (
-                    <span className="text-[10px] font-mono text-emerald-700 font-bold">৳{walletBalance.toLocaleString()}</span>
+                    <span className="text-[10px] font-mono text-emerald-700 font-bold">à§³{walletBalance.toLocaleString()}</span>
                   )}
                   {item.key === 'Favorites' && !!item.badge && (
                     <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 text-[10px] font-bold">{item.badge}</span>
@@ -2301,7 +2419,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </div>
               <div>
                 <h4 className="text-xs font-black">{T.loyaltyTier}</h4>
-                <p className="text-[10px] text-white/80 mt-0.5">{T.earnPerOrder} · {tier.cashbackPct}%</p>
+                <p className="text-[10px] text-white/80 mt-0.5">{T.earnPerOrder} Â· {tier.cashbackPct}%</p>
               </div>
               <div className="h-1.5 bg-white/25 rounded-full overflow-hidden">
                 <div
@@ -2309,7 +2427,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   style={{ width: `${Math.min(100, Math.round((totalSpend / (LOYALTY_TIERS[tier.key === 'gold' ? 2 : tier.key === 'silver' ? 2 : 1].minSpend)) * 100))}%` }}
                 />
               </div>
-              <p className="text-[9px] text-white/75">Total spend: ৳{totalSpend.toLocaleString()}</p>
+              <p className="text-[9px] text-white/75">Total spend: à§³{totalSpend.toLocaleString()}</p>
             </div>
           </div>
         </aside>
@@ -2390,7 +2508,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative">
                       <div>
                         <div className="relative h-24 overflow-hidden bg-gray-100">
-                          <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <img src={store.image} alt={nm(store.name)} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
                           <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
                           <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
@@ -2398,7 +2516,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           </button>
                         </div>
                         <div className="p-3 space-y-1.5">
-                          <h3 className="font-bold text-gray-900 text-xs group-hover:text-emerald-600 transition-colors line-clamp-1">{store.name}</h3>
+                          <h3 className="font-bold text-gray-900 text-xs group-hover:text-emerald-600 transition-colors line-clamp-1">{nm(store.name)}</h3>
                           <div className="flex items-center justify-between text-[10px] text-gray-600">
                             <div className="flex items-center space-x-1">
                               <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
@@ -2444,29 +2562,29 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <a href="mailto:support@nexagobd.com" className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/50 transition-colors">
                   <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Headphones className="w-4 h-4" /></div>
                   <div className="min-w-0">
-                    <h4 className="text-[11px] font-bold text-white truncate">সাপোর্ট</h4>
-                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">support@nexagobd.com</p>
+                    <h4 className="text-[11px] font-bold text-white truncate">{T.support}</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">{T.supportSub}</p>
                   </div>
                 </a>
                 <button onClick={() => setPolicyModal('terms')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
                   <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><ScrollText className="w-4 h-4" /></div>
                   <div className="min-w-0">
-                    <h4 className="text-[11px] font-bold text-white truncate">টার্মস ও কন্ডিশন</h4>
-                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">আমাদের নিয়মাবলি</p>
+                    <h4 className="text-[11px] font-bold text-white truncate">{T.terms}</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">{T.termsSub}</p>
                   </div>
                 </button>
                 <button onClick={() => setPolicyModal('privacy')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
                   <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Lock className="w-4 h-4" /></div>
                   <div className="min-w-0">
-                    <h4 className="text-[11px] font-bold text-white truncate">প্রাইভেসি পলিসি</h4>
-                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">আপনার তথ্য সুরক্ষিত</p>
+                    <h4 className="text-[11px] font-bold text-white truncate">{T.privacy}</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">{T.privacySub}</p>
                   </div>
                 </button>
                 <button onClick={() => setPolicyModal('refund')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
                   <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><RefreshCcw className="w-4 h-4" /></div>
                   <div className="min-w-0">
-                    <h4 className="text-[11px] font-bold text-white truncate">রিফান্ড পলিসি</h4>
-                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">ফুল রিফান্ড গ্যারান্টি</p>
+                    <h4 className="text-[11px] font-bold text-white truncate">{T.refund}</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">{T.refundSub}</p>
                   </div>
                 </button>
               </div>
@@ -2488,7 +2606,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
                 <div className="flex items-center space-x-3">
                   <button
-                    onClick={() => showToast('Free delivery filter active on orders above ৳500', 'info')}
+                    onClick={() => showToast('Free delivery filter active on orders above à§³500', 'info')}
                     className="flex items-center space-x-2 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 shadow-xs transition-colors cursor-pointer"
                   >
                     <Filter className="w-3.5 h-3.5 text-gray-500" /><span>{T.filter}</span>
@@ -2526,7 +2644,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-black text-white flex items-center space-x-2">
-                      <Sparkles className="w-4 h-4 text-amber-400" /><span>{T.searchResults} · "{searchQuery}"</span>
+                      <Sparkles className="w-4 h-4 text-amber-400" /><span>{T.searchResults} Â· "{searchQuery}"</span>
                     </h3>
                     <button onClick={() => setSearchQuery('')} className="text-[10px] font-bold text-emerald-400 hover:underline flex items-center space-x-1 cursor-pointer">
                       <X className="w-3 h-3" /><span>{T.cancel}</span>
@@ -2536,11 +2654,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   {/* Product matches */}
                   {(() => {
                     const q = searchQuery.toLowerCase();
-                    const storeMatches = syncedStores.filter(s => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q) || s.subtext.toLowerCase().includes(q));
+                    const storeMatches = syncedStores.filter(s => s.name.toLowerCase().includes(q) || (BN_NAMES[s.name] || '').toLowerCase().includes(q) || s.category.toLowerCase().includes(q) || s.subtext.toLowerCase().includes(q));
                     const prodMatches: Array<{ store: StoreDef; product: StoreProduct }> = [];
                     for (const s of syncedStores) {
                       for (const p of s.catalog) {
-                        if (p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)) prodMatches.push({ store: s, product: p });
+                        if (p.name.toLowerCase().includes(q) || (BN_NAMES[p.name] || '').toLowerCase().includes(q) || p.category.toLowerCase().includes(q)) prodMatches.push({ store: s, product: p });
                       }
                     }
                     if (prodMatches.length === 0 && storeMatches.length === 0) {
@@ -2560,11 +2678,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {prodMatches.slice(0, 6).map(({ store, product }) => (
                                 <button key={`${store.id}-${product.id}`} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-[#0e1a2b] border border-[#162a45] rounded-xl p-2.5 text-left hover:border-emerald-500/50 hover:bg-[#12233a] transition-all cursor-pointer">
-                                  <img src={product.image} alt={product.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
+                                  <img src={product.image} alt={nm(product.name)} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-white truncate">{product.name}</p>
-                                    <p className="text-[10px] text-gray-400">{store.name}</p>
-                                    <p className="text-[11px] font-black text-emerald-400 font-mono">৳{product.price} <span className="text-[9px] text-gray-500 font-normal">/ {product.unit}</span></p>
+                                    <p className="text-xs font-bold text-white truncate">{nm(product.name)}</p>
+                                    <p className="text-[10px] text-gray-400">{nm(store.name)}</p>
+                                    <p className="text-[11px] font-black text-emerald-400 font-mono">à§³{product.price} <span className="text-[9px] text-gray-500 font-normal">/ {product.unit}</span></p>
                                   </div>
                                 </button>
                               ))}
@@ -2577,10 +2695,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {storeMatches.map(store => (
                                 <button key={store.id} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-[#0e1a2b] border border-[#162a45] rounded-xl p-2.5 text-left hover:border-emerald-500/50 hover:bg-[#12233a] transition-all cursor-pointer">
-                                  <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
+                                  <img src={store.image} alt={nm(store.name)} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-white">{store.name}</p>
-                                    <p className="text-[10px] text-gray-400">{store.category} · ⭐ {displayRating(store)}</p>
+                                    <p className="text-xs font-bold text-white">{nm(store.name)}</p>
+                                    <p className="text-[10px] text-gray-400">{store.category} Â· â­ {displayRating(store)}</p>
                                     <p className="text-[10px] font-bold text-emerald-400">{store.deliveryTime}</p>
                                   </div>
                                 </button>
@@ -2601,7 +2719,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative">
                       <div>
                         <div className="relative h-24 overflow-hidden bg-gray-100">
-                          <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <img src={store.image} alt={nm(store.name)} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
                           <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
                           <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
@@ -2612,7 +2730,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           <div className="flex items-center space-x-2">
                             <div className={`w-6 h-6 rounded-lg ${store.logoBg} flex items-center justify-center font-black text-[10px] shrink-0 shadow-xs`}>{store.logoText.charAt(0)}</div>
                             <div className="min-w-0">
-                              <h3 className="font-bold text-gray-900 text-xs group-hover:text-emerald-600 transition-colors line-clamp-1">{store.name}</h3>
+                              <h3 className="font-bold text-gray-900 text-xs group-hover:text-emerald-600 transition-colors line-clamp-1">{nm(store.name)}</h3>
                               <p className="text-[10px] text-gray-500 line-clamp-1">{store.subtext}</p>
                             </div>
                           </div>
@@ -2625,7 +2743,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             <div className="flex items-center space-x-1">
                               <Clock className="w-3 h-3 text-gray-400" /><span>{store.deliveryTime}</span>
                             </div>
-                            <span className="font-bold text-emerald-700">৳{store.deliveryFee}</span>
+                            <span className="font-bold text-emerald-700">à§³{store.deliveryFee}</span>
                           </div>
                         </div>
                       </div>
@@ -2688,25 +2806,25 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               cancelled ? 'bg-red-100 text-red-800' :
                               active ? 'bg-amber-100 text-amber-800 animate-pulse' :
                               'bg-gray-100 text-gray-700'
-                            }`}>{held ? '⏸ Hold' : statusLabel(ord.status)}</span>
+                            }`}>{held ? 'â¸ Hold' : statusLabel(ord.status)}</span>
                             {ord.paymentStatus === 'Rejected' && (
-                              <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-black">⛔ Payment Rejected</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-black">â›” Payment Rejected</span>
                             )}
                             {ord.paymentStatus === 'Pending' && (
-                              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black animate-pulse">⏳ Payment Pending</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black animate-pulse">â³ Payment Pending</span>
                             )}
                             {ord.paymentStatus === 'Approved' && (
-                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">✅ Payment Approved</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">âœ… Payment Approved</span>
                             )}
                             {ord.paymentStatus === 'COD' && (
-                              <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-black">💵 Cash on Delivery</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-black">ðŸ’µ Cash on Delivery</span>
                             )}
                             {refR && (
                               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
                                 refR.status === 'Refunded' ? 'bg-emerald-100 text-emerald-800' :
                                 refR.status === 'Rejected' ? 'bg-red-100 text-red-800' :
                                 'bg-amber-100 text-amber-800'
-                              }`}>↩ {refR.status === 'Requested' ? 'Refund Requested' : refR.status === 'Processing' ? 'Refund Processing' : refR.status === 'Refunded' ? 'Refunded ✓' : 'Refund Rejected'}</span>
+                              }`}>â†© {refR.status === 'Requested' ? 'Refund Requested' : refR.status === 'Processing' ? 'Refund Processing' : refR.status === 'Refunded' ? 'Refunded âœ“' : 'Refund Rejected'}</span>
                             )}
                             {ord.estimatedMinutes && active && (
                               <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold">~{ord.estimatedMinutes} min</span>
@@ -2715,16 +2833,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">Reason: {ord.rejectionReason}</span>
                             )}
                             {held && reportUnderReview(ord.id) && (
-                              <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">🛑 Tracking paused — payment under review</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">ðŸ›‘ Tracking paused â€” payment under review</span>
                             )}
                           </div>
                           <h4 className="text-sm font-bold text-gray-900">{ord.storeName}</h4>
                           {ord.items && ord.items.length > 0 && (
                             <p className="text-[10px] text-gray-500 truncate max-w-full">
-                              {ord.items.reduce((s, i) => s + i.quantity, 0)} items — {ord.items.map(i => `${i.name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}`).join(', ')}
+                              {ord.items.reduce((s, i) => s + i.quantity, 0)} items â€” {ord.items.map(i => `${nm(i.name)}${i.quantity > 1 ? ` Ã—${i.quantity}` : ''}`).join(', ')}
                             </p>
                           )}
-                          <p className="text-[10px] text-gray-500">{ord.date} {ord.time ? `• ${ord.time}` : ''} • {T.paymentMethod}: {ord.paymentMethod}</p>
+                          <p className="text-[10px] text-gray-500">{ord.date} {ord.time ? `â€¢ ${ord.time}` : ''} â€¢ {T.paymentMethod}: {ord.paymentMethod}</p>
                           <p className="text-[10px] text-gray-600 font-medium flex items-center space-x-1">
                             <MapPin className="w-3 h-3 text-gray-400" /><span className="truncate">{ord.address || deliveryAddress}</span>
                           </p>
@@ -2739,7 +2857,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                                     {drv.name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()}
                                   </span>
                                   <span className="text-[10px] text-gray-500 font-medium">
-                                    {drv.name} · {drv.vehicleType || 'Bike'} · <span className="text-emerald-600 font-bold font-mono">{Number.isFinite(prog) ? Math.round(prog * 100) : 0}%</span>
+                                    {drv.name} Â· {drv.vehicleType || 'Bike'} Â· <span className="text-emerald-600 font-bold font-mono">{Number.isFinite(prog) ? Math.round(prog * 100) : 0}%</span>
                                   </span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden w-48">
@@ -2750,7 +2868,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           })()}
                           {active && !held && ord.paymentStatus === 'Pending' && (
                             <p className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-2 py-1 mt-1 w-fit font-semibold">
-                              ⏳ Tracking opens once admin verifies & approves your payment.
+                              â³ Tracking opens once admin verifies & approves your payment.
                             </p>
                           )}
                         </div>
@@ -2758,7 +2876,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         <div className="flex items-center space-x-2 border-t md:border-t-0 md:border-l border-gray-100 pt-3 md:pt-0 md:pl-5 justify-between md:justify-end flex-wrap gap-y-1.5">
                           <div className="text-right pr-2">
                             <p className="text-[10px] font-bold text-gray-400 uppercase">{T.totalAmount}</p>
-                            <p className="text-sm font-black text-gray-900 font-mono">৳{ord.amount.toLocaleString()}</p>
+                            <p className="text-sm font-black text-gray-900 font-mono">à§³{ord.amount.toLocaleString()}</p>
                           </div>
                           <button onClick={() => setReceiptOrder(ord)} className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
                             <Printer className="w-3 h-3 text-gray-500" /><span>{T.receipt}</span>
@@ -2842,10 +2960,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   {syncedStores.filter(s => favoriteStoreIds.includes(s.id)).map((store) => (
                     <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all p-4 space-y-3">
                       <div className="flex items-center space-x-3">
-                        <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-xl object-cover" />
+                        <img src={store.image} alt={nm(store.name)} referrerPolicy="no-referrer" className="w-12 h-12 rounded-xl object-cover" />
                         <div>
-                          <h4 className="font-bold text-sm text-gray-900">{store.name}</h4>
-                          <p className="text-[11px] text-gray-500">{store.category} • ⭐ {displayRating(store)}</p>
+                          <h4 className="font-bold text-sm text-gray-900">{nm(store.name)}</h4>
+                          <p className="text-[11px] text-gray-500">{store.category} â€¢ â­ {displayRating(store)}</p>
                         </div>
                       </div>
                       <button onClick={() => openStore(store)} className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all">
@@ -2911,7 +3029,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       </div>
                       <p className="text-xs text-gray-700 font-medium">{addr.address}</p>
                       <p className="text-xs text-gray-500">{addr.area}</p>
-                      <p className="text-xs text-gray-500 font-mono">📱 {addr.phone}</p>
+                      <p className="text-xs text-gray-500 font-mono">ðŸ“± {addr.phone}</p>
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs font-bold">
                       <button onClick={() => { setDeliveryAddress(`${addr.address}, ${addr.area}`); showToast(`Set ${addr.title} as active delivery address`, 'info'); }} className="text-emerald-700 hover:underline">
@@ -2997,7 +3115,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div className="space-y-1">
                   <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Smart Shop Cash Wallet</span>
-                  <p className="text-3xl font-black font-mono">৳{walletBalance.toLocaleString()}</p>
+                  <p className="text-3xl font-black font-mono">à§³{walletBalance.toLocaleString()}</p>
                   <p className="text-[11px] text-emerald-100">Use instant wallet balance for 1-click order checkout!</p>
                 </div>
                 <div className="shrink-0 w-full sm:w-72">
@@ -3019,11 +3137,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div key={tx.id} className="py-3 flex items-center justify-between text-xs">
                       <div>
                         <p className="font-bold text-gray-900">{tx.type}</p>
-                        <p className="text-[10px] text-gray-400">{tx.date} • {tx.id}</p>
+                        <p className="text-[10px] text-gray-400">{tx.date} â€¢ {tx.id}</p>
                       </div>
                       <div className="text-right font-mono font-bold">
                         <span className={tx.amount > 0 ? 'text-emerald-600' : 'text-gray-800'}>
-                          {tx.amount > 0 ? `+৳${tx.amount}` : `-৳${Math.abs(tx.amount)}`}
+                          {tx.amount > 0 ? `+à§³${tx.amount}` : `-à§³${Math.abs(tx.amount)}`}
                         </span>
                         <span className="block text-[9px] text-gray-400">{tx.status}</span>
                       </div>
@@ -3064,7 +3182,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <span className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-mono font-black text-xs">{cp.code}</span>
                       <h4 className="font-bold text-sm text-gray-900 pt-1">{cp.discountText}</h4>
                       <p className="text-xs text-gray-500">{cp.desc}</p>
-                      <p className="text-[10px] text-gray-400 font-mono">Min order ৳{cp.minOrder} • Expires {cp.validTill}</p>
+                      <p className="text-[10px] text-gray-400 font-mono">Min order à§³{cp.minOrder} â€¢ Expires {cp.validTill}</p>
                     </div>
                     <button
                       onClick={() => { setCopiedCoupon(cp.code); handleApplyCouponCode(cp.code); setTimeout(() => setCopiedCoupon(null), 3000); }}
@@ -3130,7 +3248,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="font-bold text-gray-800 flex items-center space-x-2">
-                    <span className="text-base">{dark ? '🌙' : '☀️'}</span><span>{dark ? 'Dark Mode' : 'Light Mode'}</span>
+                    <span className="text-base">{dark ? 'ðŸŒ™' : 'â˜€ï¸'}</span><span>{dark ? 'Dark Mode' : 'Light Mode'}</span>
                   </span>
                   <button
                     type="button"
@@ -3192,7 +3310,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-6xl w-full shadow-2xl border border-gray-200 overflow-hidden sm:my-8 max-h-[92vh] flex flex-col">
             <div className="relative h-32 sm:h-40 bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-500 shrink-0">
-              <img src={selectedStore.image} alt={selectedStore.name} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-20" />
+              <img src={selectedStore.image} alt={nm(selectedStore.name)} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-20" />
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 via-teal-800/20 to-teal-600/10" />
               <div className="absolute top-3 right-3 flex items-center space-x-2">
                 <button onClick={() => setSelectedStore(null)} className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer transition-colors">
@@ -3205,11 +3323,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </div>
                 <div>
                   <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${selectedStore.badgeColor}`}>{selectedStore.category}</span>
-                  <h2 className="text-xl font-black mt-0.5">{selectedStore.name}</h2>
+                  <h2 className="text-xl font-black mt-0.5">{nm(selectedStore.name)}</h2>
                   <p className="text-[11px] text-gray-300 flex items-center space-x-2">
                     <span className="flex items-center space-x-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" /><b>{selectedStore.rating}</b></span>
-                    <span>•</span><Clock className="w-3 h-3" /><span>{selectedStore.deliveryTime}</span>
-                    <span>•</span><span>৳{selectedStore.deliveryFee} delivery</span>
+                    <span>â€¢</span><Clock className="w-3 h-3" /><span>{selectedStore.deliveryTime}</span>
+                    <span>â€¢</span><span>à§³{selectedStore.deliveryFee} delivery</span>
                   </p>
                 </div>
               </div>
@@ -3238,7 +3356,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       type="text"
                       value={storeSearch}
                       onChange={(e) => setStoreSearch(e.target.value)}
-                      placeholder="Search menu — type product name…"
+                      placeholder="Search menu â€” type product nameâ€¦"
                       className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:bg-white focus:border-emerald-500"
                     />
                   </div>
@@ -3249,7 +3367,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         .filter(p => {
                           if (!storeSearch.trim()) return true;
                           const q = storeSearch.trim().toLowerCase();
-                          return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
+                          return p.name.toLowerCase().includes(q) || (BN_NAMES[p.name] || '').toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
                         }).length
                     } items found
                   </p>
@@ -3261,23 +3379,23 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     .filter(p => {
                       if (!storeSearch.trim()) return true;
                       const q = storeSearch.trim().toLowerCase();
-                      return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
+                      return p.name.toLowerCase().includes(q) || (BN_NAMES[p.name] || '').toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
                     })
                     .map((prod) => {
                       const inCart = cart.find(i => i.product.id === prod.id);
                       return (
                         <div key={prod.id} className={`border rounded-xl overflow-hidden bg-white transition-all ${prod.status === 'Out of Stock' ? 'opacity-55 border-gray-200' : 'border-gray-200 hover:border-emerald-300 hover:shadow-sm'}`}>
                           <div className="relative h-16 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
-                            <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                            <img src={prod.image} alt={nm(prod.name)} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                             <span className={`absolute top-0.5 left-0.5 px-1 py-px rounded text-[7px] font-black uppercase ${
                               prod.status === 'In Stock' ? 'bg-emerald-600 text-white' : prod.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'
                             }`}>{statusLabel(prod.status)}</span>
                           </div>
                           <div className="p-2 space-y-1">
-                            <h4 className="font-bold text-[11px] text-gray-900 leading-tight line-clamp-2 cursor-pointer hover:text-emerald-700" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>{prod.name}</h4>
+                            <h4 className="font-bold text-[11px] text-gray-900 leading-tight line-clamp-2 cursor-pointer hover:text-emerald-700" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>{nm(prod.name)}</h4>
                             <div className="flex items-center justify-between pt-0.5 gap-1">
                               <div className="min-w-0">
-                                <span className="font-mono font-black text-emerald-700 text-xs">৳{prod.price}</span>
+                                <span className="font-mono font-black text-emerald-700 text-xs">à§³{prod.price}</span>
                                 <span className="text-[8px] text-gray-400 ml-0.5">/{prod.unit}</span>
                               </div>
                               {prod.status === 'Out of Stock' ? (
@@ -3307,7 +3425,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     .filter(p => {
                       if (!storeSearch.trim()) return true;
                       const q = storeSearch.trim().toLowerCase();
-                      return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
+                      return p.name.toLowerCase().includes(q) || (BN_NAMES[p.name] || '').toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
                     }).length === 0 && (
                     <p className="col-span-full text-center text-xs text-gray-400 py-8">No items match "{storeSearch}"</p>
                   )}
@@ -3328,9 +3446,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       {cart.map((item) => (
                         <div key={item.product.id} className="pt-2 flex items-center justify-between text-xs">
                           <div className="flex-1 pr-2">
-                            <span className="font-bold text-gray-900 block">{item.product.name}</span>
-                            {item.note && <span className="text-[9px] text-amber-600 font-bold block truncate">✎ {item.note}</span>}
-                            <span className="text-[10px] text-gray-500">৳{item.product.price} / {item.product.unit}</span>
+                            <span className="font-bold text-gray-900 block">{nm(item.product.name)}</span>
+                            {item.note && <span className="text-[9px] text-amber-600 font-bold block truncate">âœŽ {item.note}</span>}
+                            <span className="text-[10px] text-gray-500">à§³{item.product.price} / {item.product.unit}</span>
                           </div>
                           <div className="flex items-center space-x-2 shrink-0">
                             <div className="flex items-center space-x-1 border border-gray-300 rounded-lg bg-white px-1.5 py-0.5">
@@ -3338,7 +3456,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               <span className="font-mono font-bold text-xs text-gray-800 w-4 text-center">{item.quantity}</span>
                               <button onClick={() => handleAddToCart(item.product)} className="text-gray-500 hover:text-gray-800 cursor-pointer"><Plus className="w-3 h-3" /></button>
                             </div>
-                            <span className="font-mono font-bold text-gray-900 w-12 text-right">৳{item.product.price * item.quantity}</span>
+                            <span className="font-mono font-bold text-gray-900 w-12 text-right">à§³{item.product.price * item.quantity}</span>
                           </div>
                         </div>
                       ))}
@@ -3358,7 +3476,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     if (!best) return null;
                     return (
                       <button
-                        onClick={() => { if (best.isFreeShip) { setAppliedCoupon({ code: best.code, discount: 0, isFreeShip: true }); showToast(`Coupon ${best.code} applied: Free Delivery!`, 'success'); } else { setAppliedCoupon({ code: best.code, discount: best.discountValue }); showToast(`Coupon ${best.code} applied: ৳${best.discountValue} discount!`, 'success'); } }}
+                        onClick={() => { if (best.isFreeShip) { setAppliedCoupon({ code: best.code, discount: 0, isFreeShip: true }); showToast(`Coupon ${best.code} applied: Free Delivery!`, 'success'); } else { setAppliedCoupon({ code: best.code, discount: best.discountValue }); showToast(`Coupon ${best.code} applied: à§³${best.discountValue} discount!`, 'success'); } }}
                         className="w-full p-2 bg-amber-50 border border-amber-200 rounded-xl text-[10px] font-bold text-amber-800 flex items-center justify-between cursor-pointer hover:bg-amber-100 transition-colors"
                       >
                         <span className="flex items-center space-x-1.5"><BadgePercent className="w-3.5 h-3.5" /><span>{T.bestCoupon}: <span className="font-mono">{best.code}</span></span></span>
@@ -3368,20 +3486,20 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   })()}
                   {appliedCoupon && (
                     <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex justify-between items-center">
-                      <span>🎉 Coupon '{appliedCoupon.code}' applied</span>
+                      <span>ðŸŽ‰ Coupon '{appliedCoupon.code}' applied</span>
                       <button onClick={() => setAppliedCoupon(null)} className="text-red-600 hover:underline cursor-pointer">Remove</button>
                     </div>
                   )}
 
                   <div className="pt-3 border-t border-gray-200 text-xs space-y-1.5 font-medium">
-                    <div className="flex justify-between text-gray-600"><span>{T.subtotal}</span><span className="font-mono">৳{cartSubtotal}</span></div>
-                    <div className="flex justify-between text-gray-600"><span>{T.delivery}</span><span className="font-mono">{deliveryCharge === 0 ? T.freeShip : `৳${deliveryCharge}`}</span></div>
-                    <div className="flex justify-between text-gray-600"><span>{T.vat}</span><span className="font-mono">৳{vatTax}</span></div>
+                    <div className="flex justify-between text-gray-600"><span>{T.subtotal}</span><span className="font-mono">à§³{cartSubtotal}</span></div>
+                    <div className="flex justify-between text-gray-600"><span>{T.delivery}</span><span className="font-mono">{deliveryCharge === 0 ? T.freeShip : `à§³${deliveryCharge}`}</span></div>
+                    <div className="flex justify-between text-gray-600"><span>{T.vat}</span><span className="font-mono">à§³{vatTax}</span></div>
                     {couponDiscountAmount > 0 && (
-                      <div className="flex justify-between text-emerald-600 font-bold"><span>{T.promoDiscount}</span><span className="font-mono">-৳{couponDiscountAmount}</span></div>
+                      <div className="flex justify-between text-emerald-600 font-bold"><span>{T.promoDiscount}</span><span className="font-mono">-à§³{couponDiscountAmount}</span></div>
                     )}
                     <div className="flex justify-between text-sm font-black text-gray-900 pt-1 border-t border-gray-200">
-                      <span>{T.grandTotal}</span><span className="font-mono text-emerald-700">৳{cartGrandTotal}</span>
+                      <span>{T.grandTotal}</span><span className="font-mono text-emerald-700">à§³{cartGrandTotal}</span>
                     </div>
                   </div>
                 </div>
@@ -3397,14 +3515,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         onClick={() => setIsScheduled(false)}
                         className={`flex-1 py-1.5 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${!isScheduled ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
                       >
-                        ⚡ {T.home === 'হোম' ? 'এখনই' : 'Deliver Now'}
+                        âš¡ {T.home === 'à¦¹à§‹à¦®' ? 'à¦à¦–à¦¨à¦‡' : 'Deliver Now'}
                       </button>
                       <button
                         type="button"
                         onClick={() => setIsScheduled(true)}
                         className={`flex-1 py-1.5 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center space-x-1 ${isScheduled ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
                       >
-                        <CalendarClock className="w-3 h-3" /><span>{T.home === 'হোম' ? 'পরবর্তী সময়ে' : 'Schedule Later'}</span>
+                        <CalendarClock className="w-3 h-3" /><span>{T.home === 'à¦¹à§‹à¦®' ? 'à¦ªà¦°à¦¬à¦°à§à¦¤à§€ à¦¸à¦®à¦¯à¦¼à§‡' : 'Schedule Later'}</span>
                       </button>
                     </div>
                     {isScheduled && (
@@ -3418,10 +3536,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     )}
                   </div>
 
-                  {/* Delivery pin map — tap, drag, or use your current location */}
+                  {/* Delivery pin map â€” tap, drag, or use your current location */}
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1 flex items-center justify-between">
-                      <span className="flex items-center space-x-1"><LocateFixed className="w-3 h-3 text-emerald-600" /><span>📍 {T.deliveryAddress} {lang === 'bn' ? '(পিন দিন)' : '(pin your location)'}</span></span>
+                      <span className="flex items-center space-x-1"><LocateFixed className="w-3 h-3 text-emerald-600" /><span>ðŸ“ {T.deliveryAddress} {lang === 'bn' ? '(à¦ªà¦¿à¦¨ à¦¦à¦¿à¦¨)' : '(pin your location)'}</span></span>
                       {deliveryPin && <button type="button" onClick={() => setDeliveryPin(null)} className="text-red-500 hover:underline font-bold">{T.cancel}</button>}
                     </label>
                     <div className="h-36 rounded-xl overflow-hidden border border-gray-200 relative z-0">
@@ -3445,7 +3563,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       {deliveryPin && (
                         <button
                           type="button"
-                          onClick={() => showToast('Delivery pin saved — it cannot change after the order completes.', 'success')}
+                          onClick={() => showToast('Delivery pin saved â€” it cannot change after the order completes.', 'success')}
                           className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5"
                         >
                           <MapPin className="w-3.5 h-3.5 text-emerald-600" /><span>Pin saved</span>
@@ -3470,7 +3588,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <textarea
                       value={orderNote}
                       onChange={(e) => setOrderNote(e.target.value)}
-                      placeholder={lang === 'bn' ? 'যেমন: দরজায় রেখে যান, বেল বাজান…' : 'e.g. leave at the door, ring the bell…'}
+                      placeholder={lang === 'bn' ? 'à¦¯à§‡à¦®à¦¨: à¦¦à¦°à¦œà¦¾à¦¯à¦¼ à¦°à§‡à¦–à§‡ à¦¯à¦¾à¦¨, à¦¬à§‡à¦² à¦¬à¦¾à¦œà¦¾à¦¨â€¦' : 'e.g. leave at the door, ring the bellâ€¦'}
                       rows={2}
                       className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-800 outline-none focus:border-emerald-500 resize-none"
                     />
@@ -3502,7 +3620,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     disabled={cart.length === 0}
                     className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
                   >
-                    <Zap className="w-4 h-4" /><span>{T.placeOrder} (৳{cartGrandTotal})</span>
+                    <Zap className="w-4 h-4" /><span>{T.placeOrder} (à§³{cartGrandTotal})</span>
                   </button>
                 </div>
               </div>
@@ -3517,8 +3635,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div>
-                <h3 className="font-black text-gray-900 text-sm">↩ Request Refund</h3>
-                <p className="text-[10px] text-gray-500">Order #{refundModal.id} · ৳{refundModal.amount.toLocaleString()}</p>
+                <h3 className="font-black text-gray-900 text-sm">â†© Request Refund</h3>
+                <p className="text-[10px] text-gray-500">Order #{refundModal.id} Â· à§³{refundModal.amount.toLocaleString()}</p>
               </div>
               <button onClick={() => setRefundModal(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
@@ -3577,7 +3695,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 flex items-center justify-between">
               <div>
                 <p className="text-[10px] text-gray-500 uppercase font-bold">{T.amountToPay}</p>
-                <p className="text-xl font-black font-mono text-gray-900">৳{cartGrandTotal}</p>
+                <p className="text-xl font-black font-mono text-gray-900">à§³{cartGrandTotal}</p>
               </div>
               <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center"><Lock className="w-4 h-4" /></div>
             </div>
@@ -3601,7 +3719,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div className="flex items-center space-x-2">
                       <div className="w-9 h-9 rounded-xl overflow-hidden shadow">{wk === 'bKash' ? <BkashLogo className="w-9 h-9" /> : wk === 'Nagad' ? <NagadLogo className="w-9 h-9" /> : wk === 'Upay' ? <UpayLogo className="w-9 h-9" /> : <RocketLogo className="w-9 h-9" />}</div>
                       <div>
-                        <p className="font-black text-sm leading-tight">{mwName} · {wk} Wallet</p>
+                        <p className="font-black text-sm leading-tight">{mwName} Â· {wk} Wallet</p>
                         <p className="text-[10px] text-white/80">{T.sendMoneyTo}</p>
                       </div>
                     </div>
@@ -3661,7 +3779,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         maxLength={13}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono outline-none focus:border-emerald-500"
                       />
-                      {blocked && <p className="text-[10px] text-red-600 mt-1 font-bold">Too many invalid attempts — this number is temporarily blocked.</p>}
+                      {blocked && <p className="text-[10px] text-red-600 mt-1 font-bold">Too many invalid attempts â€” this number is temporarily blocked.</p>}
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.last4Label?.replace('{m}', payModal)}</label>
@@ -3670,7 +3788,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         inputMode="numeric"
                         value={sendMoney.last4}
                         onChange={(e) => setSendMoney(s => ({ ...s, last4: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) }))}
-                        placeholder="••••"
+                        placeholder="â€¢â€¢â€¢â€¢"
                         maxLength={4}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono tracking-[0.3em] text-center text-sm font-black outline-none focus:border-emerald-500"
                       />
@@ -3692,7 +3810,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5 text-[11px] text-blue-800">
                       <p className="font-black">{T.reference}</p>
                       <p>{T.referenceHint}</p>
-                      <p className="bg-white/70 rounded-lg p-2 font-mono font-bold text-blue-900 break-all">{sendMoney.note || customerPhone} · {customerProfile.name}</p>
+                      <p className="bg-white/70 rounded-lg p-2 font-mono font-bold text-blue-900 break-all">{sendMoney.note || customerPhone} Â· {customerProfile.name}</p>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.trxIdLabel?.replace('{m}', payModal)}</label>
@@ -3726,7 +3844,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       onClick={confirmSendMoney}
                       className={`w-full py-2.5 text-white font-black rounded-xl shadow-md transition-all cursor-pointer ${WALLET_META[payModal as WalletKey].btn}`}
                     >
-                      {T.submitVerify} ৳{cartGrandTotal}
+                      {T.submitVerify} à§³{cartGrandTotal}
                     </button>
                     <p className="text-[10px] text-gray-400 text-center flex items-center justify-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>{T.verificationNote}</span></p>
                   </div>
@@ -3736,8 +3854,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             })(              ) : payModal === 'Split (Wallet + bKash)' ? (
                 <div className="space-y-3">
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-800 space-y-1.5">
-                    <div className="flex justify-between font-bold"><span>Wallet balance</span><span className="font-mono">৳{walletBalance.toLocaleString()}</span></div>
-                    <div className="flex justify-between font-bold text-gray-900"><span>Order total</span><span className="font-mono">৳{cartGrandTotal}</span></div>
+                    <div className="flex justify-between font-bold"><span>Wallet balance</span><span className="font-mono">à§³{walletBalance.toLocaleString()}</span></div>
+                    <div className="flex justify-between font-bold text-gray-900"><span>Order total</span><span className="font-mono">à§³{cartGrandTotal}</span></div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Pay from Wallet</label>
@@ -3749,17 +3867,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       onChange={(e) => setSplitWalletAmount(Math.max(0, Math.min(Number(e.target.value) || 0, walletBalance, cartGrandTotal)))}
                       className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500"
                     />
-                    <p className="text-[10px] text-gray-400 mt-1">Remaining <b className="font-mono">৳{Math.max(0, cartGrandTotal - splitWalletAmount)}</b> will be paid via bKash.</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Remaining <b className="font-mono">à§³{Math.max(0, cartGrandTotal - splitWalletAmount)}</b> will be paid via bKash.</p>
                   </div>
                   {cartGrandTotal - splitWalletAmount > 0 && (
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">bKash PIN (for ৳{Math.max(0, cartGrandTotal - splitWalletAmount)})</label>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">bKash PIN (for à§³{Math.max(0, cartGrandTotal - splitWalletAmount)})</label>
                       <input
                         type="password"
                         inputMode="numeric"
                         value={splitPinInput}
                         onChange={(e) => setSplitPinInput(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="• • • • •"
+                        placeholder="â€¢ â€¢ â€¢ â€¢ â€¢"
                         maxLength={5}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-center tracking-[0.5em] font-mono outline-none focus:border-emerald-500"
                       />
@@ -3770,13 +3888,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     onClick={() => {
                       if (splitWalletAmount <= 0) { showToast('Choose an amount from wallet', 'info'); return; }
                       const bPin = paymentMethods.find(p => p.type === 'bKash')?.pin || '12345';
-                      if (cartGrandTotal - splitWalletAmount > 0 && splitPinInput !== bPin) { showToast(`Incorrect bKash PIN — the correct PIN is ${bPin}`, 'info'); return; }
-                      showToast(`Split payment: ৳${splitWalletAmount} wallet + ৳${cartGrandTotal - splitWalletAmount} bKash`, 'success');
+                      if (cartGrandTotal - splitWalletAmount > 0 && splitPinInput !== bPin) { showToast(`Incorrect bKash PIN â€” the correct PIN is ${bPin}`, 'info'); return; }
+                      showToast(`Split payment: à§³${splitWalletAmount} wallet + à§³${cartGrandTotal - splitWalletAmount} bKash`, 'success');
                       confirmPayment();
                     }}
                     className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
                   >
-                    Pay ৳{splitWalletAmount} wallet + ৳{Math.max(0, cartGrandTotal - splitWalletAmount)} bKash
+                    Pay à§³{splitWalletAmount} wallet + à§³{Math.max(0, cartGrandTotal - splitWalletAmount)} bKash
                   </button>
                 </div>
               ) : payModal === 'Card' ? (
@@ -3796,7 +3914,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">CVV</label>
-                    <input type="password" value={cardInfo.cvv} onChange={(e) => setCardInfo({ ...cardInfo, cvv: e.target.value.replace(/[^0-9]/g, '') })} placeholder="•••" maxLength={3} className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500" />
+                    <input type="password" value={cardInfo.cvv} onChange={(e) => setCardInfo({ ...cardInfo, cvv: e.target.value.replace(/[^0-9]/g, '') })} placeholder="â€¢â€¢â€¢" maxLength={3} className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500" />
                   </div>
                 </div>
                 <button
@@ -3810,18 +3928,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     if (mm < 1 || mm > 12) { showToast('Invalid expiry month', 'info'); return; }
                     if (yy < 2026 || (yy === 2026 && mm < 8)) { showToast('This card is expired', 'info'); return; }
                     if (cardInfo.cvv.length < 3) { showToast('Enter the 3-digit CVV', 'info'); return; }
-                    showToast('Card payment of ৳' + cartGrandTotal + ' successful', 'success');
+                    showToast('Card payment of à§³' + cartGrandTotal + ' successful', 'success');
                     confirmPayment();
                   }}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
                 >
-                  Pay ৳{cartGrandTotal}
+                  Pay à§³{cartGrandTotal}
                 </button>
               </div>
             ) : (
               <div className="space-y-3">
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 font-bold flex items-center space-x-2">
-                  <Banknote className="w-4 h-4 shrink-0" /><span>Pay ৳{cartGrandTotal} in cash when your order arrives.</span>
+                  <Banknote className="w-4 h-4 shrink-0" /><span>Pay à§³{cartGrandTotal} in cash when your order arrives.</span>
                 </div>
                 <p className="text-[11px] text-gray-500">Your driver will collect the exact amount on delivery. Please keep the cash ready.</p>
                 <button onClick={confirmPayment} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer">
@@ -3840,7 +3958,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div>
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{T.liveTracking}</span>
-                <h3 className="text-base font-black text-gray-900">Order #{trackingOrder.id} · {trackingOrder.storeName}</h3>
+                <h3 className="text-base font-black text-gray-900">Order #{trackingOrder.id} Â· {trackingOrder.storeName}</h3>
                 <div className="flex items-center space-x-2 mt-1">
                   <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${trackingOrder.status === 'Ongoing' ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>{trackingOrder.status}</span>
                   {trackingOrder.scheduledSlot && <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-bold flex items-center space-x-1"><CalendarClock className="w-3 h-3" /><span>{trackingOrder.scheduledSlot}</span></span>}
@@ -3849,7 +3967,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <button onClick={() => setTrackingOrder(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
 
-            {/* Location links — store pickup + customer's pinned delivery point (no live driver location) */}
+            {/* Location links â€” store pickup + customer's pinned delivery point (no live driver location) */}
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider flex items-center space-x-1.5">
@@ -3864,8 +3982,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-bold text-gray-700">
                   <span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">{initialsOf(trackingDriver.name)}</span>
                   <span className="min-w-0">
-                    {T.courierDriver}: <b>{trackingDriver.name}</b> · {trackingDriver.vehicleType}
-                    {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="ml-1 text-amber-500">★ {rr.avg} <span className="text-gray-400">({rr.count})</span></span> : null; })()}
+                    {T.courierDriver}: <b>{trackingDriver.name}</b> Â· {trackingDriver.vehicleType}
+                    {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="ml-1 text-amber-500">â˜… {rr.avg} <span className="text-gray-400">({rr.count})</span></span> : null; })()}
                   </span>
                 </div>
               )}
@@ -3918,7 +4036,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               })}
             </div>
 
-            {/* Driver card — only shown once the order is Out for Delivery */}
+            {/* Driver card â€” only shown once the order is Out for Delivery */}
             {trackingDriver && trackingOrder.status === 'Ongoing' && (() => {
               const dPhone = trackingDriver.phone || '01700000000';
               const waNum = '88' + dPhone.replace(/^0/, '');
@@ -3929,9 +4047,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       {initialsOf(trackingDriver.name)}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-gray-900 truncate">{T.courierDriver}: {trackingDriver.name} {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="text-amber-500">★ {rr.avg}</span> : null; })()}</p>
-                      <p className="text-[10px] text-gray-500 font-mono truncate">{trackingDriver.vehicleType}: {trackingDriver.id} · {trackProgress < 0.12 ? 'At store — picking up your order' : 'En route to you'}</p>
-                      {dPhone && <p className="text-[10px] text-gray-600 font-mono font-bold">📞 {dPhone}</p>}
+                      <p className="font-bold text-gray-900 truncate">{T.courierDriver}: {trackingDriver.name} {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="text-amber-500">â˜… {rr.avg}</span> : null; })()}</p>
+                      <p className="text-[10px] text-gray-500 font-mono truncate">{trackingDriver.vehicleType}: {trackingDriver.id} Â· {trackProgress < 0.12 ? 'At store â€” picking up your order' : 'En route to you'}</p>
+                      {dPhone && <p className="text-[10px] text-gray-600 font-mono font-bold">ðŸ“ž {dPhone}</p>}
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 shrink-0">
@@ -3946,11 +4064,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               );
             })()}
 
-            {/* Delivery is completed by the admin/store only — customers cannot complete orders */}
+            {/* Delivery is completed by the admin/store only â€” customers cannot complete orders */}
             {trackProgress >= 0.9 && trackingOrder.status !== 'Completed' && (
               <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl text-center">
                 <p className="text-xs font-black text-blue-900 flex items-center justify-center space-x-1.5">
-                  <Lock className="w-3.5 h-3.5" /><span>Driver at your door — delivery will be confirmed by our team</span>
+                  <Lock className="w-3.5 h-3.5" /><span>Driver at your door â€” delivery will be confirmed by our team</span>
                 </p>
               </div>
             )}
@@ -3983,12 +4101,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </svg>
                 </div>
                 <div className="flex items-center space-x-1.5 text-[9px] font-black tracking-widest uppercase text-black print:text-black">
-                  <span>★</span><span>SMART SHOP BRAND</span><span>★</span>
+                  <span>â˜…</span><span>SMART SHOP BRAND</span><span>â˜…</span>
                 </div>
               </div>
               <h4 className="font-black text-sm text-gray-900 uppercase print:text-black">{receiptOrder.storeName}</h4>
               <p className="text-[10px] text-gray-500 print:text-black">Order ID: #{receiptOrder.id}</p>
-              <p className="text-[10px] text-gray-500 print:text-black">Date: {receiptOrder.date} {receiptOrder.time ? `• ${receiptOrder.time}` : ''}</p>
+              <p className="text-[10px] text-gray-500 print:text-black">Date: {receiptOrder.date} {receiptOrder.time ? `â€¢ ${receiptOrder.time}` : ''}</p>
             </div>
             <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200">
               <QRCodeSVG
@@ -4016,10 +4134,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="flex justify-between"><span>Items:</span><span className="font-bold">{receiptOrder.itemCount} pcs</span></div>
               ) : null}
               {receiptOrder.deliveryCharge ? (
-                <div className="flex justify-between"><span>Delivery:</span><span className="font-bold">৳{receiptOrder.deliveryCharge}</span></div>
+                <div className="flex justify-between"><span>Delivery:</span><span className="font-bold">à§³{receiptOrder.deliveryCharge}</span></div>
               ) : null}
               <div className="flex justify-between text-sm font-black text-gray-900 pt-1">
-                <span>Total Amount:</span><span>৳{receiptOrder.amount}</span>
+                <span>Total Amount:</span><span>à§³{receiptOrder.amount}</span>
               </div>
             </div>
             <button onClick={() => { window.print(); }} className="w-full py-2 bg-emerald-600 text-white rounded-xl font-sans font-bold text-xs">
@@ -4065,35 +4183,35 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 text-xs" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center border-b border-gray-100 pb-2 mb-3">
               <h3 className="font-black text-sm text-gray-900">
-                {policyModal === 'terms' ? 'টার্মস অ্যান্ড কন্ডিশনস' : policyModal === 'privacy' ? 'প্রাইভেসি পলিসি' : 'রিফান্ড পলিসি'}
+                {policyModal === 'terms' ? T.terms : policyModal === 'privacy' ? T.privacy : T.refund}
               </h3>
               <button onClick={() => setPolicyModal(null)} className="cursor-pointer text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
             </div>
             <div className="space-y-3 text-gray-700 leading-relaxed max-h-80 overflow-y-auto pr-1">
               {policyModal === 'terms' && (
                 <>
-                  <p>১. অর্ডার নিশ্চিত হওয়ার পর পণ্যের মূল্য ও ডেলিভারি চার্জ প্রযোজ্য থাকবে।</p>
-                  <p>২. ডেলিভারি সময় শহরভেদে ৩০–৬০ মিনিটের মধ্যে হয়ে থাকে।</p>
-                  <p>৩. পেমেন্ট অ্যাডমিন যাচাই করার পরই অর্ডার ডেলিভারির জন্য ট্র্যাকিং খুলবে।</p>
-                  <p>৪. অ্যাপের মাধ্যমে ঘোষিত যেকোনো অফার ও ডিল সময়সাপেক্ষ পরিবর্তন হতে পারে।</p>
-                  <p>৫. ডেলিভারি ঠিকানা সঠিক না হলে পুনরায় ডেলিভারি চার্জ প্রযোজ্য হবে।</p>
-                  <p>৬. যেকোনো অভিযোগের জন্য ৪৮ ঘণ্টার মধ্যে আমাদের সাপোর্ট টিমের সাথে যোগাযোগ করুন।</p>
+                  <p>{T.t1}</p>
+                  <p>{T.t2}</p>
+                  <p>{T.t3}</p>
+                  <p>{T.t4}</p>
+                  <p>{T.t5}</p>
+                  <p>{T.t6}</p>
                 </>
               )}
               {policyModal === 'privacy' && (
                 <>
-                  <p>১. আপনার ব্যক্তিগত তথ্য (নাম, ঠিকানা, ফোন) শুধুমাত্র ডেলিভারি ও অর্ডার পরিচালনার জন্য ব্যবহৃত হয়।</p>
-                  <p>২. পেমেন্ট তথ্য এনক্রিপ্টেড পেমেন্ট গেটওয়ের মাধ্যমে নিরাপদে প্রসেস হয়।</p>
-                  <p>৩. আপনার অনুমতি ছাড়া তৃতীয় পক্ষের সাথে তথ্য শেয়ার করা হয় না।</p>
-                  <p>৪. আপনি যেকোনো সময় আমাদের সাপোর্ট টিমের কাছে তথ্য মুছে ফেলার অনুরোধ করতে পারবেন।</p>
+                  <p>{T.p1}</p>
+                  <p>{T.p2}</p>
+                  <p>{T.p3}</p>
+                  <p>{T.p4}</p>
                 </>
               )}
               {policyModal === 'refund' && (
                 <>
-                  <p>১. পণ্য ডেলিভারি না হওয়া বা অর্ডার ক্যান্সেল হলে পূর্ণ অর্থ ফেরত দেওয়া হয়।</p>
-                  <p>২. রিফান্ড যাচাই হওয়ার পর ২৪–৪৮ ঘণ্টার মধ্যে আপনার ওয়ালেট বা পেমেন্ট মেথডে ফেরত যাবে।</p>
-                  <p>৩. ভুল পণ্য বা ক্ষতিগ্রস্ত পণ্য পেলে ডেলিভারির ৪৮ ঘণ্টার মধ্যে রিপোর্ট করুন।</p>
-                  <p>৪. রিফান্ড রিপোর্ট অ্যাডমিন যাচাইয়ের পর অনুমোদিত হয়।</p>
+                  <p>{T.r1}</p>
+                  <p>{T.r2}</p>
+                  <p>{T.r3}</p>
+                  <p>{T.r4}</p>
                 </>
               )}
             </div>
@@ -4106,17 +4224,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         <div className="fixed inset-0 z-[70] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200">
             <div className="relative h-40 bg-white">
-              <img src={detailProduct.image} alt={detailProduct.name} referrerPolicy="no-referrer" className="w-full h-full object-contain" />
+              <img src={detailProduct.image} alt={nm(detailProduct.name)} referrerPolicy="no-referrer" className="w-full h-full object-contain" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/5 pointer-events-none" />
               <button onClick={() => setDetailProduct(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer"><X className="w-4 h-4" /></button>
               <span className={`absolute bottom-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase ${detailProduct.status === 'In Stock' ? 'bg-emerald-600 text-white' : detailProduct.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'}`}>{statusLabel(detailProduct.status)}</span>
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">{detailStoreName} · {detailProduct.category}</p>
-                <h3 className="text-base font-black text-gray-900">{detailProduct.name}</h3>
+                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">{detailStoreName} Â· {detailProduct.category}</p>
+                <h3 className="text-base font-black text-gray-900">{nm(detailProduct.name)}</h3>
                 <div className="flex items-center justify-between mt-1.5">
-                  <p className="font-mono font-black text-emerald-700 text-lg">৳{detailProduct.price} <span className="text-xs text-gray-400 font-normal">/ {detailProduct.unit}</span></p>
+                  <p className="font-mono font-black text-emerald-700 text-lg">à§³{detailProduct.price} <span className="text-xs text-gray-400 font-normal">/ {detailProduct.unit}</span></p>
                   <div className="flex items-center space-x-1">
                     {[1, 2, 3, 4, 5].map(r => {
                       const agg = productReviews.filter(pr => pr.productId === detailProduct.id);
@@ -4155,7 +4273,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                 ))}
                 {productReviews.filter(pr => pr.productId === detailProduct.id).length === 0 && (
-                  <p className="text-[11px] text-gray-400">No reviews yet — be the first to review this product.</p>
+                  <p className="text-[11px] text-gray-400">No reviews yet â€” be the first to review this product.</p>
                 )}
 
                 {/* Write review */}
@@ -4184,7 +4302,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       }, ...prev]);
                       setNewReviewText('');
                       setNewReviewRating(5);
-                      showToast('Review submitted — thank you!', 'success');
+                      showToast('Review submitted â€” thank you!', 'success');
                     }}
                     className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all cursor-pointer"
                   >
@@ -4198,7 +4316,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 disabled={detailProduct.status === 'Out of Stock'}
                 className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
               >
-                <Plus className="w-4 h-4" /><span>{detailProduct.status === 'Out of Stock' ? (lang === 'bn' ? 'অনুপলব্ধ' : 'Unavailable') : T.addToCart} · ৳{detailProduct.price}</span>
+                <Plus className="w-4 h-4" /><span>{detailProduct.status === 'Out of Stock' ? (lang === 'bn' ? 'à¦…à¦¨à§à¦ªà¦²à¦¬à§à¦§' : 'Unavailable') : T.addToCart} Â· à§³{detailProduct.price}</span>
               </button>
             </div>
           </div>
@@ -4228,18 +4346,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               ) : (
                 cart.map((item) => (
                   <div key={item.product.id} className="flex items-center space-x-3 bg-gray-50 border border-gray-200 rounded-xl p-2.5">
-                    <img src={item.product.image} alt={item.product.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
+                    <img src={item.product.image} alt={nm(item.product.name)} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-900 truncate">{item.product.name}</p>
-                      {item.note && <p className="text-[9px] text-amber-600 font-bold truncate mt-0.5">✎ {item.note}</p>}
-                      <p className="text-[10px] text-gray-500">৳{item.product.price} / {item.product.unit}</p>
+                      <p className="text-xs font-bold text-gray-900 truncate">{nm(item.product.name)}</p>
+                      {item.note && <p className="text-[9px] text-amber-600 font-bold truncate mt-0.5">âœŽ {item.note}</p>}
+                      <p className="text-[10px] text-gray-500">à§³{item.product.price} / {item.product.unit}</p>
                       <div className="flex items-center space-x-1.5 mt-1 border border-gray-300 rounded-lg bg-white w-fit px-1.5 py-0.5">
                         <button onClick={() => handleUpdateQty(item.product.id, -1)} className="text-gray-500 cursor-pointer"><Minus className="w-3 h-3" /></button>
                         <span className="font-mono font-bold text-[11px] text-gray-800 w-4 text-center">{item.quantity}</span>
                         <button onClick={() => handleAddToCart(item.product)} className="text-gray-500 cursor-pointer"><Plus className="w-3 h-3" /></button>
                       </div>
                     </div>
-                    <span className="font-mono font-black text-gray-900 text-xs">৳{item.product.price * item.quantity}</span>
+                    <span className="font-mono font-black text-gray-900 text-xs">à§³{item.product.price * item.quantity}</span>
                   </div>
                 ))
               )}
@@ -4248,7 +4366,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div className="p-4 border-t border-gray-200 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 font-bold">{T.grandTotal}</span>
-                  <span className="font-mono font-black text-emerald-700">৳{cartGrandTotal}</span>
+                  <span className="font-mono font-black text-emerald-700">à§³{cartGrandTotal}</span>
                 </div>
                 <button onClick={() => {
                   setIsCartDrawerOpen(false);
@@ -4279,8 +4397,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         {initialsOf(drv ? drv.name : 'Rider')}
                       </div>
                       <div>
-                        <p className="text-xs font-black text-gray-900">{drv ? drv.name : 'Rider'} · {ord?.storeName}</p>
-                        <p className="text-[10px] text-emerald-600 font-bold flex items-center space-x-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /><span>Online · replies instantly</span></p>
+                        <p className="text-xs font-black text-gray-900">{drv ? drv.name : 'Rider'} Â· {ord?.storeName}</p>
+                        <p className="text-[10px] text-emerald-600 font-bold flex items-center space-x-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /><span>Online Â· replies instantly</span></p>
                       </div>
                     </>
                   );
@@ -4307,7 +4425,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') sendChatMessage(); }}
-                placeholder={lang === 'bn' ? 'বার্তা লিখুন...' : 'Type a message...'}
+                placeholder={lang === 'bn' ? 'à¦¬à¦¾à¦°à§à¦¤à¦¾ à¦²à¦¿à¦–à§à¦¨...' : 'Type a message...'}
                 className="flex-1 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-emerald-500"
               />
               <button onClick={sendChatMessage} className="p-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 cursor-pointer">
@@ -4325,7 +4443,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center mx-auto"><Send className="w-6 h-6" /></div>
             <div>
               <h3 className="text-sm font-black text-gray-900">Re-send Payment for Review</h3>
-              <p className="text-xs text-gray-500 mt-1">Order <span className="font-mono font-bold">#{reSubmitOrder.id}</span> · {reSubmitOrder.storeName} · {reSubmitOrder.paymentMethod}</p>
+              <p className="text-xs text-gray-500 mt-1">Order <span className="font-mono font-bold">#{reSubmitOrder.id}</span> Â· {reSubmitOrder.storeName} Â· {reSubmitOrder.paymentMethod}</p>
               <p className="text-[10px] text-purple-600 mt-1 bg-purple-50 border border-purple-200 rounded-lg px-2 py-1">Your payment was rejected. Re-enter the correct details + upload a fresh screenshot so we can re-verify it.</p>
             </div>
             <div className="space-y-2.5 text-xs">
@@ -4339,9 +4457,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Amount (৳)</label>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Amount (à§³)</label>
                   <input type="number" value={reSub.amount} readOnly className="w-full p-2.5 border border-gray-300 rounded-xl outline-none bg-gray-50 text-gray-700 font-bold" />
-                  <p className="text-[9px] text-gray-400 mt-1">Must match order total ৳{reSubmitOrder?.amount}</p>
+                  <p className="text-[9px] text-gray-400 mt-1">Must match order total à§³{reSubmitOrder?.amount}</p>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Last 4 digits</label>
@@ -4376,11 +4494,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto"><AlertCircle className="w-6 h-6" /></div>
             <div>
               <h3 className="text-sm font-black text-gray-900">{reportOrder.paymentStatus === 'Rejected' ? 'Report payment issue' : 'Report an issue'}</h3>
-              <p className="text-xs text-gray-500 mt-1">Order <span className="font-mono font-bold">#{reportOrder.id}</span> · {reportOrder.storeName}</p>
+              <p className="text-xs text-gray-500 mt-1">Order <span className="font-mono font-bold">#{reportOrder.id}</span> Â· {reportOrder.storeName}</p>
             </div>
             <div className="space-y-1.5">
               {(reportOrder.paymentStatus === 'Rejected'
-                ? ['Payment rejected — money not credited', 'I sent the money — please re-check', 'Wrong transaction ID entered', 'Amount mismatched', 'Receipt / screenshot not visible', 'Send Money failed', 'Other']
+                ? ['Payment rejected â€” money not credited', 'I sent the money â€” please re-check', 'Wrong transaction ID entered', 'Amount mismatched', 'Receipt / screenshot not visible', 'Send Money failed', 'Other']
                 : ['Wrong item received', 'Missing item', 'Poor food quality', 'Late delivery', 'Damaged packaging', 'Overcharged', 'Other']).map(r => (
                 <button key={r} onClick={() => setReportReason(r)} className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold cursor-pointer border ${reportReason === r ? 'bg-red-50 border-red-400 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-700 hover:border-gray-300'}`}>
                   <span>{r}</span>{reportReason === r && <Check className="w-3.5 h-3.5 text-red-500" />}
@@ -4391,11 +4509,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               rows={2}
               value={reportNote}
               onChange={(e) => setReportNote(e.target.value)}
-              placeholder={reportOrder.paymentStatus === 'Rejected' ? 'Add details (optional) — e.g. TrxID 8ETRGRGD, sent at 08:53 AM…' : 'Add details (optional) — e.g. ordered 2 but got 1…'}
+              placeholder={reportOrder.paymentStatus === 'Rejected' ? 'Add details (optional) â€” e.g. TrxID 8ETRGRGD, sent at 08:53 AMâ€¦' : 'Add details (optional) â€” e.g. ordered 2 but got 1â€¦'}
               className="w-full p-2.5 border border-gray-300 rounded-xl text-xs outline-none focus:border-red-500 resize-none"
             />
             <div className="space-y-2">
-              <button onClick={() => { if (onReport) onReport({ orderId: reportOrder.id, reason: reportReason, note: reportNote }); setReportOrder(null); showToast(`Report submitted for #${reportOrder.id} — admin notified ✓`, 'success'); }} className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
+              <button onClick={() => { if (onReport) onReport({ orderId: reportOrder.id, reason: reportReason, note: reportNote }); setReportOrder(null); showToast(`Report submitted for #${reportOrder.id} â€” admin notified âœ“`, 'success'); }} className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
                 Submit Report to Admin
               </button>
               <button onClick={() => setReportOrder(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.cancel}</button>
@@ -4493,7 +4611,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
                 <div>
                   <h3 className="text-sm font-black text-gray-900">{addMoneyStep === 'otp' ? 'Verify OTP' : 'Add Money to Wallet'}</h3>
-                  <p className="text-[9px] text-gray-400">Current balance: ৳{walletBalance.toLocaleString()}</p>
+                  <p className="text-[9px] text-gray-400">Current balance: à§³{walletBalance.toLocaleString()}</p>
                 </div>
               </div>
               <button onClick={() => setAddMoneyOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-4 h-4 text-gray-500" /></button>
@@ -4502,7 +4620,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             {addMoneyStep === 'method' ? (
               <>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Amount (৳)</label>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Amount (à§³)</label>
                   <input
                     type="number"
                     value={addMoneyAmount}
@@ -4554,7 +4672,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">CVV</label>
-                        <input type="password" value={addMoneyCard.cvv} onChange={(e) => setAddMoneyCard({ ...addMoneyCard, cvv: e.target.value })} placeholder="•••" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 outline-none focus:border-emerald-500 font-mono" />
+                        <input type="password" value={addMoneyCard.cvv} onChange={(e) => setAddMoneyCard({ ...addMoneyCard, cvv: e.target.value })} placeholder="â€¢â€¢â€¢" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 outline-none focus:border-emerald-500 font-mono" />
                       </div>
                     </div>
                   </div>
@@ -4563,7 +4681,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
 
                 <button onClick={sendAddMoneyOtp} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
-                  Continue — Send OTP
+                  Continue â€” Send OTP
                 </button>
               </>
             ) : (
@@ -4573,7 +4691,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <div className="bg-white border border-dashed border-emerald-300 rounded-lg px-3 py-2 font-mono font-black tracking-[0.25em] text-lg text-emerald-700 text-center select-all">
                     {addMoneyOtp}
                   </div>
-                  <p className="text-[9px] text-gray-400">Enter the 6-digit code to complete ৳{parseFloat(addMoneyAmount).toLocaleString()} top-up</p>
+                  <p className="text-[9px] text-gray-400">Enter the 6-digit code to complete à§³{parseFloat(addMoneyAmount).toLocaleString()} top-up</p>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">OTP Code</label>
@@ -4588,7 +4706,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
                 <div className="space-y-2">
                   <button onClick={confirmAddMoney} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
-                    Verify & Add ৳{parseFloat(addMoneyAmount).toLocaleString()}
+                    Verify & Add à§³{parseFloat(addMoneyAmount).toLocaleString()}
                   </button>
                   <button onClick={() => { setAddMoneyStep('method'); setAddMoneyError(''); }} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">
                     {T.cancel}
@@ -4609,13 +4727,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         <div className="fixed inset-0 z-[86] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200 flex flex-col max-h-[90vh]">
             <div className="relative h-40 bg-gray-100 shrink-0">
-              <img src={customizeProd.image} alt={customizeProd.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              <img src={customizeProd.image} alt={nm(customizeProd.name)} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
               <button onClick={() => setCustomizeProd(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 text-gray-700 flex items-center justify-center hover:bg-white cursor-pointer shadow-md"><X className="w-4 h-4" /></button>
               <div className="absolute bottom-3 left-4 right-4">
                 <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-600 text-white">{customizeProd.category}</span>
-                <h3 className="text-lg font-black text-white mt-1 leading-tight">{customizeProd.name}</h3>
-                <p className="text-xs text-white/90"><span className="font-mono font-black">৳{customizeProd.price}</span> / {customizeProd.unit}</p>
+                <h3 className="text-lg font-black text-white mt-1 leading-tight">{nm(customizeProd.name)}</h3>
+                <p className="text-xs text-white/90"><span className="font-mono font-black">à§³{customizeProd.price}</span> / {customizeProd.unit}</p>
               </div>
             </div>
             <div className="p-5 space-y-4 overflow-y-auto">
@@ -4635,7 +4753,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         }`}
                       >
                         <span className="block">{ch.label}</span>
-                        <span className="block text-[10px] text-gray-500 font-mono">৳{ch.price}</span>
+                        <span className="block text-[10px] text-gray-500 font-mono">à§³{ch.price}</span>
                       </button>
                     ))}
                   </div>
@@ -4670,7 +4788,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <textarea
                   value={customizeNote}
                   onChange={(e) => setCustomizeNote(e.target.value)}
-                  placeholder="e.g. less spicy, no onions, extra sauce…"
+                  placeholder="e.g. less spicy, no onions, extra sauceâ€¦"
                   rows={2}
                   className="w-full bg-white border border-gray-300 rounded-xl p-3 text-xs text-gray-900 outline-none focus:border-emerald-500 resize-none"
                 />
@@ -4680,15 +4798,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <span className="font-bold text-gray-700">Total</span>
                 <div className="text-right">
                   {wChoices.length > 0 && (
-                    <span className="text-[10px] text-gray-500 font-mono block">{wChoices.find(c => c.multiplier === customizeWeight)?.label || '1'} × {customizeQty} qty</span>
+                    <span className="text-[10px] text-gray-500 font-mono block">{wChoices.find(c => c.multiplier === customizeWeight)?.label || '1'} Ã— {customizeQty} qty</span>
                   )}
-                  <span className="font-mono font-black text-emerald-700 text-lg">৳{total.toLocaleString()}</span>
+                  <span className="font-mono font-black text-emerald-700 text-lg">à§³{total.toLocaleString()}</span>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <button onClick={handleCustomizeAdd} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer">
-                  Add to Cart — ৳{total.toLocaleString()}
+                  Add to Cart â€” à§³{total.toLocaleString()}
                 </button>
                 <button onClick={() => setCustomizeProd(null)} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">{T.cancel}</button>
               </div>
@@ -4700,7 +4818,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* FOOTER */}
       <footer className="bg-white border-t border-gray-200 py-4 px-6 text-center text-xs text-gray-500 hidden md:block">
-        <p>© 2026 Smart Shop E-Commerce Platform by NexaGo BD. All rights reserved.</p>
+        <p>Â© 2026 Smart Shop E-Commerce Platform by NexaGo BD. All rights reserved.</p>
       </footer>
     </div>
   );
