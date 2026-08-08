@@ -231,3 +231,23 @@ export interface Product {
   status: string;
   image?: string;
 }
+
+// Send Money merchant wallets — admin edits these from the Orders dashboard,
+// the customer storefront reads the same shared key (bKash / Nagad / Upay / Rocket)
+export type WalletKey = 'bKash' | 'Nagad' | 'Upay' | 'Rocket';
+export interface WalletNumbers {
+  name: string;
+  numbers: string[];
+}
+export type WalletConfig = Record<WalletKey, WalletNumbers>;
+
+export const WALLET_CONFIG_KEY = 'ss_wallet_config';
+
+export const DEFAULT_WALLETS: WalletConfig = {
+  bKash: { name: 'NexaGo Pay', numbers: ['01712-345678', '01811-222333', '01611-444555'] },
+  Nagad: { name: 'NexaGo Pay', numbers: ['01819-987654', '01311-666777'] },
+  Upay: { name: 'NexaGo Pay', numbers: ['01911-123456', '01511-654321'] },
+  Rocket: { name: 'NexaGo Pay', numbers: ['01812-333444', '01612-555666'] },
+};
+
+export const SEND_MONEY_METHODS: WalletKey[] = ['bKash', 'Nagad', 'Upay', 'Rocket'];

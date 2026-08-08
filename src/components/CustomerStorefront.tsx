@@ -10,10 +10,11 @@ import {
   SlidersHorizontal, Camera
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Order, Product, RefundRequest } from '../types';
+import { Order, Product, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
+import { UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
 interface CustomerStorefrontProps {
   stores: Array<{
@@ -325,12 +326,8 @@ const LS_KEYS = {
   reminded: 'ss_reminded',
 };
 
-// Send Money merchant wallets — multiple numbers rotate per order to spread load
-// (configure these with the real business numbers)
-const MERCHANT_WALLETS: Record<'bKash' | 'Nagad', { name: string; numbers: string[] }> = {
-  bKash: { name: 'NexaGo Pay', numbers: ['01712-345678', '01811-222333', '01611-444555'] },
-  Nagad: { name: 'NexaGo Pay', numbers: ['01819-987654', '01311-666777'] },
-};
+// Send Money merchant wallets come from the shared admin-managed config
+// (bKash / Nagad / Upay / Rocket) — the admin edits these from the Orders dashboard.
 
 const TRX_RE = /^[A-Z0-9]{8,20}$/;
 const PAY_SESSION_MS = 10 * 60 * 1000;   // 10-minute payment window
@@ -685,19 +682,37 @@ const ETA_STEPS = [
   { label: 'Delivered', desc: 'Order delivered to your door', min: 0.9 },
 ];
 
-const BkashLogo = ({ className = '' }: { className?: string }) => (
-  <svg viewBox="0 0 60 34" className={className} xmlns="http://www.w3.org/2000/svg" aria-label="bKash">
-    <rect width="60" height="34" rx="7.5" fill="#E2136E" />
-    <text x="30" y="23" textAnchor="middle" fontFamily="'Arial Black','Segoe UI',Arial,sans-serif" fontWeight="900" fontSize="15" fill="#ffffff" letterSpacing="-0.3">bKash</text>
-    <path d="M14 24.5c10.5 2.2 21.5 2.2 32 0" stroke="#ffffff" strokeWidth="2.2" fill="none" strokeLinecap="round" opacity="0.95" />
+// Official bKash brand logo (vector artwork from bkash.com)
+const BkashLogo = ({ className = '', width, height }: { className?: string; width?: number; height?: number }) => (
+  <svg viewBox="11.22 10.7 458.08 209.58" className={className} width={width} height={height} xmlns="http://www.w3.org/2000/svg" aria-label="bKash">
+    <path d="M327.99 110.75l12.99 58.4 85.01-43.04z" fill="#d12053" />
+    <path d="M352.16 23.48L328 110.76l98.01 15.35z" fill="#e2136e" />
+    <path d="M248.31 10.7l101.38 12.11-23.97 86.76z" fill="#d12053" />
+    <path d="M247.52 27.76h11.29l31.67 40.5z" fill="#9e1638" />
+    <path d="M428.69 125.55l-29.46-40.77 47.66-8.53z" fill="#d12053" />
+    <path d="M423.77 137.5l3.04-9.07-74.39 37.74z" fill="#e2136e" />
+    <path d="M325.91 113.05l15.52 69.77-46.06 37.46z" fill="#9e1638" />
+    <path d="M442.25 96.97l27.05-.46-19.55-19.89z" fill="#e2136e" />
+    <path d="M255.13 94.18v7.53c-2.76-4.35-10.52-7.22-14.8-6.62s-11 4.14-14.65 12C221.68 98.82 214 94 208.27 94h-17.78v8.84h11.58c5.12 0 10.46-.52 15.24 3.83a11.76 11.76 0 0 1 3.46 6.7c1.47 6.86-1.54 15.09-9.51 15.29a24.63 24.63 0 0 1-7.49-.87l-.61.63a66.48 66.48 0 0 1 4.91 8.17 25.21 25.21 0 0 0 12.56-6.82 24.09 24.09 0 0 0 5.05-7.12 24.26 24.26 0 0 0 4.49 7.12 22.36 22.36 0 0 0 11.32 6.82 69.8 69.8 0 0 1 4.42-8.17l-.54-.63a20.07 20.07 0 0 1-6.74.87c-8.25-.23-9.76-8.69-8.48-15.29 1.11-5.62 6.11-11.15 11-11.56 5.49-.45 12.19 4.18 13.55 9.85a41.85 41.85 0 0 1 1 9.47v51.49a35 35 0 0 1 3.94-.38 33.7 33.7 0 0 1 4 .38V94.18z" fill="#231f20" />
+    <path d="M42.34 64.29c13.91-1.39 35.27 16.56 37 20.48l1.32-.21V74.25c-9.77-5.17-23.41-15.79-41.5-14.49-20.07 1.44-27.92 13.24-27.94 34V172.67a26.39 26.39 0 0 1 3.77-.41 36.5 36.5 0 0 1 4.27.41v-69.79h53.36v5.73c-29.29.54-42 16.87-42 30.9 0 17.1 17.66 33.17 48.68 33.17h1.37V94H20l-.1-.18a20.61 20.61 0 0 1-.61-4.66C19.18 75.87 28 65.69 42.34 64.29zM41.09 140c0-12.34 13.67-24.17 31.53-26.74v56.09C53 166 41.09 150.6 41.09 140z" fill="#e2136e" />
+    <path d="M82.75 94v8.85h54.88v5.73c-29.29.54-42 16.87-42 30.9 0 17.1 17.67 33.17 48.67 33.17h1.36v-58.32h.85c9.85-.27 15.74 6 16.05 14.05a13.34 13.34 0 0 1-8.69 13.09l.06 1.19 7.48-.22c4.18-5.29 6.89-11.19 6.62-17.56-.46-11.11-7.88-16.4-22.37-16.2v-5.75h34.75v69.79a28.1 28.1 0 0 1 3.93-.41 34.62 34.62 0 0 1 4.1.41V94zm23.35 46c0-12.34 13.68-24.17 31.53-26.74v56.1C118 166 106.1 150.6 106.1 140z" fill="#231f20" />
   </svg>
 );
 
-const NagadLogo = ({ className = '' }: { className?: string }) => (
-  <svg viewBox="0 0 60 34" className={className} xmlns="http://www.w3.org/2000/svg" aria-label="nagad">
-    <rect width="60" height="34" rx="7.5" fill="#F6921E" />
-    <text x="30" y="23" textAnchor="middle" fontFamily="'Arial Black','Segoe UI',Arial,sans-serif" fontWeight="900" fontSize="15" fill="#ffffff" letterSpacing="-0.3">nagad</text>
-    <path d="M12 10.5 48 23.5" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" opacity="0.95" />
+// Official Nagad brand logo (vector artwork from nagad.com.bd)
+const NagadLogo = ({ className = '', width, height }: { className?: string; width?: number; height?: number }) => (
+  <svg viewBox="-0.002 -0.001 300.21 131.033" className={className} width={width} height={height} xmlns="http://www.w3.org/2000/svg" aria-label="nagad">
+    <g fill="#ed1c24">
+      <path d="m193.564 50.855h-52.413c-1.038 0-1.557.779-1.557 1.557v4.152c0 1.038.779 1.556 1.557 1.556h39.18v21.796c-1.038-1.557-2.335-3.114-3.632-4.67-4.67-4.67-9.6-7.006-14.79-7.006-4.152 0-7.525 2.076-10.38 5.708-2.334 3.114-3.632 6.747-3.632 10.12s.52 7.784 3.114 11.935c3.114 4.93 8.303 6.487 12.974 6.487 5.967 0 10.897-4.151 10.897-9.6 0-3.114-1.556-5.709-4.41-7.525l-2.855-1.557v4.67c-.26 1.298-2.335 3.114-4.67 3.114-2.076 0-3.892-.778-5.19-2.075-.778-.779-1.297-2.336-1.038-3.374 0-1.556.52-2.854 1.557-4.151 1.298-1.557 2.595-2.335 4.67-2.335 5.19 0 9.601 2.335 13.234 7.524 2.854 4.411 4.41 8.563 4.41 13.233v10.898l7.785 4.67c.26.26.519.26.778.26 1.038 0 1.557-.778 1.557-1.557v-56.305h3.114c1.038 0 1.557-.778 1.557-1.557v-4.151c0-1.038-.779-1.817-1.817-1.817z" />
+      <path d="m298.391 50.855h-66.425c-1.038 0-1.557.779-1.557 1.557v7.265c-6.486-6.746-12.195-10.12-17.384-10.12-4.93 0-9.082 1.039-12.714 3.893-3.374 2.595-5.45 5.968-5.45 9.86 0 11.676 12.974 11.417 16.347 9.86.52-.26 1.298-.779 2.076-.779 2.595 0 3.633 2.076 3.633 3.893 0 2.594-3.892 4.93-8.563 4.93-2.594 0-4.151-.779-5.19-2.336l-2.075-3.113-1.297 3.632c-.26.779-.779 1.816-.779 3.114 0 2.595 1.298 5.19 3.892 7.525 2.336 2.075 5.19 3.113 8.303 3.113 4.93 0 9.082-1.816 11.677-5.449 2.335-2.854 3.373-6.227 3.373-10.12 0-2.075-.779-4.41-2.595-7.005-2.076-3.114-4.67-4.67-7.525-4.67-1.037 0-2.335.26-3.632.778-.52.26-1.557.519-1.817.519-.518 0-1.297-.26-1.816-1.038-.519-.519-1.038-1.297-1.038-2.595 0-2.854 2.595-5.708 7.266-5.708h.259c3.114 0 6.227 1.557 9.082 4.411 2.335 2.335 4.151 4.67 5.708 7.265v41.256l7.784 4.67c.26.26.519.26.778.26 1.038 0 1.557-.778 1.557-1.557v-55.786h11.936v36.067l9.341 3.892h.519c.778 0 1.557-.52 1.557-1.557v-.26c1.557-10.638 6.227-17.903 14.011-22.314v2.076c0 1.556 0 5.448.26 7.524 0 1.298 0 2.076.26 2.854 0 4.152.518 10.38 1.816 15.05 2.594 8.822 7.005 10.898 10.119 10.898h.26c1.816 0 3.373-.52 4.41-1.557.52-.52 1.298-1.557 1.298-3.373 0-1.557-.26-2.855-.779-3.892l-.778-1.298-1.557.26c-1.557.519-2.335.519-2.335.26h-.26c-.519 0-.519 0-.778-.26-.519-.26-1.557-1.038-2.335-3.892-.52-2.076-.779-4.93-.779-6.487 0-11.676 2.336-20.498 6.228-22.315h.26c.518-.26 1.037-.778 1.037-1.557 0-.26 0-.519-.26-.778v-.26c-1.816-3.632-5.708-6.227-10.897-7.524h-1.038c-4.152.778-9.082 3.632-15.309 8.822-1.557 1.297-3.114 2.595-4.411 3.892v-14.271h36.326c1.038 0 1.557-.778 1.557-1.557v-4.151c.26-1.038-.52-1.817-1.557-1.817zm-175.922 19.201c0 1.817 0 3.373-.26 4.93a58.206 58.206 0 0 1 -5.189 20.239c-1.038 2.595-2.335 4.93-3.892 7.265-10.898 17.125-30.099 28.542-51.894 28.542-9.341 0-18.163-2.076-25.948-5.708-20.756-9.6-35.288-30.877-35.288-55.268 0-24.13 14.012-44.888 33.991-54.748-1.557 2.075-3.114 4.151-4.411 6.486 0 .26-.26.26-.26.52-.778.778-1.556 1.297-2.335 2.075-1.038.779-1.816 1.816-2.854 2.595l-.519.519-.519.519c-.26.26-.519.778-1.038 1.038-.519.778-1.297 1.556-1.816 2.335a45.542 45.542 0 0 0 -6.227 10.898c-.26.26-.26.778-.52 1.038-.259.519-.259 1.037-.518 1.297 0 .26-.26.519-.26.778-.26.779-.519 1.298-.778 2.076-.26.52-.26 1.038-.519 1.297 0 .26-.26.52-.26.779 0 .519-.259 1.038-.259 1.557l-.778 4.67c0 .52 0 .779-.26 1.298v6.227c0 16.606 7.525 31.656 19.72 41.256 9.341 7.525 21.017 12.195 33.731 12.195 11.677 0 22.315-3.632 31.137-10.12 6.487-4.67 11.676-10.638 15.568-17.643.52-1.038 1.038-1.817 1.557-2.855 3.114-6.486 4.93-13.492 4.93-21.017v-1.816c0-1.816 0-3.373-.26-5.19l.26.26c.779.778 1.557 1.297 2.335 2.076.779-1.298 1.557-2.336 2.336-3.633.519 2.335.778 4.67 1.038 7.265.259 2.336.259 4.152.259 5.968z" />
+    </g>
+    <path d="m68.499 21.016-11.417-21.017c-18.941 8.561-31.915 27.504-31.915 49.559 0 11.157 3.373 21.536 9.082 30.099-.52-2.855-.52-5.709-.52-8.822.261-22.575 14.531-41.775 34.771-49.819z" fill="#f7941d" />
+    <path d="m77.58 31.395c4.67-1.297 9.86-1.816 14.79-1.816 3.114 0 6.487.259 9.341.778l-.26-9.341-.518-18.682c-2.076-.26-4.411-.519-6.746-.519-10.38 0-19.98 3.373-27.764 8.822l6.227 11.417c-11.157 3.892-20.238 11.676-25.947 21.796-2.854 4.93-4.93 10.638-5.708 16.606 1.557-3.114 3.373-5.968 5.449-8.563 7.524-9.86 18.422-17.384 31.136-20.498z" fill="#ed1c24" />
+    <g fill="#f7941d">
+      <path d="m104.825 20.757.519 13.233c-4.411-1.298-8.822-2.076-13.752-2.076-9.082 0-17.644 2.595-25.169 7.006-9.34 5.708-16.606 14.79-20.239 25.428 3.633-4.93 8.044-9.341 13.233-12.714 7.525-4.93 16.607-7.784 26.207-7.784 7.265 0 14.011 1.556 20.239 4.41a41.05 41.05 0 0 1 12.454 8.563l7.266-10.898 9.34-14.27c-8.302-6.747-18.681-10.898-30.098-10.898z" />
+      <path d="m116.501 63.829v1.816c0 10.898-4.41 19.98-4.93 21.017s-1.038 1.817-1.557 2.855c-3.892 7.005-9.081 12.973-15.568 17.644-8.822 6.227-19.46 10.12-31.137 10.12-12.714 0-24.65-4.412-33.731-12.196-11.936-9.86-19.72-24.65-19.72-41.256v-6.227c0-.52 0-.779.26-1.298l.778-4.67c0-.52.26-1.038.26-1.557 0-.26.259-.52.259-.779.26-.519.26-1.037.519-1.297.26-.778.519-1.557.778-2.076 0-.26.26-.519.26-.778.26-.52.26-1.038.519-1.297s.26-.779.519-1.038c1.557-3.892 3.892-7.525 6.227-10.898.519-.779 1.297-1.557 1.816-2.335.26-.26.52-.779 1.038-1.038.26-.26.26-.52.52-.52.259-.259.259-.518.518-.518.779-1.038 1.816-1.817 2.854-2.595.779-.778 1.557-1.297 2.336-2.076 0 .26-.26.26-.26.52s-.26.518-.26.518c-3.113 6.228-5.189 13.752-5.967 21.536-.26 2.076-.26 4.152-.26 6.487 0 28.023 16.347 50.597 36.586 50.597h2.076c2.854 0 5.708-.519 8.562-1.038 13.752-3.632 23.872-16.346 23.872-31.136v-.779c-.26-8.822-3.892-16.865-9.86-22.314 4.151 0 8.303.778 12.195 1.816 7.525 1.816 14.27 5.449 20.239 10.12l.26.259c-.26 1.038 0 2.854 0 4.41z" />
+      <path d="m116.501 63.829v1.816c0 11.417-5.19 21.277-5.19 21.277-.518 1.038-1.037 1.816-1.556 2.854-3.892 7.006-9.341 12.974-15.828 17.644-9.081 6.746-19.98 10.12-31.396 10.12-12.455 0-24.39-4.411-33.99-12.196-12.457-10.119-19.721-25.428-19.721-41.514s7.264-31.396 19.72-41.516l.518-.519c0 .26-.26.26-.26.52s-.259.259-.259.518c-12.195 10.12-19.2 24.91-19.2 40.997s7.005 30.877 19.46 41.256c9.34 7.784 21.536 11.936 33.731 11.936 11.157 0 22.055-3.374 31.137-10.12 6.486-4.67 11.676-10.638 15.568-17.644.519-1.038 1.038-1.816 1.297-2.854 0 0 5.19-9.6 5.19-21.017v-1.817c0-1.816 0-3.373-.26-5.189v-.26l.26.26.26.26c.518 2.075.518 3.632.518 5.189z" />
+    </g>
   </svg>
 );
 
@@ -866,7 +881,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; isFreeShip?: boolean } | null>(null);
   const [couponInput, setCouponInput] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad' | 'Cash on Delivery' | 'Card' | 'Split (Wallet + bKash)'>('bKash');
+  const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad' | 'Upay' | 'Rocket' | 'Cash on Delivery' | 'Card' | 'Split (Wallet + bKash)'>('bKash');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('House 42, Road 8A, Dhanmondi, Dhaka');
   const [customerPhone, setCustomerPhone] = useState<string>('01712-345678');
 
@@ -925,21 +940,30 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Payment flow modal
-  const [payModal, setPayModal] = useState<null | 'bKash' | 'Nagad' | 'Card' | 'COD' | 'Split (Wallet + bKash)'>(null);
+  const [payModal, setPayModal] = useState<null | 'bKash' | 'Nagad' | 'Upay' | 'Rocket' | 'Card' | 'COD' | 'Split (Wallet + bKash)'>(null);
   const [pinInput, setPinInput] = useState('');
   const [cardInfo, setCardInfo] = useState({ number: '', name: '', expiry: '', cvv: '' });
 
-  // Send Money flow (bKash/Nagad)
+  // Send Money flow (bKash/Nagad/Upay/Rocket) — numbers are admin-managed via shared config
   const [sendMoney, setSendMoney] = useState({ sender: '', trxId: '', amount: '', receipt: '', note: '', last4: '' });
-  const [walletIdx, setWalletIdx] = useState<number>(() => getStoredData(LS_KEYS.walletIdx, 0));
-  useEffect(() => setStoredData(LS_KEYS.walletIdx, walletIdx), [walletIdx]);
-  const [walletPick, setWalletPick] = useState<{ bKash: number; Nagad: number }>({ bKash: 0, Nagad: 0 });
+  const [walletConfig, setWalletConfig] = useState<WalletConfig>(() => getStoredData(WALLET_CONFIG_KEY, DEFAULT_WALLETS));
+
+  // Live-refresh wallet numbers when the admin edits them from the dashboard tab
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === WALLET_CONFIG_KEY) {
+        try { setWalletConfig(e.newValue ? (JSON.parse(e.newValue) as WalletConfig) : DEFAULT_WALLETS); } catch { /* noop */ }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // Refund / cancellation request
   const [refunds, setRefunds] = useState<RefundRequest[]>(() => getStoredData(LS_KEYS.refunds, []));
   useEffect(() => setStoredData(LS_KEYS.refunds, refunds), [refunds]);
   const [refundModal, setRefundModal] = useState<Order | null>(null);
-  const [refundMethod, setRefundMethod] = useState<'bKash' | 'Nagad'>('bKash');
+  const [refundMethod, setRefundMethod] = useState<WalletKey>('bKash');
   const [refundNumber, setRefundNumber] = useState('');
   const [refundReason, setRefundReason] = useState('');
 
@@ -1040,12 +1064,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
-  const startPaySession = (wallet: 'bKash' | 'Nagad') => {
+  const startPaySession = (wallet: WalletKey) => {
     setPayExpired(false);
-    const list = MERCHANT_WALLETS[wallet].numbers;
-    const idx = walletIdx % list.length;
-    setWalletPick(prev => ({ ...prev, [wallet]: idx }));
-    setWalletIdx(i => i + 1);
     setSendMoney({ sender: customerPhone.replace(/[^0-9]/g, ''), trxId: '', amount: String(cartGrandTotal), receipt: '', note: customerPhone, last4: '' });
     setPayDeadline(Date.now() + PAY_SESSION_MS);
     setPayLeft(PAY_SESSION_MS / 1000);
@@ -1313,11 +1333,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast('Your cart is empty. Add items to order!', 'info');
       return;
     }
-    if (paymentMethod === 'bKash' || paymentMethod === 'Nagad') {
+    if (SEND_MONEY_METHODS.includes(paymentMethod as WalletKey)) {
       setPayModal(paymentMethod);
       setPinInput('');
       setCardInfo({ number: '', name: '', expiry: '', cvv: '' });
-      startPaySession(paymentMethod);
+      startPaySession(paymentMethod as WalletKey);
       return;
     }
     if (paymentMethod === 'Card' || paymentMethod === 'Split (Wallet + bKash)') {
@@ -1351,7 +1371,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Order Payment', amount: -splitDeduct, date: 'Just now', status: 'Completed' }, ...prev]);
     }
 
-    const isSendMoney = payModal === 'bKash' || payModal === 'Nagad';
+    const isSendMoney = payModal !== null && SEND_MONEY_METHODS.includes(payModal as WalletKey);
     const trxId = (sendMoney.trxId || '').trim().toUpperCase();
 
     finishOrder({
@@ -1405,7 +1425,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     const last4 = sendMoney.last4.replace(/[^0-9]/g, '');
     if (!/^\d{4}$/.test(last4)) { showToast('Enter the last 4 digits of the sending number for verification', 'info'); return; }
     if (!sender.endsWith(last4)) { showToast('Last 4 digits must match the last 4 digits of your sending number', 'info'); return; }
-    if (!TRX_RE.test(trxId)) { showToast(`Invalid ${payModal} TrxID — expected 8–20 letters/digits (e.g. ${payModal === 'bKash' ? '8NHK7K8MJH' : 'NG170870910001120M'})`, 'info'); registerFraudAttempt(sender); return; }
+    if (!TRX_RE.test(trxId)) { showToast(`Invalid ${payModal} TrxID — expected 8–20 letters/digits (e.g. ${WALLET_META[payModal as WalletKey].trxPlaceholder})`, 'info'); registerFraudAttempt(sender); return; }
     if (trxUsed.some(t => t.trxId === trxId)) { showToast('This TrxID was already used — duplicate transactions are blocked', 'info'); registerFraudAttempt(sender); return; }
     if (!sendMoney.receipt) { showToast('Upload the payment screenshot/receipt before submitting', 'info'); return; }
     const claimed = parseFloat(sendMoney.amount) || 0;
@@ -1416,7 +1436,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const submitRefund = () => {
     if (!refundModal) return;
     const num = refundNumber.replace(/[^0-9]/g, '');
-    if (num.length < 10) { showToast('Enter your valid bKash/Nagad number', 'info'); return; }
+    if (num.length < 10) { showToast('Enter your valid bKash/Nagad/Upay/Rocket number', 'info'); return; }
     if (!refundReason.trim()) { showToast('Tell us why you want a refund', 'info'); return; }
     setRefunds(prev => [{
       id: `RF-${Date.now().toString().slice(-5)}`,
@@ -3295,7 +3315,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">{T.paymentMethod}</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {(['bKash', 'Nagad', 'Cash on Delivery', 'Card', 'Split (Wallet + bKash)'] as const).map((method) => (
+                      {(['bKash', 'Nagad', 'Upay', 'Rocket', 'Cash on Delivery', 'Card', 'Split (Wallet + bKash)'] as const).map((method) => (
                         <button
                           type="button"
                           key={method}
@@ -3304,9 +3324,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             paymentMethod === method ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                           }`}
                         >
-                          {method === 'bKash' ? <span className="flex items-center justify-center space-x-1"><BkashLogo className="w-8 h-8 rounded-md" /><span>Send Money</span></span>
-                            : method === 'Nagad' ? <span className="flex items-center justify-center space-x-1"><NagadLogo className="w-8 h-8 rounded-md" /><span>Send Money</span></span>
-                            : method}
+                          {(SEND_MONEY_METHODS as readonly string[]).includes(method) ? (
+                            <span className="flex items-center justify-center space-x-1">
+                              {method === 'bKash' ? <BkashLogo className="w-8 h-8 rounded-md" /> : method === 'Nagad' ? <NagadLogo className="w-8 h-8 rounded-md" /> : method === 'Upay' ? <UpayLogo className="w-8 h-8 rounded-md" /> : <RocketLogo className="w-8 h-8 rounded-md" />}
+                              <span>Send Money</span>
+                            </span>
+                          ) : method}
                         </button>
                       ))}
                     </div>
@@ -3342,12 +3365,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div>
               <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Refund to (wallet)</label>
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setRefundMethod('bKash')} className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${refundMethod === 'bKash' ? 'border-pink-500 bg-pink-50' : 'border-gray-200 bg-white text-gray-500'}`}>
-                  <BkashLogo className="w-8 h-8 rounded-md" /><span>bKash</span>
-                </button>
-                <button onClick={() => setRefundMethod('Nagad')} className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${refundMethod === 'Nagad' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-white text-gray-500'}`}>
-                  <NagadLogo className="w-8 h-8 rounded-md" /><span>Nagad</span>
-                </button>
+                {(['bKash', 'Nagad', 'Upay', 'Rocket'] as const).map(m => (
+                  <button key={m} onClick={() => setRefundMethod(m)} className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${refundMethod === m ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 bg-white text-gray-500'}`}>
+                    {m === 'bKash' ? <BkashLogo className="w-8 h-8 rounded-md" /> : m === 'Nagad' ? <NagadLogo className="w-8 h-8 rounded-md" /> : m === 'Upay' ? <UpayLogo className="w-8 h-8 rounded-md" /> : <RocketLogo className="w-8 h-8 rounded-md" />}
+                    <span>{m}</span>
+                  </button>
+                ))}
               </div>
             </div>
             <div>
@@ -3373,12 +3396,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div className="flex items-center space-x-2">
                 {payModal === 'bKash' && <BkashLogo className="w-9 h-9 rounded-lg" />}
                 {payModal === 'Nagad' && <NagadLogo className="w-9 h-9 rounded-lg" />}
+                {payModal === 'Upay' && <UpayLogo className="w-9 h-9 rounded-lg" />}
+                {payModal === 'Rocket' && <RocketLogo className="w-9 h-9 rounded-lg" />}
                 {payModal === 'Card' && <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center"><CreditCard className="w-4 h-4" /></div>}
                 {payModal === 'COD' && <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center"><Banknote className="w-4 h-4" /></div>}
                 {payModal === 'Split (Wallet + bKash)' && <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>}
                 <div>
                   <h3 className="font-black text-gray-900 text-sm">
-                    {payModal === 'bKash' ? 'Pay with bKash' : payModal === 'Nagad' ? 'Pay with Nagad' : payModal === 'Card' ? 'Card Payment' : payModal === 'Split (Wallet + bKash)' ? 'Split Payment' : 'Cash on Delivery'}
+                    {payModal === 'bKash' ? 'Pay with bKash' : payModal === 'Nagad' ? 'Pay with Nagad' : payModal === 'Upay' ? 'Pay with Upay' : payModal === 'Rocket' ? 'Pay with Rocket' : payModal === 'Card' ? 'Card Payment' : payModal === 'Split (Wallet + bKash)' ? 'Split Payment' : 'Cash on Delivery'}
                   </h3>
                   <p className="text-[10px] text-gray-500">{T.secureVia}</p>
                 </div>
@@ -3394,11 +3419,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center"><Lock className="w-4 h-4" /></div>
             </div>
 
-            {payModal === 'bKash' || payModal === 'Nagad' ? (() => {
-              const mwList = MERCHANT_WALLETS[payModal].numbers;
-              const mwName = MERCHANT_WALLETS[payModal].name;
-              const mwIdx = Math.min(walletPick[payModal] || 0, mwList.length - 1);
-              const mw = mwList[mwIdx];
+            {payModal === 'bKash' || payModal === 'Nagad' || payModal === 'Upay' || payModal === 'Rocket' ? (() => {
+              const wk = payModal as WalletKey;
+              const cfg = walletConfig[wk] || DEFAULT_WALLETS[wk];
+              const mwList = cfg.numbers && cfg.numbers.length ? cfg.numbers : DEFAULT_WALLETS[wk].numbers;
+              const mwName = cfg.name || DEFAULT_WALLETS[wk].name;
+              const mw = mwList[0];
+              const meta = WALLET_META[wk];
               const mm = Math.floor(payLeft / 60);
               const ss = payLeft % 60;
               const sender = sendMoney.sender.replace(/[^0-9]/g, '');
@@ -3406,12 +3433,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               return (
               <div className="space-y-3">
                 {/* Merchant wallet card */}
-                <div className={`rounded-2xl border p-3 text-white relative overflow-hidden ${payModal === 'bKash' ? 'bg-gradient-to-br from-pink-500 via-pink-600 to-rose-600 border-pink-700' : 'bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 border-orange-700'}`}>
+                <div className={`rounded-2xl border p-3 text-white relative overflow-hidden bg-gradient-to-br ${meta.gradient}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <div className="w-9 h-9 rounded-xl overflow-hidden shadow">{payModal === 'bKash' ? <BkashLogo className="w-9 h-9" /> : <NagadLogo className="w-9 h-9" />}</div>
+                      <div className="w-9 h-9 rounded-xl overflow-hidden shadow">{wk === 'bKash' ? <BkashLogo className="w-9 h-9" /> : wk === 'Nagad' ? <NagadLogo className="w-9 h-9" /> : wk === 'Upay' ? <UpayLogo className="w-9 h-9" /> : <RocketLogo className="w-9 h-9" />}</div>
                       <div>
-                        <p className="font-black text-sm leading-tight">{mwName} · {payModal} Wallet</p>
+                        <p className="font-black text-sm leading-tight">{mwName} · {wk} Wallet</p>
                         <p className="text-[10px] text-white/80">{T.sendMoneyTo}</p>
                       </div>
                     </div>
@@ -3419,24 +3446,27 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                   <div className="mt-2.5 flex items-center justify-between gap-2">
                     <p className="font-mono text-lg font-black tracking-wider">{mw}</p>
-                    <div className="flex items-center space-x-1.5">
-                      {mwList.length > 1 && (
-                        <button
-                          onClick={() => setWalletPick(prev => ({ ...prev, [payModal]: (prev[payModal] + 1) % mwList.length }))}
-                          className="px-2 py-1.5 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-lg text-[9px] font-black transition-colors cursor-pointer"
-                          title={T.anotherNumber}
-                        >
-                          ↻ {T.numberOf?.replace('{i}', String(mwIdx + 1)).replace('{n}', String(mwList.length))}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => copyText(mw, `${payModal} number`)}
-                        className="px-3 py-1.5 bg-white text-gray-900 rounded-lg text-[10px] font-black flex items-center space-x-1 hover:bg-gray-100 transition-colors cursor-pointer shadow"
-                      >
-                        <Copy className="w-3 h-3" /><span>{T.copyNumber}</span>
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => copyText(mw, `${wk} number`)}
+                      className="px-3 py-1.5 bg-white text-gray-900 rounded-lg text-[10px] font-black flex items-center space-x-1 hover:bg-gray-100 transition-colors cursor-pointer shadow shrink-0"
+                    >
+                      <Copy className="w-3 h-3" /><span>{T.copyNumber}</span>
+                    </button>
                   </div>
+                  {mwList.length > 1 && (
+                    <div className="mt-2 pt-2 border-t border-white/20 flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9px] text-white/70 font-bold uppercase">Other numbers:</span>
+                      {mwList.slice(1).map(n => (
+                        <button
+                          key={n}
+                          onClick={() => copyText(n, `${wk} number`)}
+                          className="px-2 py-1 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-lg text-[9px] font-bold transition-colors cursor-pointer flex items-center space-x-1"
+                        >
+                          <Copy className="w-2.5 h-2.5" /><span className="font-mono">{n}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Countdown */}
@@ -3507,7 +3537,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         type="text"
                         value={sendMoney.trxId}
                         onChange={(e) => setSendMoney(s => ({ ...s, trxId: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20) }))}
-                        placeholder={payModal === 'bKash' ? '8NHK7K8MJH' : 'NG170870910001120M'}
+                        placeholder={WALLET_META[payModal as WalletKey].trxPlaceholder}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono tracking-wider uppercase outline-none focus:border-emerald-500"
                       />
                       <p className="text-[10px] text-gray-400 mt-1">{T.trxIdHint}</p>
@@ -3531,7 +3561,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                     <button
                       onClick={confirmSendMoney}
-                      className={`w-full py-2.5 text-white font-black rounded-xl shadow-md transition-all cursor-pointer ${payModal === 'bKash' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-orange-500 hover:bg-orange-600'}`}
+                      className={`w-full py-2.5 text-white font-black rounded-xl shadow-md transition-all cursor-pointer ${WALLET_META[payModal as WalletKey].btn}`}
                     >
                       {T.submitVerify} ৳{cartGrandTotal}
                     </button>

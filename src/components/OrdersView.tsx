@@ -4,13 +4,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Order, Driver, AdminAuditEntry, RefundRequest } from '../types';
+import { Order, Driver, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
 import { 
   Search, Plus, Filter, Edit3, Trash2, Check, Clock, X, Copy, 
   Eye, Download, ChevronRight, ChevronLeft, ChevronDown, MoreHorizontal, Store,
   Zap, MapPin, Package, Navigation, Sparkles, Timer, Undo2, ShieldCheck, MessageCircle,
-  History, Banknote, TrendingUp
+  History, Banknote, TrendingUp, Wallet, PlusCircle
 } from 'lucide-react';
+import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
 const lsGet = <T,>(key: string, fallback: T): T => {
   try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -71,24 +72,7 @@ const BrandImage: React.FC<{ src: string; size: number; alt: string }> = ({ src,
   );
 };
 
-// Real bKash / Nagad brand marks
-const BkashLogo = ({ className = '', width, height }: { className?: string; width?: number; height?: number }) => (
-  <svg viewBox="0 0 60 34" className={className} width={width} height={height} xmlns="http://www.w3.org/2000/svg" aria-label="bKash">
-    <rect width="60" height="34" rx="7.5" fill="#E2136E" />
-    <text x="30" y="23" textAnchor="middle" fontFamily="'Arial Black','Segoe UI',Arial,sans-serif" fontWeight="900" fontSize="15" fill="#ffffff" letterSpacing="-0.3">bKash</text>
-    <path d="M14 24.5c10.5 2.2 21.5 2.2 32 0" stroke="#ffffff" strokeWidth="2.2" fill="none" strokeLinecap="round" opacity="0.95" />
-  </svg>
-);
-
-const NagadLogo = ({ className = '', width, height }: { className?: string; width?: number; height?: number }) => (
-  <svg viewBox="0 0 60 34" className={className} width={width} height={height} xmlns="http://www.w3.org/2000/svg" aria-label="nagad">
-    <rect width="60" height="34" rx="7.5" fill="#F6921E" />
-    <text x="30" y="23" textAnchor="middle" fontFamily="'Arial Black','Segoe UI',Arial,sans-serif" fontWeight="900" fontSize="15" fill="#ffffff" letterSpacing="-0.3">nagad</text>
-    <path d="M12 10.5 48 23.5" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" opacity="0.95" />
-  </svg>
-);
-
-// Brand logo renderer for each Bangladesh payment method (crisp HTML/CSS marks)
+// Brand logo renderer for each Bangladesh payment method (official SVG artwork where available)
 const PaymentLogo: React.FC<{ method: string; size?: number }> = ({ method, size = 28 }) => {
   const base: React.CSSProperties = {
     width: size,
@@ -112,31 +96,29 @@ const PaymentLogo: React.FC<{ method: string; size?: number }> = ({ method, size
     fontStyle: italic ? 'italic' : 'normal',
     lineHeight: 1
   });
+  const walletBox = (children: React.ReactNode, bg: string): React.ReactElement => (
+    <div style={{ ...base, background: bg }}>{children}</div>
+  );
 
   switch (method) {
     case 'bKash':
-      return <div style={{ ...base, background: '#e2136e', overflow: 'hidden' }}><BkashLogo width={size} height={size} /></div>;
+      return walletBox(<BkashLogo width={size} height={size} />, '#fff');
     case 'Nagad':
-      return <div style={{ ...base, background: '#f26522', overflow: 'hidden' }}><NagadLogo width={size} height={size} /></div>;
-    case 'Rocket':
-      return (
-        <div style={{ ...base, background: 'linear-gradient(135deg, #7b1fa2, #ab47bc)' }}>
-          <span style={{ position: 'absolute', width: size * 0.5, height: size * 0.5, border: `2px solid #fff`, borderRightColor: 'transparent', borderBottomColor: 'transparent', borderRadius: '50%', transform: 'rotate(-45deg)' }} />
-          <span style={{ position: 'absolute', width: size * 0.16, height: size * 0.16, background: '#fff', borderRadius: '50%' }} />
-        </div>
-      );
+      return walletBox(<NagadLogo width={size} height={size} />, '#fff');
     case 'Upay':
-      return <div style={{ ...base, background: '#ee1c25' }}><span style={text('#fff', 'uPay', 0.32)}>uPay</span></div>;
+      return walletBox(<UpayLogo width={size} height={size} />, '#fff');
+    case 'Rocket':
+      return walletBox(<RocketLogo width={size} height={size} />, '#fff');
     case 'SureCash':
-      return <div style={{ ...base, background: '#f7941d' }}><span style={text('#fff', 'S', 0.5)}>S</span></div>;
+      return walletBox(<span style={text('#fff', 'S', 0.5)}>S</span>, '#f7941d');
     case 'Tap':
-      return <div style={{ ...base, background: '#7c3aed' }}><span style={text('#fff', 'tap', 0.34, true)}>tap</span></div>;
+      return walletBox(<span style={text('#fff', 'tap', 0.34, true)}>tap</span>, '#7c3aed');
     case 'mCash':
-      return <div style={{ ...base, background: '#d71920' }}><span style={text('#fff', 'mCash', 0.3)}>mCash</span></div>;
+      return walletBox(<span style={text('#fff', 'mCash', 0.3)}>mCash</span>, '#d71920');
     case 'OK Wallet':
-      return <div style={{ ...base, background: '#00a651' }}><span style={text('#fff', 'OK', 0.36)}>OK</span></div>;
+      return walletBox(<span style={text('#fff', 'OK', 0.36)}>OK</span>, '#00a651');
     case 'MY Cash':
-      return <div style={{ ...base, background: '#f58220' }}><span style={text('#fff', 'MY', 0.36)}>MY</span></div>;
+      return walletBox(<span style={text('#fff', 'MY', 0.36)}>MY</span>, '#f58220');
     case 'Aamra Pay':
       return <div style={{ ...base, background: '#78be20' }}><span style={text('#fff', 'A', 0.5)}>A</span></div>;
     case 'Islami Bank mCash':
@@ -204,7 +186,7 @@ export default function OrdersView({
 }: OrdersViewProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Processing' | 'Completed' | 'Cancelled'>('All');
-  const [paymentFilter, setPaymentFilter] = useState<'All' | 'bKash' | 'Nagad' | 'Cash on Delivery' | 'Card' | 'Wallet'>('All');
+  const [paymentFilter, setPaymentFilter] = useState<'All' | 'bKash' | 'Nagad' | 'Upay' | 'Rocket' | 'Cash on Delivery' | 'Card' | 'Wallet'>('All');
   const [payStatusFilter, setPayStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Rejected' | 'COD' | 'Paid'>('All');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -237,6 +219,23 @@ export default function OrdersView({
 
   // Analytics / reports panel
   const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // Admin-managed Send Money wallet numbers (bKash / Nagad / Upay / Rocket) — shared with the customer storefront
+  const [walletCfg, setWalletCfg] = useState<WalletConfig>(() => lsGet<WalletConfig>(WALLET_CONFIG_KEY, DEFAULT_WALLETS));
+  const [showWallets, setShowWallets] = useState(false);
+
+  const setWalletNum = (k: WalletKey, i: number, v: string) =>
+    setWalletCfg(prev => ({ ...prev, [k]: { ...prev[k], numbers: prev[k].numbers.map((n, j) => (j === i ? v : n)) } }));
+  const addWalletNum = (k: WalletKey) =>
+    setWalletCfg(prev => ({ ...prev, [k]: { ...prev[k], numbers: [...prev[k].numbers, '01XXX-XXXXXX'] } }));
+  const removeWalletNum = (k: WalletKey, i: number) =>
+    setWalletCfg(prev => ({ ...prev, [k]: { ...prev[k], numbers: prev[k].numbers.filter((_, j) => j !== i) } }));
+  const setWalletName = (k: WalletKey, v: string) =>
+    setWalletCfg(prev => ({ ...prev, [k]: { ...prev[k], name: v } }));
+  const saveWallets = () => {
+    lsSet(WALLET_CONFIG_KEY, walletCfg);
+    showToast && showToast('Wallet numbers saved — customers now send money to these', 'success');
+  };
 
   // Form states
   const [storeName, setStoreName] = useState('');
@@ -285,6 +284,8 @@ export default function OrdersView({
     const paymentBucket = (m: string) =>
       m.startsWith('bKash') ? 'bKash' :
       m.startsWith('Nagad') ? 'Nagad' :
+      m.startsWith('Upay') ? 'Upay' :
+      m.startsWith('Rocket') ? 'Rocket' :
       m.includes('Wallet') ? 'Wallet' :
       m.includes('Cash') ? 'Cash on Delivery' : m;
     const matchesPayment = paymentFilter === 'All' || paymentBucket(order.paymentMethod) === paymentFilter;
@@ -638,6 +639,10 @@ export default function OrdersView({
               <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
               <span>Analytics</span>
             </button>
+            <button onClick={() => setShowWallets(true)} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer" title="Send Money wallet numbers — customers send payments to these">
+              <Wallet className="w-3.5 h-3.5 text-blue-400" />
+              <span>Wallets</span>
+            </button>
             <button onClick={handleExportCSV} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer">
               <Download className="w-3.5 h-3.5 text-gray-400" />
               <span>Export CSV</span>
@@ -653,7 +658,7 @@ export default function OrdersView({
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center border-t border-brand-border/60 pt-3 mt-3">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Payment:</span>
-            {(['All', 'bKash', 'Nagad', 'Cash on Delivery', 'Card', 'Wallet'] as const).map((m) => (
+            {(['All', 'bKash', 'Nagad', 'Upay', 'Rocket', 'Cash on Delivery', 'Card', 'Wallet'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => { setPaymentFilter(m); setCurrentPage(1); }}
@@ -1464,12 +1469,12 @@ export default function OrdersView({
             </div>
 
             {(() => {
-              const bucket = (m: string) => m.startsWith('bKash') ? 'bKash' : m.startsWith('Nagad') ? 'Nagad' : m.includes('Wallet') ? 'Wallet' : m.includes('Cash') ? 'Cash on Delivery' : m;
+              const bucket = (m: string) => m.startsWith('bKash') ? 'bKash' : m.startsWith('Nagad') ? 'Nagad' : m.startsWith('Upay') ? 'Upay' : m.startsWith('Rocket') ? 'Rocket' : m.includes('Wallet') ? 'Wallet' : m.includes('Cash') ? 'Cash on Delivery' : m;
               const byMethod = (m: string) => {
                 const list = orders.filter(o => bucket(o.paymentMethod) === m);
                 return { count: list.length, total: list.reduce((s, o) => s + o.amount, 0), approved: list.filter(o => o.paymentStatus === 'Approved').length };
               };
-              const methods = ['bKash', 'Nagad', 'Cash on Delivery', 'Card', 'Wallet'];
+              const methods = ['bKash', 'Nagad', 'Upay', 'Rocket', 'Cash on Delivery', 'Card', 'Wallet'];
               const methodStats = methods.map(m => ({ m, ...byMethod(m) }));
               const maxTotal = Math.max(1, ...methodStats.map(s => s.total));
               const grandTotal = orders.reduce((s, o) => s + o.amount, 0);
@@ -1526,6 +1531,81 @@ export default function OrdersView({
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* ============ PAYMENT WALLETS PANEL (admin-controlled Send Money numbers) ============ */}
+      {showWallets && (
+        <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-brand-card border border-brand-border/60 rounded-2xl max-w-2xl w-full p-5 space-y-3 text-xs my-auto max-h-[88dvh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-white text-sm flex items-center space-x-2"><Wallet className="w-4 h-4 text-brand-orange" /><span>Payment Wallets</span></h3>
+              <button onClick={() => setShowWallets(false)} className="p-1 rounded-full hover:bg-brand-border/30 cursor-pointer"><X className="w-4 h-4 text-gray-400" /></button>
+            </div>
+            <p className="text-[10px] text-gray-400">These are the Send Money numbers customers see in the storefront. Customers cannot change them — only you can, from here.</p>
+
+            {(Object.keys(walletCfg) as WalletKey[]).map(k => (
+              <div key={k} className="bg-brand-dark/50 border border-brand-border/40 rounded-xl p-3 space-y-2">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white shrink-0">
+                    {k === 'bKash' ? <BkashLogo width={40} height={40} /> : k === 'Nagad' ? <NagadLogo width={40} height={40} /> : k === 'Upay' ? <UpayLogo width={40} height={40} /> : <RocketLogo width={40} height={40} />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-white font-black">{k}</p>
+                    <input
+                      value={walletCfg[k].name}
+                      onChange={(e) => setWalletName(k, e.target.value)}
+                      placeholder="Wallet holder name"
+                      className="w-full px-2 py-1 bg-brand-dark text-xs text-gray-200 border border-brand-border rounded-md outline-none focus:border-brand-orange mt-0.5"
+                    />
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ background: WALLET_META[k].accent + '22', color: WALLET_META[k].accent }}>Send Money</span>
+                </div>
+                <div className="space-y-1.5">
+                  {walletCfg[k].numbers.map((n, i) => (
+                    <div key={i} className="flex items-center space-x-2">
+                      <span className="text-[9px] font-mono text-gray-500 w-6 shrink-0">#{i + 1}</span>
+                      <input
+                        value={n}
+                        onChange={(e) => setWalletNum(k, i, e.target.value)}
+                        placeholder="01XXX-XXXXXX"
+                        className="flex-1 px-2.5 py-1.5 bg-brand-dark text-xs font-mono text-gray-200 border border-brand-border rounded-md outline-none focus:border-brand-orange"
+                      />
+                      <button
+                        onClick={() => removeWalletNum(k, i)}
+                        disabled={walletCfg[k].numbers.length <= 1}
+                        className="p-1.5 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0"
+                        title="Remove number"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => addWalletNum(k)}
+                  className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md bg-brand-dark border border-dashed border-brand-border text-gray-400 hover:text-white hover:border-brand-orange text-[10px] font-bold cursor-pointer transition-colors"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" /><span>Add number</span>
+                </button>
+              </div>
+            ))}
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-brand-border/40">
+              <button
+                onClick={() => { setWalletCfg(DEFAULT_WALLETS); lsSet(WALLET_CONFIG_KEY, DEFAULT_WALLETS); showToast && showToast('Wallet numbers reset to defaults', 'info'); }}
+                className="px-4 py-2 bg-brand-dark border border-brand-border hover:bg-brand-border/30 text-gray-300 rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                Reset to defaults
+              </button>
+              <button
+                onClick={saveWallets}
+                className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                Save wallet numbers
+              </button>
+            </div>
           </div>
         </div>
       )}
