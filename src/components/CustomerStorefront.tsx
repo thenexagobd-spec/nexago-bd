@@ -2217,7 +2217,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </button>
           )}
           {showSuggest && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-[#0e1a2b] border border-[#162a45] rounded-2xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
+            <div className="absolute left-0 right-0 top-full mt-1 bg-[#0a101e] border border-[#1a2b45] rounded-2xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
               {suggestions.length > 0 ? (
                 suggestions.map((s, i) => (
                   <div
@@ -2490,12 +2490,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </div>
 
               {searchQuery && (
-                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5 space-y-4">
+                <div className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-black text-gray-900 flex items-center space-x-2">
-                      <Sparkles className="w-4 h-4 text-amber-500" /><span>{T.searchResults} · "{searchQuery}"</span>
+                    <h3 className="text-sm font-black text-white flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" /><span>{T.searchResults} · "{searchQuery}"</span>
                     </h3>
-                    <button onClick={() => setSearchQuery('')} className="text-[10px] font-bold text-emerald-700 hover:underline flex items-center space-x-1 cursor-pointer">
+                    <button onClick={() => setSearchQuery('')} className="text-[10px] font-bold text-emerald-400 hover:underline flex items-center space-x-1 cursor-pointer">
                       <X className="w-3 h-3" /><span>{T.cancel}</span>
                     </button>
                   </div>
@@ -2513,9 +2513,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     if (prodMatches.length === 0 && storeMatches.length === 0) {
                       return (
                         <div className="text-center py-6">
-                          <Search className="w-8 h-8 text-gray-300 mx-auto" />
-                          <p className="text-xs font-bold text-gray-700 mt-2">{T.noResults}</p>
-                          <p className="text-[10px] text-gray-500">{T.noResultsSub}</p>
+                          <Search className="w-8 h-8 text-gray-600 mx-auto" />
+                          <p className="text-xs font-bold text-gray-200 mt-2">{T.noResults}</p>
+                          <p className="text-[10px] text-gray-400">{T.noResultsSub}</p>
                         </div>
                       );
                     }
@@ -2523,7 +2523,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <>
                         {prodMatches.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{prodMatches.length} {T.productMatches}</p>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-400">{prodMatches.length} {T.productMatches}</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {prodMatches.slice(0, 6).map(({ store, product }) => (
                                 <button key={`${store.id}-${product.id}`} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-[#0e1a2b] border border-[#162a45] rounded-xl p-2.5 text-left hover:border-emerald-500/50 hover:bg-[#12233a] transition-all cursor-pointer">
@@ -2540,7 +2540,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         )}
                         {storeMatches.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{storeMatches.length} {T.storeMatches}</p>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-400">{storeMatches.length} {T.storeMatches}</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {storeMatches.map(store => (
                                 <button key={store.id} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-[#0e1a2b] border border-[#162a45] rounded-xl p-2.5 text-left hover:border-emerald-500/50 hover:bg-[#12233a] transition-all cursor-pointer">
