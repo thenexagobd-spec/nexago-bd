@@ -1146,12 +1146,19 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   useEffect(() => setStoredData(LS_KEYS.wallet, walletBalance), [walletBalance]);
   const [addMoneyOpen, setAddMoneyOpen] = useState(false);
   const [addMoneyStep, setAddMoneyStep] = useState<'method' | 'send' | 'pending'>('method');
-  const [addMoneyMethod, setAddMoneyMethod] = useState<'bKash' | 'Nagad' | 'Card'>('bKash');
+  const [addMoneyMethod, setAddMoneyMethod] = useState<WalletKey | 'Card'>('bKash');
   const [addMoneyAmount, setAddMoneyAmount] = useState('500');
   const [addMoneyPhone, setAddMoneyPhone] = useState('');
   const [addMoneyCard, setAddMoneyCard] = useState({ name: '', number: '', expiry: '', cvv: '' });
+  const [addMoneySender, setAddMoneySender] = useState('');
+  const [addMoneyLast4, setAddMoneyLast4] = useState('');
+  const [addMoneyTrxId, setAddMoneyTrxId] = useState('');
+  const [addMoneyReceipt, setAddMoneyReceipt] = useState('');
   const [addMoneySentTo, setAddMoneySentTo] = useState('');
   const [addMoneyError, setAddMoneyError] = useState('');
+  const [addMoneyDeadline, setAddMoneyDeadline] = useState<number>(0);
+  const [addMoneyLeft, setAddMoneyLeft] = useState<number>(0);
+  const [addMoneyExpired, setAddMoneyExpired] = useState(false);
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>(() => getStoredData(LS_KEYS.wtxn, []));
   useEffect(() => setStoredData(LS_KEYS.wtxn, walletTransactions), [walletTransactions]);
   const [splitPinInput, setSplitPinInput] = useState('');
@@ -1248,6 +1255,20 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     }, 1000);
     return () => clearInterval(t);
   }, [payDeadline]);
+
+  // Add Money countdown (personal number Send Money session)
+  useEffect(() => {
+    if (!addMoneyDeadline) return;
+    const t = setInterval(() => {
+      const left = Math.max(0, Math.ceil((addMoneyDeadline - Date.now()) / 1000));
+      setAddMoneyLeft(left);
+      if (left <= 0) {
+        clearInterval(t);
+        setAddMoneyExpired(true);
+      }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [addMoneyDeadline]);
 
   // Auto-expiry: cancel pending-payment orders whose window lapsed (fake-order cleanup)
   useEffect(() => {
@@ -2040,13 +2061,28 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       setAddMoneyError('Enter card holder name, 16-digit number, expiry & CVV'); return;
     }
     setAddMoneyError('');
+    setAddMoneySender('');
+    setAddMoneyLast4('');
+    setAddMoneyTrxId('');
+    setAddMoneyReceipt('');
     setAddMoneySentTo(addMoneyMethod === 'Card' ? `card **** ${addMoneyCard.number.replace(/\D/g, '').slice(-4)}` : addMoneyPhone.trim());
+    setAddMoneyDeadline(Date.now() + 10 * 60 * 1000);
+    setAddMoneyLeft(600);
+    setAddMoneyExpired(false);
     setAddMoneyStep('send');
     showToast('Send money to the personal number shown below', 'info');
   };
 
   const confirmAddMoney = () => {
     const num = parseFloat(addMoneyAmount);
+    const sender = addMoneySender.replace(/[^0-9]/g, '');
+    if (addMoneyExpired) { setAddMoneyError('Payment session expired — start again'); return; }
+    if (sender.length < 10) { setAddMoneyError('Enter the 11-digit mobile number that sent the money'); return; }
+    const last4 = addMoneyLast4.replace(/[^0-9]/g, '');
+    if (!/^\d{4}$/.test(last4)) { setAddMoneyError('Enter the last 4 digits of the sending number'); return; }
+    if (!sender.endsWith(last4)) { setAddMoneyError('Last 4 digits must match the sending number'); return; }
+    if (!/^[A-Z0-9]{8,20}$/.test(addMoneyTrxId.trim())) { setAddMoneyError('Invalid TrxID — expected 8–20 letters/digits from your SMS'); return; }
+    if (!addMoneyReceipt) { setAddMoneyError('Upload the payment screenshot/receipt before submitting'); return; }
     setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Pending' }, ...prev]);
     setAddMoneyStep('pending');
     showToast('Payment received — admin will verify & add to your wallet', 'info');
@@ -4772,18 +4808,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         </div>
       )}
 
-      {/* ============ ADD MONEY MODAL (real flow: card/bKash/Nagad + OTP) ============ */}
+      {/* ============ ADD MONEY MODAL (real flow: send to personal number + admin verify) ============ */}
       {addMoneyOpen && (
-        <div className="fixed inset-0 z-[84] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs animate-in fade-in duration-200">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
-                  <div>
-                    <h3 className="text-sm font-black text-gray-900">{addMoneyStep === 'send' ? 'Send Money to Personal Number' : addMoneyStep === 'pending' ? 'Awaiting Admin Verification' : 'Add Money to Wallet'}</h3>
-                    <p className="text-[9px] text-gray-400">Current balance: ৳{walletBalance.toLocaleString()}</p>
-                  </div>
+        <div className="fixed inset-0 z-[84] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto overflow-x-hidden">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
+                <div>
+                  <h3 className="text-sm font-black text-gray-900">{addMoneyStep === 'send' ? 'Send Money to Personal Number' : addMoneyStep === 'pending' ? 'Awaiting Admin Verification' : 'Add Money to Wallet'}</h3>
+                  <p className="text-[9px] text-gray-400">Current balance: ৳{walletBalance.toLocaleString()}</p>
                 </div>
+              </div>
               <button onClick={() => setAddMoneyOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-4 h-4 text-gray-500" /></button>
             </div>
 
@@ -4802,13 +4838,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">Payment Method</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['bKash', 'Nagad', 'Card'] as const).map((m) => (
+                    {(['bKash', 'Nagad', 'Upay', 'Rocket', 'Card'] as const).map((m) => (
                       <button
                         key={m}
                         onClick={() => setAddMoneyMethod(m)}
                         className={`py-2 rounded-xl border text-center font-black text-[10px] transition-all cursor-pointer ${addMoneyMethod === m ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
                       >
-                        {m === 'bKash' ? 'bKash' : m === 'Nagad' ? 'Nagad' : 'Card'}
+                        {m === 'bKash' ? 'bKash' : m === 'Nagad' ? 'Nagad' : m === 'Upay' ? 'Upay' : m === 'Rocket' ? 'Rocket' : 'Card'}
                       </button>
                     ))}
                   </div>
@@ -4851,35 +4887,162 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
 
                 <button onClick={sendAddMoneyOtp} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
-                  Continue — Show Personal Number
+                  Continue
                 </button>
               </>
-            ) : addMoneyStep === 'send' ? (
-              <>
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1.5">
-                  <p className="text-[10px] text-emerald-800 font-bold">Send exactly ৳{parseFloat(addMoneyAmount).toLocaleString()} to this personal number via {addMoneyMethod}:</p>
-                  <div className="bg-white border border-dashed border-emerald-300 rounded-lg px-3 py-2 font-mono font-black tracking-wider text-lg text-emerald-700 text-center select-all">
-                    {addMoneyMethod === 'Card' ? `Bank transfer to ${addMoneyCard.number.replace(/\D/g, '').slice(-4)}` : (walletConfig[(addMoneyMethod === 'bKash' ? 'bKash' : addMoneyMethod === 'Nagad' ? 'Nagad' : 'bKash') as WalletKey]?.numbers?.[0] || '01712-345678')}
+            ) : addMoneyStep === 'send' ? (() => {
+              const wk = addMoneyMethod as WalletKey;
+              const cfg = addMoneyMethod === 'Card' ? { name: 'NexaGo Pay', numbers: ['Bank transfer to card'] } : (walletConfig[wk] || DEFAULT_WALLETS[wk]);
+              const mwList = cfg.numbers && cfg.numbers.length ? cfg.numbers : DEFAULT_WALLETS[wk]?.numbers || [];
+              const mwName = cfg.name || 'NexaGo Pay';
+              const mw = mwList[0] || '01712-345678';
+              const meta = addMoneyMethod === 'Card' ? { gradient: 'from-blue-600 to-blue-800', btn: 'bg-blue-600 hover:bg-blue-700', trxPlaceholder: 'CARD-XXXXXXXX' } : WALLET_META[wk];
+              const mm = Math.floor(addMoneyLeft / 60);
+              const ss = addMoneyLeft % 60;
+              return (
+              <div className="space-y-3">
+                {/* Personal number card */}
+                <div className={`rounded-2xl border p-3 text-white relative overflow-hidden bg-gradient-to-br ${meta.gradient}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-9 h-9 rounded-xl overflow-hidden shadow">{addMoneyMethod === 'bKash' ? <BkashLogo className="w-9 h-9" /> : addMoneyMethod === 'Nagad' ? <NagadLogo className="w-9 h-9" /> : addMoneyMethod === 'Upay' ? <UpayLogo className="w-9 h-9" /> : addMoneyMethod === 'Rocket' ? <RocketLogo className="w-9 h-9" /> : <CreditCard className="w-9 h-9 text-white bg-blue-600 rounded-lg p-1.5" />}</div>
+                      <div>
+                        <p className="font-black text-sm leading-tight">{mwName} · {addMoneyMethod === 'Card' ? 'Bank' : `${addMoneyMethod} Wallet`}</p>
+                        <p className="text-[10px] text-white/80">{T.sendMoneyTo}</p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-white/25 text-[9px] font-black">Send Money</span>
                   </div>
-                  <p className="text-[9px] text-gray-500">Sent from: {addMoneySentTo}</p>
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                    <p className="font-mono text-lg font-black tracking-wider">{addMoneyMethod === 'Card' ? `**** ${addMoneyCard.number.replace(/\D/g, '').slice(-4)}` : mw}</p>
+                    {addMoneyMethod !== 'Card' && (
+                      <button
+                        onClick={() => copyText(mw, `${addMoneyMethod} number`)}
+                        className="px-3 py-1.5 bg-white text-gray-900 rounded-lg text-[10px] font-black flex items-center space-x-1 hover:bg-gray-100 transition-colors cursor-pointer shadow shrink-0"
+                      >
+                        <Copy className="w-3 h-3" /><span>{T.copyNumber}</span>
+                      </button>
+                    )}
+                  </div>
+                  {addMoneyMethod !== 'Card' && mwList.length > 1 && (
+                    <div className="mt-2 pt-2 border-t border-white/20 flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9px] text-white/70 font-bold uppercase">Other numbers:</span>
+                      {mwList.slice(1).map(n => (
+                        <button
+                          key={n}
+                          onClick={() => copyText(n, `${addMoneyMethod} number`)}
+                          className="px-2 py-1 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-lg text-[9px] font-bold transition-colors cursor-pointer flex items-center space-x-1"
+                        >
+                          <Copy className="w-2.5 h-2.5" /><span className="font-mono">{n}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5 text-[11px] text-blue-800">
-                  <p className="font-black">📝 Reference note</p>
-                  <p>Put this in the reference box so admin can match your payment:</p>
-                  <p className="bg-white/70 rounded-lg p-2 font-mono font-bold text-blue-900 break-all">{customerPhone} · {customerProfile.name}</p>
+
+                {/* Countdown */}
+                <div className={`flex items-center justify-between px-3 py-2 rounded-xl border ${addMoneyExpired ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                  <span className="font-bold flex items-center space-x-1"><Clock className="w-3.5 h-3.5" /><span>{addMoneyExpired ? T.sessionExpired : T.completeWithin}</span></span>
+                  <span className="font-mono font-black text-sm">{addMoneyExpired ? '00:00' : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`}</span>
                 </div>
-                <p className="text-[10px] text-gray-500 leading-relaxed">After sending the money, tap below. The admin verifies your payment (100% real) and adds the balance to your wallet.</p>
-                {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
-                <div className="space-y-2">
-                  <button onClick={confirmAddMoney} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
-                    I've Sent the Money — Request Verification
-                  </button>
-                  <button onClick={() => { setAddMoneyStep('method'); setAddMoneyError(''); }} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">
-                    {T.cancel}
-                  </button>
-                </div>
-              </>
-            ) : (
+
+                {addMoneyExpired ? (
+                  <div className="space-y-3">
+                    <p className="text-[11px] text-gray-500 text-center py-2">{T.expiredMsg}</p>
+                    <button
+                      onClick={() => { setAddMoneyStep('method'); setAddMoneyError(''); }}
+                      className="w-full py-2.5 bg-gray-600 hover:bg-gray-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
+                    >
+                      {T.close}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.yourNumber?.replace('{m}', addMoneyMethod === 'Card' ? 'Card' : addMoneyMethod)}</label>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={addMoneySender}
+                        onChange={(e) => setAddMoneySender(e.target.value.replace(/[^0-9-]/g, ''))}
+                        placeholder="01XXX-XXXXXX"
+                        maxLength={13}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.last4Label?.replace('{m}', addMoneyMethod === 'Card' ? 'Card' : addMoneyMethod)}</label>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={addMoneyLast4}
+                        onChange={(e) => setAddMoneyLast4(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                        placeholder="••••"
+                        maxLength={4}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono tracking-[0.3em] text-center text-sm font-black outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">{T.last4Hint?.replace('{m}', addMoneyMethod === 'Card' ? 'Card' : addMoneyMethod)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.sentAmount?.replace('{x}', String(parseFloat(addMoneyAmount) || 0))}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={addMoneyAmount}
+                        onChange={(e) => setAddMoneyAmount(e.target.value)}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono outline-none focus:border-emerald-500"
+                      />
+                      <p className={`text-[10px] mt-1 font-bold ${Math.abs((parseFloat(addMoneyAmount) || 0) - (parseFloat(addMoneyAmount) || 0)) <= 0.01 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {T.exactMatch}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.trxIdLabel?.replace('{m}', addMoneyMethod === 'Card' ? 'Card' : addMoneyMethod)}</label>
+                      <input
+                        type="text"
+                        value={addMoneyTrxId}
+                        onChange={(e) => setAddMoneyTrxId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20))}
+                        placeholder={meta.trxPlaceholder}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono tracking-wider uppercase outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">{T.trxIdHint}</p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.receiptLabel}</label>
+                      <div className="flex items-center space-x-2">
+                        <label className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-gray-600 font-bold cursor-pointer hover:bg-gray-100 transition-colors">
+                          <Camera className="w-4 h-4" /><span>{addMoneyReceipt ? T.changeReceipt : T.uploadReceipt}</span>
+                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => {
+                            const file = e.target.files?.[0]; if (!file) return;
+                            if (file.size > MAX_RECEIPT_BYTES) { showToast('Screenshot too large — max 2 MB', 'info'); return; }
+                            const reader = new FileReader();
+                            reader.onload = () => setAddMoneyReceipt(String(reader.result || ''));
+                            reader.readAsDataURL(file);
+                          }} />
+                        </label>
+                        {addMoneyReceipt && (
+                          <button onClick={() => setAddMoneyReceipt('')} className="px-2.5 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer" title="Remove receipt">
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      {addMoneyReceipt && (
+                        <img src={addMoneyReceipt} alt="receipt" className="mt-2 w-full h-20 object-cover rounded-xl border border-gray-200" />
+                      )}
+                    </div>
+                    {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
+                    <button
+                      onClick={confirmAddMoney}
+                      className={`w-full py-2.5 text-white font-black rounded-xl shadow-md transition-all cursor-pointer ${addMoneyMethod === 'Card' ? 'bg-blue-600 hover:bg-blue-700' : WALLET_META[wk].btn}`}
+                    >
+                      {T.submitVerify} ৳{parseFloat(addMoneyAmount).toLocaleString()}
+                    </button>
+                    <p className="text-[10px] text-gray-400 text-center flex items-center justify-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>Balance is added only after admin verifies your TrxID & amount</span></p>
+                  </div>
+                )}
+              </div>
+              );
+            })() : (
               <>
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1.5 text-center">
                   <div className="mx-auto w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center"><Clock className="w-5 h-5 text-amber-600" /></div>
