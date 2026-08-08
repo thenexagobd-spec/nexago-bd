@@ -2566,6 +2566,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     const active = ord.status === 'Ongoing' || ord.status === 'Processing' || ord.status === 'Confirmed' || ord.status === 'Pending';
                     const completed = ord.status === 'Completed';
                     const cancelled = ord.status === 'Cancelled';
+                    const held = ord.paymentStatus === 'Rejected';
                     const refR = refunds.find(r => r.orderId === ord.id);
                     return (
                       <div key={ord.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-200 transition-colors">
@@ -2573,19 +2574,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           <div className="flex items-center space-x-3 flex-wrap gap-y-1">
                             <span className="font-mono text-xs font-bold text-gray-500">#{ord.id}</span>
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              held ? 'bg-red-100 text-red-800' :
                               completed ? 'bg-emerald-100 text-emerald-800' :
                               cancelled ? 'bg-red-100 text-red-800' :
                               active ? 'bg-amber-100 text-amber-800 animate-pulse' :
                               'bg-gray-100 text-gray-700'
-                            }`}>{statusLabel(ord.status)}</span>
+                            }`}>{held ? '⏸ Hold' : statusLabel(ord.status)}</span>
                             {ord.paymentStatus === 'Pending' && (
                               <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black animate-pulse">⏳ Payment Pending</span>
                             )}
                             {ord.paymentStatus === 'Approved' && (
                               <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">✅ Payment Approved</span>
-                            )}
-                            {ord.paymentStatus === 'Rejected' && (
-                              <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-black animate-pulse">⏸ Order on Hold</span>
                             )}
                             {ord.paymentStatus === 'COD' && (
                               <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-black">💵 Cash on Delivery</span>
@@ -2603,6 +2602,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             {ord.paymentStatus === 'Rejected' && ord.rejectionReason && (
                               <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">Reason: {ord.rejectionReason}</span>
                             )}
+                            {held && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">🛑 Tracking paused — payment under review</span>
+                            )}
                           </div>
                           <h4 className="text-sm font-bold text-gray-900">{ord.storeName}</h4>
                           {ord.items && ord.items.length > 0 && (
@@ -2614,7 +2616,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           <p className="text-[10px] text-gray-600 font-medium flex items-center space-x-1">
                             <MapPin className="w-3 h-3 text-gray-400" /><span className="truncate">{ord.address || deliveryAddress}</span>
                           </p>
-                          {active && (() => {
+                          {active && !held && (() => {
                             const drv = liveDriverOf(ord);
                             if (!drv) return null;
                             const prog = liveProgressOf(ord);
@@ -2651,9 +2653,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                                   <X className="w-3 h-3" /><span>{T.cancelOrder}</span>
                                 </button>
                               )}
-                              <button onClick={() => setTrackingOrder(ord)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs flex items-center space-x-1">
-                                <Navigation className="w-3 h-3" /><span>{T.trackDelivery}</span>
-                              </button>
+                              {!held && (
+                                <button onClick={() => setTrackingOrder(ord)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs flex items-center space-x-1">
+                                  <Navigation className="w-3 h-3" /><span>{T.trackDelivery}</span>
+                                </button>
+                              )}
                               <button onClick={() => { setReportOrder(ord); setReportReason('Wrong item received'); setReportNote(''); }} className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-red-200">
                                 <AlertCircle className="w-3 h-3" /><span>Report</span>
                               </button>
