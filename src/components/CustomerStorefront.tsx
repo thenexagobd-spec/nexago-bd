@@ -7,7 +7,7 @@ import {
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
   MessageCircle, Share2, LocateFixed, CalendarClock, AlertCircle, Link2,
-  Camera, Send, Headphones, ScrollText, RefreshCcw, User, Mail, KeyRound
+  Camera, Send, Headphones, ScrollText, RefreshCcw, User, Mail, KeyRound, Wrench
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
@@ -3239,6 +3239,80 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                   </div>
                   <p className="text-[11px] text-emerald-100/80">Your balance is safe with Smart Shop. Order payments and cashback update instantly in your transaction history.</p>
+                </div>
+              </div>
+
+              {/* Order Tools */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center space-x-2">
+                      <Wrench className="w-4 h-4 text-emerald-600" /><span>Order Tools</span>
+                    </h3>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Everything you need for your orders — all in one place.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <button
+                    onClick={() => setActiveNav('My Orders')}
+                    className="p-3 rounded-2xl border border-gray-200 hover:border-emerald-500 bg-gray-50 hover:bg-emerald-50 transition-all cursor-pointer text-left space-y-2"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><Package className="w-4 h-4" /></div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900">Track Orders</p>
+                      <p className="text-[9px] text-gray-500">Live delivery status</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveNav('My Orders')}
+                    className="p-3 rounded-2xl border border-gray-200 hover:border-emerald-500 bg-gray-50 hover:bg-emerald-50 transition-all cursor-pointer text-left space-y-2"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><RotateCcw className="w-4 h-4" /></div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900">Reorder</p>
+                      <p className="text-[9px] text-gray-500">Re-buy in one tap</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { const last = orders[0]; if (last) setRefundModal(last); else showToast('No orders yet to refund', 'info'); }}
+                    className="p-3 rounded-2xl border border-gray-200 hover:border-emerald-500 bg-gray-50 hover:bg-emerald-50 transition-all cursor-pointer text-left space-y-2"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><Banknote className="w-4 h-4" /></div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900">Request Refund</p>
+                      <p className="text-[9px] text-gray-500">Money back support</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { const last = orders.find(o => o.paymentStatus === 'Completed' || o.paymentStatus === 'Paid'); if (last) setReceiptOrder(last); else showToast('No completed orders for a receipt yet', 'info'); }}
+                    className="p-3 rounded-2xl border border-gray-200 hover:border-emerald-500 bg-gray-50 hover:bg-emerald-50 transition-all cursor-pointer text-left space-y-2"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><ScrollText className="w-4 h-4" /></div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900">Order Receipt</p>
+                      <p className="text-[9px] text-gray-500">Print / view QR</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveNav('Coupons')}
+                    className="p-3 rounded-2xl border border-gray-200 hover:border-emerald-500 bg-gray-50 hover:bg-emerald-50 transition-all cursor-pointer text-left space-y-2"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><BadgePercent className="w-4 h-4" /></div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900">Coupons</p>
+                      <p className="text-[9px] text-gray-500">Active promo codes</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveNav('Wallet')}
+                    className="p-3 rounded-2xl border border-gray-200 hover:border-emerald-500 bg-gray-50 hover:bg-emerald-50 transition-all cursor-pointer text-left space-y-2"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900">Top-up History</p>
+                      <p className="text-[9px] text-gray-500">Transactions & balance</p>
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
