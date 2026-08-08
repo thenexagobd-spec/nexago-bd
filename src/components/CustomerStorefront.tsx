@@ -3170,8 +3170,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ PAYMENT FLOW MODAL ============ */}
       {payModal && (
-        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto overflow-x-hidden">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
                 {payModal === 'bKash' && <div className="w-8 h-8 rounded-lg bg-pink-500 text-white flex items-center justify-center font-black text-xs">bK</div>}
@@ -3189,12 +3189,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <button onClick={() => setPayModal(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center justify-between">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 flex items-center justify-between">
               <div>
                 <p className="text-[10px] text-gray-500 uppercase font-bold">Amount to pay</p>
-                <p className="text-2xl font-black font-mono text-gray-900">৳{cartGrandTotal}</p>
+                <p className="text-xl font-black font-mono text-gray-900">৳{cartGrandTotal}</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center"><Lock className="w-4 h-4" /></div>
+              <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center"><Lock className="w-4 h-4" /></div>
             </div>
 
             {payModal === 'bKash' || payModal === 'Nagad' ? (() => {
@@ -3206,10 +3206,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               return (
               <div className="space-y-3">
                 {/* Merchant wallet card */}
-                <div className={`rounded-2xl border p-4 text-white relative overflow-hidden ${payModal === 'bKash' ? 'bg-gradient-to-br from-pink-500 via-pink-600 to-rose-600 border-pink-700' : 'bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 border-orange-700'}`}>
+                <div className={`rounded-2xl border p-3 text-white relative overflow-hidden ${payModal === 'bKash' ? 'bg-gradient-to-br from-pink-500 via-pink-600 to-rose-600 border-pink-700' : 'bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 border-orange-700'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <div className="w-9 h-9 rounded-xl bg-white/25 border border-white/30 flex items-center justify-center font-black text-base">{payModal === 'bKash' ? 'bK' : 'Ng'}</div>
+                      <div className="w-8 h-8 rounded-xl bg-white/25 border border-white/30 flex items-center justify-center font-black text-sm">{payModal === 'bKash' ? 'bK' : 'Ng'}</div>
                       <div>
                         <p className="font-black text-sm leading-tight">{mw.name} · {payModal} Wallet</p>
                         <p className="text-[10px] text-white/80">Send Money to this number</p>
@@ -3217,8 +3217,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                     <span className="px-2 py-0.5 rounded-full bg-white/25 text-[9px] font-black">Send Money</span>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <p className="font-mono text-xl font-black tracking-wider">{mw.number}</p>
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                    <p className="font-mono text-lg font-black tracking-wider">{mw.number}</p>
                     <button
                       onClick={() => copyText(mw.number, `${payModal} number`)}
                       className="px-3 py-1.5 bg-white text-gray-900 rounded-lg text-[10px] font-black flex items-center space-x-1 hover:bg-gray-100 transition-colors cursor-pointer shadow"
@@ -3239,7 +3239,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <p className="text-[11px] text-gray-500 text-center py-2">This payment window has expired to prevent fake orders. Your cart is untouched — start again to place a fresh order.</p>
                     <button
                       onClick={() => { setPayModal(null); resetPaySession(); }}
-                      className="w-full py-3 bg-gray-600 hover:bg-gray-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
+                      className="w-full py-2.5 bg-gray-600 hover:bg-gray-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
                     >
                       Close
                     </button>
@@ -3255,7 +3255,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         onChange={(e) => setSendMoney(s => ({ ...s, sender: e.target.value.replace(/[^0-9-]/g, '') }))}
                         placeholder="01XXX-XXXXXX"
                         maxLength={13}
-                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500"
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono outline-none focus:border-emerald-500"
                       />
                       {blocked && <p className="text-[10px] text-red-600 mt-1 font-bold">Too many invalid attempts — this number is temporarily blocked.</p>}
                     </div>
@@ -3266,7 +3266,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         min={0}
                         value={sendMoney.amount}
                         onChange={(e) => setSendMoney(s => ({ ...s, amount: e.target.value }))}
-                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500"
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono outline-none focus:border-emerald-500"
                       />
                       <p className={`text-[10px] mt-1 font-bold ${Math.abs((parseFloat(sendMoney.amount) || 0) - cartGrandTotal) <= 0.01 ? 'text-emerald-600' : 'text-red-500'}`}>
                         {Math.abs((parseFloat(sendMoney.amount) || 0) - cartGrandTotal) <= 0.01 ? '✓ Exact amount matches' : `Amount must match exactly ৳${cartGrandTotal}`}
@@ -3284,14 +3284,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         value={sendMoney.trxId}
                         onChange={(e) => setSendMoney(s => ({ ...s, trxId: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20) }))}
                         placeholder={payModal === 'bKash' ? '8NHK7K8MJH' : 'NG170870910001120M'}
-                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono tracking-wider uppercase outline-none focus:border-emerald-500"
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono tracking-wider uppercase outline-none focus:border-emerald-500"
                       />
                       <p className="text-[10px] text-gray-400 mt-1">8–20 letters/digits from your SMS confirmation.</p>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Payment receipt / screenshot</label>
                       <div className="flex items-center space-x-2">
-                        <label className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-gray-600 font-bold cursor-pointer hover:bg-gray-100 transition-colors">
+                        <label className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-gray-600 font-bold cursor-pointer hover:bg-gray-100 transition-colors">
                           <Camera className="w-4 h-4" /><span>{sendMoney.receipt ? 'Change receipt' : 'Upload screenshot'}</span>
                           <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleReceiptFile} />
                         </label>
@@ -3302,12 +3302,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         )}
                       </div>
                       {sendMoney.receipt && (
-                        <img src={sendMoney.receipt} alt="receipt" className="mt-2 w-full h-24 object-cover rounded-xl border border-gray-200" />
+                        <img src={sendMoney.receipt} alt="receipt" className="mt-2 w-full h-20 object-cover rounded-xl border border-gray-200" />
                       )}
                     </div>
                     <button
                       onClick={confirmSendMoney}
-                      className={`w-full py-3 text-white font-black rounded-xl shadow-md transition-all cursor-pointer ${payModal === 'bKash' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-orange-500 hover:bg-orange-600'}`}
+                      className={`w-full py-2.5 text-white font-black rounded-xl shadow-md transition-all cursor-pointer ${payModal === 'bKash' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-orange-500 hover:bg-orange-600'}`}
                     >
                       Submit for Verification ৳{cartGrandTotal}
                     </button>
