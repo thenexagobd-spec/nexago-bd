@@ -362,6 +362,55 @@ export default function App() {
   // On first load: seed the cloud with local data if the cloud is empty (local stays authoritative)
   useEffect(() => { seedCloudIfEmpty(); }, []);
 
+  // Live pending-payment alerts: quietly poll the cloud and ring + toast on new Send Money submissions
+  const ordersRef = useRef(orders);
+  ordersRef.current = orders;
+  const pendingAckRef = useRef<Set<string>>(new Set());
+  const [pendingPayments, setPendingPayments] = useState(0);
+  const playAlertSound = () => {
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new Ctx();
+      [880, 1174, 1568, 1174].forEach((f, i) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        const t = ctx.currentTime + i * 0.18;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(t); o.stop(t + 0.18);
+      });
+    } catch { /* audio unsupported */ }
+  };
+  const quietPull = async () => {
+    try {
+      const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.state && Array.isArray(data.state.orders)) setOrders(data.state.orders);
+    } catch { /* ignore */ }
+  };
+  useEffect(() => {
+    const checkPending = () => {
+      const pend = (ordersRef.current || []).filter((o: any) => o.paymentStatus === 'Pending');
+      setPendingPayments(pend.length);
+      for (const o of pend) {
+        if (!pendingAckRef.current.has(o.id)) {
+          pendingAckRef.current.add(o.id);
+          playAlertSound();
+          showToast(`🔔 New payment awaiting verification — Order #${o.id} (${o.storeName})`, 'info');
+        }
+      }
+    };
+    checkPending();
+    const pullTimer = setInterval(quietPull, 20000);
+    const checkTimer = setInterval(checkPending, 5000);
+    return () => { clearInterval(pullTimer); clearInterval(checkTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Expiry auto-waste: batch expired → auto Waste (runs on load + every 6 hours)
   useEffect(() => {
     const runWaste = () => {

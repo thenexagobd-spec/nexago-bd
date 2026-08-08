@@ -8,7 +8,7 @@ import { Order, Driver } from '../types';
 import { 
   Search, Plus, Filter, Edit3, Trash2, Check, Clock, X, Copy, 
   Eye, Download, ChevronRight, ChevronLeft, ChevronDown, MoreHorizontal, Store,
-  Zap, MapPin, Package, Navigation, Sparkles, Timer, Undo2
+  Zap, MapPin, Package, Navigation, Sparkles, Timer, Undo2, ShieldCheck, MessageCircle
 } from 'lucide-react';
 
 interface OrdersViewProps {
@@ -398,12 +398,66 @@ export default function OrdersView({
     { name: 'Cash on Delivery', color: '#059669', letter: 'COD' }
   ];
 
-  // Render Payment badges with original brand logos
-  const getPaymentMethodBadge = (method: string) => {
+  // Render Payment badges with original brand logos + verification for Send Money
+  const getPaymentMethodBadge = (order: Order) => {
+    const isPending = order.paymentStatus === 'Pending';
+    const amountOk = !order.trxAmount || Math.abs(order.trxAmount - order.amount) <= 0.01;
+    const waLink = order.customerPhone
+      ? `https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`NexaGo: Order #${order.id} payment ${order.paymentStatus === 'Approved' ? 'approved ✓' : 'rejected ✗'} (৳${order.amount}).`)}`
+      : null;
     return (
-      <div className="flex items-center space-x-2">
-        <PaymentLogo method={method} size={28} />
-        <span className="font-semibold text-gray-300">{method}</span>
+      <div className="space-y-2">
+        <div className="flex items-center space-x-2">
+          <PaymentLogo method={order.paymentMethod} size={28} />
+          <span className="font-semibold text-gray-300">{order.paymentMethod}</span>
+        </div>
+        {order.paymentStatus && (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+            order.paymentStatus === 'Approved' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
+            order.paymentStatus === 'Pending' ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30 animate-pulse' :
+            order.paymentStatus === 'Rejected' ? 'bg-red-500/15 text-red-300 border border-red-500/30' :
+            order.paymentStatus === 'COD' ? 'bg-gray-500/15 text-gray-300 border border-gray-500/30' :
+            'bg-blue-500/15 text-blue-300 border border-blue-500/30'
+          }`}>
+            {order.paymentStatus === 'Approved' ? '✓ Approved' : order.paymentStatus === 'Pending' ? '⏳ Pending' : order.paymentStatus === 'Rejected' ? '✗ Rejected' : order.paymentStatus === 'COD' ? 'COD' : 'Paid'}
+          </span>
+        )}
+        {isPending && order.trxId && (
+          <div className="space-y-1.5 text-[10px] bg-brand-dark/60 border border-brand-border/60 rounded-lg p-2">
+            <p className="font-mono text-gray-300">TrxID: <b className="text-white">{order.trxId}</b></p>
+            {order.senderNumber && <p className="text-gray-400">From: <b className="text-gray-300">{order.senderNumber}</b></p>}
+            <p className={amountOk ? 'text-emerald-400' : 'text-amber-400 font-bold'}>
+              {amountOk ? `✓ Amount matches (৳${order.amount})` : `⚠ Amount mismatch — claimed ৳${order.trxAmount} vs ৳${order.amount}`}
+            </p>
+            {order.receipt && (
+              <a href={order.receipt} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-1 text-blue-400 hover:underline cursor-pointer">
+                <Eye className="w-3 h-3" /><span>View receipt</span>
+              </a>
+            )}
+            <div className="flex items-center space-x-1.5 pt-1">
+              <button
+                onClick={() => onUpdateOrder({ ...order, paymentStatus: 'Approved', status: 'Confirmed' })}
+                className="flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded text-[9px] font-bold cursor-pointer transition-colors"
+              >
+                <ShieldCheck className="w-3 h-3" /><span>Verify & Approve</span>
+              </button>
+              <button
+                onClick={() => onUpdateOrder({ ...order, paymentStatus: 'Rejected', status: 'Cancelled', paymentNote: 'Payment rejected by admin' })}
+                className="flex items-center space-x-1 px-2.5 py-1.5 bg-red-500 hover:bg-red-400 text-white rounded text-[9px] font-bold cursor-pointer transition-colors"
+              >
+                <X className="w-3 h-3" /><span>Reject</span>
+              </button>
+            </div>
+            {waLink && (
+              <a href={waLink} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-1 text-emerald-400 hover:underline cursor-pointer">
+                <MessageCircle className="w-3 h-3" /><span>WhatsApp {order.customerPhone}</span>
+              </a>
+            )}
+          </div>
+        )}
+        {!isPending && order.paymentNote && (
+          <p className="text-[9px] text-gray-500">Note: {order.paymentNote}</p>
+        )}
       </div>
     );
   };
@@ -414,8 +468,43 @@ export default function OrdersView({
     return orders.filter(o => o.status === tab).length;
   };
 
+  const pendingPayments = orders.filter(o => o.paymentStatus === 'Pending').length;
+
   return (
     <div className="space-y-6 fade-in">
+      
+      {/* Live payment verification alert */}
+      {pendingPayments > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-purple-500/10 border border-purple-500/30 rounded-xl px-4 py-3 animate-pulse">
+          <div className="flex items-center space-x-3">
+            <span className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4" />
+            </span>
+            <div>
+              <p className="text-xs font-bold text-purple-200">🔔 {pendingPayments} payment{pendingPayments > 1 ? 's' : ''} awaiting verification</p>
+              <p className="text-[10px] text-purple-300/80">Review the TrxID, match the exact amount, then Verify & Approve or Reject.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+              try {
+                const ctx = new Ctx();
+                [880, 1174, 1568].forEach((f, i) => {
+                  const o = ctx.createOscillator(); const g = ctx.createGain();
+                  o.type = 'sine'; o.frequency.value = f;
+                  const t = ctx.currentTime + i * 0.18;
+                  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+                  o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.18);
+                });
+              } catch { /* noop */ }
+            }}
+            className="px-3 py-1.5 bg-purple-500 hover:bg-purple-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors shrink-0"
+          >
+            Test Ring
+          </button>
+        </div>
+      )}
       
       {/* Header title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -567,7 +656,7 @@ export default function OrdersView({
 
                   {/* Payment Method Badge */}
                   <td className="py-3.5 px-4">
-                    {getPaymentMethodBadge(order.paymentMethod)}
+                    {getPaymentMethodBadge(order)}
                   </td>
 
                   {/* Status pills matching original design */}

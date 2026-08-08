@@ -269,6 +269,15 @@ const server = http.createServer((req, res) => {
       const order = body && body.order;
       if (!order || !order.id) { sendJson(res, 400, { ok: false, error: 'order.id required' }); return; }
       const orders = Array.isArray(store.state.orders) ? store.state.orders : [];
+      // Anti-duplicate TrxID: reject reuse of a transaction id already on a live order
+      if (order.trxId) {
+        const trx = String(order.trxId).trim().toUpperCase();
+        const dup = orders.find((o) => o && o.id !== order.id && o.trxId === trx && o.paymentStatus && o.paymentStatus !== 'Rejected');
+        if (dup) {
+          sendJson(res, 409, { ok: false, error: 'DUPLICATE_TRX', message: 'This TrxID has already been used for order #' + dup.id + ' — duplicate transactions are blocked' });
+          return;
+        }
+      }
       const idx = orders.findIndex((o) => o && o.id === order.id);
       if (idx >= 0) orders[idx] = order; else orders.unshift(order);
       store.state.orders = orders;

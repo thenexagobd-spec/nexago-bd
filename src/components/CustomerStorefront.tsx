@@ -7,7 +7,7 @@ import {
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
   MessageCircle, BellPlus, Share2, LocateFixed, CalendarClock, AlertCircle, Link2,
-  SlidersHorizontal
+  SlidersHorizontal, Camera
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product } from '../types';
@@ -318,7 +318,25 @@ const LS_KEYS = {
   watchSnap: 'ss_watch_snap',
   referral: 'ss_referral',
   dark: 'ss_dark',
+  trxUsed: 'ss_trx_used',
+  fraud: 'ss_trx_fraud',
 };
+
+// Send Money merchant wallets (configure these with the real business numbers)
+const MERCHANT_WALLETS = {
+  bKash: { name: 'NexaGo Pay', number: '01712-345678' },
+  Nagad: { name: 'NexaGo Pay', number: '01819-987654' },
+} as const;
+
+const TRX_RE = /^[A-Z0-9]{8,20}$/;
+const PAY_SESSION_MS = 10 * 60 * 1000;   // 10-minute payment window
+const PAY_AUTO_CANCEL_MS = 15 * 60 * 1000; // auto-cancel unpaid pending orders after 15 min
+const FRAUD_MAX_ATTEMPTS = 3;
+const FRAUD_COOLDOWN_MS = 10 * 60 * 1000;  // 10-minute lockout
+const MAX_RECEIPT_BYTES = 2 * 1024 * 1024; // 2 MB screenshot limit
+
+interface TrxUsed { trxId: string; orderId: string; at: number; }
+interface FraudRecord { sender: string; attempts: number; blockedUntil: number; }
 
 const SCHEDULE_SLOTS = [
   'ASAP (Fastest)',
@@ -839,6 +857,119 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [pinInput, setPinInput] = useState('');
   const [cardInfo, setCardInfo] = useState({ number: '', name: '', expiry: '', cvv: '' });
 
+  // Send Money flow (bKash/Nagad)
+  const [sendMoney, setSendMoney] = useState({ sender: '', trxId: '', amount: '', receipt: '', note: '' });
+  const [payDeadline, setPayDeadline] = useState<number>(0);
+  const [payLeft, setPayLeft] = useState<number>(0);
+  const [payExpired, setPayExpired] = useState(false);
+  const [trxUsed, setTrxUsed] = useState<TrxUsed[]>(() => getStoredData(LS_KEYS.trxUsed, []));
+  useEffect(() => setStoredData(LS_KEYS.trxUsed, trxUsed), [trxUsed]);
+  const [fraud, setFraud] = useState<FraudRecord[]>(() => getStoredData(LS_KEYS.fraud, []));
+  useEffect(() => setStoredData(LS_KEYS.fraud, fraud), [fraud]);
+
+  const fraudStateOf = (sender: string): FraudRecord => {
+    const rec = fraud.find(f => f.sender === sender);
+    return rec || { sender, attempts: 0, blockedUntil: 0 };
+  };
+  const fraudBlocked = (sender: string) => {
+    const r = fraudStateOf(sender);
+    return r.blockedUntil > Date.now();
+  };
+  const registerFraudAttempt = (sender: string) => {
+    const r = fraudStateOf(sender);
+    const attempts = r.attempts + 1;
+    if (attempts >= FRAUD_MAX_ATTEMPTS) {
+      setFraud(prev => [...prev.filter(f => f.sender !== sender), { sender, attempts, blockedUntil: Date.now() + FRAUD_COOLDOWN_MS }]);
+      return true;
+    }
+    setFraud(prev => [...prev.filter(f => f.sender !== sender), { sender, attempts, blockedUntil: 0 }]);
+    return false;
+  };
+
+  // Payment countdown for Send Money session
+  useEffect(() => {
+    if (!payDeadline) return;
+    const t = setInterval(() => {
+      const left = Math.max(0, Math.ceil((payDeadline - Date.now()) / 1000));
+      setPayLeft(left);
+      if (left <= 0) {
+        clearInterval(t);
+        setPayExpired(true);
+      }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [payDeadline]);
+
+  // Auto-expiry: cancel pending-payment orders whose window lapsed (fake-order cleanup)
+  useEffect(() => {
+    const t = setInterval(() => {
+      for (const o of orders) {
+        if (o.paymentStatus === 'Pending' && o.placedAt && Date.now() - o.placedAt > PAY_AUTO_CANCEL_MS && (o.status === 'Pending' || o.status === 'Confirmed')) {
+          onSilentUpdateOrder?.({ ...o, status: 'Cancelled', paymentStatus: 'Rejected', paymentNote: 'Payment window expired — order auto-cancelled' });
+        }
+      }
+    }, 15000);
+    return () => clearInterval(t);
+  }, [orders, onSilentUpdateOrder]);
+
+  // Notify when a pending payment gets approved/rejected (admin action visible to user)
+  useEffect(() => {
+    for (const ord of orders) {
+      if ((ord.paymentStatus === 'Approved') && !seenCompletedRef.current.has(ord.id + '-pay-ok')) {
+        seenCompletedRef.current.add(ord.id + '-pay-ok');
+        setCustomerNotifs(prev => [{
+          id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Payment Approved',
+          body: `Payment for order #${ord.id} verified. Your order is confirmed!`, emoji: '✅', time: 'Just now', read: false
+        }, ...prev]);
+      }
+      if ((ord.paymentStatus === 'Rejected') && !seenCompletedRef.current.has(ord.id + '-pay-no')) {
+        seenCompletedRef.current.add(ord.id + '-pay-no');
+        setCustomerNotifs(prev => [{
+          id: `CN-${Date.now().toString().slice(-4)}`, title: '⛔ Payment Rejected',
+          body: `Payment for order #${ord.id} was rejected${ord.paymentNote ? ` — ${ord.paymentNote}` : ''}.`, emoji: '⛔', time: 'Just now', read: false
+        }, ...prev]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
+  const startPaySession = () => {
+    setPayExpired(false);
+    setSendMoney({ sender: customerPhone.replace(/[^0-9]/g, ''), trxId: '', amount: String(cartGrandTotal), receipt: '', note: customerPhone });
+    setPayDeadline(Date.now() + PAY_SESSION_MS);
+    setPayLeft(PAY_SESSION_MS / 1000);
+  };
+  const resetPaySession = () => {
+    setPayDeadline(0);
+    setPayLeft(0);
+    setPayExpired(false);
+  };
+  const copyText = (text: string, label: string) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => showToast(`${label} copied to clipboard`, 'success')).catch(() => fallbackCopy(text, label));
+    } else {
+      fallbackCopy(text, label);
+    }
+  };
+  const fallbackCopy = (text: string, label: string) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showToast(`${label} copied to clipboard`, 'success'); } catch { showToast(`Number: ${text}`, 'info'); }
+    document.body.removeChild(ta);
+  };
+  const handleReceiptFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_RECEIPT_BYTES) { showToast('Screenshot too large — max 2 MB', 'info'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setSendMoney(s => ({ ...s, receipt: String(reader.result || '') }));
+    reader.readAsDataURL(file);
+  };
+
   // Tracking live sim
   const [bannerIdx, setBannerIdx] = useState(0);
 
@@ -1071,7 +1202,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast('Your cart is empty. Add items to order!', 'info');
       return;
     }
-    if (paymentMethod === 'bKash' || paymentMethod === 'Nagad' || paymentMethod === 'Card' || paymentMethod === 'Split (Wallet + bKash)') {
+    if (paymentMethod === 'bKash' || paymentMethod === 'Nagad') {
+      setPayModal(paymentMethod);
+      setPinInput('');
+      setCardInfo({ number: '', name: '', expiry: '', cvv: '' });
+      startPaySession();
+      return;
+    }
+    if (paymentMethod === 'Card' || paymentMethod === 'Split (Wallet + bKash)') {
       setPayModal(paymentMethod);
       setPinInput('');
       setCardInfo({ number: '', name: '', expiry: '', cvv: '' });
@@ -1102,12 +1240,24 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Order Payment', amount: -splitDeduct, date: 'Just now', status: 'Completed' }, ...prev]);
     }
 
+    const isSendMoney = payModal === 'bKash' || payModal === 'Nagad';
+    const trxId = (sendMoney.trxId || '').trim().toUpperCase();
+
     finishOrder({
       customerName: customerProfile.name,
       storeName: targetStore.name,
       amount: cartGrandTotal,
-      status: 'Confirmed',
-      paymentMethod: paymentMethod === 'Split (Wallet + bKash)' ? `Split (Wallet ৳${splitDeduct} + bKash ৳${cartGrandTotal - splitDeduct})` : paymentMethod,
+      status: isSendMoney ? 'Pending' : 'Confirmed',
+      paymentMethod: isSendMoney
+        ? `${payModal} (Send Money)`
+        : paymentMethod === 'Split (Wallet + bKash)' ? `Split (Wallet ৳${splitDeduct} + bKash ৳${cartGrandTotal - splitDeduct})` : paymentMethod,
+      paymentStatus: isSendMoney ? 'Pending' : (paymentMethod === 'Cash on Delivery' ? 'COD' : 'Paid'),
+      trxId: isSendMoney ? trxId : undefined,
+      senderNumber: isSendMoney ? sendMoney.sender.replace(/[^0-9]/g, '') : undefined,
+      trxAmount: isSendMoney ? (parseFloat(sendMoney.amount) || cartGrandTotal) : undefined,
+      receipt: isSendMoney ? sendMoney.receipt : undefined,
+      reference: isSendMoney ? sendMoney.note : undefined,
+      paymentExpiry: isSendMoney ? Date.now() + PAY_AUTO_CANCEL_MS : undefined,
       customerPhone,
       address: deliveryAddress,
       deliveryCoords: { lat: dest[0], lng: dest[1] },
@@ -1123,10 +1273,29 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       splitWalletAmount: splitDeduct || undefined,
       items: cart.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.price, quantity: i.quantity }))
     });
+    if (isSendMoney && trxId) {
+      setTrxUsed(prev => [{ trxId, orderId: '', at: Date.now() }, ...prev.filter(t => t.trxId !== trxId)]);
+    }
     setPayModal(null);
+    resetPaySession();
     setIsScheduled(false);
     setDeliveryPin(null);
-    showToast(`Order placed successfully with ${targetStore.name}!`, 'success');
+    showToast(isSendMoney ? `Payment submitted — order #pending admin verification` : `Order placed successfully with ${targetStore.name}!`, isSendMoney ? 'info' : 'success');
+  };
+
+  const confirmSendMoney = () => {
+    if (!payModal) return;
+    const sender = sendMoney.sender.replace(/[^0-9]/g, '');
+    const trxId = (sendMoney.trxId || '').trim().toUpperCase();
+    if (payExpired) { showToast('Payment session expired — restart to place a fresh order', 'info'); return; }
+    if (fraudBlocked(sender)) { showToast('Too many invalid attempts — payment temporarily blocked. Try again in a few minutes.', 'info'); return; }
+    if (sender.length < 10) { showToast('Enter the 11-digit mobile number that sent the money', 'info'); registerFraudAttempt(sender); return; }
+    if (!TRX_RE.test(trxId)) { showToast(`Invalid ${payModal} TrxID — expected 8–20 letters/digits (e.g. ${payModal === 'bKash' ? '8NHK7K8MJH' : 'NG170870910001120M'})`, 'info'); registerFraudAttempt(sender); return; }
+    if (trxUsed.some(t => t.trxId === trxId)) { showToast('This TrxID was already used — duplicate transactions are blocked', 'info'); registerFraudAttempt(sender); return; }
+    if (!sendMoney.receipt) { showToast('Upload the payment screenshot/receipt before submitting', 'info'); return; }
+    const claimed = parseFloat(sendMoney.amount) || 0;
+    if (Math.abs(claimed - cartGrandTotal) > 0.01) { showToast(`Sent amount must match exactly ৳${cartGrandTotal} — you entered ৳${claimed}`, 'info'); return; }
+    confirmPayment();
   };
 
   const reorder = (ord: Order) => {
@@ -2243,6 +2412,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               active ? 'bg-amber-100 text-amber-800 animate-pulse' :
                               'bg-gray-100 text-gray-700'
                             }`}>{statusLabel(ord.status)}</span>
+                            {ord.paymentStatus === 'Pending' && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black animate-pulse">⏳ Payment Pending</span>
+                            )}
+                            {ord.paymentStatus === 'Approved' && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">✅ Payment Approved</span>
+                            )}
+                            {ord.paymentStatus === 'Rejected' && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-black">⛔ Payment Rejected</span>
+                            )}
+                            {ord.paymentStatus === 'COD' && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-black">💵 Cash on Delivery</span>
+                            )}
                             {ord.estimatedMinutes && active && (
                               <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold">~{ord.estimatedMinutes} min</span>
                             )}
@@ -2966,7 +3147,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             paymentMethod === method ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                           }`}
                         >
-                          {method}
+                          {method === 'bKash' ? <span className="flex items-center justify-center space-x-1"><span className="w-3 h-3 rounded-full bg-pink-500 text-white text-[7px] font-black flex items-center justify-center">bK</span><span>Send Money</span></span>
+                            : method === 'Nagad' ? <span className="flex items-center justify-center space-x-1"><span className="w-3 h-3 rounded-full bg-orange-500 text-white text-[7px] font-black flex items-center justify-center">Ng</span><span>Send Money</span></span>
+                            : method}
                         </button>
                       ))}
                     </div>
@@ -3015,38 +3198,122 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </div>
 
             {payModal === 'bKash' || payModal === 'Nagad' ? (() => {
-              const payAccount = paymentMethods.find(p => p.type === payModal);
-              const expectedPin = payAccount?.pin || '12345';
+              const mw = MERCHANT_WALLETS[payModal];
+              const mm = Math.floor(payLeft / 60);
+              const ss = payLeft % 60;
+              const sender = sendMoney.sender.replace(/[^0-9]/g, '');
+              const blocked = fraudBlocked(sender);
               return (
               <div className="space-y-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{payModal} Account</label>
-                  <input type="text" value={payAccount?.accountNumber || '01712-345678'} readOnly className="w-full bg-gray-100 border border-gray-200 rounded-xl p-2.5 font-mono text-gray-700 outline-none" />
+                {/* Merchant wallet card */}
+                <div className={`rounded-2xl border p-4 text-white relative overflow-hidden ${payModal === 'bKash' ? 'bg-gradient-to-br from-pink-500 via-pink-600 to-rose-600 border-pink-700' : 'bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 border-orange-700'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-9 h-9 rounded-xl bg-white/25 border border-white/30 flex items-center justify-center font-black text-base">{payModal === 'bKash' ? 'bK' : 'Ng'}</div>
+                      <div>
+                        <p className="font-black text-sm leading-tight">{mw.name} · {payModal} Wallet</p>
+                        <p className="text-[10px] text-white/80">Send Money to this number</p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-white/25 text-[9px] font-black">Send Money</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <p className="font-mono text-xl font-black tracking-wider">{mw.number}</p>
+                    <button
+                      onClick={() => copyText(mw.number, `${payModal} number`)}
+                      className="px-3 py-1.5 bg-white text-gray-900 rounded-lg text-[10px] font-black flex items-center space-x-1 hover:bg-gray-100 transition-colors cursor-pointer shadow"
+                    >
+                      <Copy className="w-3 h-3" /><span>Copy Number</span>
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Enter {payModal} PIN</label>
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    value={pinInput}
-                    onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="• • • • •"
-                    maxLength={5}
-                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-center text-lg tracking-[0.5em] font-mono outline-none focus:border-emerald-500"
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1 flex items-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>Demo PIN for this account: <b className="text-gray-600 font-mono">{expectedPin}</b></span></p>
+
+                {/* Countdown */}
+                <div className={`flex items-center justify-between px-3 py-2 rounded-xl border ${payExpired ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                  <span className="font-bold flex items-center space-x-1"><Clock className="w-3.5 h-3.5" /><span>{payExpired ? 'Session expired' : 'Complete payment within'}</span></span>
+                  <span className="font-mono font-black text-sm">{payExpired ? '00:00' : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`}</span>
                 </div>
-                <button
-                  onClick={() => {
-                    if (pinInput.length < 5) { showToast('Enter your 5-digit PIN', 'info'); return; }
-                    if (pinInput !== expectedPin) { showToast(`Incorrect PIN — the correct PIN is ${expectedPin}`, 'info'); return; }
-                    showToast(`${payModal} payment of ৳${cartGrandTotal} successful`, 'success');
-                    confirmPayment();
-                  }}
-                  className="w-full py-3 bg-pink-600 hover:bg-pink-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
-                >
-                  Confirm & Pay ৳{cartGrandTotal}
-                </button>
+
+                {payExpired ? (
+                  <div className="space-y-3">
+                    <p className="text-[11px] text-gray-500 text-center py-2">This payment window has expired to prevent fake orders. Your cart is untouched — start again to place a fresh order.</p>
+                    <button
+                      onClick={() => { setPayModal(null); resetPaySession(); }}
+                      className="w-full py-3 bg-gray-600 hover:bg-gray-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Your {payModal} number (sender)</label>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={sendMoney.sender}
+                        onChange={(e) => setSendMoney(s => ({ ...s, sender: e.target.value.replace(/[^0-9-]/g, '') }))}
+                        placeholder="01XXX-XXXXXX"
+                        maxLength={13}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500"
+                      />
+                      {blocked && <p className="text-[10px] text-red-600 mt-1 font-bold">Too many invalid attempts — this number is temporarily blocked.</p>}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Sent amount (must equal ৳{cartGrandTotal})</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={sendMoney.amount}
+                        onChange={(e) => setSendMoney(s => ({ ...s, amount: e.target.value }))}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono outline-none focus:border-emerald-500"
+                      />
+                      <p className={`text-[10px] mt-1 font-bold ${Math.abs((parseFloat(sendMoney.amount) || 0) - cartGrandTotal) <= 0.01 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {Math.abs((parseFloat(sendMoney.amount) || 0) - cartGrandTotal) <= 0.01 ? '✓ Exact amount matches' : `Amount must match exactly ৳${cartGrandTotal}`}
+                      </p>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5 text-[11px] text-blue-800">
+                      <p className="font-black">📝 Send Money Reference</p>
+                      <p>When sending, put this note in the reference box:</p>
+                      <p className="bg-white/70 rounded-lg p-2 font-mono font-bold text-blue-900 break-all">{sendMoney.note || customerPhone} · {customerProfile.name}</p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{payModal} TrxID</label>
+                      <input
+                        type="text"
+                        value={sendMoney.trxId}
+                        onChange={(e) => setSendMoney(s => ({ ...s, trxId: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20) }))}
+                        placeholder={payModal === 'bKash' ? '8NHK7K8MJH' : 'NG170870910001120M'}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono tracking-wider uppercase outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">8–20 letters/digits from your SMS confirmation.</p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Payment receipt / screenshot</label>
+                      <div className="flex items-center space-x-2">
+                        <label className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-gray-600 font-bold cursor-pointer hover:bg-gray-100 transition-colors">
+                          <Camera className="w-4 h-4" /><span>{sendMoney.receipt ? 'Change receipt' : 'Upload screenshot'}</span>
+                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleReceiptFile} />
+                        </label>
+                        {sendMoney.receipt && (
+                          <button onClick={() => setSendMoney(s => ({ ...s, receipt: '' }))} className="px-2.5 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer" title="Remove receipt">
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      {sendMoney.receipt && (
+                        <img src={sendMoney.receipt} alt="receipt" className="mt-2 w-full h-24 object-cover rounded-xl border border-gray-200" />
+                      )}
+                    </div>
+                    <button
+                      onClick={confirmSendMoney}
+                      className={`w-full py-3 text-white font-black rounded-xl shadow-md transition-all cursor-pointer ${payModal === 'bKash' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-orange-500 hover:bg-orange-600'}`}
+                    >
+                      Submit for Verification ৳{cartGrandTotal}
+                    </button>
+                    <p className="text-[10px] text-gray-400 text-center flex items-center justify-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>Order is placed only after admin verifies your TrxID & amount</span></p>
+                  </div>
+                )}
               </div>
               );
             })(              ) : payModal === 'Split (Wallet + bKash)' ? (

@@ -34,6 +34,15 @@ export interface Order {
   pickedUp?: boolean;
   extraStores?: string[];
   placedAt?: number; // epoch ms — drives deterministic store→customer tracking progress
+  // Send Money / manual payment verification
+  paymentStatus?: 'Pending' | 'Approved' | 'Rejected' | 'Paid' | 'COD';
+  trxId?: string;          // bKash/Nagad Send Money transaction id
+  senderNumber?: string;   // customer mobile that sent the money
+  trxAmount?: number;      // amount user claims to have sent
+  receipt?: string;        // base64 data-URL screenshot/receipt
+  reference?: string;      // pre-filled "Send Money" reference note
+  paymentExpiry?: number;  // epoch ms deadline for pending payment
+  paymentNote?: string;    // admin note on approve/reject
 }
 
 export type DriverDutyStatus = 'Online' | 'Offline' | 'On-Delivery';
