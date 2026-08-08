@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, OrderReportEntry } from '../types';
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
-  ClipboardList, Check
+  ClipboardList, Check, Users, Search, Plus
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -27,7 +27,7 @@ interface OrderToolsDashboardProps {
   showToast?: (message: string, type?: 'success' | 'info') => void;
 }
 
-type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets' | 'reports';
+type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets' | 'reports' | 'customers';
 
 export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [], onOpenReport, onReportReply, showToast }: OrderToolsDashboardProps) {
   const [tab, setTab] = useState<ToolTab>('audit');
@@ -40,6 +40,23 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   useEffect(() => lsSet('ss_refunds', refunds), [refunds]);
 
   const [walletCfg, setWalletCfg] = useState<WalletConfig>(() => lsGet<WalletConfig>(WALLET_CONFIG_KEY, DEFAULT_WALLETS));
+
+  // Customer directory (A–Z) with per-customer wallet add
+  const [custSearch, setCustSearch] = useState('');
+  const seedCustomers = [
+    { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024' },
+    { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024' },
+    { id: 'CUS-003', name: 'Tanvir Ahmed', phone: '01611-444555', email: 'tanvir.a@example.com', orders: 15, spent: 12400, zone: 'Uttara', joined: 'Feb 2024' },
+    { id: 'CUS-004', name: 'Sumaiya Jahan', phone: '01311-666777', email: 'sumaiya.j@example.com', orders: 5, spent: 3180, zone: 'Banani', joined: 'May 2024' },
+    { id: 'CUS-005', name: 'Farhan Hasan', phone: '01911-123456', email: 'farhan.h@example.com', orders: 20, spent: 18750, zone: 'Mirpur', joined: 'Jan 2024' },
+    { id: 'CUS-006', name: 'Nusrat Zaman', phone: '01511-654321', email: 'nusrat.z@example.com', orders: 3, spent: 2450, zone: 'Mohakhali', joined: 'Jun 2024' },
+    { id: 'CUS-007', name: 'Imran Kabir', phone: '01412-888999', email: 'imran.k@example.com', orders: 9, spent: 6740, zone: 'Bashundhara', joined: 'Apr 2024' },
+    { id: 'CUS-008', name: 'Sadia Rahman', phone: '01755-222333', email: 'sadia.r@example.com', orders: 6, spent: 3980, zone: 'Dhanmondi', joined: 'Feb 2024' },
+    { id: 'CUS-009', name: 'Mahmudul Islam', phone: '01877-444555', email: 'mahmudul.i@example.com', orders: 11, spent: 9020, zone: 'Gulshan', joined: 'Mar 2024' },
+    { id: 'CUS-010', name: 'Tasnim Akter', phone: '01933-777888', email: 'tasnim.a@example.com', orders: 2, spent: 1680, zone: 'Uttara', joined: 'Jul 2024' },
+  ];
+  const [custWallet, setCustWallet] = useState<Record<string, number>>(() => lsGet('ss_admin_cust_wallet', {}));
+  useEffect(() => lsSet('ss_admin_cust_wallet', custWallet), [custWallet]);
 
   // Keep wallet numbers in sync if edited from another tab
   useEffect(() => {
@@ -78,6 +95,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     { key: 'refunds', label: 'Refund Requests', icon: Banknote, badge: refunds.filter(r => r.status === 'Requested').length },
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
     { key: 'wallets', label: 'Payment Wallets', icon: Wallet },
+    { key: 'customers', label: 'Customers', icon: Users },
   ];
 
   return (
@@ -467,6 +485,75 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
               >
                 Save wallet numbers
               </button>
+            </div>
+          </div>
+        )}
+
+        {tab === 'customers' && (
+          <div className="space-y-3">
+            <h3 className="font-black text-white text-sm flex items-center space-x-2"><Users className="w-4 h-4 text-brand-orange" /><span>Customer Directory</span></h3>
+            <p className="text-[10px] text-gray-400">All customers A–Z. Add balance straight to any customer wallet — they see it instantly in the storefront.</p>
+
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={custSearch}
+                onChange={(e) => setCustSearch(e.target.value)}
+                placeholder="Search by name, phone or email..."
+                className="w-full bg-brand-dark/50 border border-brand-border rounded-lg pl-9 pr-3 py-2 text-xs text-gray-200 outline-none focus:border-brand-orange placeholder:text-gray-600"
+              />
+            </div>
+
+            <div className="space-y-2">
+              {[...seedCustomers]
+                .filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase()))
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(c => {
+                  const alloc = custWallet[c.id] || 0;
+                  return (
+                    <div key={c.id} className="bg-brand-dark/50 border border-brand-border/40 rounded-xl p-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-brand-orange/20 border border-brand-orange/30 text-brand-orange text-[11px] font-black flex items-center justify-center shrink-0">
+                          {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-white font-black text-xs truncate">{c.name}</p>
+                          <p className="text-[10px] text-gray-400 font-mono truncate">{c.phone} · {c.email}</p>
+                          <div className="flex items-center space-x-2 text-[9px] text-gray-500 mt-0.5">
+                            <span>{c.zone}</span><span>•</span><span>{c.orders} orders</span><span>•</span><span>৳{c.spent.toLocaleString()} spent</span>
+                            {alloc > 0 && <span className="text-emerald-400 font-black">• Wallet: ৳{alloc}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex items-center space-x-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          value={alloc === 0 && !custWallet[c.id] ? '' : alloc}
+                          placeholder="৳"
+                          onChange={(e) => setCustWallet(prev => ({ ...prev, [c.id]: Math.max(0, Number(e.target.value) || 0) }))}
+                          className="w-20 bg-brand-dark text-xs font-mono text-gray-200 border border-brand-border rounded-lg px-2 py-1.5 outline-none focus:border-brand-orange"
+                        />
+                        <button
+                          onClick={() => {
+                            const amt = custWallet[c.id] || 0;
+                            if (amt <= 0) { showToast && showToast('Enter an amount to add to wallet', 'info'); return; }
+                            setCustWallet(prev => ({ ...prev, [c.id]: 0 }));
+                            setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Wallet add', orderId: c.id, paymentMethod: 'Wallet', amount: amt, at: Date.now() }, ...prev]);
+                            showToast && showToast(`৳${amt.toLocaleString()} added to ${c.name}'s wallet`, 'success');
+                          }}
+                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors flex items-center space-x-1"
+                        >
+                          <Plus className="w-3 h-3" /><span>Add</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              {seedCustomers.filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase())).length === 0 && (
+                <p className="text-center text-[10px] text-gray-500 py-6">No customers found</p>
+              )}
             </div>
           </div>
         )}
