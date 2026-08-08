@@ -3222,7 +3222,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {selectedStore.catalog
                     .filter(p => storeCat === 'All' || p.category === storeCat)
                     .filter(p => {
@@ -3234,31 +3234,31 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       const inCart = cart.find(i => i.product.id === prod.id);
                       return (
                         <div key={prod.id} className={`border rounded-xl overflow-hidden bg-white transition-all ${prod.status === 'Out of Stock' ? 'opacity-55 border-gray-200' : 'border-gray-200 hover:border-emerald-300 hover:shadow-sm'}`}>
-                          <div className="relative h-28 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
+                          <div className="relative h-16 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
                             <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                            <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                            <span className={`absolute top-0.5 left-0.5 px-1 py-px rounded text-[7px] font-black uppercase ${
                               prod.status === 'In Stock' ? 'bg-emerald-600 text-white' : prod.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'
                             }`}>{statusLabel(prod.status)}</span>
                           </div>
-                          <div className="p-3 space-y-1.5">
-                            <h4 className="font-bold text-xs text-gray-900 leading-snug line-clamp-2 cursor-pointer hover:text-emerald-700" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>{prod.name}</h4>
+                          <div className="p-2 space-y-1">
+                            <h4 className="font-bold text-[11px] text-gray-900 leading-tight line-clamp-2 cursor-pointer hover:text-emerald-700" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>{prod.name}</h4>
                             <div className="flex items-center justify-between pt-0.5 gap-1">
                               <div className="min-w-0">
-                                <span className="font-mono font-black text-emerald-700 text-sm">৳{prod.price}</span>
-                                <span className="text-[9px] text-gray-400 ml-0.5">/{prod.unit}</span>
+                                <span className="font-mono font-black text-emerald-700 text-xs">৳{prod.price}</span>
+                                <span className="text-[8px] text-gray-400 ml-0.5">/{prod.unit}</span>
                               </div>
                               {prod.status === 'Out of Stock' ? (
-                                <span className="text-[9px] font-bold text-gray-400">Sold out</span>
+                                <span className="text-[8px] font-bold text-gray-400">Sold out</span>
                               ) : (
-                                <div className="flex items-center space-x-1 shrink-0">
+                                <div className="flex items-center space-x-0.5 shrink-0">
                                    {inCart ? (
-                                    <div className="flex items-center justify-center space-x-1.5 bg-emerald-500 text-white rounded-lg px-1.5 py-1">
+                                    <div className="flex items-center justify-center space-x-1 bg-emerald-500 text-white rounded-md px-1.5 py-0.5">
                                       <button onClick={() => handleUpdateQty(prod.id, -1)} className="text-white hover:text-green-200 cursor-pointer"><Minus className="w-3 h-3" /></button>
                                       <span className="font-mono font-bold text-[10px] w-3 text-center">{inCart.quantity}</span>
                                       <button onClick={() => handleAddToCart(prod)} className="text-white hover:text-green-200 cursor-pointer"><Plus className="w-3 h-3" /></button>
                                     </div>
                                   ) : (
-                                    <button onClick={() => handleAddToCart(prod)} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1">
+                                    <button onClick={() => handleAddToCart(prod)} className="px-2 py-1 bg-emerald-500 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1">
                                       <Plus className="w-3 h-3" /><span>Add</span>
                                     </button>
                                   )}
