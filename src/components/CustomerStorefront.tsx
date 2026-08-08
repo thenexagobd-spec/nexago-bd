@@ -868,6 +868,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       receipt: reSub.receipt || reSubmitOrder.receipt,
       paymentNote: 'Re-submitted by customer for re-verification',
     });
+    // Old "Under Review" ticket for this order is cleared on the customer side (not saved)
+    setTickets(prev => prev.filter(t => !t.subject.includes(`order #${reSubmitOrder.id}`)));
     setReSubmitOrder(null);
     showToast(`Payment re-submitted for #${reSubmitOrder.id} — sent for review again`, 'success');
   };
@@ -1110,6 +1112,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           body: `Payment for order #${ord.id} needs re-verification — your order is on hold${ord.paymentNote ? ` (${ord.paymentNote})` : ''}.`, emoji: '⏸', time: 'Just now', read: false
         }, ...prev]);
         // Auto-open a support ticket so the customer sees it "Under Review" in Help & Support
+        // Old tickets for the same order are replaced (not accumulated) on the customer side
         setTickets(prev => [{
           id: `TCK-${Math.floor(100 + Math.random() * 900)}`,
           subject: `Payment under review — order #${ord.id}`,
@@ -1117,7 +1120,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           status: 'Under Review',
           date: 'Just now',
           lastMessage: `Our team is re-verifying your ${ord.paymentMethod} payment for order #${ord.id}. You will be notified once it is confirmed.`
-        }, ...prev]);
+        }, ...prev.filter(t => !t.subject.includes(`order #${ord.id}`))]);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
