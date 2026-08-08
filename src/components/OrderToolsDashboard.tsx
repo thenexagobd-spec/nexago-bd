@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
-  ClipboardList, Check, Eye
+  ClipboardList, Check
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -63,6 +63,9 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
       m.startsWith('bKash') ? 'bKash' : m.startsWith('Nagad') ? 'Nagad' : m.startsWith('Upay') ? 'Upay' : m.startsWith('Rocket') ? 'Rocket' : m.includes('Wallet') ? 'Wallet' : m.includes('Cash') ? 'Cash on Delivery' : m
     );
   const pendingPayments = orders.filter(o => o.paymentStatus === 'Pending' && isWalletMethod(o.paymentMethod));
+
+  // Receipt popup viewer (full-size payment screenshot)
+  const [receiptView, setReceiptView] = useState<string | null>(null);
 
   const tabs: { key: ToolTab; label: string; icon: any; badge?: number }[] = [
     { key: 'verify', label: 'Verify Payments', icon: ShieldCheck, badge: pendingPayments.length },
@@ -140,28 +143,28 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
                         >✗ Reject</button>
                       </div>
                     </div>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1.5 text-[10px]">
-                      <p className="text-gray-400"><b className="text-gray-200">Customer:</b> {o.customerName}{o.customerPhone ? ` · ${o.customerPhone}` : ''}</p>
-                      <p className="text-gray-400"><b className="text-gray-200">Store:</b> {o.storeName}</p>
-                      <p className="text-gray-400"><b className="text-gray-200">Amount:</b> <span className="font-mono text-white font-bold">৳{o.amount.toLocaleString()}</span></p>
-                      <p className="text-gray-400"><b className="text-gray-200">Method:</b> {o.paymentMethod}</p>
-                      {o.trxId && <p className="text-gray-400"><b className="text-gray-200">TrxID:</b> <span className="font-mono">{o.trxId}</span></p>}
-                      {o.senderNumber && <p className="text-gray-400"><b className="text-gray-200">Sender No:</b> <span className="font-mono">{o.senderNumber}</span></p>}
-                      {o.last4 && <p className="text-gray-400"><b className="text-gray-200">Last 4:</b> <span className="font-mono">{o.last4}</span></p>}
-                      {o.trxAmount !== undefined && <p className="text-gray-400"><b className="text-gray-200">Sent:</b> <span className="font-mono">৳{o.trxAmount.toLocaleString()}</span></p>}
-                      <p className="text-gray-400"><b className="text-gray-200">Date:</b> {o.date}{o.time ? ` · ${o.time}` : ''}</p>
-                    </div>
-                    {o.receipt && (
-                      <div className="flex items-center gap-3">
-                        <a href={o.receipt} target="_blank" rel="noreferrer" title="Open receipt in new tab">
-                          <img src={o.receipt} alt="payment receipt" className="h-28 w-24 object-cover rounded-lg border border-brand-border bg-brand-dark cursor-pointer hover:opacity-90 transition-opacity" />
-                        </a>
-                        <div className="space-y-0.5">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center space-x-1.5"><Eye className="w-3.5 h-3.5 text-brand-orange" /><span>Payment receipt / screenshot</span></p>
-                          <p className="text-[9px] text-gray-500">Customer's uploaded payment proof — click the image to view full size.</p>
-                        </div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1.5 text-[10px]">
+                        <p className="text-gray-400"><b className="text-gray-200">Customer:</b> {o.customerName}{o.customerPhone ? ` · ${o.customerPhone}` : ''}</p>
+                        <p className="text-gray-400"><b className="text-gray-200">Store:</b> {o.storeName}</p>
+                        <p className="text-gray-400"><b className="text-gray-200">Amount:</b> <span className="font-mono text-white font-bold">৳{o.amount.toLocaleString()}</span></p>
+                        <p className="text-gray-400"><b className="text-gray-200">Method:</b> {o.paymentMethod}</p>
+                        {o.trxId && <p className="text-gray-400"><b className="text-gray-200">TrxID:</b> <span className="font-mono">{o.trxId}</span></p>}
+                        {o.senderNumber && <p className="text-gray-400"><b className="text-gray-200">Sender No:</b> <span className="font-mono">{o.senderNumber}</span></p>}
+                        {o.last4 && <p className="text-gray-400"><b className="text-gray-200">Last 4:</b> <span className="font-mono">{o.last4}</span></p>}
+                        {o.trxAmount !== undefined && <p className="text-gray-400"><b className="text-gray-200">Sent:</b> <span className="font-mono">৳{o.trxAmount.toLocaleString()}</span></p>}
+                        <p className="text-gray-400"><b className="text-gray-200">Date:</b> {o.date}{o.time ? ` · ${o.time}` : ''}</p>
                       </div>
-                    )}
+                      {o.receipt && (
+                        <button
+                          onClick={() => setReceiptView(o.receipt)}
+                          className="shrink-0 self-start sm:self-center w-16 h-20 rounded-lg border border-brand-border overflow-hidden bg-brand-dark cursor-pointer hover:opacity-90 hover:border-brand-orange transition-all"
+                          title="Tap to view receipt full size"
+                        >
+                          <img src={o.receipt} alt="payment receipt" className="w-full h-full object-cover" />
+                        </button>
+                      )}
+                    </div>
                     {o.customerNote && (
                       <p className="text-[10px] text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-2.5 py-1.5">💬 Customer note: {o.customerNote}</p>
                     )}
@@ -380,6 +383,29 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
           </div>
         )}
       </div>
+
+      {/* Receipt popup viewer */}
+      {receiptView && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setReceiptView(null)}
+        >
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setReceiptView(null)}
+              className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-white text-gray-900 flex items-center justify-center shadow-xl cursor-pointer hover:bg-gray-200 transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <img
+              src={receiptView}
+              alt="payment receipt full size"
+              className="max-h-[82vh] max-w-[92vw] object-contain rounded-xl shadow-2xl bg-white"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
