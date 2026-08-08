@@ -3308,32 +3308,32 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       {/* ============ STORE MENU & CHECKOUT MODAL ============ */}
       {selectedStore && (
         <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-6xl w-full shadow-2xl border border-gray-200 overflow-hidden sm:my-8 max-h-[92vh] flex flex-col">
-            <div className="relative h-32 sm:h-40 bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-500 shrink-0">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-4xl w-full shadow-2xl border border-gray-200 overflow-hidden sm:my-6 max-h-[90vh] flex flex-col">
+            <div className="relative h-24 sm:h-28 bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-500 shrink-0">
               <img src={selectedStore.image} alt={nm(selectedStore.name)} referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-20" />
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 via-teal-800/20 to-teal-600/10" />
-              <div className="absolute top-3 right-3 flex items-center space-x-2">
-                <button onClick={() => setSelectedStore(null)} className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer transition-colors">
-                  <X className="w-4 h-4" />
+              <div className="absolute top-2.5 right-2.5 flex items-center space-x-2">
+                <button onClick={() => setSelectedStore(null)} className="w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer transition-colors">
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="absolute bottom-3 left-4 text-white flex items-end gap-3">
-                <div className={`hidden sm:flex w-14 h-14 rounded-2xl ${selectedStore.logoBg} items-center justify-center font-black text-lg shadow-lg border-2 border-white/40`}>
+              <div className="absolute bottom-2 left-3 text-white flex items-end gap-2.5">
+                <div className={`hidden sm:flex w-11 h-11 rounded-xl ${selectedStore.logoBg} items-center justify-center font-black text-base shadow-lg border-2 border-white/40`}>
                   {selectedStore.logoText.charAt(0)}
                 </div>
                 <div>
-                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${selectedStore.badgeColor}`}>{selectedStore.category}</span>
-                  <h2 className="text-xl font-black mt-0.5">{nm(selectedStore.name)}</h2>
-                  <p className="text-[11px] text-gray-300 flex items-center space-x-2">
-                    <span className="flex items-center space-x-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" /><b>{selectedStore.rating}</b></span>
-                    <span>•</span><Clock className="w-3 h-3" /><span>{selectedStore.deliveryTime}</span>
+                  <span className={`px-1.5 py-px rounded text-[8px] font-bold uppercase ${selectedStore.badgeColor}`}>{selectedStore.category}</span>
+                  <h2 className="text-lg font-black mt-0.5">{nm(selectedStore.name)}</h2>
+                  <p className="text-[10px] text-gray-300 flex items-center space-x-1.5">
+                    <span className="flex items-center space-x-1"><Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" /><b>{selectedStore.rating}</b></span>
+                    <span>•</span><Clock className="w-2.5 h-2.5" /><span>{selectedStore.deliveryTime}</span>
                     <span>•</span><span>৳{selectedStore.deliveryFee} delivery</span>
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="p-5 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="p-4 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Product grid */}
               <div className="lg:col-span-2 space-y-3">
                 <div className="space-y-2.5">
