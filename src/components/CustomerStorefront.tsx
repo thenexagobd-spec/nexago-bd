@@ -1145,13 +1145,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [walletBalance, setWalletBalance] = useState<number>(() => getStoredData(LS_KEYS.wallet, 0));
   useEffect(() => setStoredData(LS_KEYS.wallet, walletBalance), [walletBalance]);
   const [addMoneyOpen, setAddMoneyOpen] = useState(false);
-  const [addMoneyStep, setAddMoneyStep] = useState<'method' | 'otp'>('method');
+  const [addMoneyStep, setAddMoneyStep] = useState<'method' | 'send' | 'pending'>('method');
   const [addMoneyMethod, setAddMoneyMethod] = useState<'bKash' | 'Nagad' | 'Card'>('bKash');
   const [addMoneyAmount, setAddMoneyAmount] = useState('500');
   const [addMoneyPhone, setAddMoneyPhone] = useState('');
   const [addMoneyCard, setAddMoneyCard] = useState({ name: '', number: '', expiry: '', cvv: '' });
-  const [addMoneyOtp, setAddMoneyOtp] = useState('');
-  const [addMoneyOtpInput, setAddMoneyOtpInput] = useState('');
   const [addMoneySentTo, setAddMoneySentTo] = useState('');
   const [addMoneyError, setAddMoneyError] = useState('');
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>(() => getStoredData(LS_KEYS.wtxn, []));
@@ -2041,25 +2039,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (addMoneyMethod === 'Card' && (addMoneyCard.name.trim() === '' || addMoneyCard.number.trim().replace(/\D/g, '').length < 12 || addMoneyCard.expiry.trim() === '' || addMoneyCard.cvv.length < 3)) {
       setAddMoneyError('Enter card holder name, 16-digit number, expiry & CVV'); return;
     }
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
-    setAddMoneyOtp(otp);
-    setAddMoneyOtpInput('');
     setAddMoneyError('');
     setAddMoneySentTo(addMoneyMethod === 'Card' ? `card **** ${addMoneyCard.number.replace(/\D/g, '').slice(-4)}` : addMoneyPhone.trim());
-    setAddMoneyStep('otp');
-    showToast('OTP sent — check your phone / registered number', 'info');
+    setAddMoneyStep('send');
+    showToast('Send money to the personal number shown below', 'info');
   };
 
   const confirmAddMoney = () => {
     const num = parseFloat(addMoneyAmount);
-    if (addMoneyOtpInput.trim() !== addMoneyOtp) { setAddMoneyError('Incorrect OTP — please check the code sent to you'); return; }
-    setWalletBalance(prev => prev + num);
-    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: `Add Money (${addMoneyMethod})`, amount: num, date: 'Just now', status: 'Completed' }, ...prev]);
-    setAddMoneyOpen(false);
-    setAddMoneyStep('method');
-    setAddMoneyOtp('');
-    setAddMoneyOtpInput('');
-    showToast(`৳${num.toLocaleString()} added to your wallet via ${addMoneyMethod}!`, 'success');
+    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Pending' }, ...prev]);
+    setAddMoneyStep('pending');
+    showToast('Payment received — admin will verify & add to your wallet', 'info');
   };
 
   const handleCreateTicketSubmit = (e: React.FormEvent) => {
@@ -3176,7 +3166,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   >
                     <Plus className="w-4 h-4" /><span>Add Money</span>
                   </button>
-                  <p className="text-[9px] text-emerald-100 mt-2">Card or bKash / Nagad with OTP verification</p>
+                  <p className="text-[9px] text-emerald-100 mt-2">Card or bKash / Nagad — send to personal number, admin verifies (100% real)</p>
                 </div>
               </div>
 
@@ -4787,13 +4777,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         <div className="fixed inset-0 z-[84] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs animate-in fade-in duration-200">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
-                <div>
-                  <h3 className="text-sm font-black text-gray-900">{addMoneyStep === 'otp' ? 'Verify OTP' : 'Add Money to Wallet'}</h3>
-                  <p className="text-[9px] text-gray-400">Current balance: ৳{walletBalance.toLocaleString()}</p>
+                <div className="flex items-center space-x-2">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
+                  <div>
+                    <h3 className="text-sm font-black text-gray-900">{addMoneyStep === 'send' ? 'Send Money to Personal Number' : addMoneyStep === 'pending' ? 'Awaiting Admin Verification' : 'Add Money to Wallet'}</h3>
+                    <p className="text-[9px] text-gray-400">Current balance: ৳{walletBalance.toLocaleString()}</p>
+                  </div>
                 </div>
-              </div>
               <button onClick={() => setAddMoneyOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-4 h-4 text-gray-500" /></button>
             </div>
 
@@ -4861,37 +4851,48 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
 
                 <button onClick={sendAddMoneyOtp} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
-                  Continue — Send OTP
+                  Continue — Show Personal Number
                 </button>
               </>
-            ) : (
+            ) : addMoneyStep === 'send' ? (
               <>
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1.5">
-                  <p className="text-[10px] text-gray-500 font-bold">OTP sent to {addMoneySentTo}</p>
-                  <div className="bg-white border border-dashed border-emerald-300 rounded-lg px-3 py-2 font-mono font-black tracking-[0.25em] text-lg text-emerald-700 text-center select-all">
-                    {addMoneyOtp}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1.5">
+                  <p className="text-[10px] text-emerald-800 font-bold">Send exactly ৳{parseFloat(addMoneyAmount).toLocaleString()} to this personal number via {addMoneyMethod}:</p>
+                  <div className="bg-white border border-dashed border-emerald-300 rounded-lg px-3 py-2 font-mono font-black tracking-wider text-lg text-emerald-700 text-center select-all">
+                    {addMoneyMethod === 'Card' ? `Bank transfer to ${addMoneyCard.number.replace(/\D/g, '').slice(-4)}` : (walletConfig[(addMoneyMethod === 'bKash' ? 'bKash' : addMoneyMethod === 'Nagad' ? 'Nagad' : 'bKash') as WalletKey]?.numbers?.[0] || '01712-345678')}
                   </div>
-                  <p className="text-[9px] text-gray-400">Enter the 6-digit code to complete ৳{parseFloat(addMoneyAmount).toLocaleString()} top-up</p>
+                  <p className="text-[9px] text-gray-500">Sent from: {addMoneySentTo}</p>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">OTP Code</label>
-                  <input
-                    type="text"
-                    value={addMoneyOtpInput}
-                    onChange={(e) => setAddMoneyOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="000000"
-                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-center text-gray-900 outline-none focus:border-emerald-500 font-mono font-black text-xl tracking-[0.4em]"
-                  />
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5 text-[11px] text-blue-800">
+                  <p className="font-black">📝 Reference note</p>
+                  <p>Put this in the reference box so admin can match your payment:</p>
+                  <p className="bg-white/70 rounded-lg p-2 font-mono font-bold text-blue-900 break-all">{customerPhone} · {customerProfile.name}</p>
                 </div>
+                <p className="text-[10px] text-gray-500 leading-relaxed">After sending the money, tap below. The admin verifies your payment (100% real) and adds the balance to your wallet.</p>
                 {addMoneyError && <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-bold">{addMoneyError}</p>}
                 <div className="space-y-2">
                   <button onClick={confirmAddMoney} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
-                    Verify & Add ৳{parseFloat(addMoneyAmount).toLocaleString()}
+                    I've Sent the Money — Request Verification
                   </button>
                   <button onClick={() => { setAddMoneyStep('method'); setAddMoneyError(''); }} className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">
                     {T.cancel}
                   </button>
                 </div>
+              </>
+            ) : (
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1.5 text-center">
+                  <div className="mx-auto w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center"><Clock className="w-5 h-5 text-amber-600" /></div>
+                  <p className="text-xs font-black text-amber-800">Top-up Pending — Admin Verification</p>
+                  <p className="text-[10px] text-amber-700">৳{parseFloat(addMoneyAmount).toLocaleString()} {addMoneyMethod} request submitted. The admin checks the money received on the personal number and adds it to your wallet shortly.</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1.5">
+                  <p className="text-[10px] text-gray-500 font-bold">Transaction status</p>
+                  <p className="text-[11px] text-gray-700">Added to your wallet transaction history as <span className="font-black text-amber-700">Pending</span>. Once the admin verifies, it turns <span className="font-black text-emerald-600">Completed</span> and your balance updates automatically.</p>
+                </div>
+                <button onClick={() => { setAddMoneyOpen(false); setAddMoneyStep('method'); setAddMoneyError(''); }} className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
+                  Done
+                </button>
               </>
             )}
           </div>
