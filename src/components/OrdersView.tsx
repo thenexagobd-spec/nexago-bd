@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Order, Driver, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
 import { 
   Search, Plus, Filter, Edit3, Trash2, Check, Clock, X, Copy, 
-  Eye, Download, ChevronRight, ChevronLeft, ChevronDown, MoreHorizontal, Store,
+  Eye, Download, ChevronRight, ChevronLeft, ChevronDown, Store,
   Zap, MapPin, Package, Navigation, Sparkles, Timer, Undo2, ShieldCheck, MessageCircle,
   History, Banknote, TrendingUp, Wallet, PlusCircle
 } from 'lucide-react';
@@ -31,6 +31,7 @@ interface OrdersViewProps {
   onReactivateOrder?: (order: Order, destination: 'driver' | 'customer' | 'store') => void;
   onUndoStatus?: (order: Order) => void;
   showToast?: (message: string, type?: 'success' | 'info') => void;
+  toolRequest?: { tool: 'audit' | 'refunds' | 'analytics' | 'wallets' | null; at: number };
 }
 
 // Real brand logo image with graceful fallback to a styled mark when offline
@@ -182,7 +183,8 @@ export default function OrdersView({
   onCancelOrder,
   onReactivateOrder,
   onUndoStatus,
-  showToast
+  showToast,
+  toolRequest
 }: OrdersViewProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Processing' | 'Completed' | 'Cancelled'>('All');
@@ -236,6 +238,15 @@ export default function OrdersView({
     lsSet(WALLET_CONFIG_KEY, walletCfg);
     showToast && showToast('Wallet numbers saved — customers now send money to these', 'success');
   };
+
+  // Open a tool panel (audit / refunds / analytics / wallets) when requested from the sidebar
+  useEffect(() => {
+    if (!toolRequest || !toolRequest.tool) return;
+    if (toolRequest.tool === 'audit') setShowAudit(true);
+    else if (toolRequest.tool === 'refunds') setShowRefunds(true);
+    else if (toolRequest.tool === 'analytics') setShowAnalytics(true);
+    else if (toolRequest.tool === 'wallets') setShowWallets(true);
+  }, [toolRequest]);
 
   // Form states
   const [storeName, setStoreName] = useState('');
@@ -627,22 +638,6 @@ export default function OrdersView({
           </div>
 
           <div className="flex items-center space-x-2 w-full sm:w-auto shrink-0 justify-end">
-            <button onClick={() => setShowAudit(true)} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer" title="Admin audit log">
-              <History className="w-3.5 h-3.5 text-purple-400" />
-              <span>Audit</span>
-            </button>
-            <button onClick={() => setShowRefunds(true)} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer" title="Refund requests">
-              <Banknote className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Refunds {refunds.filter(r => r.status === 'Requested').length > 0 ? `(${refunds.filter(r => r.status === 'Requested').length})` : ''}</span>
-            </button>
-            <button onClick={() => setShowAnalytics(true)} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer" title="Analytics & reports">
-              <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
-              <span>Analytics</span>
-            </button>
-            <button onClick={() => setShowWallets(true)} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer" title="Send Money wallet numbers — customers send payments to these">
-              <Wallet className="w-3.5 h-3.5 text-blue-400" />
-              <span>Wallets</span>
-            </button>
             <button onClick={handleExportCSV} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer">
               <Download className="w-3.5 h-3.5 text-gray-400" />
               <span>Export CSV</span>

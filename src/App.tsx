@@ -46,13 +46,21 @@ import {
   Check, Calendar, BellOff, Box, FolderOpen, Store, ClipboardList, Ticket,
   BarChart3, ShieldCheck, MapPin, Star, Megaphone, ShieldAlert, Award, Download,
   Copy, ExternalLink, Plus, Link, Search, Mail, Trash2, Edit, MessageSquare, CheckCircle, XCircle, Clock, ArrowRight, Sparkles, TrendingUp, Printer, Globe, ShoppingBag,
-  Camera, QrCode, Smartphone, Wallet, CloudUpload
+  Camera, QrCode, Smartphone, Wallet, CloudUpload,
+  History, Banknote
 } from 'lucide-react';
 
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('Dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Request to open a specific tool panel inside the Orders view (audit / refunds / analytics / wallets)
+  const [orderToolRequest, setOrderToolRequest] = useState<{ tool: 'audit' | 'refunds' | 'analytics' | 'wallets' | null; at: number }>({ tool: null, at: 0 });
+  const openOrdersTool = (tool: 'audit' | 'refunds' | 'analytics' | 'wallets') => {
+    setActiveTab('Orders Management');
+    setOrderToolRequest({ tool, at: Date.now() });
+  };
 
   // Standalone Store Portal state
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(() => {
@@ -818,8 +826,9 @@ export default function App() {
   };
 
   // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
+  const pendingRefundCount = (getStoredData<Array<{ status?: string }>>('ss_refunds', []) || []).filter(r => r.status === 'Requested').length;
   const sidebarItems = React.useMemo(() => {
-    const allItems: Array<{ name: string; icon: any; badgeCount?: number; section?: string }> = [
+    const allItems: Array<{ name: string; icon: any; badgeCount?: number; section?: string; onClick?: () => void }> = [
       // --- DELIVERY SYSTEM MANAGEMENT PANEL (Requested Screenshot) ---
       { section: 'Delivery System', name: 'Dashboard', icon: LayoutDashboard },
       { name: 'Mobile App Simulator', icon: Smartphone },
@@ -831,6 +840,12 @@ export default function App() {
       { name: 'Vehicles Management', icon: Truck },
       { name: 'Promotions & Banners', icon: Megaphone, badgeCount: banners.length },
       { name: 'KPI Dashboard', icon: TrendingUp },
+
+      // --- ORDER TOOLS (kept out of the All Orders header to stay clean) ---
+      { section: 'Order Tools', name: 'Audit Log', icon: History, onClick: () => openOrdersTool('audit') },
+      { name: 'Refund Requests', icon: Banknote, badgeCount: pendingRefundCount, onClick: () => openOrdersTool('refunds') },
+      { name: 'Orders Analytics', icon: TrendingUp, onClick: () => openOrdersTool('analytics') },
+      { name: 'Payment Wallets', icon: Wallet, onClick: () => openOrdersTool('wallets') },
 
       // --- PREVIOUS GROCERY STORE & CATALOG ADMIN ---
       { section: 'Store & Catalog Admin', name: 'Store Dashboard', icon: Store },
@@ -861,6 +876,7 @@ export default function App() {
         [
           'Dashboard', 'Mobile App Simulator', 'Users Management', 'Drivers Management', 'Orders Management', 
           'Earnings & Payouts', 'Zones & Areas', 'Vehicles Management', 'Promotions & Banners', 'KPI Dashboard',
+          'Audit Log', 'Refund Requests', 'Orders Analytics', 'Payment Wallets',
           'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'Settings'
         ].includes(item.name)
       ).map((item) => {
@@ -902,7 +918,8 @@ export default function App() {
     categories.length,
     stores.length,
     supportTickets,
-    unreadNotifCount
+    unreadNotifCount,
+    pendingRefundCount
   ]);
 
   // Quick Action Forms submit helper
@@ -3701,7 +3718,7 @@ export default function App() {
                 )}
                 <button
                   onClick={() => {
-                    setActiveTab(item.name);
+                    if (item.onClick) { item.onClick(); } else { setActiveTab(item.name); }
                     setIsMobileSidebarOpen(false);
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all relative ${
@@ -3792,7 +3809,7 @@ export default function App() {
                     )}
                     <button
                       onClick={() => {
-                        setActiveTab(item.name);
+                        if (item.onClick) { item.onClick(); } else { setActiveTab(item.name); }
                         setIsMobileSidebarOpen(false);
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
@@ -4052,6 +4069,7 @@ export default function App() {
                 }
               }}
               showToast={showToast}
+              toolRequest={orderToolRequest}
             />
           )}
 
