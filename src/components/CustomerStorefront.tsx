@@ -4222,19 +4222,19 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       {/* ============ PRODUCT DETAIL + REVIEWS MODAL ============ */}
       {detailProduct && (
         <div className="fixed inset-0 z-[70] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200">
-            <div className="relative h-40 bg-white">
+          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-200">
+            <div className="relative h-32 bg-white">
               <img src={detailProduct.image} alt={nm(detailProduct.name)} referrerPolicy="no-referrer" className="w-full h-full object-contain" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/5 pointer-events-none" />
-              <button onClick={() => setDetailProduct(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer"><X className="w-4 h-4" /></button>
-              <span className={`absolute bottom-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase ${detailProduct.status === 'In Stock' ? 'bg-emerald-600 text-white' : detailProduct.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'}`}>{statusLabel(detailProduct.status)}</span>
+              <button onClick={() => setDetailProduct(null)} className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black cursor-pointer"><X className="w-3.5 h-3.5" /></button>
+              <span className={`absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${detailProduct.status === 'In Stock' ? 'bg-emerald-600 text-white' : detailProduct.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'}`}>{statusLabel(detailProduct.status)}</span>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-3.5 space-y-2.5">
               <div>
-                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">{detailStoreName} · {detailProduct.category}</p>
-                <h3 className="text-base font-black text-gray-900">{nm(detailProduct.name)}</h3>
-                <div className="flex items-center justify-between mt-1.5">
-                  <p className="font-mono font-black text-emerald-700 text-lg">৳{detailProduct.price} <span className="text-xs text-gray-400 font-normal">/ {detailProduct.unit}</span></p>
+                <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">{detailStoreName} · {detailProduct.category}</p>
+                <h3 className="text-sm font-black text-gray-900">{nm(detailProduct.name)}</h3>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="font-mono font-black text-emerald-700 text-base">৳{detailProduct.price} <span className="text-[11px] text-gray-400 font-normal">/ {detailProduct.unit}</span></p>
                   <div className="flex items-center space-x-1">
                     {[1, 2, 3, 4, 5].map(r => {
                       const agg = productReviews.filter(pr => pr.productId === detailProduct.id);
@@ -4314,9 +4314,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <button
                 onClick={() => { handleAddToCart(detailProduct); }}
                 disabled={detailProduct.status === 'Out of Stock'}
-                className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
+                className="w-full py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-[11px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
               >
-                <Plus className="w-4 h-4" /><span>{detailProduct.status === 'Out of Stock' ? (lang === 'bn' ? 'অনুপলব্ধ' : 'Unavailable') : T.addToCart} · ৳{detailProduct.price}</span>
+                <Plus className="w-3.5 h-3.5" /><span>{detailProduct.status === 'Out of Stock' ? (lang === 'bn' ? 'অনুপলব্ধ' : 'Unavailable') : T.addToCart} · ৳{detailProduct.price}</span>
               </button>
             </div>
           </div>
