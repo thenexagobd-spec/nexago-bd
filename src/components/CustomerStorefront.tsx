@@ -1575,61 +1575,60 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         /* ===== DARK MODE ===== */
         .cs-glass.cs-dark {
           background:
-            radial-gradient(circle at 10% 0%, rgba(16,185,129,0.14), transparent 40%),
-            radial-gradient(circle at 90% 15%, rgba(45,212,191,0.1), transparent 45%),
-            radial-gradient(circle at 75% 90%, rgba(59,130,246,0.1), transparent 40%),
-            radial-gradient(circle at 20% 95%, rgba(139,92,246,0.09), transparent 45%),
-            linear-gradient(180deg, #04060c 0%, #070b16 55%, #0a1020 100%);
+            radial-gradient(circle at 10% 0%, rgba(16,185,129,0.1), transparent 40%),
+            radial-gradient(circle at 90% 15%, rgba(45,212,191,0.07), transparent 45%),
+            radial-gradient(circle at 75% 90%, rgba(59,130,246,0.07), transparent 40%),
+            linear-gradient(180deg, #020408 0%, #050a14 55%, #070d1c 100%);
           color: #e2e8f0;
         }
         .cs-glass.cs-dark html, .cs-glass.cs-dark body { color-scheme: dark; }
         .cs-glass.cs-dark .glass-bar, .cs-glass.cs-dark aside, .cs-glass.cs-dark nav {
-          background: rgba(7,11,22,0.88) !important;
+          background: rgba(4,7,14,0.96) !important;
           backdrop-filter: blur(30px) saturate(170%);
           -webkit-backdrop-filter: blur(30px) saturate(170%);
-          border-color: rgba(148,163,184,0.16) !important;
-          box-shadow: 0 4px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+          border-color: rgba(148,163,184,0.15) !important;
+          box-shadow: 0 4px 28px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
         }
-        .cs-glass.cs-dark aside { border-right: 1px solid rgba(148,163,184,0.16) !important; }
+        .cs-glass.cs-dark aside { border-right: 1px solid rgba(148,163,184,0.15) !important; }
         .cs-glass.cs-dark main .bg-white:not(a):not(input):not(select):not(textarea),
         .cs-glass.cs-dark .fixed .bg-white:not(a):not(input):not(select):not(textarea),
         .cs-glass.cs-dark header .bg-white:not(a),
         .cs-glass.cs-dark .bg-white:not(a):not(input):not(select):not(textarea) {
-          background: rgba(12,18,34,0.92) !important;
+          background: rgba(7,12,24,0.96) !important;
           backdrop-filter: blur(28px) saturate(175%);
           -webkit-backdrop-filter: blur(28px) saturate(175%);
-          border-color: rgba(148,163,184,0.18) !important;
-          box-shadow: 0 14px 44px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+          border-color: rgba(148,163,184,0.17) !important;
+          box-shadow: 0 14px 44px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
           border-radius: inherit;
         }
         .cs-glass.cs-dark .fixed .bg-white:not(a):not(input):not(select):not(textarea) {
-          background: rgba(8,13,25,0.98) !important;
+          background: rgba(4,8,16,0.99) !important;
           backdrop-filter: blur(38px) saturate(180%);
           -webkit-backdrop-filter: blur(38px) saturate(180%);
-          border-color: rgba(148,163,184,0.2) !important;
-          box-shadow: 0 30px 80px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05);
+          border-color: rgba(148,163,184,0.18) !important;
+          box-shadow: 0 30px 80px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.04);
         }
         .cs-glass.cs-dark button.bg-white, .cs-glass.cs-dark a.bg-white, .cs-glass.cs-dark .bg-white.cursor-pointer {
-          background: rgba(17,25,45,0.95) !important;
-          border-color: rgba(148,163,184,0.22) !important;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+          background: rgba(10,16,30,0.98) !important;
+          border-color: rgba(148,163,184,0.2) !important;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.4);
         }
         .cs-glass.cs-dark .shadow-xl.bg-white, .cs-glass.cs-dark .shadow-lg.bg-white {
-          background: #0d1424 !important;
+          background: #060b16 !important;
           backdrop-filter: none;
           -webkit-backdrop-filter: none;
-          border-color: rgba(148,163,184,0.25) !important;
-          box-shadow: 0 18px 50px rgba(0,0,0,0.6) !important;
+          border-color: rgba(148,163,184,0.24) !important;
+          box-shadow: 0 18px 50px rgba(0,0,0,0.7) !important;
         }
         .cs-glass.cs-dark main .bg-slate-50, .cs-glass.cs-dark main .bg-gray-50, .cs-glass.cs-dark main .bg-gray-100, .cs-glass.cs-dark main .bg-gray-200 {
-          background: rgba(30,41,59,0.55) !important;
+          background: rgba(30,41,59,0.5) !important;
         }
-        .cs-glass.cs-dark main .bg-emerald-50, .cs-glass.cs-dark main .bg-emerald-50\/30 { background: rgba(6,78,59,0.4) !important; }
+        .cs-glass.cs-dark main .bg-emerald-50, .cs-glass.cs-dark main .bg-emerald-50\/30 { background: rgba(6,78,59,0.35) !important; }
         .cs-glass.cs-dark .bg-blue-50, .cs-glass.cs-dark .bg-amber-50, .cs-glass.cs-dark .bg-red-50, .cs-glass.cs-dark .bg-green-50, .cs-glass.cs-dark .bg-violet-50 {
-          background: rgba(30,41,59,0.55) !important;
+          background: rgba(30,41,59,0.5) !important;
         }
         .cs-glass.cs-dark .border-gray-200, .cs-glass.cs-dark .border-gray-100, .cs-glass.cs-dark .border-gray-300, .cs-glass.cs-dark .border-gray-400 {
-          border-color: rgba(148,163,184,0.2) !important;
+          border-color: rgba(148,163,184,0.18) !important;
         }
         .cs-glass.cs-dark .text-gray-900, .cs-glass.cs-dark .text-gray-800, .cs-glass.cs-dark .text-gray-700, .cs-glass.cs-dark .text-gray-600, .cs-glass.cs-dark .text-slate-900, .cs-glass.cs-dark .text-slate-800, .cs-glass.cs-dark .text-slate-700, .cs-glass.cs-dark .text-slate-600 {
           color: #f1f5f9 !important;
@@ -1641,15 +1640,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           color: #34d399 !important;
         }
         .cs-glass.cs-dark input, .cs-glass.cs-dark select, .cs-glass.cs-dark textarea {
-          background: rgba(7,11,22,0.85) !important;
+          background: rgba(3,6,12,0.95) !important;
           color: #e2e8f0 !important;
           border-color: rgba(148,163,184,0.28) !important;
         }
         .cs-glass.cs-dark input::placeholder { color: #64748b; }
-        .cs-glass.cs-dark .bg-gray-100, .cs-glass.cs-dark .bg-gray-50 { background: rgba(30,41,59,0.55) !important; }
+        .cs-glass.cs-dark .bg-gray-100, .cs-glass.cs-dark .bg-gray-50 { background: rgba(30,41,59,0.5) !important; }
         .cs-glass.cs-dark .bg-white\/90, .cs-glass.cs-dark .bg-white\/80, .cs-glass.cs-dark .bg-white\/70, .cs-glass.cs-dark .bg-white\/60, .cs-glass.cs-dark .bg-white\/40, .cs-glass.cs-dark .bg-white\/20, .cs-glass.cs-dark .bg-white\/10, .cs-glass.cs-dark .bg-white\/5 {
-          background: rgba(255,255,255,0.06) !important;
-          border-color: rgba(148,163,184,0.15) !important;
+          background: rgba(255,255,255,0.05) !important;
+          border-color: rgba(148,163,184,0.14) !important;
         }
         .cs-glass.cs-dark main::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); }
       `}</style>
@@ -1712,7 +1711,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 )}
               </button>
               {isNotifOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs z-50">
+                <div className="fixed top-16 right-2 z-[60] w-[min(22rem,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-gray-200 p-3 text-xs" style={{ backdropFilter: 'blur(0px)' }}>
                   <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold">
                     <span className="text-gray-900">{T.notifications}</span>
                     {unreadNotifCount > 0 && (
