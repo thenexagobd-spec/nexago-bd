@@ -32,6 +32,7 @@ interface OrdersViewProps {
   onUndoStatus?: (order: Order) => void;
   showToast?: (message: string, type?: 'success' | 'info') => void;
   toolRequest?: { tool: 'audit' | 'refunds' | 'analytics' | 'wallets' | null; at: number };
+  embedded?: boolean;
 }
 
 // Real brand logo image with graceful fallback to a styled mark when offline
@@ -184,7 +185,8 @@ export default function OrdersView({
   onReactivateOrder,
   onUndoStatus,
   showToast,
-  toolRequest
+  toolRequest,
+  embedded = false
 }: OrdersViewProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Processing' | 'Completed' | 'Cancelled'>('All');
@@ -574,19 +576,21 @@ export default function OrdersView({
       )}
       
       {/* Header title */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-white uppercase tracking-wider">All Orders</h2>
-          <p className="text-xs text-gray-400">Manage real-time grocery logistics, dispatch controls, and active orders</p>
+      {!embedded && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-white uppercase tracking-wider">All Orders</h2>
+            <p className="text-xs text-gray-400">Manage real-time grocery logistics, dispatch controls, and active orders</p>
+          </div>
+          <button
+            onClick={() => { resetForm(); setIsAddOpen(true); }}
+            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Dispatch New Order</span>
+          </button>
         </div>
-        <button
-          onClick={() => { resetForm(); setIsAddOpen(true); }}
-          className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Dispatch New Order</span>
-        </button>
-      </div>
+      )}
 
       {/* FILTER BUTTONS & EXPORT/FILTER TOOLS */}
       <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between bg-brand-card/30 border border-brand-border/60 p-4 rounded-xl">
@@ -650,6 +654,44 @@ export default function OrdersView({
         </div>
 
       </div>
+
+      {/* Payment method & payment status filters (embedded only, inside the Order Tools dashboard) */}
+      {embedded && (
+        <div className="flex flex-col lg:flex-row gap-3 lg:items-center bg-brand-card/30 border border-brand-border/60 p-4 rounded-xl">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Payment:</span>
+            {(['All', 'bKash', 'Nagad', 'Upay', 'Rocket', 'Cash on Delivery', 'Card', 'Wallet'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => { setPaymentFilter(m); setCurrentPage(1); }}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer shrink-0 ${
+                  paymentFilter === m
+                    ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
+                    : 'bg-brand-dark/40 border-brand-border/50 text-gray-400 hover:text-gray-200 hover:bg-brand-dark/80'
+                }`}
+              >
+                {m === 'All' ? 'All Methods' : m === 'Cash on Delivery' ? 'COD' : m}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Pay Status:</span>
+            {(['All', 'Pending', 'Approved', 'Rejected', 'COD', 'Paid'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => { setPayStatusFilter(s); setCurrentPage(1); }}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer shrink-0 ${
+                  payStatusFilter === s
+                    ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
+                    : 'bg-brand-dark/40 border-brand-border/50 text-gray-400 hover:text-gray-200 hover:bg-brand-dark/80'
+                }`}
+              >
+                {s === 'Pending' ? '⏳ Pending' : s === 'Approved' ? '✓ Approved' : s === 'Rejected' ? '✗ Rejected' : s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* TABLE CONTAINER */}
       <div className="bg-brand-card border border-brand-border/60 rounded-xl overflow-hidden shadow-2xl">

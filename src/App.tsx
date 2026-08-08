@@ -4062,7 +4062,26 @@ export default function App() {
           )}
 
           {activeTab === 'Order Tools Dashboard' && (
-            <OrderToolsDashboard orders={orders} showToast={showToast} />
+            <OrderToolsDashboard
+              orders={orders}
+              drivers={drivers}
+              onAddOrder={handleAddOrder}
+              onUpdateOrder={handleUpdateOrder}
+              onDeleteOrder={handleDeleteOrder}
+              onAssignDriver={handleAssignDriver}
+              onCancelOrder={(order, note) => {
+                handleAddNotification({ title: '🚫 Order Cancelled — ' + order.id, message: note, type: 'system' });
+                showToast(`Order #${order.id} cancelled by admin · ${note}`, 'info');
+              }}
+              onReactivateOrder={handleReactivateOrder}
+              onUndoStatus={(order) => {
+                if (order.status === 'Completed') {
+                  handleUpdateOrder({ ...order, status: 'Ongoing' });
+                  showToast(`Order #${order.id} status undone → Ongoing`, 'info');
+                }
+              }}
+              showToast={showToast}
+            />
           )}
 
           {(activeTab === 'Payments' || activeTab === 'Earnings & Payouts') && (
