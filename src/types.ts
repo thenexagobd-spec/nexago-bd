@@ -44,6 +44,7 @@ export interface Order {
   reference?: string;      // pre-filled "Send Money" reference note
   paymentExpiry?: number;  // epoch ms deadline for pending payment
   paymentNote?: string;    // admin note on approve/reject
+  rejectionReason?: string; // structured reject reason (TrxID invalid, Amount mismatched, ...)
 }
 
 export type DriverDutyStatus = 'Online' | 'Offline' | 'On-Delivery';
@@ -198,6 +199,27 @@ export interface OrderReportEntry {
   reason: string;
   note: string;
   time: string;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  action: 'Approved' | 'Rejected' | 'Refunded';
+  orderId: string;
+  paymentMethod: string;
+  amount: number;
+  reason?: string;
+  at: number;
+}
+
+export interface RefundRequest {
+  id: string;
+  orderId: string;
+  method: string;
+  number: string;
+  amount: number;
+  reason: string;
+  status: 'Requested' | 'Processing' | 'Refunded' | 'Rejected';
+  at: number;
 }
 
 export interface Product {

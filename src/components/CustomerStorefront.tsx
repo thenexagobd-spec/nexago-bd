@@ -10,7 +10,7 @@ import {
   SlidersHorizontal, Camera
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Order, Product } from '../types';
+import { Order, Product, RefundRequest } from '../types';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -320,13 +320,17 @@ const LS_KEYS = {
   dark: 'ss_dark',
   trxUsed: 'ss_trx_used',
   fraud: 'ss_trx_fraud',
+  walletIdx: 'ss_wallet_idx',
+  refunds: 'ss_refunds',
+  reminded: 'ss_reminded',
 };
 
-// Send Money merchant wallets (configure these with the real business numbers)
-const MERCHANT_WALLETS = {
-  bKash: { name: 'NexaGo Pay', number: '01712-345678' },
-  Nagad: { name: 'NexaGo Pay', number: '01819-987654' },
-} as const;
+// Send Money merchant wallets — multiple numbers rotate per order to spread load
+// (configure these with the real business numbers)
+const MERCHANT_WALLETS: Record<'bKash' | 'Nagad', { name: string; numbers: string[] }> = {
+  bKash: { name: 'NexaGo Pay', numbers: ['01712-345678', '01811-222333', '01611-444555'] },
+  Nagad: { name: 'NexaGo Pay', numbers: ['01819-987654', '01311-666777'] },
+};
 
 const TRX_RE = /^[A-Z0-9]{8,20}$/;
 const PAY_SESSION_MS = 10 * 60 * 1000;   // 10-minute payment window
@@ -489,6 +493,32 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     atStore: 'At store',
     assignedDriver: 'Rider assigned',
     fromWallet: 'from wallet',
+    // Payment instructions
+    amountToPay: 'Amount to pay',
+    secureVia: 'Secure payment via NexaGo Pay Gateway',
+    sendMoneyTo: 'Send Money to this number',
+    copyNumber: 'Copy Number',
+    completeWithin: 'Complete payment within',
+    sessionExpired: 'Session expired',
+    expiredMsg: 'This payment window has expired to prevent fake orders. Your cart is untouched — start again to place a fresh order.',
+    close: 'Close',
+    yourNumber: 'Your {m} number (sender)',
+    sentAmount: 'Sent amount (must equal ৳{x})',
+    exactMatch: '✓ Exact amount matches',
+    amountMatch: 'Amount must match exactly ৳{x}',
+    reference: '📝 Send Money Reference',
+    referenceHint: 'When sending, put this note in the reference box:',
+    trxIdLabel: '{m} TrxID',
+    trxIdHint: '8–20 letters/digits from your SMS confirmation.',
+    receiptLabel: 'Payment receipt / screenshot',
+    uploadReceipt: 'Upload screenshot',
+    changeReceipt: 'Change receipt',
+    submitVerify: 'Submit for Verification',
+    verificationNote: 'Order is placed only after admin verifies your TrxID & amount',
+    last4Label: 'Last 4 digits (your {m} PIN)',
+    last4Hint: 'Security check: last 4 digits must match your {m} number that sent the money.',
+    numberOf: 'Number {i} of {n}',
+    anotherNumber: 'Use another number',
   },
   bn: {
     brandTag: 'নেক্সাগো বিডি ডেলিভারি',
@@ -609,6 +639,32 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     atStore: 'দোকানে',
     assignedDriver: 'রাইডার নিয়োগ হয়েছে',
     fromWallet: 'ওয়ালেট থেকে',
+    // Payment instructions
+    amountToPay: 'পরিশোধের পরিমাণ',
+    secureVia: 'নেক্সাগো পে গেটওয়ে মাধ্যমে নিরাপদ পেমেন্ট',
+    sendMoneyTo: 'এই নম্বরে সেন্ড মানি করুন',
+    copyNumber: 'নম্বর কপি করুন',
+    completeWithin: 'এর মধ্যে পেমেন্ট সম্পন্ন করুন',
+    sessionExpired: 'সেশন শেষ',
+    expiredMsg: 'ফেক অর্ডার ঠেকাতে পেমেন্ট উইন্ডো শেষ হয়ে গেছে। আপনার কার্ট অপরিবর্তিত আছে — নতুন অর্ডার দিতে আবার শুরু করুন।',
+    close: 'বন্ধ করুন',
+    yourNumber: 'আপনার {m} নম্বর (প্রেরক)',
+    sentAmount: 'পাঠানো পরিমাণ (অবশ্যই ৳{x} হতে হবে)',
+    exactMatch: '✓ সঠিক পরিমাণ মিলেছে',
+    amountMatch: 'পরিমাণ অবশ্যই ৳{x} এর সাথে মেলাতে হবে',
+    reference: '📝 সেন্ড মানি রেফারেন্স',
+    referenceHint: 'পাঠানোর সময় রেফারেন্স বক্সে এই নোটটি লিখুন:',
+    trxIdLabel: '{m} TrxID',
+    trxIdHint: 'আপনার SMS কনফার্মেশনের ৮–২০ অক্ষর/সংখ্যা।',
+    receiptLabel: 'পেমেন্ট রিসিট / স্ক্রিনশট',
+    uploadReceipt: 'স্ক্রিনশট আপলোড করুন',
+    changeReceipt: 'রিসিট পরিবর্তন করুন',
+    submitVerify: 'যাচাইয়ের জন্য জমা দিন',
+    verificationNote: 'অ্যাডমিন আপনার TrxID ও পরিমাণ যাচাই করার পরেই অর্ডার নিশ্চিত হবে',
+    last4Label: 'শেষ ৪ সংখ্যা (আপনার {m} PIN)',
+    last4Hint: 'নিরাপত্তা চেক: শেষ ৪ সংখ্যা অবশ্যই আপনার {m} নম্বরের সাথে মেলাতে হবে।',
+    numberOf: 'নম্বর {i} / {n}',
+    anotherNumber: 'অন্য নম্বর ব্যবহার করুন',
   },
 };
 
@@ -875,6 +931,21 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   // Send Money flow (bKash/Nagad)
   const [sendMoney, setSendMoney] = useState({ sender: '', trxId: '', amount: '', receipt: '', note: '', last4: '' });
+  const [walletIdx, setWalletIdx] = useState<number>(() => getStoredData(LS_KEYS.walletIdx, 0));
+  useEffect(() => setStoredData(LS_KEYS.walletIdx, walletIdx), [walletIdx]);
+  const [walletPick, setWalletPick] = useState<{ bKash: number; Nagad: number }>({ bKash: 0, Nagad: 0 });
+
+  // Refund / cancellation request
+  const [refunds, setRefunds] = useState<RefundRequest[]>(() => getStoredData(LS_KEYS.refunds, []));
+  useEffect(() => setStoredData(LS_KEYS.refunds, refunds), [refunds]);
+  const [refundModal, setRefundModal] = useState<Order | null>(null);
+  const [refundMethod, setRefundMethod] = useState<'bKash' | 'Nagad'>('bKash');
+  const [refundNumber, setRefundNumber] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+
+  // Payment reminder tracking (avoid repeat reminders per order)
+  const [reminded, setReminded] = useState<string[]>(() => getStoredData(LS_KEYS.reminded, []));
+  useEffect(() => setStoredData(LS_KEYS.reminded, reminded), [reminded]);
   const [payDeadline, setPayDeadline] = useState<number>(0);
   const [payLeft, setPayLeft] = useState<number>(0);
   const [payExpired, setPayExpired] = useState(false);
@@ -928,6 +999,26 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     return () => clearInterval(t);
   }, [orders, onSilentUpdateOrder]);
 
+  // Payment reminder: nudge user ~5 min after a pending payment order is placed (before the 15-min window ends)
+  useEffect(() => {
+    const t = setInterval(() => {
+      for (const o of orders) {
+        if (o.paymentStatus === 'Pending' && o.placedAt && !reminded.includes(o.id)) {
+          const age = Date.now() - o.placedAt;
+          if (age >= 5 * 60 * 1000 && age < PAY_AUTO_CANCEL_MS) {
+            setReminded(prev => [...prev, o.id]);
+            setCustomerNotifs(prev => [{
+              id: `CN-${Date.now().toString().slice(-4)}`, title: '⏰ Payment Reminder',
+              body: `You still have time to complete the payment for order #${o.id}. Finish your Send Money within the window or it auto-cancels.`, emoji: '⏰', time: 'Just now', read: false
+            }, ...prev]);
+          }
+        }
+      }
+    }, 20000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, reminded]);
+
   // Notify when a pending payment gets approved/rejected (admin action visible to user)
   useEffect(() => {
     for (const ord of orders) {
@@ -949,8 +1040,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
-  const startPaySession = () => {
+  const startPaySession = (wallet: 'bKash' | 'Nagad') => {
     setPayExpired(false);
+    const list = MERCHANT_WALLETS[wallet].numbers;
+    const idx = walletIdx % list.length;
+    setWalletPick(prev => ({ ...prev, [wallet]: idx }));
+    setWalletIdx(i => i + 1);
     setSendMoney({ sender: customerPhone.replace(/[^0-9]/g, ''), trxId: '', amount: String(cartGrandTotal), receipt: '', note: customerPhone, last4: '' });
     setPayDeadline(Date.now() + PAY_SESSION_MS);
     setPayLeft(PAY_SESSION_MS / 1000);
@@ -1222,7 +1317,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       setPayModal(paymentMethod);
       setPinInput('');
       setCardInfo({ number: '', name: '', expiry: '', cvv: '' });
-      startPaySession();
+      startPaySession(paymentMethod);
       return;
     }
     if (paymentMethod === 'Card' || paymentMethod === 'Split (Wallet + bKash)') {
@@ -1316,6 +1411,31 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     const claimed = parseFloat(sendMoney.amount) || 0;
     if (Math.abs(claimed - cartGrandTotal) > 0.01) { showToast(`Sent amount must match exactly ৳${cartGrandTotal} — you entered ৳${claimed}`, 'info'); return; }
     confirmPayment();
+  };
+
+  const submitRefund = () => {
+    if (!refundModal) return;
+    const num = refundNumber.replace(/[^0-9]/g, '');
+    if (num.length < 10) { showToast('Enter your valid bKash/Nagad number', 'info'); return; }
+    if (!refundReason.trim()) { showToast('Tell us why you want a refund', 'info'); return; }
+    setRefunds(prev => [{
+      id: `RF-${Date.now().toString().slice(-5)}`,
+      orderId: refundModal.id,
+      method: refundMethod,
+      number: num,
+      amount: refundModal.amount,
+      reason: refundReason.trim(),
+      status: 'Requested',
+      at: Date.now(),
+    }, ...prev]);
+    setCustomerNotifs(prev => [{
+      id: `CN-${Date.now().toString().slice(-4)}`, title: '↩ Refund Request Submitted',
+      body: `Refund of ৳${refundModal.amount} for order #${refundModal.id} is under review.`, emoji: '↩', time: 'Just now', read: false
+    }, ...prev]);
+    setRefundModal(null);
+    setRefundReason('');
+    setRefundNumber('');
+    showToast('Refund request submitted — admin will review soon', 'success');
   };
 
   const reorder = (ord: Order) => {
@@ -2421,6 +2541,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     const active = ord.status === 'Ongoing' || ord.status === 'Processing' || ord.status === 'Confirmed' || ord.status === 'Pending';
                     const completed = ord.status === 'Completed';
                     const cancelled = ord.status === 'Cancelled';
+                    const refR = refunds.find(r => r.orderId === ord.id);
                     return (
                       <div key={ord.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-200 transition-colors">
                         <div className="space-y-1">
@@ -2444,8 +2565,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             {ord.paymentStatus === 'COD' && (
                               <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-black">💵 Cash on Delivery</span>
                             )}
+                            {refR && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                refR.status === 'Refunded' ? 'bg-emerald-100 text-emerald-800' :
+                                refR.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-amber-100 text-amber-800'
+                              }`}>↩ {refR.status === 'Requested' ? 'Refund Requested' : refR.status === 'Processing' ? 'Refund Processing' : refR.status === 'Refunded' ? 'Refunded ✓' : 'Refund Rejected'}</span>
+                            )}
                             {ord.estimatedMinutes && active && (
                               <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold">~{ord.estimatedMinutes} min</span>
+                            )}
+                            {ord.paymentStatus === 'Rejected' && ord.rejectionReason && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold border border-red-200">Reason: {ord.rejectionReason}</span>
                             )}
                           </div>
                           <h4 className="text-sm font-bold text-gray-900">{ord.storeName}</h4>
@@ -2504,6 +2635,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             </div>
                           ) : cancelled ? (
                             <div className="flex items-center space-x-1.5">
+                              <button onClick={() => { setRefundModal(ord); setRefundNumber(customerPhone.replace(/[^0-9]/g, '')); setRefundReason(''); }} className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-blue-200">
+                                <Banknote className="w-3 h-3" /><span>{refR ? 'Refund Again' : 'Request Refund'}</span>
+                              </button>
                               <button onClick={() => showToast('This order has been cancelled', 'info')} className="px-3 py-1.5 bg-gray-200 text-gray-500 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1">
                                 <X className="w-3 h-3" /><span>{T.cancelled}</span>
                               </button>
@@ -2513,6 +2647,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             </div>
                           ) : (
                             <div className="flex items-center space-x-1.5">
+                              <button onClick={() => { setRefundModal(ord); setRefundNumber(customerPhone.replace(/[^0-9]/g, '')); setRefundReason(''); }} className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-blue-200">
+                                <Banknote className="w-3 h-3" /><span>{refR ? 'Refund Again' : 'Request Refund'}</span>
+                              </button>
                               <button onClick={() => { reorder(ord); }} className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-emerald-200">
                                 <RotateCcw className="w-3 h-3" /><span>{T.reOrder}</span>
                               </button>
@@ -3188,6 +3325,46 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         </div>
       )}
 
+      {/* ============ REFUND MODAL ============ */}
+      {refundModal && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-black text-gray-900 text-sm">↩ Request Refund</h3>
+                <p className="text-[10px] text-gray-500">Order #{refundModal.id} · ৳{refundModal.amount.toLocaleString()}</p>
+              </div>
+              <button onClick={() => setRefundModal(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-[11px] text-blue-800">
+              Money will be returned to your bKash/Nagad account after admin approval.
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Refund to (wallet)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setRefundMethod('bKash')} className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${refundMethod === 'bKash' ? 'border-pink-500 bg-pink-50' : 'border-gray-200 bg-white text-gray-500'}`}>
+                  <BkashLogo className="w-8 h-8 rounded-md" /><span>bKash</span>
+                </button>
+                <button onClick={() => setRefundMethod('Nagad')} className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${refundMethod === 'Nagad' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-white text-gray-500'}`}>
+                  <NagadLogo className="w-8 h-8 rounded-md" /><span>Nagad</span>
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Your {refundMethod} number</label>
+              <input type="tel" inputMode="numeric" value={refundNumber} onChange={(e) => setRefundNumber(e.target.value.replace(/[^0-9-]/g, ''))} placeholder="01XXX-XXXXXX" maxLength={13} className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono outline-none focus:border-emerald-500" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Reason</label>
+              <textarea value={refundReason} onChange={(e) => setRefundReason(e.target.value)} rows={2} placeholder="Why do you want a refund? (e.g. order cancelled, wrong item, not delivered)" className="w-full bg-white border border-gray-300 rounded-xl p-2 outline-none focus:border-emerald-500 resize-none" />
+            </div>
+            <button onClick={submitRefund} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer">
+              Submit Refund Request
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ============ PAYMENT FLOW MODAL ============ */}
       {payModal && (
         <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -3203,7 +3380,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <h3 className="font-black text-gray-900 text-sm">
                     {payModal === 'bKash' ? 'Pay with bKash' : payModal === 'Nagad' ? 'Pay with Nagad' : payModal === 'Card' ? 'Card Payment' : payModal === 'Split (Wallet + bKash)' ? 'Split Payment' : 'Cash on Delivery'}
                   </h3>
-                  <p className="text-[10px] text-gray-500">Secure payment via NexaGo Pay Gateway</p>
+                  <p className="text-[10px] text-gray-500">{T.secureVia}</p>
                 </div>
               </div>
               <button onClick={() => setPayModal(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
@@ -3211,14 +3388,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 flex items-center justify-between">
               <div>
-                <p className="text-[10px] text-gray-500 uppercase font-bold">Amount to pay</p>
+                <p className="text-[10px] text-gray-500 uppercase font-bold">{T.amountToPay}</p>
                 <p className="text-xl font-black font-mono text-gray-900">৳{cartGrandTotal}</p>
               </div>
               <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center"><Lock className="w-4 h-4" /></div>
             </div>
 
             {payModal === 'bKash' || payModal === 'Nagad' ? (() => {
-              const mw = MERCHANT_WALLETS[payModal];
+              const mwList = MERCHANT_WALLETS[payModal].numbers;
+              const mwName = MERCHANT_WALLETS[payModal].name;
+              const mwIdx = Math.min(walletPick[payModal] || 0, mwList.length - 1);
+              const mw = mwList[mwIdx];
               const mm = Math.floor(payLeft / 60);
               const ss = payLeft % 60;
               const sender = sendMoney.sender.replace(/[^0-9]/g, '');
@@ -3231,43 +3411,54 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div className="flex items-center space-x-2">
                       <div className="w-9 h-9 rounded-xl overflow-hidden shadow">{payModal === 'bKash' ? <BkashLogo className="w-9 h-9" /> : <NagadLogo className="w-9 h-9" />}</div>
                       <div>
-                        <p className="font-black text-sm leading-tight">{mw.name} · {payModal} Wallet</p>
-                        <p className="text-[10px] text-white/80">Send Money to this number</p>
+                        <p className="font-black text-sm leading-tight">{mwName} · {payModal} Wallet</p>
+                        <p className="text-[10px] text-white/80">{T.sendMoneyTo}</p>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded-full bg-white/25 text-[9px] font-black">Send Money</span>
                   </div>
                   <div className="mt-2.5 flex items-center justify-between gap-2">
-                    <p className="font-mono text-lg font-black tracking-wider">{mw.number}</p>
-                    <button
-                      onClick={() => copyText(mw.number, `${payModal} number`)}
-                      className="px-3 py-1.5 bg-white text-gray-900 rounded-lg text-[10px] font-black flex items-center space-x-1 hover:bg-gray-100 transition-colors cursor-pointer shadow"
-                    >
-                      <Copy className="w-3 h-3" /><span>Copy Number</span>
-                    </button>
+                    <p className="font-mono text-lg font-black tracking-wider">{mw}</p>
+                    <div className="flex items-center space-x-1.5">
+                      {mwList.length > 1 && (
+                        <button
+                          onClick={() => setWalletPick(prev => ({ ...prev, [payModal]: (prev[payModal] + 1) % mwList.length }))}
+                          className="px-2 py-1.5 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-lg text-[9px] font-black transition-colors cursor-pointer"
+                          title={T.anotherNumber}
+                        >
+                          ↻ {T.numberOf?.replace('{i}', String(mwIdx + 1)).replace('{n}', String(mwList.length))}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => copyText(mw, `${payModal} number`)}
+                        className="px-3 py-1.5 bg-white text-gray-900 rounded-lg text-[10px] font-black flex items-center space-x-1 hover:bg-gray-100 transition-colors cursor-pointer shadow"
+                      >
+                        <Copy className="w-3 h-3" /><span>{T.copyNumber}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Countdown */}
                 <div className={`flex items-center justify-between px-3 py-2 rounded-xl border ${payExpired ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                  <span className="font-bold flex items-center space-x-1"><Clock className="w-3.5 h-3.5" /><span>{payExpired ? 'Session expired' : 'Complete payment within'}</span></span>
+                  <span className="font-bold flex items-center space-x-1"><Clock className="w-3.5 h-3.5" /><span>{payExpired ? T.sessionExpired : T.completeWithin}</span></span>
                   <span className="font-mono font-black text-sm">{payExpired ? '00:00' : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`}</span>
                 </div>
 
                 {payExpired ? (
                   <div className="space-y-3">
-                    <p className="text-[11px] text-gray-500 text-center py-2">This payment window has expired to prevent fake orders. Your cart is untouched — start again to place a fresh order.</p>
+                    <p className="text-[11px] text-gray-500 text-center py-2">{T.expiredMsg}</p>
                     <button
                       onClick={() => { setPayModal(null); resetPaySession(); }}
                       className="w-full py-2.5 bg-gray-600 hover:bg-gray-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer"
                     >
-                      Close
+                      {T.close}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Your {payModal} number (sender)</label>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.yourNumber?.replace('{m}', payModal)}</label>
                       <input
                         type="tel"
                         inputMode="numeric"
@@ -3280,7 +3471,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       {blocked && <p className="text-[10px] text-red-600 mt-1 font-bold">Too many invalid attempts — this number is temporarily blocked.</p>}
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Last 4 digits (your {payModal} PIN)</label>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.last4Label?.replace('{m}', payModal)}</label>
                       <input
                         type="tel"
                         inputMode="numeric"
@@ -3290,10 +3481,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         maxLength={4}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono tracking-[0.3em] text-center text-sm font-black outline-none focus:border-emerald-500"
                       />
-                      <p className="text-[10px] text-gray-400 mt-1">Security check: last 4 digits must match your {payModal} number that sent the money.</p>
+                      <p className="text-[10px] text-gray-400 mt-1">{T.last4Hint?.replace('{m}', payModal)}</p>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Sent amount (must equal ৳{cartGrandTotal})</label>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.sentAmount?.replace('{x}', String(cartGrandTotal))}</label>
                       <input
                         type="number"
                         min={0}
@@ -3302,16 +3493,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono outline-none focus:border-emerald-500"
                       />
                       <p className={`text-[10px] mt-1 font-bold ${Math.abs((parseFloat(sendMoney.amount) || 0) - cartGrandTotal) <= 0.01 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {Math.abs((parseFloat(sendMoney.amount) || 0) - cartGrandTotal) <= 0.01 ? '✓ Exact amount matches' : `Amount must match exactly ৳${cartGrandTotal}`}
+                        {Math.abs((parseFloat(sendMoney.amount) || 0) - cartGrandTotal) <= 0.01 ? T.exactMatch : T.amountMatch?.replace('{x}', String(cartGrandTotal))}
                       </p>
                     </div>
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5 text-[11px] text-blue-800">
-                      <p className="font-black">📝 Send Money Reference</p>
-                      <p>When sending, put this note in the reference box:</p>
+                      <p className="font-black">{T.reference}</p>
+                      <p>{T.referenceHint}</p>
                       <p className="bg-white/70 rounded-lg p-2 font-mono font-bold text-blue-900 break-all">{sendMoney.note || customerPhone} · {customerProfile.name}</p>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{payModal} TrxID</label>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.trxIdLabel?.replace('{m}', payModal)}</label>
                       <input
                         type="text"
                         value={sendMoney.trxId}
@@ -3319,13 +3510,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         placeholder={payModal === 'bKash' ? '8NHK7K8MJH' : 'NG170870910001120M'}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono tracking-wider uppercase outline-none focus:border-emerald-500"
                       />
-                      <p className="text-[10px] text-gray-400 mt-1">8–20 letters/digits from your SMS confirmation.</p>
+                      <p className="text-[10px] text-gray-400 mt-1">{T.trxIdHint}</p>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Payment receipt / screenshot</label>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.receiptLabel}</label>
                       <div className="flex items-center space-x-2">
                         <label className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-gray-600 font-bold cursor-pointer hover:bg-gray-100 transition-colors">
-                          <Camera className="w-4 h-4" /><span>{sendMoney.receipt ? 'Change receipt' : 'Upload screenshot'}</span>
+                          <Camera className="w-4 h-4" /><span>{sendMoney.receipt ? T.changeReceipt : T.uploadReceipt}</span>
                           <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleReceiptFile} />
                         </label>
                         {sendMoney.receipt && (
@@ -3342,9 +3533,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       onClick={confirmSendMoney}
                       className={`w-full py-2.5 text-white font-black rounded-xl shadow-md transition-all cursor-pointer ${payModal === 'bKash' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-orange-500 hover:bg-orange-600'}`}
                     >
-                      Submit for Verification ৳{cartGrandTotal}
+                      {T.submitVerify} ৳{cartGrandTotal}
                     </button>
-                    <p className="text-[10px] text-gray-400 text-center flex items-center justify-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>Order is placed only after admin verifies your TrxID & amount</span></p>
+                    <p className="text-[10px] text-gray-400 text-center flex items-center justify-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>{T.verificationNote}</span></p>
                   </div>
                 )}
               </div>
