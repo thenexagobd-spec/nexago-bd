@@ -2589,6 +2589,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               active ? 'bg-amber-100 text-amber-800 animate-pulse' :
                               'bg-gray-100 text-gray-700'
                             }`}>{held ? '⏸ Hold' : statusLabel(ord.status)}</span>
+                            {ord.paymentStatus === 'Rejected' && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-black">⛔ Payment Rejected</span>
+                            )}
                             {ord.paymentStatus === 'Pending' && (
                               <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black animate-pulse">⏳ Payment Pending</span>
                             )}
