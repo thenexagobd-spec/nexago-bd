@@ -116,6 +116,30 @@ const AREA_COORDS: Record<string, [number, number]> = {
   'Shahbagh': [23.7806, 90.4009],
 };
 
+const AREA_NAMES_BN: Record<string, string> = {
+  'Dhanmondi': 'ধানমন্ডি',
+  'Gulshan': 'গুলশান',
+  'Banani': 'বনানী',
+  'Mirpur': 'মিরপুর',
+  'Motijheel': 'মতিঝিল',
+  'Uttara': 'উত্তরা',
+  'Badda': 'বাড্ডা',
+  'Tejgaon': 'তেজগাঁও',
+  'Farmgate': 'ফার্মগেট',
+  'Shahbagh': 'শাহবাগ',
+};
+
+// Approximate reverse-geocoder: nearest known Dhaka area for a lat/lng
+const nearestAreaOf = (lat: number, lng: number) => {
+  let best = 'Dhanmondi';
+  let bestD = Infinity;
+  for (const [name, [al, ag]] of Object.entries(AREA_COORDS)) {
+    const d = Math.pow(al - lat, 2) + Math.pow(ag - lng, 2);
+    if (d < bestD) { bestD = d; best = name; }
+  }
+  return best;
+};
+
 const U = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=600`;
 
 const STORE_DEFS: StoreDef[] = [
@@ -1803,7 +1827,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setDeliveryPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        showToast('Current location pinned — drag to fine-tune', 'success');
+        // Auto-fill the delivery address text from the pinned location — in Bangla or English
+        const area = nearestAreaOf(pos.coords.latitude, pos.coords.longitude);
+        const addrText = lang === 'bn'
+          ? `আপনার বর্তমান অবস্থান, ${AREA_NAMES_BN[area]}, ঢাকা`
+          : `Your current location, ${area}, Dhaka`;
+        setDeliveryAddress(addrText);
+        showToast('Current location pinned — address updated', 'success');
       },
       () => showToast('Could not fetch location — drag the pin to place it manually', 'info'),
       { enableHighAccuracy: true, timeout: 8000 }
