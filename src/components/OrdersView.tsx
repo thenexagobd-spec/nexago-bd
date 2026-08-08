@@ -642,46 +642,10 @@ export default function OrdersView({
               <Download className="w-3.5 h-3.5 text-gray-400" />
               <span>Export CSV</span>
             </button>
-            <button onClick={() => showToast && showToast('Filters: status, search, payment method & status are applied live above', 'info')} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer">
+            <button onClick={() => showToast && showToast('Filters: status & search are applied live above', 'info')} className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-dark/80 text-gray-300 hover:text-white border border-brand-border rounded-lg text-xs font-bold transition-all cursor-pointer">
               <Filter className="w-3.5 h-3.5 text-gray-400" />
               <span>Filter</span>
             </button>
-          </div>
-        </div>
-
-        {/* Payment method & payment status filters */}
-        <div className="flex flex-col lg:flex-row gap-3 lg:items-center border-t border-brand-border/60 pt-3 mt-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Payment:</span>
-            {(['All', 'bKash', 'Nagad', 'Upay', 'Rocket', 'Cash on Delivery', 'Card', 'Wallet'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => { setPaymentFilter(m); setCurrentPage(1); }}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer shrink-0 ${
-                  paymentFilter === m
-                    ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
-                    : 'bg-brand-dark/40 border-brand-border/50 text-gray-400 hover:text-gray-200 hover:bg-brand-dark/80'
-                }`}
-              >
-                {m === 'All' ? 'All Methods' : m === 'Cash on Delivery' ? 'COD' : m}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Pay Status:</span>
-            {(['All', 'Pending', 'Approved', 'Rejected', 'COD', 'Paid'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => { setPayStatusFilter(s); setCurrentPage(1); }}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer shrink-0 ${
-                  payStatusFilter === s
-                    ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
-                    : 'bg-brand-dark/40 border-brand-border/50 text-gray-400 hover:text-gray-200 hover:bg-brand-dark/80'
-                }`}
-              >
-                {s === 'Pending' ? '⏳ Pending' : s === 'Approved' ? '✓ Approved' : s === 'Rejected' ? '✗ Rejected' : s}
-              </button>
-            ))}
           </div>
         </div>
 
