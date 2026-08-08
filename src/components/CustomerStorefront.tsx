@@ -838,7 +838,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [reSub, setReSub] = useState({ sender: '', trxId: '', amount: '', receipt: '', last4: '' });
   const openReSubmit = (order: Order) => {
     setReSubmitOrder(order);
-    setReSub({ sender: '', trxId: '', amount: '', receipt: '', last4: '' });
+    setReSub({ sender: '', trxId: '', amount: String(order.amount), receipt: '', last4: '' });
   };
   const handleReSubFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -851,6 +851,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const submitReSubmit = () => {
     if (!reSubmitOrder) return;
     if (!reSub.trxId || !reSub.amount) { showToast('Enter the TrxID and amount before resubmitting', 'info'); return; }
+    if (Number(reSub.amount) !== reSubmitOrder.amount) { showToast(`Amount must match the order total ৳${reSubmitOrder.amount}`, 'info'); return; }
     if (!reSub.receipt) { showToast('Upload a fresh payment screenshot/receipt', 'info'); return; }
     onUpdateOrder({
       ...reSubmitOrder,
@@ -4221,7 +4222,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Amount (৳)</label>
-                  <input type="number" value={reSub.amount} onChange={(e) => setReSub(s => ({ ...s, amount: e.target.value }))} placeholder="0" className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-purple-500" />
+                  <input type="number" value={reSub.amount} readOnly className="w-full p-2.5 border border-gray-300 rounded-xl outline-none bg-gray-50 text-gray-700 font-bold" />
+                  <p className="text-[9px] text-gray-400 mt-1">Must match order total ৳{reSubmitOrder?.amount}</p>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Last 4 digits</label>
@@ -4231,7 +4233,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Payment receipt / screenshot</label>
                 <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-purple-400 hover:bg-purple-50 cursor-pointer text-[11px] font-bold">
-                  <Camera className="w-4 h-4" /><span>{reSub.receipt || reSubmitOrder.receipt ? 'Change receipt' : 'Upload new screenshot'}</span>
+                  <Camera className="w-4 h-4" /><span>{reSub.receipt ? 'Change receipt' : 'Upload new screenshot'}</span>
                   <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleReSubFile} />
                 </label>
                 {reSub.receipt && (
