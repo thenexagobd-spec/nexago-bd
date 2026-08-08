@@ -1682,9 +1682,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     const pk = pickupOfOrder(ord);
     const dv = areaOfOrder(ord);
     if (!drv) return statusProgressFloor(ord.status);
+    if (!Number.isFinite(drv.lat) || !Number.isFinite(drv.lng) || !Number.isFinite(dv.lat) || !Number.isFinite(dv.lng)) return statusProgressFloor(ord.status);
     const total = Math.sqrt(Math.pow(dv.lat - pk.lat, 2) + Math.pow(dv.lng - pk.lng, 2)) || 1;
     const left = Math.sqrt(Math.pow(dv.lat - drv.lat, 2) + Math.pow(dv.lng - drv.lng, 2));
-    const p = Math.min(1, 1 - left / total);
+    const p = Math.min(1, Math.max(0, 1 - left / total));
     return Math.max(statusProgressFloor(ord.status), p);
   };
 
@@ -2664,7 +2665,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           <p className="text-[10px] text-gray-600 font-medium flex items-center space-x-1">
                             <MapPin className="w-3 h-3 text-gray-400" /><span className="truncate">{ord.address || deliveryAddress}</span>
                           </p>
-                          {active && !held && ord.paymentStatus !== 'Pending' && (() => {
+                          {active && !held && ord.paymentStatus !== 'Pending' && ord.status === 'Ongoing' && (() => {
                             const drv = liveDriverOf(ord);
                             if (!drv) return null;
                             const prog = liveProgressOf(ord);
@@ -2675,11 +2676,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                                     {drv.name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()}
                                   </span>
                                   <span className="text-[10px] text-gray-500 font-medium">
-                                    {drv.name} · {drv.vehicleType || 'Bike'} · <span className="text-emerald-600 font-bold font-mono">{Math.round(prog * 100)}%</span>
+                                    {drv.name} · {drv.vehicleType || 'Bike'} · <span className="text-emerald-600 font-bold font-mono">{Number.isFinite(prog) ? Math.round(prog * 100) : 0}%</span>
                                   </span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden w-48">
-                                  <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Math.round(prog * 100)}%` }} />
+                                  <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Number.isFinite(prog) ? Math.round(prog * 100) : 0}%` }} />
                                 </div>
                               </div>
                             );
@@ -3763,8 +3764,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
       {/* ============ LIVE TRACKING MODAL ============ */}
       {trackingOrder && (
-        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 shadow-2xl border border-gray-200 space-y-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-4 sm:p-5 shadow-2xl border border-gray-200 space-y-3 sm:space-y-4 animate-in fade-in duration-200 my-2">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div>
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{T.liveTracking}</span>
@@ -3788,7 +3789,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   {trackProgress >= 1 ? T.delivered : `${etaMins} ${T.minsAway}`}
                 </span>
               </div>
-              {trackingDriver && (
+              {trackingDriver && trackingOrder.status === 'Ongoing' && (
                 <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-bold text-gray-700">
                   <span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">{initialsOf(trackingDriver.name)}</span>
                   <span className="min-w-0">
@@ -3846,28 +3847,33 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               })}
             </div>
 
-            {/* Driver card */}
-            {trackingDriver && (
-              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-9 h-9 rounded-full ${hashColor(trackingDriver.name)} text-white font-bold flex items-center justify-center text-[11px]`}>
-                    {initialsOf(trackingDriver.name)}
+            {/* Driver card — only shown once the order is Out for Delivery */}
+            {trackingDriver && trackingOrder.status === 'Ongoing' && (() => {
+              const dPhone = trackingDriver.phone || '01700000000';
+              const waNum = '88' + dPhone.replace(/^0/, '');
+              return (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs gap-2">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-full ${hashColor(trackingDriver.name)} text-white font-bold flex items-center justify-center text-[11px] shrink-0`}>
+                      {initialsOf(trackingDriver.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900 truncate">{T.courierDriver}: {trackingDriver.name} {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="text-amber-500">★ {rr.avg}</span> : null; })()}</p>
+                      <p className="text-[10px] text-gray-500 font-mono truncate">{trackingDriver.vehicleType}: {trackingDriver.id} · {trackProgress < 0.12 ? 'At store — picking up your order' : 'En route to you'}</p>
+                      {dPhone && <p className="text-[10px] text-gray-600 font-mono font-bold">📞 {dPhone}</p>}
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-900">{T.courierDriver}: {trackingDriver.name} {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="text-amber-500">★ {rr.avg}</span> : null; })()}</p>
-                    <p className="text-[10px] text-gray-500 font-mono">{trackingDriver.vehicleType}: {trackingDriver.id} · {trackProgress < 0.12 ? 'At store — picking up your order' : 'En route to you'}</p>
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <a href={`https://wa.me/${waNum}`} target="_blank" rel="noreferrer" className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors cursor-pointer" title="Chat on WhatsApp">
+                      <MessageCircle className="w-4 h-4" />
+                    </a>
+                    <button onClick={() => showToast(`${T.callDriver} ${trackingDriver.name}: ${dPhone}`, 'info')} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 cursor-pointer" title={`Call ${dPhone}`}>
+                      <Phone className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button onClick={() => setChatOrderId(trackingOrder.id)} className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer" title="Chat with rider">
-                    <MessageCircle className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => showToast(`${T.callDriver} ${trackingDriver.name}`, 'info')} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 cursor-pointer">
-                    <Phone className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Delivery is completed by the admin/store only — customers cannot complete orders */}
             {trackProgress >= 0.9 && trackingOrder.status !== 'Completed' && (
@@ -3893,7 +3899,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       {/* ============ RECEIPT MODAL ============ */}
       {receiptOrder && (
         <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs font-mono">
+          <div id="pos-receipt" className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-xs font-mono">
             <div className="flex justify-between items-center border-b border-gray-200 pb-2">
               <span className="font-bold text-gray-900">Official Order Receipt</span>
               <button onClick={() => setReceiptOrder(null)}><X className="w-4 h-4" /></button>

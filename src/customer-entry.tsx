@@ -23,10 +23,10 @@ const API_BASE = window.location.origin;
 // Simulated live GPS riders — the customer "Track Delivery" screen follows
 // the nearest online driver in real time (same engine as the admin Live Map).
 const SEED_DRIVERS = [
-  { id: 'DRV-1001', name: 'Rahim Khan', status: 'On-Delivery', vehicleType: 'Bike' },
-  { id: 'DRV-1002', name: 'Shakib Hasan', status: 'On-Delivery', vehicleType: 'Bike' },
-  { id: 'DRV-1003', name: 'Monirul Islam', status: 'Online', vehicleType: 'Bike' },
-  { id: 'DRV-1004', name: 'Karim Uddin', status: 'Online', vehicleType: 'Bike' },
+  { id: 'DRV-1001', name: 'Rahim Khan', status: 'On-Delivery', vehicleType: 'Bike', phone: '01712345678' },
+  { id: 'DRV-1002', name: 'Shakib Hasan', status: 'On-Delivery', vehicleType: 'Bike', phone: '01812345678' },
+  { id: 'DRV-1003', name: 'Monirul Islam', status: 'Online', vehicleType: 'Bike', phone: '01912345678' },
+  { id: 'DRV-1004', name: 'Karim Uddin', status: 'Online', vehicleType: 'Bike', phone: '01612345678' },
 ];
 
 const SEED_STORES = [

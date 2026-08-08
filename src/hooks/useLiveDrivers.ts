@@ -16,7 +16,6 @@ export type LiveDriverSim = LiveVeh & {
   dir: number;
   progress: number;
 };
-
 const randDest = () => ['Customer', 'Restaurant', 'Base', 'Idle'][Math.floor(Math.random() * 4)];
 const pairPick = () => {
   const r = RESTAURANTS[Math.floor(Math.random() * RESTAURANTS.length)];
@@ -42,7 +41,7 @@ export interface LiveDriversApi {
  * admin "Live Road Map" and the customer "Track Delivery" screens consume the
  * exact same real driver positions.
  */
-export function useLiveDrivers(drivers: { id: string; name: string; status: string; vehicleType?: string }[]): LiveDriversApi {
+export function useLiveDrivers(drivers: { id: string; name: string; status: string; vehicleType?: string; phone?: string }[]): LiveDriversApi {
   const [locSim, setLocSim] = useState<boolean>(() => {
     try {
       const stored = localStorage.getItem('sd_locsim');

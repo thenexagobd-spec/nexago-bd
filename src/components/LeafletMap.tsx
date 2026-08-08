@@ -114,6 +114,7 @@ export type LiveVeh = {
   custLat?: number;
   custLng?: number;
   custName?: string;
+  phone?: string;
 };
 
 const vehSVG = (v?: string, color?: string) => {
