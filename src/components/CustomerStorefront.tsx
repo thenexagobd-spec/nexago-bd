@@ -1156,6 +1156,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   useEffect(() => setStoredData(LS_KEYS.profile, customerProfile), [customerProfile]);
 
   const [pwd, setPwd] = useState({ old: '', fresh: '', confirm: '' });
+  const [showPwdForm, setShowPwdForm] = useState(false);
 
   const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -3362,25 +3363,32 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </form>
 
               {/* Change password */}
-              <form onSubmit={(e) => { e.preventDefault(); if (!pwd.old || !pwd.fresh) { showToast('Please fill in all password fields', 'info'); return; } if (pwd.fresh !== pwd.confirm) { showToast('New password and confirm password do not match', 'info'); return; } setPwd({ old: '', fresh: '', confirm: '' }); showToast('Password changed successfully!', 'success'); }} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
-                <div className="flex items-center space-x-2">
-                  <Lock className="w-4 h-4 text-gray-400" />
-                  <h3 className="font-black text-gray-900 text-sm">{T.changePassword || 'Change Password'}</h3>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.oldPassword || 'Current Password'}</label>
-                  <input type="password" value={pwd.old} onChange={(e) => setPwd(p => ({ ...p, old: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.newPassword || 'New Password'}</label>
-                  <input type="password" value={pwd.fresh} onChange={(e) => setPwd(p => ({ ...p, fresh: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.confirmPassword || 'Confirm New Password'}</label>
-                  <input type="password" value={pwd.confirm} onChange={(e) => setPwd(p => ({ ...p, confirm: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
-                </div>
-                <button type="submit" className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl shadow-md transition-all">{T.updatePassword || 'Update Password'}</button>
-              </form>
+              <div className="bg-white border border-gray-200 rounded-2xl shadow-xs">
+                <button type="button" onClick={() => setShowPwdForm(!showPwdForm)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <span className="flex items-center space-x-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                    <span className="font-black text-gray-900 text-sm">{T.changePassword || 'Change Password'}</span>
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showPwdForm ? 'rotate-180' : ''}`} />
+                </button>
+                {showPwdForm && (
+                  <form onSubmit={(e) => { e.preventDefault(); if (!pwd.old || !pwd.fresh) { showToast('Please fill in all password fields', 'info'); return; } if (pwd.fresh !== pwd.confirm) { showToast('New password and confirm password do not match', 'info'); return; } setPwd({ old: '', fresh: '', confirm: '' }); showToast('Password changed successfully!', 'success'); }} className="px-6 pb-6 space-y-4 text-xs border-t border-gray-100 pt-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.oldPassword || 'Current Password'}</label>
+                      <input type="password" value={pwd.old} onChange={(e) => setPwd(p => ({ ...p, old: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.newPassword || 'New Password'}</label>
+                      <input type="password" value={pwd.fresh} onChange={(e) => setPwd(p => ({ ...p, fresh: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.confirmPassword || 'Confirm New Password'}</label>
+                      <input type="password" value={pwd.confirm} onChange={(e) => setPwd(p => ({ ...p, confirm: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                    </div>
+                    <button type="submit" className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl shadow-md transition-all">{T.updatePassword || 'Update Password'}</button>
+                  </form>
+                )}
+              </div>
             </div>
           )}
         </main>
