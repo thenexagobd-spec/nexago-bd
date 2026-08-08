@@ -201,6 +201,7 @@ export interface OrderReportEntry {
   note: string;
   time: string;
   status?: 'Open' | 'Under Review' | 'Resolved';
+  adminReply?: string;
 }
 
 export interface AdminAuditEntry {

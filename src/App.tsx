@@ -781,6 +781,11 @@ export default function App() {
     setOrderReports(prev => prev.map(r => r.orderId === orderId && r.status !== 'Resolved' ? { ...r, status: 'Under Review' } : r));
   };
 
+  // Admin replies to a customer report -> the reply is shown to the customer and report is Resolved
+  const handleReportReply = (orderId: string, reply: string) => {
+    setOrderReports(prev => prev.map(r => r.orderId === orderId ? { ...r, status: 'Resolved', adminReply: reply } : r));
+  };
+
   const handleMarkAllNotificationsAsRead = () => {
     setNotifications(notifications.map(n => ({ ...n, read: true })));
     showToast("All system alerts cleared.");
@@ -4074,6 +4079,7 @@ export default function App() {
               onUpdateOrder={handleUpdateOrder}
               reports={orderReports}
               onOpenReport={handleOpenReport}
+              onReportReply={handleReportReply}
               showToast={showToast}
             />
           )}

@@ -23,13 +23,15 @@ interface OrderToolsDashboardProps {
   onUpdateOrder: (order: Order) => void;
   reports?: OrderReportEntry[];
   onOpenReport?: (orderId: string) => void;
+  onReportReply?: (orderId: string, reply: string) => void;
   showToast?: (message: string, type?: 'success' | 'info') => void;
 }
 
 type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets' | 'reports';
 
-export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [], onOpenReport, showToast }: OrderToolsDashboardProps) {
+export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [], onOpenReport, onReportReply, showToast }: OrderToolsDashboardProps) {
   const [tab, setTab] = useState<ToolTab>('audit');
+  const [reportReply, setReportReply] = useState('');
 
   const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>(() => lsGet('ss_admin_audit', []));
   useEffect(() => lsSet('ss_admin_audit', auditLog), [auditLog]);
@@ -228,6 +230,31 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                           {order ? <><b className="text-gray-300">{order.customerName}</b> · {order.storeName} · <span className="font-mono text-white font-bold">৳{order.amount.toLocaleString()}</span> · {order.paymentMethod}</> : 'Unknown order'} · {r.time}
                         </p>
                       </div>
+                      {r.adminReply && (
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2">
+                          <p className="text-[9px] font-black text-emerald-300 uppercase tracking-wider mb-0.5">Admin reply</p>
+                          <p className="text-gray-300 text-[10px]">{r.adminReply}</p>
+                        </div>
+                      )}
+                      {r.status !== 'Resolved' && (
+                        <div className="flex items-start space-x-2 pt-1">
+                          <input
+                            value={reportReply}
+                            onChange={(e) => setReportReply(e.target.value)}
+                            placeholder="Reply to customer — explain the resolution…"
+                            className="flex-1 bg-brand-dark/60 border border-brand-border/60 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-200 outline-none focus:border-emerald-500/60"
+                          />
+                          <button
+                            onClick={() => {
+                              if (!reportReply.trim()) { showToast && showToast('Write a reply first', 'info'); return; }
+                              onReportReply && onReportReply(r.orderId, reportReply.trim());
+                              setReportReply('');
+                              showToast && showToast(`Reply sent to customer for #${r.orderId} — report resolved`, 'success');
+                            }}
+                            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors shrink-0"
+                          >Send Reply</button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

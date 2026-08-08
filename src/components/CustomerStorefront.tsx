@@ -35,7 +35,7 @@ interface CustomerStorefrontProps {
   onReturnToAdmin: () => void;
   onLaunchMerchantStore: (storeId: string) => void;
   onReport?: (report: { orderId: string; reason: string; note: string }) => void;
-  reports?: { orderId: string; status?: string }[];
+  reports?: { orderId: string; status?: string; adminReply?: string }[];
   showToast: (message: string, type?: 'success' | 'info') => void;
 }
 
@@ -3034,20 +3034,30 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </div>
               <div className="space-y-3">
                 <h3 className="text-xs font-black uppercase tracking-wider text-gray-400">Your Support Requests</h3>
-                {tickets.map((tck) => (
-                  <div key={tck.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-gray-500">{tck.id}</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        tck.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' :
-                        tck.status === 'Under Review' ? 'bg-blue-100 text-blue-800' :
-                        'bg-amber-100 text-amber-800'
-                      }`}>{tck.status}</span>
+                {tickets.map((tck) => {
+                  const oid = tck.subject.match(/#(\d+)/)?.[1];
+                  const adminR = oid ? reports.find(r => r.orderId === oid && r.adminReply) : undefined;
+                  return (
+                    <div key={tck.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold text-gray-500">{tck.id}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          tck.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' :
+                          tck.status === 'Under Review' ? 'bg-blue-100 text-blue-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>{tck.status}</span>
+                      </div>
+                      <h4 className="font-bold text-xs text-gray-900">{tck.subject}</h4>
+                      <p className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-xl border border-gray-100">"{tck.lastMessage}"</p>
+                      {adminR && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
+                          <p className="text-[9px] font-black text-emerald-700 uppercase tracking-wider mb-0.5">Admin response</p>
+                          <p className="text-xs text-emerald-900">{adminR.adminReply}</p>
+                        </div>
+                      )}
                     </div>
-                    <h4 className="font-bold text-xs text-gray-900">{tck.subject}</h4>
-                    <p className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-xl border border-gray-100">"{tck.lastMessage}"</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
