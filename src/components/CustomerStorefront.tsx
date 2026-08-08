@@ -2277,23 +2277,23 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               ))}
             </nav>
 
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-3 relative overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+            <div className="bg-gradient-to-br from-emerald-700 to-teal-800 border border-emerald-600/40 rounded-2xl p-4 space-y-3 relative overflow-hidden">
+              <div className="w-10 h-10 rounded-xl bg-white/15 text-white flex items-center justify-center shadow-md">
                 <Truck className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-xs font-black text-emerald-900">{T.freeDelivery}</h4>
-                <p className="text-[10px] text-emerald-700 mt-0.5">{T.freeDeliverySub}</p>
+                <h4 className="text-xs font-black text-white">{T.freeDelivery}</h4>
+                <p className="text-[10px] text-emerald-100/90 mt-0.5">{T.freeDeliverySub}</p>
               </div>
               <button
                 onClick={() => { setSelectedCategory('All'); setActiveNav('Orders'); showToast('Browsing free delivery stores', 'info'); }}
-                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+                className="w-full py-2 bg-white hover:bg-emerald-50 text-emerald-800 rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs"
               >
                 {T.shopNow}
               </button>
             </div>
 
-            <div className={`rounded-2xl p-4 space-y-2.5 relative overflow-hidden text-white ${tier.key === 'gold' ? 'bg-gradient-to-br from-amber-400 to-amber-500' : tier.key === 'silver' ? 'bg-gradient-to-br from-slate-400 to-slate-500' : 'bg-gradient-to-br from-emerald-600 to-teal-600'}`}>
+            <div className={`rounded-2xl p-4 space-y-2.5 relative overflow-hidden text-white ${tier.key === 'gold' ? 'bg-gradient-to-br from-amber-400 to-amber-600' : tier.key === 'silver' ? 'bg-gradient-to-br from-slate-500 to-slate-700' : 'bg-gradient-to-br from-emerald-800 to-teal-900'}`}>
               <div className="flex items-center justify-between">
                 <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg">{tier.icon}</div>
                 <span className="px-2 py-0.5 rounded-md bg-white/20 text-[9px] font-black uppercase tracking-wider">{tier.label}</span>
