@@ -1122,8 +1122,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketDetail, setTicketDetail] = useState('');
 
-  const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: 'Rahim Khan', email: 'rahim.khan@example.com', sms: true, emailNotif: true }));
+  const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: 'Rahim Khan', email: 'rahim.khan@example.com', phone: '01712-345678', sms: true, emailNotif: true, pushNotif: true, profilePic: '' }));
   useEffect(() => setStoredData(LS_KEYS.profile, customerProfile), [customerProfile]);
+
+  const [pwd, setPwd] = useState({ old: '', fresh: '', confirm: '' });
 
   const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
   const [isNotifOpen, setIsNotifOpen] = useState(false);

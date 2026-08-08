@@ -49,7 +49,12 @@ const SEED_PRODUCTS: Product[] = [
 function PublicCustomerApp() {
   const [stores] = useState(SEED_STORES);
   const [products, setProducts] = useState<Product[]>(SEED_PRODUCTS);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const CUST_ORDERS_KEY = 'nexago_customer_orders';
+  const [orders, setOrders] = useState<Order[]>(() => {
+    try { const raw = localStorage.getItem(CUST_ORDERS_KEY); if (raw) return JSON.parse(raw); } catch {}
+    return [];
+  });
+  useEffect(() => { try { localStorage.setItem(CUST_ORDERS_KEY, JSON.stringify(orders)); } catch {} }, [orders]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const { liveDrivers } = useLiveDrivers(SEED_DRIVERS);
 
