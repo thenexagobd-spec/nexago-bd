@@ -793,7 +793,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const [lang, setLang] = useState<Lang>(() => getStoredData(LS_KEYS.lang, 'en'));
   useEffect(() => setStoredData(LS_KEYS.lang, lang), [lang]);
-  const [dark, setDark] = useState<boolean>(() => getStoredData(LS_KEYS.dark, false));
+  const [dark, setDark] = useState<boolean>(true);
   useEffect(() => setStoredData(LS_KEYS.dark, dark), [dark]);
   const T = T_DICT[lang];
   const catLabel = (c: string) => (lang === 'bn' ? (CAT_BN[c] || c) : c);
@@ -2102,11 +2102,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           <div className="flex items-center space-x-0.5 sm:space-x-2 shrink-0">
             <button
               onClick={() => setActiveNav('Wallet')}
-              className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
+              className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 transition-colors cursor-pointer"
             >
-              <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+              <Wallet className="w-3.5 h-3.5 text-emerald-400" />
               <span>৳{walletBalance.toLocaleString()}</span>
-              <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${tier.key === 'gold' ? 'bg-amber-400 text-amber-900' : tier.key === 'silver' ? 'bg-slate-300 text-slate-800' : 'bg-gray-200 text-gray-600'}`}>{tier.icon} {tier.label}</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${tier.key === 'gold' ? 'bg-amber-400 text-amber-900' : tier.key === 'silver' ? 'bg-slate-300 text-slate-800' : 'bg-white/10 text-gray-300'}`}>{tier.icon} {tier.label}</span>
             </button>
 
             <div className="relative">
@@ -2257,7 +2257,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   key={item.key}
                   onClick={() => setActiveNav(item.key)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold transition-all cursor-pointer ${
-                    activeNav === item.key ? 'bg-emerald-50 text-emerald-600 font-black' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    activeNav === item.key ? 'bg-emerald-500/15 text-emerald-300 font-black' : 'text-gray-400 hover:bg-white/5 hover:text-gray-100'
                   }`}
                 >
                   <div className="flex items-center space-x-3">{item.icon}<span>{item.label}</span></div>
