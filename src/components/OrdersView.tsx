@@ -63,6 +63,23 @@ const BrandImage: React.FC<{ src: string; size: number; alt: string }> = ({ src,
   );
 };
 
+// Real bKash / Nagad brand marks
+const BkashLogo = ({ className = '', width, height }: { className?: string; width?: number; height?: number }) => (
+  <svg viewBox="0 0 60 34" className={className} width={width} height={height} xmlns="http://www.w3.org/2000/svg" aria-label="bKash">
+    <rect width="60" height="34" rx="7.5" fill="#E2136E" />
+    <text x="30" y="23" textAnchor="middle" fontFamily="'Arial Black','Segoe UI',Arial,sans-serif" fontWeight="900" fontSize="15" fill="#ffffff" letterSpacing="-0.3">bKash</text>
+    <path d="M14 24.5c10.5 2.2 21.5 2.2 32 0" stroke="#ffffff" strokeWidth="2.2" fill="none" strokeLinecap="round" opacity="0.95" />
+  </svg>
+);
+
+const NagadLogo = ({ className = '', width, height }: { className?: string; width?: number; height?: number }) => (
+  <svg viewBox="0 0 60 34" className={className} width={width} height={height} xmlns="http://www.w3.org/2000/svg" aria-label="nagad">
+    <rect width="60" height="34" rx="7.5" fill="#F6921E" />
+    <text x="30" y="23" textAnchor="middle" fontFamily="'Arial Black','Segoe UI',Arial,sans-serif" fontWeight="900" fontSize="15" fill="#ffffff" letterSpacing="-0.3">nagad</text>
+    <path d="M12 10.5 48 23.5" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" opacity="0.95" />
+  </svg>
+);
+
 // Brand logo renderer for each Bangladesh payment method (crisp HTML/CSS marks)
 const PaymentLogo: React.FC<{ method: string; size?: number }> = ({ method, size = 28 }) => {
   const base: React.CSSProperties = {
@@ -90,9 +107,9 @@ const PaymentLogo: React.FC<{ method: string; size?: number }> = ({ method, size
 
   switch (method) {
     case 'bKash':
-      return <div style={{ ...base, background: '#e2136e' }}><span style={text('#fff', 'b', 0.5)}>b</span></div>;
+      return <div style={{ ...base, background: '#e2136e', overflow: 'hidden' }}><BkashLogo width={size} height={size} /></div>;
     case 'Nagad':
-      return <div style={{ ...base, background: '#f26522' }}><span style={text('#fff', 'N', 0.5)}>N</span></div>;
+      return <div style={{ ...base, background: '#f26522', overflow: 'hidden' }}><NagadLogo width={size} height={size} /></div>;
     case 'Rocket':
       return (
         <div style={{ ...base, background: 'linear-gradient(135deg, #7b1fa2, #ab47bc)' }}>
@@ -179,6 +196,8 @@ export default function OrdersView({
 }: OrdersViewProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Processing' | 'Completed' | 'Cancelled'>('All');
+  const [paymentFilter, setPaymentFilter] = useState<'All' | 'bKash' | 'Nagad' | 'Cash on Delivery' | 'Card' | 'Wallet'>('All');
+  const [payStatusFilter, setPayStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Rejected' | 'COD' | 'Paid'>('All');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -238,7 +257,14 @@ export default function OrdersView({
                           order.customerName.toLowerCase().includes(search.toLowerCase()) ||
                           (order.customerPhone && order.customerPhone.includes(search));
     const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const paymentBucket = (m: string) =>
+      m.startsWith('bKash') ? 'bKash' :
+      m.startsWith('Nagad') ? 'Nagad' :
+      m.includes('Wallet') ? 'Wallet' :
+      m.includes('Cash') ? 'Cash on Delivery' : m;
+    const matchesPayment = paymentFilter === 'All' || paymentBucket(order.paymentMethod) === paymentFilter;
+    const matchesPayStatus = payStatusFilter === 'All' || order.paymentStatus === payStatusFilter;
+    return matchesSearch && matchesStatus && matchesPayment && matchesPayStatus;
   });
 
   // Pagination calculation
@@ -426,6 +452,7 @@ export default function OrdersView({
           <div className="space-y-1.5 text-[10px] bg-brand-dark/60 border border-brand-border/60 rounded-lg p-2">
             <p className="font-mono text-gray-300">TrxID: <b className="text-white">{order.trxId}</b></p>
             {order.senderNumber && <p className="text-gray-400">From: <b className="text-gray-300">{order.senderNumber}</b></p>}
+            {order.last4 && <p className="text-gray-400">Last 4 (PIN): <b className="text-gray-300">•••• {order.last4}</b></p>}
             <p className={amountOk ? 'text-emerald-400' : 'text-amber-400 font-bold'}>
               {amountOk ? `✓ Amount matches (৳${order.amount})` : `⚠ Amount mismatch — claimed ৳${order.trxAmount} vs ৳${order.amount}`}
             </p>
@@ -579,6 +606,42 @@ export default function OrdersView({
               <Filter className="w-3.5 h-3.5 text-gray-400" />
               <span>Filter</span>
             </button>
+          </div>
+        </div>
+
+        {/* Payment method & payment status filters */}
+        <div className="flex flex-col lg:flex-row gap-3 lg:items-center border-t border-brand-border/60 pt-3 mt-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Payment:</span>
+            {(['All', 'bKash', 'Nagad', 'Cash on Delivery', 'Card', 'Wallet'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => { setPaymentFilter(m); setCurrentPage(1); }}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer shrink-0 ${
+                  paymentFilter === m
+                    ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
+                    : 'bg-brand-dark/40 border-brand-border/50 text-gray-400 hover:text-gray-200 hover:bg-brand-dark/80'
+                }`}
+              >
+                {m === 'All' ? 'All Methods' : m === 'Cash on Delivery' ? 'COD' : m}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Pay Status:</span>
+            {(['All', 'Pending', 'Approved', 'Rejected', 'COD', 'Paid'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => { setPayStatusFilter(s); setCurrentPage(1); }}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer shrink-0 ${
+                  payStatusFilter === s
+                    ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
+                    : 'bg-brand-dark/40 border-brand-border/50 text-gray-400 hover:text-gray-200 hover:bg-brand-dark/80'
+                }`}
+              >
+                {s === 'Pending' ? '⏳ Pending' : s === 'Approved' ? '✓ Approved' : s === 'Rejected' ? '✗ Rejected' : s}
+              </button>
+            ))}
           </div>
         </div>
 

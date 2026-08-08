@@ -38,6 +38,7 @@ export interface Order {
   paymentStatus?: 'Pending' | 'Approved' | 'Rejected' | 'Paid' | 'COD';
   trxId?: string;          // bKash/Nagad Send Money transaction id
   senderNumber?: string;   // customer mobile that sent the money
+  last4?: string;          // last 4 digits / PIN of the sending number (verification)
   trxAmount?: number;      // amount user claims to have sent
   receipt?: string;        // base64 data-URL screenshot/receipt
   reference?: string;      // pre-filled "Send Money" reference note

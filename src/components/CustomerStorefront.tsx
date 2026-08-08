@@ -629,6 +629,22 @@ const ETA_STEPS = [
   { label: 'Delivered', desc: 'Order delivered to your door', min: 0.9 },
 ];
 
+const BkashLogo = ({ className = '' }: { className?: string }) => (
+  <svg viewBox="0 0 60 34" className={className} xmlns="http://www.w3.org/2000/svg" aria-label="bKash">
+    <rect width="60" height="34" rx="7.5" fill="#E2136E" />
+    <text x="30" y="23" textAnchor="middle" fontFamily="'Arial Black','Segoe UI',Arial,sans-serif" fontWeight="900" fontSize="15" fill="#ffffff" letterSpacing="-0.3">bKash</text>
+    <path d="M14 24.5c10.5 2.2 21.5 2.2 32 0" stroke="#ffffff" strokeWidth="2.2" fill="none" strokeLinecap="round" opacity="0.95" />
+  </svg>
+);
+
+const NagadLogo = ({ className = '' }: { className?: string }) => (
+  <svg viewBox="0 0 60 34" className={className} xmlns="http://www.w3.org/2000/svg" aria-label="nagad">
+    <rect width="60" height="34" rx="7.5" fill="#F6921E" />
+    <text x="30" y="23" textAnchor="middle" fontFamily="'Arial Black','Segoe UI',Arial,sans-serif" fontWeight="900" fontSize="15" fill="#ffffff" letterSpacing="-0.3">nagad</text>
+    <path d="M12 10.5 48 23.5" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" opacity="0.95" />
+  </svg>
+);
+
 export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   stores,
   products,
@@ -858,7 +874,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [cardInfo, setCardInfo] = useState({ number: '', name: '', expiry: '', cvv: '' });
 
   // Send Money flow (bKash/Nagad)
-  const [sendMoney, setSendMoney] = useState({ sender: '', trxId: '', amount: '', receipt: '', note: '' });
+  const [sendMoney, setSendMoney] = useState({ sender: '', trxId: '', amount: '', receipt: '', note: '', last4: '' });
   const [payDeadline, setPayDeadline] = useState<number>(0);
   const [payLeft, setPayLeft] = useState<number>(0);
   const [payExpired, setPayExpired] = useState(false);
@@ -935,7 +951,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const startPaySession = () => {
     setPayExpired(false);
-    setSendMoney({ sender: customerPhone.replace(/[^0-9]/g, ''), trxId: '', amount: String(cartGrandTotal), receipt: '', note: customerPhone });
+    setSendMoney({ sender: customerPhone.replace(/[^0-9]/g, ''), trxId: '', amount: String(cartGrandTotal), receipt: '', note: customerPhone, last4: '' });
     setPayDeadline(Date.now() + PAY_SESSION_MS);
     setPayLeft(PAY_SESSION_MS / 1000);
   };
@@ -1254,6 +1270,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       paymentStatus: isSendMoney ? 'Pending' : (paymentMethod === 'Cash on Delivery' ? 'COD' : 'Paid'),
       trxId: isSendMoney ? trxId : undefined,
       senderNumber: isSendMoney ? sendMoney.sender.replace(/[^0-9]/g, '') : undefined,
+      last4: isSendMoney ? sendMoney.last4.replace(/[^0-9]/g, '').slice(-4) : undefined,
       trxAmount: isSendMoney ? (parseFloat(sendMoney.amount) || cartGrandTotal) : undefined,
       receipt: isSendMoney ? sendMoney.receipt : undefined,
       reference: isSendMoney ? sendMoney.note : undefined,
@@ -1290,6 +1307,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (payExpired) { showToast('Payment session expired — restart to place a fresh order', 'info'); return; }
     if (fraudBlocked(sender)) { showToast('Too many invalid attempts — payment temporarily blocked. Try again in a few minutes.', 'info'); return; }
     if (sender.length < 10) { showToast('Enter the 11-digit mobile number that sent the money', 'info'); registerFraudAttempt(sender); return; }
+    const last4 = sendMoney.last4.replace(/[^0-9]/g, '');
+    if (!/^\d{4}$/.test(last4)) { showToast('Enter the last 4 digits of the sending number for verification', 'info'); return; }
+    if (!sender.endsWith(last4)) { showToast('Last 4 digits must match the last 4 digits of your sending number', 'info'); return; }
     if (!TRX_RE.test(trxId)) { showToast(`Invalid ${payModal} TrxID — expected 8–20 letters/digits (e.g. ${payModal === 'bKash' ? '8NHK7K8MJH' : 'NG170870910001120M'})`, 'info'); registerFraudAttempt(sender); return; }
     if (trxUsed.some(t => t.trxId === trxId)) { showToast('This TrxID was already used — duplicate transactions are blocked', 'info'); registerFraudAttempt(sender); return; }
     if (!sendMoney.receipt) { showToast('Upload the payment screenshot/receipt before submitting', 'info'); return; }
@@ -3147,8 +3167,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             paymentMethod === method ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                           }`}
                         >
-                          {method === 'bKash' ? <span className="flex items-center justify-center space-x-1"><span className="w-3 h-3 rounded-full bg-pink-500 text-white text-[7px] font-black flex items-center justify-center">bK</span><span>Send Money</span></span>
-                            : method === 'Nagad' ? <span className="flex items-center justify-center space-x-1"><span className="w-3 h-3 rounded-full bg-orange-500 text-white text-[7px] font-black flex items-center justify-center">Ng</span><span>Send Money</span></span>
+                          {method === 'bKash' ? <span className="flex items-center justify-center space-x-1"><BkashLogo className="w-8 h-8 rounded-md" /><span>Send Money</span></span>
+                            : method === 'Nagad' ? <span className="flex items-center justify-center space-x-1"><NagadLogo className="w-8 h-8 rounded-md" /><span>Send Money</span></span>
                             : method}
                         </button>
                       ))}
@@ -3174,8 +3194,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto overflow-x-hidden">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
-                {payModal === 'bKash' && <div className="w-8 h-8 rounded-lg bg-pink-500 text-white flex items-center justify-center font-black text-xs">bK</div>}
-                {payModal === 'Nagad' && <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center font-black text-xs">Ng</div>}
+                {payModal === 'bKash' && <BkashLogo className="w-9 h-9 rounded-lg" />}
+                {payModal === 'Nagad' && <NagadLogo className="w-9 h-9 rounded-lg" />}
                 {payModal === 'Card' && <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center"><CreditCard className="w-4 h-4" /></div>}
                 {payModal === 'COD' && <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center"><Banknote className="w-4 h-4" /></div>}
                 {payModal === 'Split (Wallet + bKash)' && <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>}
@@ -3209,7 +3229,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className={`rounded-2xl border p-3 text-white relative overflow-hidden ${payModal === 'bKash' ? 'bg-gradient-to-br from-pink-500 via-pink-600 to-rose-600 border-pink-700' : 'bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 border-orange-700'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-xl bg-white/25 border border-white/30 flex items-center justify-center font-black text-sm">{payModal === 'bKash' ? 'bK' : 'Ng'}</div>
+                      <div className="w-9 h-9 rounded-xl overflow-hidden shadow">{payModal === 'bKash' ? <BkashLogo className="w-9 h-9" /> : <NagadLogo className="w-9 h-9" />}</div>
                       <div>
                         <p className="font-black text-sm leading-tight">{mw.name} · {payModal} Wallet</p>
                         <p className="text-[10px] text-white/80">Send Money to this number</p>
@@ -3258,6 +3278,19 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono outline-none focus:border-emerald-500"
                       />
                       {blocked && <p className="text-[10px] text-red-600 mt-1 font-bold">Too many invalid attempts — this number is temporarily blocked.</p>}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Last 4 digits (your {payModal} PIN)</label>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={sendMoney.last4}
+                        onChange={(e) => setSendMoney(s => ({ ...s, last4: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) }))}
+                        placeholder="••••"
+                        maxLength={4}
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2 font-mono tracking-[0.3em] text-center text-sm font-black outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">Security check: last 4 digits must match your {payModal} number that sent the money.</p>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Sent amount (must equal ৳{cartGrandTotal})</label>
