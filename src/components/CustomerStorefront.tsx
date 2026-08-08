@@ -1165,7 +1165,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const [pwd, setPwd] = useState({ old: '', fresh: '', confirm: '' });
   const [showPwdForm, setShowPwdForm] = useState(false);
-  const [showProfileCard, setShowProfileCard] = useState(true);
+  const [showProfileCard, setShowProfileCard] = useState(false);
   const [showPrefsCard, setShowPrefsCard] = useState(false);
   const [showAccountForm, setShowAccountForm] = useState(false);
 
