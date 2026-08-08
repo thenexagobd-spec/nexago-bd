@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
 import {
-  History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck
+  History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
+  ClipboardList, Check
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -22,10 +23,14 @@ interface OrderToolsDashboardProps {
   showToast?: (message: string, type?: 'success' | 'info') => void;
 }
 
-type ToolTab = 'audit' | 'refunds' | 'analytics' | 'wallets';
+type ToolTab = 'orders' | 'audit' | 'refunds' | 'analytics' | 'wallets';
 
 export default function OrderToolsDashboard({ orders, showToast }: OrderToolsDashboardProps) {
-  const [tab, setTab] = useState<ToolTab>('audit');
+  const [tab, setTab] = useState<ToolTab>('orders');
+
+  // Payment method & payment status filters (moved here from the All Orders header)
+  const [payFilter, setPayFilter] = useState<'All' | 'bKash' | 'Nagad' | 'Upay' | 'Rocket' | 'Cash on Delivery' | 'Card' | 'Wallet'>('All');
+  const [payStatusFilter, setPayStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Rejected' | 'COD' | 'Paid'>('All');
 
   const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>(() => lsGet('ss_admin_audit', []));
   useEffect(() => lsSet('ss_admin_audit', auditLog), [auditLog]);
@@ -56,6 +61,7 @@ export default function OrderToolsDashboard({ orders, showToast }: OrderToolsDas
   };
 
   const tabs: { key: ToolTab; label: string; icon: any; badge?: number }[] = [
+    { key: 'orders', label: 'Orders', icon: ClipboardList, badge: orders.length },
     { key: 'audit', label: 'Audit Log', icon: History, badge: auditLog.length },
     { key: 'refunds', label: 'Refund Requests', icon: Banknote, badge: refunds.filter(r => r.status === 'Requested').length },
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
@@ -97,6 +103,106 @@ export default function OrderToolsDashboard({ orders, showToast }: OrderToolsDas
       </div>
 
       <div className="bg-brand-card border border-brand-border/60 rounded-2xl p-5 text-xs max-w-5xl">
+        {/* ============ ORDERS — PAYMENT FILTER ============ */}
+        {tab === 'orders' && (
+          <div className="space-y-3">
+            <h3 className="font-black text-white text-sm flex items-center space-x-2"><ClipboardList className="w-4 h-4 text-brand-orange" /><span>Orders — Payment Filter</span></h3>
+            <p className="text-[10px] text-gray-400">Filter orders by payment method and payment status.</p>
+
+            {(() => {
+              const bucket = (m: string) => m.startsWith('bKash') ? 'bKash' : m.startsWith('Nagad') ? 'Nagad' : m.startsWith('Upay') ? 'Upay' : m.startsWith('Rocket') ? 'Rocket' : m.includes('Wallet') ? 'Wallet' : m.includes('Cash') ? 'Cash on Delivery' : m;
+              const filtered = orders.filter(o =>
+                (payFilter === 'All' || bucket(o.paymentMethod) === payFilter) &&
+                (payStatusFilter === 'All' || o.paymentStatus === payStatusFilter)
+              );
+              return (
+                <div className="space-y-3">
+                  <div className="flex flex-col lg:flex-row gap-3 lg:items-center border border-brand-border/50 rounded-xl p-3 bg-brand-dark/20">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Payment:</span>
+                      {(['All', 'bKash', 'Nagad', 'Upay', 'Rocket', 'Cash on Delivery', 'Card', 'Wallet'] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setPayFilter(m)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer shrink-0 ${
+                            payFilter === m
+                              ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
+                              : 'bg-brand-dark/40 border-brand-border/50 text-gray-400 hover:text-gray-200 hover:bg-brand-dark/80'
+                          }`}
+                        >
+                          {m === 'All' ? 'All Methods' : m === 'Cash on Delivery' ? 'COD' : m}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Pay Status:</span>
+                      {(['All', 'Pending', 'Approved', 'Rejected', 'COD', 'Paid'] as const).map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setPayStatusFilter(s)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer shrink-0 ${
+                            payStatusFilter === s
+                              ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
+                              : 'bg-brand-dark/40 border-brand-border/50 text-gray-400 hover:text-gray-200 hover:bg-brand-dark/80'
+                          }`}
+                        >
+                          {s === 'Pending' ? '⏳ Pending' : s === 'Approved' ? '✓ Approved' : s === 'Rejected' ? '✗ Rejected' : s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto border border-brand-border/40 rounded-xl">
+                    <table className="w-full text-left text-xs min-w-[760px]">
+                      <thead>
+                        <tr className="text-gray-400 border-b border-brand-border/40 bg-brand-dark/40 select-none">
+                          <th className="py-2.5 px-3 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Order</th>
+                          <th className="py-2.5 px-3 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Customer</th>
+                          <th className="py-2.5 px-3 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Store</th>
+                          <th className="py-2.5 px-3 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Amount</th>
+                          <th className="py-2.5 px-3 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Payment</th>
+                          <th className="py-2.5 px-3 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Pay Status</th>
+                          <th className="py-2.5 px-3 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Status</th>
+                          <th className="py-2.5 px-3 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.length === 0 ? (
+                          <tr><td colSpan={8} className="py-10 text-center text-gray-500">No orders match these filters.</td></tr>
+                        ) : filtered.map(o => (
+                          <tr key={o.id} className="border-b border-brand-border/30 last:border-0 hover:bg-brand-dark/30 transition-colors">
+                            <td className="py-2.5 px-3 font-mono text-gray-300">#{o.id}</td>
+                            <td className="py-2.5 px-3 text-gray-200 font-semibold">
+                              <span className="block">{o.customerName}</span>
+                              {o.customerNote && <span className="block text-[9px] text-blue-300 truncate max-w-[150px]" title={o.customerNote}>💬 {o.customerNote}</span>}
+                            </td>
+                            <td className="py-2.5 px-3 text-gray-400">{o.storeName}</td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-white">৳{o.amount.toLocaleString()}</td>
+                            <td className="py-2.5 px-3 text-gray-300">{o.paymentMethod}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                o.paymentStatus === 'Approved' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' :
+                                o.paymentStatus === 'Rejected' ? 'bg-red-500/10 text-red-300 border border-red-500/20' :
+                                o.paymentStatus === 'COD' ? 'bg-slate-500/10 text-slate-300 border border-slate-500/20' :
+                                o.paymentStatus === 'Paid' ? 'bg-teal-500/10 text-teal-300 border border-teal-500/20' :
+                                'bg-purple-500/10 text-purple-300 border border-purple-500/20'
+                              }`}>
+                                {o.paymentStatus === 'Approved' ? <><Check className="w-3 h-3 mr-1" />Approved</> : o.paymentStatus || '—'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-gray-400">{o.status}</td>
+                            <td className="py-2.5 px-3 text-gray-500">{o.date}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* ============ AUDIT LOG ============ */}
         {tab === 'audit' && (
           <div className="space-y-3">
