@@ -2179,13 +2179,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <ChevronDown className="w-3 h-3 text-gray-500" />
               </button>
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-200 p-2 text-xs z-50 space-y-1">
-                  <div className="p-2 border-b border-gray-100">
-                    <p className="font-bold text-gray-900">{customerProfile.name}</p>
-                    <p className="text-[10px] text-gray-500">{customerProfile.email}</p>
+                <div className="absolute right-0 mt-2 w-52 bg-[#0e1a2b] rounded-2xl shadow-xl border border-[#162a45] p-2 text-xs z-50 space-y-1">
+                  <div className="p-2 border-b border-white/10">
+                    <p className="font-bold text-white">{customerProfile.name}</p>
+                    <p className="text-[10px] text-gray-400">{customerProfile.email}</p>
                   </div>
-                  <button onClick={() => { setActiveNav('Settings'); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-gray-700 font-semibold hover:bg-gray-100 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
-                    <Settings className="w-4 h-4 text-gray-500" /><span>My Account Settings</span>
+                  <button onClick={() => { setActiveNav('Settings'); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-gray-300 font-semibold hover:bg-white/5 hover:text-white rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
+                    <Settings className="w-4 h-4 text-gray-400" /><span>My Account Settings</span>
                   </button>
                 </div>
               )}
@@ -2217,7 +2217,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </button>
           )}
           {showSuggest && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
+            <div className="absolute left-0 right-0 top-full mt-1 bg-[#0e1a2b] border border-[#162a45] rounded-2xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
               {suggestions.length > 0 ? (
                 suggestions.map((s, i) => (
                   <div
@@ -2226,14 +2226,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       setSearchQuery(s.product.name);
                       openStore(s.store);
                     }}
-                    className="flex items-center space-x-3 px-4 py-2.5 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
+                    className="flex items-center space-x-3 px-4 py-2.5 hover:bg-emerald-500/10 cursor-pointer border-b border-white/10 last:border-0 transition-colors"
                   >
                     <img src={s.product.image} alt={s.product.name} referrerPolicy="no-referrer" className="w-9 h-9 rounded-lg object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-900 truncate">{s.product.name}</p>
-                      <p className="text-[10px] text-gray-500 truncate">{s.store.name} · {s.product.category}</p>
+                      <p className="text-xs font-bold text-white truncate">{s.product.name}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{s.store.name} · {s.product.category}</p>
                     </div>
-                    <span className="text-[11px] font-mono font-black text-emerald-700 shrink-0">৳{s.product.price}</span>
+                    <span className="text-[11px] font-mono font-black text-emerald-400 shrink-0">৳{s.product.price}</span>
                   </div>
                 ))
               ) : (
@@ -2526,12 +2526,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{prodMatches.length} {T.productMatches}</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {prodMatches.slice(0, 6).map(({ store, product }) => (
-                                <button key={`${store.id}-${product.id}`} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-white border border-gray-200 rounded-xl p-2.5 text-left hover:border-emerald-300 hover:shadow-sm transition-all cursor-pointer">
+                                <button key={`${store.id}-${product.id}`} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-[#0e1a2b] border border-[#162a45] rounded-xl p-2.5 text-left hover:border-emerald-500/50 hover:bg-[#12233a] transition-all cursor-pointer">
                                   <img src={product.image} alt={product.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-gray-900 truncate">{product.name}</p>
-                                    <p className="text-[10px] text-gray-500">{store.name}</p>
-                                    <p className="text-[11px] font-black text-emerald-700 font-mono">৳{product.price} <span className="text-[9px] text-gray-400 font-normal">/ {product.unit}</span></p>
+                                    <p className="text-xs font-bold text-white truncate">{product.name}</p>
+                                    <p className="text-[10px] text-gray-400">{store.name}</p>
+                                    <p className="text-[11px] font-black text-emerald-400 font-mono">৳{product.price} <span className="text-[9px] text-gray-500 font-normal">/ {product.unit}</span></p>
                                   </div>
                                 </button>
                               ))}
@@ -2543,12 +2543,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                             <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{storeMatches.length} {T.storeMatches}</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {storeMatches.map(store => (
-                                <button key={store.id} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-white border border-gray-200 rounded-xl p-2.5 text-left hover:border-emerald-300 hover:shadow-sm transition-all cursor-pointer">
+                                <button key={store.id} onClick={() => openStore(store)} className="flex items-center space-x-3 bg-[#0e1a2b] border border-[#162a45] rounded-xl p-2.5 text-left hover:border-emerald-500/50 hover:bg-[#12233a] transition-all cursor-pointer">
                                   <img src={store.image} alt={store.name} referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-gray-900">{store.name}</p>
-                                    <p className="text-[10px] text-gray-500">{store.category} · ⭐ {displayRating(store)}</p>
-                                    <p className="text-[10px] font-bold text-emerald-700">{store.deliveryTime}</p>
+                                    <p className="text-xs font-bold text-white">{store.name}</p>
+                                    <p className="text-[10px] text-gray-400">{store.category} · ⭐ {displayRating(store)}</p>
+                                    <p className="text-[10px] font-bold text-emerald-400">{store.deliveryTime}</p>
                                   </div>
                                 </button>
                               ))}
