@@ -3184,9 +3184,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
             <div className="p-5 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Product grid */}
-              <div className="lg:col-span-2 space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none flex-1">
+              <div className="lg:col-span-2 space-y-3">
+                <div className="space-y-2.5">
+                  <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none">
                     {['All', ...Array.from(new Set(selectedStore.catalog.map(p => p.category)))].map((cat) => (
                       <button
                         key={cat}
@@ -3199,69 +3199,83 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       </button>
                     ))}
                   </div>
-                  <div className="relative hidden sm:block">
+                  <div className="relative w-full">
                     <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={storeSearch}
                       onChange={(e) => setStoreSearch(e.target.value)}
-                      placeholder="Search menu..."
-                      className="w-44 bg-gray-100 border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:bg-white focus:border-emerald-500"
+                      placeholder="Search menu — type product name…"
+                      className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:bg-white focus:border-emerald-500"
                     />
                   </div>
+                  <p className="text-[10px] text-gray-400">
+                    {
+                      selectedStore.catalog
+                        .filter(p => storeCat === 'All' || p.category === storeCat)
+                        .filter(p => {
+                          if (!storeSearch.trim()) return true;
+                          const q = storeSearch.trim().toLowerCase();
+                          return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
+                        }).length
+                    } items found
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                   {selectedStore.catalog
                     .filter(p => storeCat === 'All' || p.category === storeCat)
-                    .filter(p => p.name.toLowerCase().includes(storeSearch.toLowerCase()))
+                    .filter(p => {
+                      if (!storeSearch.trim()) return true;
+                      const q = storeSearch.trim().toLowerCase();
+                      return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
+                    })
                     .map((prod) => {
                       const inCart = cart.find(i => i.product.id === prod.id);
                       return (
-                        <div key={prod.id} className={`border rounded-2xl overflow-hidden bg-white transition-all ${prod.status === 'Out of Stock' ? 'opacity-55 border-gray-200' : 'border-gray-200 hover:border-emerald-300 hover:shadow-md'}`}>
-                          <div className="relative h-32 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
+                        <div key={prod.id} className={`border rounded-xl overflow-hidden bg-white transition-all ${prod.status === 'Out of Stock' ? 'opacity-55 border-gray-200' : 'border-gray-200 hover:border-emerald-300 hover:shadow-md'}`}>
+                          <div className="relative h-20 bg-gray-100 cursor-pointer" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>
                             <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
-                            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                            <span className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
                               prod.status === 'In Stock' ? 'bg-emerald-600 text-white' : prod.status === 'Low Stock' ? 'bg-amber-500 text-white' : 'bg-gray-600 text-white'
                             }`}>{statusLabel(prod.status)}</span>
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleWatch(prod.id); }}
                               title={watchedProducts.includes(prod.id) ? 'Remove price alert' : 'Set price-drop alert'}
-                              className={`absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center transition-colors cursor-pointer shadow-md ${watchedProducts.includes(prod.id) ? 'text-amber-500' : 'text-gray-500 hover:text-amber-500'}`}
+                              className={`absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center transition-colors cursor-pointer shadow-sm ${watchedProducts.includes(prod.id) ? 'text-amber-500' : 'text-gray-500 hover:text-amber-500'}`}
                             >
-                              <BellPlus className={`w-3.5 h-3.5 ${watchedProducts.includes(prod.id) ? 'fill-amber-400' : ''}`} />
+                              <BellPlus className={`w-3 h-3 ${watchedProducts.includes(prod.id) ? 'fill-amber-400' : ''}`} />
                             </button>
                           </div>
-                          <div className="p-3 space-y-1.5">
-                            <h4 className="font-bold text-xs text-gray-900 leading-snug cursor-pointer hover:text-emerald-700" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>{prod.name}</h4>
-                            <p className="text-[10px] text-gray-500 line-clamp-1">{prod.desc}</p>
-                            <div className="flex items-center justify-between pt-1">
-                              <div>
-                                <span className="font-mono font-black text-emerald-700 text-sm">৳{prod.price}</span>
-                                <span className="text-[10px] text-gray-400 ml-1">/ {prod.unit}</span>
+                          <div className="p-2 space-y-1">
+                            <h4 className="font-bold text-[11px] text-gray-900 leading-snug line-clamp-2 cursor-pointer hover:text-emerald-700" onClick={() => { setDetailProduct(prod); setDetailStoreName(selectedStore.name); }}>{prod.name}</h4>
+                            <p className="text-[9px] text-gray-400 line-clamp-1">{prod.desc}</p>
+                            <div className="flex items-center justify-between pt-0.5 gap-1">
+                              <div className="min-w-0">
+                                <span className="font-mono font-black text-emerald-700 text-xs">৳{prod.price}</span>
+                                <span className="text-[9px] text-gray-400 ml-0.5">/ {prod.unit}</span>
                               </div>
                               {prod.status === 'Out of Stock' ? (
-                                <span className="text-[10px] font-bold text-gray-400 px-3 py-1.5">Unavailable</span>
+                                <span className="text-[9px] font-bold text-gray-400">Unavailable</span>
                               ) : (
-                                <div className="flex items-center space-x-1.5 shrink-0">
+                                <div className="flex items-center space-x-1 shrink-0">
                                    {inCart ? (
-                                    <div className="flex items-center justify-center space-x-2 bg-emerald-500 text-white rounded-lg px-2 py-1 min-w-[80px]">
+                                    <div className="flex items-center justify-center space-x-1.5 bg-emerald-500 text-white rounded-lg px-1.5 py-1">
                                       <button onClick={() => handleUpdateQty(prod.id, -1)} className="text-white hover:text-green-200 cursor-pointer"><Minus className="w-3 h-3" /></button>
-                                      <span className="font-mono font-bold text-xs w-4 text-center">{inCart.quantity}</span>
+                                      <span className="font-mono font-bold text-[10px] w-3.5 text-center">{inCart.quantity}</span>
                                       <button onClick={() => handleAddToCart(prod)} className="text-white hover:text-green-200 cursor-pointer"><Plus className="w-3 h-3" /></button>
                                     </div>
                                   ) : (
-                                    <button onClick={() => handleAddToCart(prod)} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1 min-w-[80px]">
+                                    <button onClick={() => handleAddToCart(prod)} className="px-2 py-1 bg-emerald-500 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1">
                                       <Plus className="w-3 h-3" /><span>Add</span>
                                     </button>
                                   )}
                                   <button
                                     onClick={() => openCustomize(prod)}
                                     title="Customize this item"
-                                    className="px-2 py-1.5 border border-emerald-600 text-emerald-700 bg-white text-[10px] font-bold rounded-lg hover:bg-emerald-50 transition-all cursor-pointer flex items-center space-x-1 shrink-0"
+                                    className="p-1 border border-emerald-600 text-emerald-700 bg-white rounded-lg hover:bg-emerald-50 transition-all cursor-pointer shrink-0"
                                   >
-                                    <SlidersHorizontal className="w-3 h-3" /><span>Customize</span>
+                                    <SlidersHorizontal className="w-3 h-3" />
                                   </button>
                                 </div>
                               )}
@@ -3270,6 +3284,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         </div>
                       );
                     })}
+                  {selectedStore.catalog
+                    .filter(p => storeCat === 'All' || p.category === storeCat)
+                    .filter(p => {
+                      if (!storeSearch.trim()) return true;
+                      const q = storeSearch.trim().toLowerCase();
+                      return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc || '').toLowerCase().includes(q) || (p.unit || '').toLowerCase().includes(q);
+                    }).length === 0 && (
+                    <p className="col-span-full text-center text-xs text-gray-400 py-8">No items match "{storeSearch}"</p>
+                  )}
                 </div>
               </div>
 
