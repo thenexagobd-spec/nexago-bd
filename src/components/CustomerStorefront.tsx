@@ -3807,11 +3807,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         {Math.abs((parseFloat(sendMoney.amount) || 0) - cartGrandTotal) <= 0.01 ? T.exactMatch : T.amountMatch?.replace('{x}', String(cartGrandTotal))}
                       </p>
                     </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5 text-[11px] text-blue-800">
-                      <p className="font-black">{T.reference}</p>
-                      <p>{T.referenceHint}</p>
-                      <p className="bg-white/70 rounded-lg p-2 font-mono font-bold text-blue-900 break-all">{sendMoney.note || customerPhone} · {customerProfile.name}</p>
-                    </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">{T.trxIdLabel?.replace('{m}', payModal)}</label>
                       <input
