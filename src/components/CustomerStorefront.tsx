@@ -655,6 +655,9 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     activeAccount: 'Active Account',
     connectedGmail: 'Connected Gmail',
     forgotPassword: 'Forgot password?',
+    forgotTitle: 'Forgot your password?',
+    forgotGmailPwd: 'Forgot Gmail password',
+    forgotAppPwd: 'Forgot App password',
     recoverViaGmail: 'Reset via your connected Gmail',
   },
   bn: {
@@ -843,7 +846,10 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     activeAccount: 'সক্রিয় অ্যাকাউন্ট',
     connectedGmail: 'সংযুক্ত Gmail',
     forgotPassword: 'পাসওয়ার্ড ভুলে গেছেন?',
-    recoverViaGmail: 'আপনার সংযুক্ত Gmail দিয়ে রিসেট করুন',
+    forgotTitle: 'পাসওয়ার্ড ভুলে গেছেন?',
+    forgotGmailPwd: 'Gmail পাসওয়ার্ড ভুলে গেছেন',
+    forgotAppPwd: 'অ্যাপ পাসওয়ার্ড ভুলে গেছেন',
+    recoverViaGmail: 'সংযুক্ত Gmail বা ফোন OTP দিয়ে রিসেট করুন',
   },
 };
 
@@ -3292,7 +3298,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
               {/* Profile picture + identity */}
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs">
-                <button type="button" onClick={() => setShowProfileCard(!showProfileCard)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-gray-50 transition-colors">
+                <button type="button" onClick={() => setShowProfileCard(!showProfileCard)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-black/5 transition-colors">
                   <span className="flex items-center space-x-2">
                     <User className="w-4 h-4 text-gray-400" />
                     <span className="font-black text-gray-900 text-sm">{T.activeAccount || 'Active Account'}</span>
@@ -3328,7 +3334,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
               {/* Preferences toggles */}
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs">
-                <button type="button" onClick={() => setShowPrefsCard(!showPrefsCard)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-gray-50 transition-colors">
+                <button type="button" onClick={() => setShowPrefsCard(!showPrefsCard)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-black/5 transition-colors">
                   <span className="flex items-center space-x-2">
                     <Settings className="w-4 h-4 text-gray-400" />
                     <span className="font-black text-gray-900 text-sm">Preferences</span>
@@ -3367,7 +3373,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
               {/* Account details */}
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs">
-                <button type="button" onClick={() => setShowAccountForm(!showAccountForm)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-gray-50 transition-colors">
+                <button type="button" onClick={() => setShowAccountForm(!showAccountForm)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-black/5 transition-colors">
                   <span className="flex items-center space-x-2">
                     <Mail className="w-4 h-4 text-gray-400" />
                     <span className="font-black text-gray-900 text-sm">{T.connectedGmail || 'Connected Gmail'}</span>
@@ -3409,7 +3415,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
               {/* Change password */}
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs">
-                <button type="button" onClick={() => setShowPwdForm(!showPwdForm)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-gray-50 transition-colors">
+                <button type="button" onClick={() => setShowPwdForm(!showPwdForm)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-black/5 transition-colors">
                   <span className="flex items-center space-x-2">
                     <Lock className="w-4 h-4 text-gray-400" />
                     <span className="font-black text-gray-900 text-sm">{T.changePassword || 'Change Password'}</span>
@@ -3438,14 +3444,24 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <input type="password" value={pwd.confirm} onChange={(e) => setPwd(p => ({ ...p, confirm: e.target.value }))} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
                     </div>
                     <button type="submit" className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl shadow-md transition-all">{T.updatePassword || 'Update Password'}</button>
-                    <button
-                      type="button"
-                      onClick={() => { setPwd({ old: '', fresh: '', confirm: '' }); showToast(`Password reset link sent to ${customerProfile.email}`, 'success'); }}
-                      className="w-full flex items-center justify-center space-x-2 py-2.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors cursor-pointer"
-                    >
-                      <KeyRound className="w-3.5 h-3.5" /><span>{T.forgotPassword || 'Forgot password?'}</span>
-                    </button>
-                    <p className="text-[10px] text-gray-400 text-center">{T.recoverViaGmail || 'Reset via your connected Gmail'}</p>
+                    <div className="space-y-2 pt-1 border-t border-gray-100">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{T.forgotTitle || 'Forgot your password?'}</p>
+                      <button
+                        type="button"
+                        onClick={() => { setPwd({ old: '', fresh: '', confirm: '' }); showToast(`Gmail password reset link sent to ${customerProfile.email}`, 'success'); }}
+                        className="w-full flex items-center justify-center space-x-2 py-2.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors cursor-pointer"
+                      >
+                        <Mail className="w-3.5 h-3.5" /><span>{T.forgotGmailPwd || 'Forgot Gmail password'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setPwd({ old: '', fresh: '', confirm: '' }); showToast('App password reset OTP sent to your phone', 'success'); }}
+                        className="w-full flex items-center justify-center space-x-2 py-2.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors cursor-pointer"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" /><span>{T.forgotAppPwd || 'Forgot App password'}</span>
+                      </button>
+                      <p className="text-[10px] text-gray-400 text-center">{T.recoverViaGmail || 'Reset via your connected Gmail or phone OTP'}</p>
+                    </div>
                   </form>
                 )}
               </div>
