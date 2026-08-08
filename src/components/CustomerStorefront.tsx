@@ -2422,51 +2422,51 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </div>
 
               {/* Offers strip */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                 {[
-                  { icon: <Store className="w-5 h-5" />, title: T.wideRange, sub: T.wideRangeSub },
-                  { icon: <Truck className="w-5 h-5" />, title: T.fastDelivery, sub: T.fastDeliverySub },
-                  { icon: <Shield className="w-5 h-5" />, title: T.securePay, sub: T.securePaySub },
-                  { icon: <Gift className="w-5 h-5" />, title: T.bestOffers, sub: T.bestOffersSub },
+                  { icon: <Store className="w-4 h-4" />, title: T.wideRange, sub: T.wideRangeSub },
+                  { icon: <Truck className="w-4 h-4" />, title: T.fastDelivery, sub: T.fastDeliverySub },
+                  { icon: <Shield className="w-4 h-4" />, title: T.securePay, sub: T.securePaySub },
+                  { icon: <Gift className="w-4 h-4" />, title: T.bestOffers, sub: T.bestOffersSub },
                 ].map((f, i) => (
-                  <div key={i} className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">{f.icon}</div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white">{f.title}</h4>
-                      <p className="text-[11px] text-gray-400 mt-0.5">{f.sub}</p>
+                  <div key={i} className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">{f.icon}</div>
+                    <div className="min-w-0">
+                      <h4 className="text-[11px] font-bold text-white truncate">{f.title}</h4>
+                      <p className="text-[10px] text-gray-400 mt-0.5 truncate">{f.sub}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Quick links / policies strip */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-                <a href="mailto:support@nexagobd.com" className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs hover:border-emerald-500/50 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Headphones className="w-5 h-5" /></div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white">সাপোর্ট</h4>
-                    <p className="text-[11px] text-gray-400 mt-0.5">support@nexagobd.com</p>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                <a href="mailto:support@nexagobd.com" className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/50 transition-colors">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Headphones className="w-4 h-4" /></div>
+                  <div className="min-w-0">
+                    <h4 className="text-[11px] font-bold text-white truncate">সাপোর্ট</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">support@nexagobd.com</p>
                   </div>
                 </a>
-                <button onClick={() => setPolicyModal('terms')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><ScrollText className="w-5 h-5" /></div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white">টার্মস অ্যান্ড কন্ডিশনস</h4>
-                    <p className="text-[11px] text-gray-400 mt-0.5">আমাদের নিয়মাবলি</p>
+                <button onClick={() => setPolicyModal('terms')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><ScrollText className="w-4 h-4" /></div>
+                  <div className="min-w-0">
+                    <h4 className="text-[11px] font-bold text-white truncate">টার্মস ও কন্ডিশন</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">আমাদের নিয়মাবলি</p>
                   </div>
                 </button>
-                <button onClick={() => setPolicyModal('privacy')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Lock className="w-5 h-5" /></div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white">প্রাইভেসি পলিসি</h4>
-                    <p className="text-[11px] text-gray-400 mt-0.5">আপনার তথ্য সুরক্ষিত</p>
+                <button onClick={() => setPolicyModal('privacy')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Lock className="w-4 h-4" /></div>
+                  <div className="min-w-0">
+                    <h4 className="text-[11px] font-bold text-white truncate">প্রাইভেসি পলিসি</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">আপনার তথ্য সুরক্ষিত</p>
                   </div>
                 </button>
-                <button onClick={() => setPolicyModal('refund')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-2xl p-4 flex items-center space-x-3.5 shadow-xs hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><RefreshCcw className="w-5 h-5" /></div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white">রিফান্ড পলিসি</h4>
-                    <p className="text-[11px] text-gray-400 mt-0.5">ফুল রিফান্ড গ্যারান্টি</p>
+                <button onClick={() => setPolicyModal('refund')} className="bg-[#0a1425] border border-[#1e2f4a] rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/50 transition-colors text-left cursor-pointer">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><RefreshCcw className="w-4 h-4" /></div>
+                  <div className="min-w-0">
+                    <h4 className="text-[11px] font-bold text-white truncate">রিফান্ড পলিসি</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">ফুল রিফান্ড গ্যারান্টি</p>
                   </div>
                 </button>
               </div>
