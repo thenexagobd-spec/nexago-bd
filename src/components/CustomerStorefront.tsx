@@ -1058,8 +1058,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       if ((ord.paymentStatus === 'Rejected') && !seenCompletedRef.current.has(ord.id + '-pay-no')) {
         seenCompletedRef.current.add(ord.id + '-pay-no');
         setCustomerNotifs(prev => [{
-          id: `CN-${Date.now().toString().slice(-4)}`, title: '⛔ Payment Rejected',
-          body: `Payment for order #${ord.id} was rejected${ord.paymentNote ? ` — ${ord.paymentNote}` : ''}.`, emoji: '⛔', time: 'Just now', read: false
+          id: `CN-${Date.now().toString().slice(-4)}`, title: '⏸ Order on Hold',
+          body: `Payment for order #${ord.id} needs re-verification — your order is on hold${ord.paymentNote ? ` (${ord.paymentNote})` : ''}.`, emoji: '⏸', time: 'Just now', read: false
         }, ...prev]);
       }
     }
@@ -2585,7 +2585,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">✅ Payment Approved</span>
                             )}
                             {ord.paymentStatus === 'Rejected' && (
-                              <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-black">⛔ Payment Rejected</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-black animate-pulse">⏸ Order on Hold</span>
                             )}
                             {ord.paymentStatus === 'COD' && (
                               <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-black">💵 Cash on Delivery</span>
