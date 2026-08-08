@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
-  ClipboardList, Check
+  ClipboardList, Check, Eye
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -151,6 +151,17 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
                       {o.trxAmount !== undefined && <p className="text-gray-400"><b className="text-gray-200">Sent:</b> <span className="font-mono">৳{o.trxAmount.toLocaleString()}</span></p>}
                       <p className="text-gray-400"><b className="text-gray-200">Date:</b> {o.date}{o.time ? ` · ${o.time}` : ''}</p>
                     </div>
+                    {o.receipt && (
+                      <div className="flex items-center gap-3">
+                        <a href={o.receipt} target="_blank" rel="noreferrer" title="Open receipt in new tab">
+                          <img src={o.receipt} alt="payment receipt" className="h-28 w-24 object-cover rounded-lg border border-brand-border bg-brand-dark cursor-pointer hover:opacity-90 transition-opacity" />
+                        </a>
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center space-x-1.5"><Eye className="w-3.5 h-3.5 text-brand-orange" /><span>Payment receipt / screenshot</span></p>
+                          <p className="text-[9px] text-gray-500">Customer's uploaded payment proof — click the image to view full size.</p>
+                        </div>
+                      </div>
+                    )}
                     {o.customerNote && (
                       <p className="text-[10px] text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-2.5 py-1.5">💬 Customer note: {o.customerNote}</p>
                     )}
