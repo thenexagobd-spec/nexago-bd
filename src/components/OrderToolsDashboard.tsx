@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
 import {
-  History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck
+  History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
+  ClipboardList, Check
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -19,12 +20,13 @@ const lsSet = (key: string, v: unknown) => {
 
 interface OrderToolsDashboardProps {
   orders: Order[];
+  onUpdateOrder: (order: Order) => void;
   showToast?: (message: string, type?: 'success' | 'info') => void;
 }
 
-type ToolTab = 'audit' | 'refunds' | 'analytics' | 'wallets';
+type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets';
 
-export default function OrderToolsDashboard({ orders, showToast }: OrderToolsDashboardProps) {
+export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }: OrderToolsDashboardProps) {
   const [tab, setTab] = useState<ToolTab>('audit');
 
   const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>(() => lsGet('ss_admin_audit', []));
@@ -55,7 +57,15 @@ export default function OrderToolsDashboard({ orders, showToast }: OrderToolsDas
     showToast && showToast('Wallet numbers saved — customers now send money to these', 'success');
   };
 
+  // Pending send-money orders awaiting admin payment verification
+  const isWalletMethod = (m: string) =>
+    ['bKash', 'Nagad', 'Upay', 'Rocket'].includes(
+      m.startsWith('bKash') ? 'bKash' : m.startsWith('Nagad') ? 'Nagad' : m.startsWith('Upay') ? 'Upay' : m.startsWith('Rocket') ? 'Rocket' : m.includes('Wallet') ? 'Wallet' : m.includes('Cash') ? 'Cash on Delivery' : m
+    );
+  const pendingPayments = orders.filter(o => o.paymentStatus === 'Pending' && isWalletMethod(o.paymentMethod));
+
   const tabs: { key: ToolTab; label: string; icon: any; badge?: number }[] = [
+    { key: 'verify', label: 'Verify Payments', icon: ShieldCheck, badge: pendingPayments.length },
     { key: 'audit', label: 'Audit Log', icon: History, badge: auditLog.length },
     { key: 'refunds', label: 'Refund Requests', icon: Banknote, badge: refunds.filter(r => r.status === 'Requested').length },
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
@@ -97,6 +107,60 @@ export default function OrderToolsDashboard({ orders, showToast }: OrderToolsDas
       </div>
 
       <div className="bg-brand-card border border-brand-border/60 rounded-2xl p-5 text-xs max-w-5xl">
+        {/* ============ VERIFY PAYMENTS ============ */}
+        {tab === 'verify' && (
+          <div className="space-y-3">
+            <h3 className="font-black text-white text-sm flex items-center space-x-2"><ShieldCheck className="w-4 h-4 text-brand-orange" /><span>Verify Send Money Payments</span></h3>
+            <p className="text-[10px] text-gray-400">When a customer places a send-money order, all their details show up here. After you verify and approve the payment, the order moves to Order Management.</p>
+
+            {pendingPayments.length === 0 ? (
+              <p className="text-center text-[10px] text-gray-500 py-6 flex items-center justify-center space-x-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /><span>No pending payments — all send-money orders verified.</span></p>
+            ) : (
+              <div className="space-y-2">
+                {pendingPayments.map(o => (
+                  <div key={o.id} className="bg-brand-dark/50 border border-brand-border/50 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <p className="text-gray-100 font-black text-xs font-mono">#{o.id}</p>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => {
+                            onUpdateOrder({ ...o, paymentStatus: 'Approved' });
+                            setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Approved', orderId: o.id, paymentMethod: o.paymentMethod, amount: o.amount, at: Date.now() }, ...prev]);
+                            showToast && showToast(`Payment approved for #${o.id} — moved to Order Management`, 'success');
+                          }}
+                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                        >✓ Approve Payment</button>
+                        <button
+                          onClick={() => {
+                            onUpdateOrder({ ...o, paymentStatus: 'Rejected' });
+                            setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Rejected', orderId: o.id, paymentMethod: o.paymentMethod, amount: o.amount, at: Date.now() }, ...prev]);
+                            showToast && showToast(`Payment rejected for #${o.id}`, 'info');
+                          }}
+                          className="px-3 py-1.5 bg-brand-dark border border-brand-border hover:bg-red-500/20 text-gray-300 hover:text-red-300 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                        >✗ Reject</button>
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1.5 text-[10px]">
+                      <p className="text-gray-400"><b className="text-gray-200">Customer:</b> {o.customerName}{o.customerPhone ? ` · ${o.customerPhone}` : ''}</p>
+                      <p className="text-gray-400"><b className="text-gray-200">Store:</b> {o.storeName}</p>
+                      <p className="text-gray-400"><b className="text-gray-200">Amount:</b> <span className="font-mono text-white font-bold">৳{o.amount.toLocaleString()}</span></p>
+                      <p className="text-gray-400"><b className="text-gray-200">Method:</b> {o.paymentMethod}</p>
+                      {o.trxId && <p className="text-gray-400"><b className="text-gray-200">TrxID:</b> <span className="font-mono">{o.trxId}</span></p>}
+                      {o.senderNumber && <p className="text-gray-400"><b className="text-gray-200">Sender No:</b> <span className="font-mono">{o.senderNumber}</span></p>}
+                      {o.last4 && <p className="text-gray-400"><b className="text-gray-200">Last 4:</b> <span className="font-mono">{o.last4}</span></p>}
+                      {o.trxAmount !== undefined && <p className="text-gray-400"><b className="text-gray-200">Sent:</b> <span className="font-mono">৳{o.trxAmount.toLocaleString()}</span></p>}
+                      <p className="text-gray-400"><b className="text-gray-200">Date:</b> {o.date}{o.time ? ` · ${o.time}` : ''}</p>
+                    </div>
+                    {o.customerNote && (
+                      <p className="text-[10px] text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-2.5 py-1.5">💬 Customer note: {o.customerNote}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ============ AUDIT LOG ============ */}
         {tab === 'audit' && (
           <div className="space-y-3">

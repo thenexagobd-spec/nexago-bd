@@ -4062,7 +4062,7 @@ export default function App() {
           )}
 
           {activeTab === 'Order Tools Dashboard' && (
-            <OrderToolsDashboard orders={orders} showToast={showToast} />
+            <OrderToolsDashboard orders={orders} onUpdateOrder={handleUpdateOrder} showToast={showToast} />
           )}
 
           {(activeTab === 'Payments' || activeTab === 'Earnings & Payouts') && (
