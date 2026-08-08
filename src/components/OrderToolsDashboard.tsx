@@ -57,18 +57,18 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
     showToast && showToast('Wallet numbers saved — customers now send money to these', 'success');
   };
 
-  // Pending send-money orders awaiting admin payment verification
+  // Send-money orders awaiting payment verification (Pending) or held after a rejection (Rejected)
   const isWalletMethod = (m: string) =>
     ['bKash', 'Nagad', 'Upay', 'Rocket'].includes(
       m.startsWith('bKash') ? 'bKash' : m.startsWith('Nagad') ? 'Nagad' : m.startsWith('Upay') ? 'Upay' : m.startsWith('Rocket') ? 'Rocket' : m.includes('Wallet') ? 'Wallet' : m.includes('Cash') ? 'Cash on Delivery' : m
     );
-  const pendingPayments = orders.filter(o => o.paymentStatus === 'Pending' && isWalletMethod(o.paymentMethod));
+  const verifyPayments = orders.filter(o => (o.paymentStatus === 'Pending' || o.paymentStatus === 'Rejected') && isWalletMethod(o.paymentMethod));
 
   // Receipt popup viewer (full-size payment screenshot)
   const [receiptView, setReceiptView] = useState<string | null>(null);
 
   const tabs: { key: ToolTab; label: string; icon: any; badge?: number }[] = [
-    { key: 'verify', label: 'Verify Payments', icon: ShieldCheck, badge: pendingPayments.length },
+    { key: 'verify', label: 'Verify Payments', icon: ShieldCheck, badge: verifyPayments.length },
     { key: 'audit', label: 'Audit Log', icon: History, badge: auditLog.length },
     { key: 'refunds', label: 'Refund Requests', icon: Banknote, badge: refunds.filter(r => r.status === 'Requested').length },
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
@@ -114,22 +114,30 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
         {tab === 'verify' && (
           <div className="space-y-3">
             <h3 className="font-black text-white text-sm flex items-center space-x-2"><ShieldCheck className="w-4 h-4 text-brand-orange" /><span>Verify Send Money Payments</span></h3>
-            <p className="text-[10px] text-gray-400">When a customer places a send-money order, all their details show up here. After you verify and approve the payment, the order moves to Order Management.</p>
+            <p className="text-[10px] text-gray-400">When a customer places a send-money order, all their details show up here. Rejected payments are held here so you can re-check — approve again or keep rejected, any time.</p>
 
-            {pendingPayments.length === 0 ? (
-              <p className="text-center text-[10px] text-gray-500 py-6 flex items-center justify-center space-x-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /><span>No pending payments — all send-money orders verified.</span></p>
+            {verifyPayments.length === 0 ? (
+              <p className="text-center text-[10px] text-gray-500 py-6 flex items-center justify-center space-x-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /><span>No pending or held payments — all send-money orders verified.</span></p>
             ) : (
               <div className="space-y-2">
-                {pendingPayments.map(o => (
-                  <div key={o.id} className="bg-brand-dark/50 border border-brand-border/50 rounded-xl p-3 space-y-2">
+                {verifyPayments.map(o => (
+                  <div key={o.id} className={`bg-brand-dark/50 border rounded-xl p-3 space-y-2 ${o.paymentStatus === 'Rejected' ? 'border-red-500/40' : 'border-brand-border/50'}`}>
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <p className="text-gray-100 font-black text-xs font-mono">#{o.id}</p>
+                      <div className="flex items-center space-x-2">
+                        <p className="text-gray-100 font-black text-xs font-mono">#{o.id}</p>
+                        {o.paymentStatus === 'Rejected' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/20 text-red-300 border border-red-500/20">⏸ Hold · Rejected</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/20">⏳ Pending</span>
+                        )}
+                      </div>
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => {
-                            onUpdateOrder({ ...o, paymentStatus: 'Approved' });
+                            const wasHeld = o.paymentStatus === 'Rejected';
+                            onUpdateOrder({ ...o, paymentStatus: 'Approved', status: wasHeld && o.status === 'Cancelled' ? 'Pending' : o.status });
                             setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Approved', orderId: o.id, paymentMethod: o.paymentMethod, amount: o.amount, at: Date.now() }, ...prev]);
-                            showToast && showToast(`Payment approved for #${o.id} — moved to Order Management`, 'success');
+                            showToast && showToast(wasHeld ? `Payment re-approved for #${o.id} — order is active again` : `Payment approved for #${o.id} — moved to Order Management`, 'success');
                           }}
                           className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
                         >✓ Approve Payment</button>
@@ -137,9 +145,13 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, showToast }
                           onClick={() => {
                             onUpdateOrder({ ...o, paymentStatus: 'Rejected' });
                             setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Rejected', orderId: o.id, paymentMethod: o.paymentMethod, amount: o.amount, at: Date.now() }, ...prev]);
-                            showToast && showToast(`Payment rejected for #${o.id}`, 'info');
+                            showToast && showToast(`Payment rejected for #${o.id} — order held`, 'info');
                           }}
-                          className="px-3 py-1.5 bg-brand-dark border border-brand-border hover:bg-red-500/20 text-gray-300 hover:text-red-300 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                          className={`px-3 py-1.5 border rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
+                            o.paymentStatus === 'Rejected'
+                              ? 'bg-red-500/20 border-red-500/30 text-red-300 hover:bg-red-500/40'
+                              : 'bg-brand-dark border-brand-border hover:bg-red-500/20 text-gray-300 hover:text-red-300'
+                          }`}
                         >✗ Reject</button>
                       </div>
                     </div>
