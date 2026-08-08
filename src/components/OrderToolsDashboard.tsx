@@ -4,13 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Order, Driver, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
+import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY } from '../types';
 import {
-  History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
-  ClipboardList
+  History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
-import OrdersView from './OrdersView';
 
 const lsGet = <T,>(key: string, fallback: T): T => {
   try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -21,24 +19,13 @@ const lsSet = (key: string, v: unknown) => {
 
 interface OrderToolsDashboardProps {
   orders: Order[];
-  drivers: Driver[];
-  onAddOrder: (order: Omit<Order, 'id' | 'date'>) => void;
-  onUpdateOrder: (order: Order) => void;
-  onDeleteOrder: (id: string) => void;
-  onAssignDriver?: (order: Order, driverId: string) => void;
-  onCancelOrder?: (order: Order, note: string) => void;
-  onReactivateOrder?: (order: Order, destination: 'driver' | 'customer' | 'store') => void;
-  onUndoStatus?: (order: Order) => void;
   showToast?: (message: string, type?: 'success' | 'info') => void;
 }
 
-type ToolTab = 'orders' | 'audit' | 'refunds' | 'analytics' | 'wallets';
+type ToolTab = 'audit' | 'refunds' | 'analytics' | 'wallets';
 
-export default function OrderToolsDashboard({
-  orders, drivers, onAddOrder, onUpdateOrder, onDeleteOrder,
-  onAssignDriver, onCancelOrder, onReactivateOrder, onUndoStatus, showToast
-}: OrderToolsDashboardProps) {
-  const [tab, setTab] = useState<ToolTab>('orders');
+export default function OrderToolsDashboard({ orders, showToast }: OrderToolsDashboardProps) {
+  const [tab, setTab] = useState<ToolTab>('audit');
 
   const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>(() => lsGet('ss_admin_audit', []));
   useEffect(() => lsSet('ss_admin_audit', auditLog), [auditLog]);
@@ -69,7 +56,6 @@ export default function OrderToolsDashboard({
   };
 
   const tabs: { key: ToolTab; label: string; icon: any; badge?: number }[] = [
-    { key: 'orders', label: 'Orders', icon: ClipboardList, badge: orders.length },
     { key: 'audit', label: 'Audit Log', icon: History, badge: auditLog.length },
     { key: 'refunds', label: 'Refund Requests', icon: Banknote, badge: refunds.filter(r => r.status === 'Requested').length },
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
@@ -110,24 +96,7 @@ export default function OrderToolsDashboard({
         ))}
       </div>
 
-      <div className="bg-brand-card border border-brand-border/60 rounded-2xl p-5 text-xs max-w-7xl">
-        {/* ============ ORDERS (full management table, embedded) ============ */}
-        {tab === 'orders' && (
-          <OrdersView
-            orders={orders}
-            drivers={drivers}
-            onAddOrder={onAddOrder}
-            onUpdateOrder={onUpdateOrder}
-            onDeleteOrder={onDeleteOrder}
-            onAssignDriver={onAssignDriver}
-            onCancelOrder={onCancelOrder}
-            onReactivateOrder={onReactivateOrder}
-            onUndoStatus={onUndoStatus}
-            showToast={showToast}
-            embedded
-          />
-        )}
-
+      <div className="bg-brand-card border border-brand-border/60 rounded-2xl p-5 text-xs max-w-5xl">
         {/* ============ AUDIT LOG ============ */}
         {tab === 'audit' && (
           <div className="space-y-3">
