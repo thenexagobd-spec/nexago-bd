@@ -1550,17 +1550,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setCancelConfirmId(null);
   };
 
-  const confirmDelivery = (ord: Order) => {
-    onUpdateOrder({ ...ord, status: 'Completed' });
-    setCustomerNotifs(prev => [{
-      id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Delivery Confirmed',
-      body: `Order #${ord.id} marked delivered. Rate your rider and store!`, emoji: '🛵', time: 'Just now', read: false
-    }, ...prev]);
-    showToast('Delivery confirmed — thank you for shopping with Smart Shop!', 'success');
-    setTrackingOrder(null);
-    setRateRiderOrder(ord);
-  };
-
   const submitRiderRating = () => {
     if (!rateRiderOrder) return;
     const drv = liveDriverOf(rateRiderOrder);
@@ -3880,17 +3869,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </div>
             )}
 
-            {/* Delivery PIN verification */}
+            {/* Delivery is completed by the admin/store only — customers cannot complete orders */}
             {trackProgress >= 0.9 && trackingOrder.status !== 'Completed' && (
-              <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center space-y-2">
-                <p className="text-xs font-black text-emerald-900 flex items-center justify-center space-x-1.5">
-                  <Lock className="w-3.5 h-3.5" /><span>Driver at your door — verify to complete delivery</span>
+              <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl text-center">
+                <p className="text-xs font-black text-blue-900 flex items-center justify-center space-x-1.5">
+                  <Lock className="w-3.5 h-3.5" /><span>Driver at your door — delivery will be confirmed by our team</span>
                 </p>
-                <p className="text-[10px] text-emerald-700">Share this 4-digit PIN with the rider to confirm:</p>
-                <p className="font-mono text-3xl font-black tracking-[0.4em] text-emerald-800">{trackingOrder.deliveryPin || '----'}</p>
-                <button onClick={() => confirmDelivery(trackingOrder)} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2">
-                  <CheckCircle className="w-4 h-4" /><span>Confirm Delivery</span>
-                </button>
               </div>
             )}
 
