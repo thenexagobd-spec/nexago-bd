@@ -82,7 +82,6 @@ export default function DriverPortal() {
   const done = myOrders.filter(o => o.status === 'Completed');
   const cancelled = myOrders.filter(o => o.status === 'Cancelled');
   const earned = done.reduce((s, o) => s + (o.deliveryCharge || 60), 0) + done.length * 20;
-  const today = done.length || 0;
 
   // Auto-accept offers when enabled
   useEffect(() => {
@@ -465,22 +464,6 @@ export default function DriverPortal() {
                 </div>
               ) : (
                 <>
-                  {/* KPIs */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    {[
-                      { label: 'Today Deliveries', value: today.toString(), sub: `${done.length} total completed`, color: 'text-emerald-400' },
-                      { label: 'Active Jobs', value: (activeOrder ? 1 : 0).toString(), sub: 'awaiting delivery', color: 'text-amber-400' },
-                      { label: 'Earnings', value: bdt(earned), sub: 'delivery + tips', color: 'text-brand-orange' },
-                      { label: 'Rating', value: me?.rating ? me.rating.toFixed(1) : '4.9', sub: '★ excellent', color: 'text-sky-400' },
-                    ].map(k => (
-                      <div key={k.label} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
-                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{k.label}</p>
-                        <p className={`text-2xl font-black mt-1.5 ${k.color}`}>{k.value}</p>
-                        <p className="text-[9px] text-gray-500 mt-0.5">{k.sub}</p>
-                      </div>
-                    ))}
-                  </div>
-
                   {/* Active delivery card */}
                   {activeOrder && (
                     <div className="bg-[#101d30] border border-brand-orange/40 rounded-2xl p-4 space-y-2.5 shadow-md">
@@ -511,7 +494,7 @@ export default function DriverPortal() {
                     <div className="flex flex-col items-center justify-center py-6">
                       <button onClick={() => setTab('offers')} className="relative w-14 h-14 rounded-full bg-[#101d30] border border-brand-orange/40 flex items-center justify-center cursor-pointer group" title="Check for new orders">
                         <span className="absolute inset-0 rounded-full border-2 border-dashed border-brand-orange/50"></span>
-                        <RefreshCw className="w-6 h-6 text-brand-orange" />
+                        <RefreshCw className="w-6 h-6 text-brand-orange animate-spin" />
                       </button>
                       <p className="text-[9px] text-gray-500 font-bold uppercase mt-2 tracking-wide">{offers.length ? `${offers.length} new order${offers.length > 1 ? 's' : ''} available` : 'Tap to check for new orders'}</p>
                     </div>
