@@ -1217,7 +1217,27 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   // Permanent unique customer ID — generated once at account creation, never changes.
   // One ID per phone / one ID per Gmail (duplicates are prevented).
+  // On mount we look up the shared account registry (ss_cust_accounts) AND the admin
+  // customer directory (ss_admin_customers) by phone or Gmail. If an account already
+  // exists with the same phone/Gmail we ADOPT that permanent ID (unified identity —
+  // no duplicate accounts). If none exists, we create a brand-new permanent ID.
+  const normPhone = (p: string) => (p || '').replace(/[^0-9]/g, '');
+  const normEmail = (e: string) => (e || '').trim().toLowerCase();
   const [customerId] = useState<string>(() => {
+    const myPhone = normPhone(customerProfile.phone);
+    const myEmail = normEmail(customerProfile.email);
+    const accounts = getStoredData<Array<{ customerId: string; name: string; phone: string; email: string }>>('ss_cust_accounts', []);
+    const directory = getStoredData<Array<{ phone?: string; email?: string; custId?: string }>>('ss_admin_customers', []);
+    const regMatch = accounts.find(a => (myPhone && normPhone(a.phone) === myPhone) || (myEmail && normEmail(a.email) === myEmail));
+    if (regMatch) {
+      setStoredData('ss_cust_id', regMatch.customerId);
+      return regMatch.customerId;
+    }
+    const dirMatch = directory.find(c => (myPhone && normPhone(c.phone || '') === myPhone) || (myEmail && normEmail(c.email || '') === myEmail));
+    if (dirMatch && dirMatch.custId) {
+      setStoredData('ss_cust_id', dirMatch.custId);
+      return dirMatch.custId;
+    }
     let id = getStoredData<string>('ss_cust_id', '');
     if (!id) {
       id = 'NEX' + Math.floor(1000000000 + Math.random() * 9000000000).toString();
@@ -1225,7 +1245,32 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     }
     return id;
   });
+
+  // Register this customer in the shared account registry so the admin can find
+  // the profile by ID / phone / Gmail and duplicates are never created.
+  useEffect(() => {
+    const accounts = getStoredData<Array<{ customerId: string; name: string; phone: string; email: string }>>('ss_cust_accounts', []);
+    const idx = accounts.findIndex(a => a.customerId === customerId);
+    const entry = { customerId, name: customerProfile.name, phone: customerProfile.phone, email: customerProfile.email };
+    const next = idx >= 0 ? accounts.map(a => a.customerId === customerId ? entry : a) : [...accounts, entry];
+    setStoredData('ss_cust_accounts', next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId, customerProfile.name, customerProfile.phone, customerProfile.email]);
+
   const [custIdCopy, setCustIdCopy] = useState(false);
+
+  // Duplicate prevention: one phone + one Gmail = one account. When the customer
+  // tries to save a phone/Gmail that already belongs to another account, block it.
+  const findAccountDuplicate = (phone: string, email: string) => {
+    const accounts = getStoredData<Array<{ customerId: string; name: string; phone: string; email: string }>>('ss_cust_accounts', []);
+    const p = normPhone(phone);
+    const e = normEmail(email);
+    const byPhone = accounts.find(a => a.customerId !== customerId && p && normPhone(a.phone) === p);
+    if (byPhone) return byPhone;
+    const byEmail = accounts.find(a => a.customerId !== customerId && e && normEmail(a.email) === e);
+    if (byEmail) return byEmail;
+    return null;
+  };
 
   const [pwd, setPwd] = useState({ old: '', fresh: '', confirm: '' });
   const [showPwdForm, setShowPwdForm] = useState(false);
@@ -3590,7 +3635,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showAccountForm ? 'rotate-180' : ''}`} />
                 </button>
                 {showAccountForm && (
-                  <form onSubmit={(e) => { e.preventDefault(); showToast('Account settings updated successfully!', 'success'); }} className="px-6 pb-6 pt-4 border-t border-gray-100 space-y-4 text-xs">
+                  <form onSubmit={(e) => { e.preventDefault(); const dup = findAccountDuplicate(customerProfile.phone, customerProfile.email); if (dup) { showToast(`This phone or Gmail already belongs to account ${dup.name} (ID ${dup.customerId}). One account per phone/Gmail — please use your existing login.`, 'info'); return; } showToast('Account settings updated successfully!', 'success'); }} className="px-6 pb-6 pt-4 border-t border-gray-100 space-y-4 text-xs">
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.fullName || 'Full Name'}</label>
                       <input type="text" value={customerProfile.name} onChange={(e) => setCustomerProfile({ ...customerProfile, name: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
