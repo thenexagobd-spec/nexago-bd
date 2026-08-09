@@ -20,6 +20,13 @@ export interface Order {
   deliveryCoords?: { lat: number; lng: number };
   priority?: 'Normal' | 'Express' | 'Urgent';
   pickupLocation?: string;
+  // Store/Driver delivery flow fields (mirror the simulator's live order lifecycle)
+  storeReady?: boolean;      // store marked the order ready for pickup
+  preparing?: boolean;       // store started preparing the order
+  driverStage?: string;      // to_store | waiting_store | ready_for_pickup | to_customer | at_customer | customer_reported
+  driverDeadline?: number;   // epoch ms — driver must accept the offer before this
+  pickupProof?: string;      // filename of the driver's pickup photo
+  deliveryProof?: string;    // filename of the driver's delivery proof photo
   zone?: string;
   itemCount?: number;
   parcelSize?: 'Small' | 'Medium' | 'Large';
@@ -75,6 +82,7 @@ export interface DriverStatusLog {
 export interface Driver {
   id: string; // e.g. "DRV123456"
   name: string;
+  photo?: string; // driver profile photo URL
   completedOrders: number;
   earnings: number;
   rating: number;

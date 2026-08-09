@@ -16,6 +16,7 @@ export const defaultDrivers: Driver[] = [
     rating: 4.9,
     status: "Online",
     phone: "01712345678",
+    photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400",
     vehicleType: "Motorcycle (Yamaha 125cc)",
     dispatchLocked: false,
     commissionRate: 15,
