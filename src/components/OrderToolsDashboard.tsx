@@ -95,7 +95,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     return () => window.removeEventListener('storage', onStorage);
   }, []);
   const pendingTopUps = custTxns.filter(t => t.type === 'Top-Up' && t.status === 'Pending');
-  const unassignedTopUps = pendingTopUps.filter(t => !t.customerId || !customers.some(c => c.id === t.customerId));
+  const unassignedTopUps = pendingTopUps.filter(t => !t.customerId || !customers.some(c => c.id === t.customerId || c.custId === t.customerId));
   const [walletBal, setWalletBal] = useState<number>(() => lsGet('ss_wallet_v2', 0));
   useEffect(() => {
     const onStorage = () => setWalletBal(lsGet('ss_wallet_v2', 0));
@@ -238,7 +238,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
                       <div className="flex-1 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1.5 text-[10px]">
-                        <p className="text-gray-400"><b className="text-gray-200">Customer:</b> {o.customerName}{o.customerPhone ? ` · ${o.customerPhone}` : ''}</p>
+                        <p className="text-gray-400"><b className="text-gray-200">Customer:</b> {o.customerName}{o.customerPhone ? ` · ${o.customerPhone}` : ''}{o.customerId ? ` · ID ${o.customerId}` : ''}</p>
                         <p className="text-gray-400"><b className="text-gray-200">Store:</b> {o.storeName}</p>
                         <p className="text-gray-400"><b className="text-gray-200">Amount:</b> <span className="font-mono text-white font-bold">৳{o.amount.toLocaleString()}</span></p>
                         <p className="text-gray-400"><b className="text-gray-200">Method:</b> {o.paymentMethod}</p>
@@ -737,9 +737,9 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                 .map(c => {
                   const alloc = custWallet[c.id] || 0;
                   const loyalty = custLoyalty[c.id] !== undefined ? custLoyalty[c.id] : c.loyalty;
-                  const custOrders = orders.filter(o => o.customerName === c.name || o.customerPhone === c.phone);
+                  const custOrders = orders.filter(o => o.customerName === c.name || o.customerPhone === c.phone || o.customerId === c.custId);
                   const blocked = c.status === 'Blocked';
-                  const custPending = custTxns.filter(t => t.type === 'Top-Up' && t.status === 'Pending' && (t.customerId === c.id || t.sender === c.phone));
+                  const custPending = custTxns.filter(t => t.type === 'Top-Up' && t.status === 'Pending' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone));
                   return (
                     <div key={c.id} className={`bg-brand-dark/50 border rounded-xl overflow-hidden ${blocked ? 'border-red-500/40 opacity-80' : custPending.length > 0 ? 'border-amber-500/50' : 'border-brand-border/40'}`}>
                       <div className="p-3 flex items-center justify-between gap-3">
@@ -888,12 +888,12 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                           </div>
 
                           <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><Banknote className="w-3 h-3 text-brand-orange" /><span>Add Money Requests ({custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.sender === c.phone)).length})</span></p>
-                            {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.sender === c.phone)).length === 0 ? (
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><Banknote className="w-3 h-3 text-brand-orange" /><span>Add Money Requests ({custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).length})</span></p>
+                            {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).length === 0 ? (
                               <p className="text-[9px] text-gray-500">No add money requests for this customer. Use New Add Money to create one.</p>
                             ) : (
                               <div className="space-y-1">
-                                {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.sender === c.phone)).map(tx => (
+                                {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).map(tx => (
                                   <div key={tx.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
                                     <div className="min-w-0 flex items-center space-x-2">
                                       <span className={`font-mono ${tx.status === 'Completed' ? 'text-emerald-400' : tx.status === 'Rejected' ? 'text-red-400' : 'text-amber-400'}`}>{tx.id}</span>

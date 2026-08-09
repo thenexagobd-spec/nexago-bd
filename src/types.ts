@@ -13,6 +13,7 @@ export interface Order {
   time?: string; // "11:46 AM", etc.
   customerName: string;
   customerPhone?: string; // e.g. "01712-345678"
+  customerId?: string;    // permanent unique customer ID (NEX...) linking to profile, wallet & tickets
   driverId?: string;
   paymentMethod: string;
   pickupCoords?: { lat: number; lng: number };

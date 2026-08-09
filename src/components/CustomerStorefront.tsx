@@ -1625,11 +1625,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   };
 
   const finishOrder = (orderBase: Omit<Order, 'id' | 'date'>) => {
-    onAddOrder(orderBase);
+    onAddOrder({ ...orderBase, customerId });
     const cashback = Math.round(orderBase.amount * (tier.cashbackPct / 100));
     if (cashback > 0) {
       setWalletBalance(prev => prev + cashback);
-      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: cashback, date: 'Just now', status: 'Completed' }, ...prev]);
+      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: cashback, date: 'Just now', status: 'Completed', customerId }, ...prev]);
       setTotalSpend(prev => prev + orderBase.amount);
       setCustomerNotifs(prev => [{
         id: `CN-${Date.now().toString().slice(-4)}`, title: `${tier.icon} ${tier.label} Cashback`,
@@ -1638,7 +1638,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     }
     if (appliedCoupon?.code === 'SMARTSHOP') {
       setWalletBalance(prev => prev + 50);
-      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: 50, date: 'Just now', status: 'Completed' }, ...prev]);
+      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Cashback', amount: 50, date: 'Just now', status: 'Completed', customerId }, ...prev]);
     }
     setCustomerNotifs(prev => [{
       id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Order Placed',
@@ -1692,7 +1692,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (paymentMethod === 'Split (Wallet + bKash)' && splitWalletAmount > 0) {
       splitDeduct = Math.min(splitWalletAmount, walletBalance, cartGrandTotal);
       setWalletBalance(prev => prev - splitDeduct);
-      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Order Payment', amount: -splitDeduct, date: 'Just now', status: 'Completed' }, ...prev]);
+      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Order Payment', amount: -splitDeduct, date: 'Just now', status: 'Completed', customerId }, ...prev]);
     }
 
     const isSendMoney = payModal !== null && SEND_MONEY_METHODS.includes(payModal as WalletKey);
@@ -1805,7 +1805,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (ord) {
       onUpdateOrder({ ...ord, status: 'Cancelled' });
       setWalletBalance(prev => prev + ord.amount);
-      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Refund', amount: ord.amount, date: 'Just now', status: 'Completed' }, ...prev]);
+      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Refund', amount: ord.amount, date: 'Just now', status: 'Completed', customerId }, ...prev]);
       setCustomerNotifs(prev => [{
         id: `CN-${Date.now().toString().slice(-4)}`, title: '↩️ Order Cancelled',
         body: `Order #${ord.id} was cancelled. ৳${ord.amount} refunded to wallet.`, emoji: '↩️', time: 'Just now', read: false
