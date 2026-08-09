@@ -1174,6 +1174,38 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
   };
   const removeTicketCategory = (value: string) => setTicketCategories(prev => prev.filter(c => c.value !== value));
 
+  const [helpFaqs, setHelpFaqs] = useState<{ id: string; problem: string; solution: string }[]>(() => {
+    try {
+      const raw = localStorage.getItem('sd_support_faqs_v1');
+      if (raw && raw !== '[]') {
+        const p = JSON.parse(raw);
+        if (Array.isArray(p) && p.length > 0) return p;
+      }
+    } catch { /* ignore */ }
+    return [
+      { id: 'FAQ-1', problem: 'My order is delayed', solution: 'Check the live tracking in My Orders. If it exceeds the estimated time, the delivery partner is notified automatically. You can also open a ticket and we will prioritize it.' },
+      { id: 'FAQ-2', problem: 'How do I get a refund?', solution: 'Open the order in My Orders and tap Request Refund. Approved refunds go back to your payment method or Smart Wallet within 24–48 hours.' },
+      { id: 'FAQ-3', problem: 'An item is missing from my order', solution: 'Report it immediately via a support ticket with the Missing Item category. Attach a photo if possible and our team will verify and replace or refund.' },
+      { id: 'FAQ-4', problem: 'How does Cash on Delivery work?', solution: 'Select Cash on Delivery at checkout. Pay the rider in cash when your order arrives — no online payment needed.' },
+    ];
+  });
+  const [newFaqProblem, setNewFaqProblem] = useState('');
+  const [newFaqSolution, setNewFaqSolution] = useState('');
+
+  useEffect(() => {
+    try { localStorage.setItem('sd_support_faqs_v1', JSON.stringify(helpFaqs)); } catch { /* ignore */ }
+  }, [helpFaqs]);
+
+  const addHelpFaq = () => {
+    const p = newFaqProblem.trim();
+    const s = newFaqSolution.trim();
+    if (!p || !s) return;
+    setHelpFaqs(prev => [...prev, { id: `FAQ-${Date.now().toString().slice(-4)}`, problem: p, solution: s }]);
+    setNewFaqProblem('');
+    setNewFaqSolution('');
+  };
+  const removeHelpFaq = (id: string) => setHelpFaqs(prev => prev.filter(f => f.id !== id));
+
   useEffect(() => {
     try {
       localStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify({ faults, resolveActions, ledger, audit, proofs }));
@@ -5959,6 +5991,32 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                 </button>
               </div>
               <p className="text-[9px] text-gray-600 mt-2">Categories appear instantly in the customer's Open Support Ticket dropdown. Removing one does not affect already-submitted tickets.</p>
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-brand-border">
+              <p className="text-[10px] font-bold text-white flex items-center space-x-1.5 mb-2"><BookOpen className="w-3.5 h-3.5 text-cyan-400" /><span>Problem & Solution FAQs (shown in customer Help & Support)</span></p>
+              <div className="space-y-1.5 mb-2">
+                {helpFaqs.map(f => (
+                  <div key={f.id} className="flex items-start justify-between gap-3 bg-brand-dark/40 border border-brand-border rounded-lg px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold text-white">{f.problem}</p>
+                      <p className="text-[9px] text-gray-500 leading-relaxed mt-0.5">{f.solution}</p>
+                    </div>
+                    <button onClick={() => removeHelpFaq(f.id)} className="p-1 text-gray-500 hover:text-red-400 cursor-pointer transition-colors shrink-0" title="Remove FAQ"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+                {helpFaqs.length === 0 && <p className="text-[9px] text-gray-600">No FAQs yet. Add one below.</p>}
+              </div>
+              <div className="space-y-1.5">
+                <input type="text" value={newFaqProblem} onChange={(e) => setNewFaqProblem(e.target.value)} placeholder="Problem — e.g. My order is delayed" className="w-full px-2.5 py-1.5 bg-brand-dark text-[10px] text-gray-200 border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                <textarea rows={2} value={newFaqSolution} onChange={(e) => setNewFaqSolution(e.target.value)} placeholder="Solution — step-by-step fix shown to the customer" className="w-full px-2.5 py-1.5 bg-brand-dark text-[10px] text-gray-200 border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600 resize-none" />
+                <div className="flex items-center space-x-2">
+                  <button onClick={addHelpFaq} className="px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors flex items-center space-x-1">
+                    <Plus className="w-3 h-3" /><span>Add FAQ</span>
+                  </button>
+                </div>
+              </div>
+              <p className="text-[9px] text-gray-600 mt-2">FAQs appear instantly in the customer's Help & Customer Support page as expandable cards. Removing one does not affect already-submitted tickets.</p>
             </div>
           </div>
 

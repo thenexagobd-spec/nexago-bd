@@ -1188,11 +1188,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [ticketCategory, setTicketCategory] = useState('Order Delivery');
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketDetail, setTicketDetail] = useState('');
+  const [openFaqId, setOpenFaqId] = useState<string | null>('FAQ-1');
   const [ticketCategories, setTicketCategories] = useState<{ value: string; label: string }[]>(() => getStoredData('sd_ticket_categories_v1', [
     { value: 'Order Delivery', label: 'Order Delivery Delay' },
     { value: 'Payment / Refund', label: 'Payment / Wallet Refund' },
     { value: 'Missing Item', label: 'Missing or Damaged Item' },
     { value: 'General Query', label: 'General Query' },
+  ]));
+  const [helpFaqs, setHelpFaqs] = useState<{ id: string; problem: string; solution: string }[]>(() => getStoredData('sd_support_faqs_v1', [
+    { id: 'FAQ-1', problem: 'My order is delayed', solution: 'Check the live tracking in My Orders. If it exceeds the estimated time, the delivery partner is notified automatically. You can also open a ticket and we will prioritize it.' },
+    { id: 'FAQ-2', problem: 'How do I get a refund?', solution: 'Open the order in My Orders and tap Request Refund. Approved refunds go back to your payment method or Smart Wallet within 24–48 hours.' },
+    { id: 'FAQ-3', problem: 'An item is missing from my order', solution: 'Report it immediately via a support ticket with the Missing Item category. Attach a photo if possible and our team will verify and replace or refund.' },
+    { id: 'FAQ-4', problem: 'How does Cash on Delivery work?', solution: 'Select Cash on Delivery at checkout. Pay the rider in cash when your order arrives — no online payment needed.' },
   ]));
 
   const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: 'Rahim Khan', email: 'rahim.khan@example.com', phone: '01712-345678', sms: true, emailNotif: true, pushNotif: true, profilePic: '' }));
@@ -3427,6 +3434,35 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                   );
                 })}
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-gray-400">Common Problems & Solutions</h3>
+                {helpFaqs.length === 0 && (
+                  <p className="text-xs text-gray-500 bg-white border border-gray-200 rounded-2xl p-4">No FAQs yet — the admin will add common problems and solutions here.</p>
+                )}
+                {helpFaqs.map((f) => (
+                  <div key={f.id} className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+                    <button
+                      onClick={() => setOpenFaqId(openFaqId === f.id ? null : f.id)}
+                      className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="flex items-center space-x-2.5 text-left">
+                        <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><HelpCircle className="w-3.5 h-3.5" /></span>
+                        <span className="text-xs font-bold text-gray-900">{f.problem}</span>
+                      </span>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${openFaqId === f.id ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openFaqId === f.id && (
+                      <div className="px-4 pb-4 pt-1 border-t border-gray-100">
+                        <div className="flex items-start space-x-2.5">
+                          <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0"><Check className="w-3.5 h-3.5" /></span>
+                          <p className="text-xs text-gray-600 leading-relaxed">{f.solution}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
