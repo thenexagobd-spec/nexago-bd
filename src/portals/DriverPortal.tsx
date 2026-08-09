@@ -518,38 +518,6 @@ export default function DriverPortal() {
                   )}
 
                   {/* Next delivery + recent */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div className="lg:col-span-2 bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center space-x-2"><Package className="w-3.5 h-3.5 text-brand-orange" /><span>Today's Deliveries</span></p>
-                        <button onClick={() => setTab('deliveries')} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">View all</button>
-                      </div>
-                      {myOrders.filter(o => o.status !== 'Cancelled').length === 0 ? <p className="text-[10px] text-gray-500 py-6 text-center">No deliveries assigned yet — tap <b>Online</b> to receive jobs.</p> : (
-                        <div className="space-y-2">
-                          {myOrders.filter(o => o.status !== 'Cancelled').slice(0, 4).map(o => (
-                            <div key={o.id} className="flex items-center justify-between gap-2 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5">
-                              <div className="min-w-0">
-                                <p className="text-[10px] font-mono text-brand-orange font-bold">#{o.id}</p>
-                                <p className="text-[10px] text-gray-300 truncate">{o.storeName} → {o.customerName}</p>
-                                <p className="text-[8px] text-gray-500 truncate">{o.address || o.pickupLocation || '—'} · {o.date}</p>
-                              </div>
-                              <span className={`px-2 py-1 rounded-lg border text-[8px] font-black ${statusBadge(o.status)}`}>{o.status}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
-                      <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center space-x-2 mb-3"><BarChart3 className="w-3.5 h-3.5 text-brand-orange" /><span>This Week</span></p>
-                      <div className="flex items-end space-x-1.5 h-24">
-                        {moneyBars.map((v, i) => (
-                          <div key={i} className="flex-1 bg-gradient-to-t from-brand-orange/60 to-brand-orange rounded-t-md" style={{ height: `${(v / 5100) * 100}%` }} title={bdt(v)} />
-                        ))}
-                      </div>
-                      <div className="flex justify-between text-[8px] text-gray-500 mt-1.5"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
-                    </div>
-                  </div>
                 </>
               )}
             </div>
@@ -848,6 +816,16 @@ export default function DriverPortal() {
                     <p className={`text-xl font-black mt-1 ${k.color}`}>{k.value}</p>
                   </div>
                 ))}
+              </div>
+
+              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
+                <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center space-x-2 mb-3"><BarChart3 className="w-3.5 h-3.5 text-brand-orange" /><span>This Week</span></p>
+                <div className="flex items-end space-x-1.5 h-24">
+                  {moneyBars.map((v, i) => (
+                    <div key={i} className="flex-1 bg-gradient-to-t from-brand-orange/60 to-brand-orange rounded-t-md" style={{ height: `${(v / 5100) * 100}%` }} title={bdt(v)} />
+                  ))}
+                </div>
+                <div className="flex justify-between text-[8px] text-gray-500 mt-1.5"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
               </div>
 
               <button onClick={() => { /* withdraw */ }} className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-black uppercase rounded-xl cursor-pointer shadow-lg">
