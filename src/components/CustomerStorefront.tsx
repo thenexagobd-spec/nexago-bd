@@ -1189,12 +1189,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketDetail, setTicketDetail] = useState('');
   const [openFaqId, setOpenFaqId] = useState<string | null>('FAQ-1');
-  const [ticketCategories, setTicketCategories] = useState<{ value: string; label: string }[]>(() => getStoredData('sd_ticket_categories_v1', [
-    { value: 'Order Delivery', label: 'Order Delivery Delay' },
-    { value: 'Payment / Refund', label: 'Payment / Wallet Refund' },
-    { value: 'Missing Item', label: 'Missing or Damaged Item' },
-    { value: 'General Query', label: 'General Query' },
-  ]));
+  const [ticketCategories, setTicketCategories] = useState<{ value: string; label: string }[]>(() => {
+    const defaults = [
+      { value: 'Order Delivery', label: 'Order Delivery Delay' },
+      { value: 'Top-Up / Add Money', label: 'Top-Up / Add Money Issue' },
+      { value: 'Payment / Refund', label: 'Payment / Wallet Refund' },
+      { value: 'Missing Item', label: 'Missing or Damaged Item' },
+      { value: 'General Query', label: 'General Query' },
+    ];
+    const stored = getStoredData<{ value: string; label: string }[]>('sd_ticket_categories_v1', defaults);
+    return defaults.concat(stored.filter(s => !defaults.some(d => d.value === s.value)));
+  });
   const [helpFaqs, setHelpFaqs] = useState<{ id: string; problem: string; solution: string }[]>(() => getStoredData('sd_support_faqs_v1', [
     { id: 'FAQ-1', problem: 'My order is delayed', solution: 'Check the live tracking in My Orders. If it exceeds the estimated time, the delivery partner is notified automatically. You can also open a ticket and we will prioritize it.' },
     { id: 'FAQ-2', problem: 'How do I get a refund?', solution: 'Open the order in My Orders and tap Request Refund. Approved refunds go back to your payment method or Smart Wallet within 24–48 hours.' },

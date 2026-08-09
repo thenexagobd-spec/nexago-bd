@@ -1145,14 +1145,21 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
 
   const [ticketCategories, setTicketCategories] = useState<{ value: string; label: string }[]>(() => {
     try {
+      const defaults = [
+        { value: 'Order Delivery', label: 'Order Delivery Delay' },
+        { value: 'Top-Up / Add Money', label: 'Top-Up / Add Money Issue' },
+        { value: 'Payment / Refund', label: 'Payment / Wallet Refund' },
+        { value: 'Missing Item', label: 'Missing or Damaged Item' },
+        { value: 'General Query', label: 'General Query' },
+      ];
       const raw = localStorage.getItem('sd_ticket_categories_v1');
-      if (raw && raw !== '[]') {
-        const p = JSON.parse(raw);
-        if (Array.isArray(p) && p.length > 0) return p;
-      }
+      const p = raw ? JSON.parse(raw) : [];
+      const arr = Array.isArray(p) ? p : [];
+      return defaults.concat(arr.filter((s: any) => s && s.value && !defaults.some(d => d.value === s.value)));
     } catch { /* ignore */ }
     return [
       { value: 'Order Delivery', label: 'Order Delivery Delay' },
+      { value: 'Top-Up / Add Money', label: 'Top-Up / Add Money Issue' },
       { value: 'Payment / Refund', label: 'Payment / Wallet Refund' },
       { value: 'Missing Item', label: 'Missing or Damaged Item' },
       { value: 'General Query', label: 'General Query' },
