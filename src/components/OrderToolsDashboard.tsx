@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, OrderReportEntry } from '../types';
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
@@ -44,6 +44,11 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
 
   // Customer directory (A–Z) with per-customer wallet add
   const [custSearch, setCustSearch] = useState('');
+  const custListRef = useRef<HTMLDivElement>(null);
+  // Scroll filtered customer list back to the top whenever the search changes
+  useEffect(() => {
+    if (custListRef.current) custListRef.current.scrollTop = 0;
+  }, [custSearch]);
   const seedCustomers = () => [
     { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024', loyalty: 120, status: 'Active', custId: 'NEX4654646786' },
     { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 80, status: 'Active', custId: 'NEX3829104756' },
@@ -991,7 +996,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[65vh] overflow-y-auto pr-1">
+            <div ref={custListRef} className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[65vh] overflow-y-auto pr-1">
               {[...customers]
                 .filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase()) || (c.custId || '').toLowerCase().includes(custSearch.trim().toLowerCase()))
                 .sort((a, b) => a.name.localeCompare(b.name))
