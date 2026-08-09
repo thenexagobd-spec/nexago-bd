@@ -7,7 +7,7 @@
  * localStorage keys as the admin panel.
  */
 import React, { useState } from 'react';
-import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, bdt, statusBadge } from './portalUtils';
 
@@ -21,8 +21,18 @@ export default function StoreAdminPortal() {
   const [tickets, setTickets] = useTickets();
   const [walletBal, setWalletBal] = useWalletBal();
   const [txns, setTxns] = useWalletTxns();
-  const [products] = useProducts();
+  const [products, setProducts] = useProducts();
   const [tab, setTab] = useState('dashboard');
+  const [coupons, setCoupons] = useState<{ id: string; code: string; discount: number; used: number }[]>(
+    JSON.parse(localStorage.getItem('sd_coupons') || '[]').length ? JSON.parse(localStorage.getItem('sd_coupons') || '[]') : [
+      { id: 'C-1', code: 'WELCOME10', discount: 10, used: 342 },
+      { id: 'C-2', code: 'FRIDAY15', discount: 15, used: 128 },
+      { id: 'C-3', code: 'FREESHIP', discount: 0, used: 95 },
+    ]
+  );
+  const saveCoupons = (next: typeof coupons) => { setCoupons(next); localStorage.setItem('sd_coupons', JSON.stringify(next)); };
+  const [search, setSearch] = useState('');
+  const [newProd, setNewProd] = useState({ name: '', price: '', stock: '' });
   const [staff, setStaff] = useState<Staff[]>([
     { id: 'STF-01', name: 'Asif Rahman', role: 'Inventory Manager', shift: 'Day Shift', status: 'Active', phone: '01812345678' },
     { id: 'STF-02', name: 'Nusrat Jahan', role: 'Support Supervisor', shift: 'Night Shift', status: 'Active', phone: '01712345679' },
@@ -33,10 +43,15 @@ export default function StoreAdminPortal() {
   const pending = txns.filter(t => t.status === 'Pending');
   const refunds = JSON.parse(localStorage.getItem('ss_refunds') || '[]');
   const revenue = orders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.amount || 0), 0);
+  const lowStock = products.filter(p => p.stock > 0 && p.stock <= 10);
+  const outStock = products.filter(p => p.stock <= 0);
 
   const nav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Orders', icon: ClipboardList, badge: orders.filter(o => o.status === 'Pending').length },
+    { id: 'products', label: 'Products', icon: Box, badge: outStock.length },
+    { id: 'inventory', label: 'Inventory', icon: Package, badge: lowStock.length },
+    { id: 'coupons', label: 'Coupons', icon: Ticket },
     { id: 'tools', label: 'Order Tools', icon: Wrench, badge: pending.length },
     { id: 'staff', label: 'Staff', icon: UserSquare2 },
     { id: 'payments', label: 'Payments', icon: CreditCard },
@@ -60,6 +75,31 @@ export default function StoreAdminPortal() {
   };
 
   const replyTicket = (id: string, ok: boolean) => setTickets(prev => prev.map(t => (t.id === id ? { ...t, status: ok ? 'Closed' : 'In Progress' } : t)));
+
+  const addProduct = () => {
+    if (!newProd.name || !newProd.price) return;
+    const p = {
+      id: `PROD-${Date.now().toString().slice(-4)}`,
+      name: newProd.name,
+      category: 'General',
+      price: Number(newProd.price) || 0,
+      stock: Number(newProd.stock) || 0,
+      status: Number(newProd.stock) <= 0 ? 'Out of Stock' : Number(newProd.stock) <= 10 ? 'Low Stock' : 'In Stock',
+      image: '',
+    };
+    setProducts(prev => [p, ...prev]);
+    setNewProd({ name: '', price: '', stock: '' });
+  };
+
+  const setStock = (id: string, delta: number) => {
+    setProducts(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      const stock = Math.max(0, (p.stock || 0) + delta);
+      return { ...p, stock, status: stock <= 0 ? 'Out of Stock' : stock <= 10 ? 'Low Stock' : 'In Stock' };
+    }));
+  };
+
+  const filtered = products.filter(p => !search.trim() || p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <PortalShell role="Store Admin" tagline="Store Operations" nav={nav} active={tab} onNav={setTab} onBack={goBack}>
@@ -162,6 +202,103 @@ export default function StoreAdminPortal() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'products' && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-black text-white flex items-center space-x-2"><Box className="w-4 h-4 text-brand-orange" /><span>Product Catalog</span></h3>
+            <p className="text-[10px] text-gray-400">Add & manage products — they appear on the live storefront.</p>
+          </div>
+          <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-3">
+            <div className="flex items-center space-x-2">
+              <input value={newProd.name} onChange={e => setNewProd(prev => ({ ...prev, name: e.target.value }))} placeholder="Product name" className="flex-1 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+              <input value={newProd.price} onChange={e => setNewProd(prev => ({ ...prev, price: e.target.value }))} placeholder="Price ৳" type="number" className="w-24 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+              <input value={newProd.stock} onChange={e => setNewProd(prev => ({ ...prev, stock: e.target.value }))} placeholder="Stock" type="number" className="w-20 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+              <button onClick={addProduct} className="flex items-center space-x-1.5 px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl text-[10px] font-black transition-colors"><Plus className="w-3.5 h-3.5" /><span>Add</span></button>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…" className="w-full bg-[#101d30] border border-[#1e3050] rounded-xl pl-9 pr-3 py-2.5 text-[10px] outline-none focus:border-brand-orange" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filtered.map(p => (
+              <div key={p.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl overflow-hidden">
+                <div className="h-28 bg-[#132238] flex items-center justify-center">
+                  {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-gray-600" />}
+                </div>
+                <div className="p-3">
+                  <p className="text-[11px] font-bold text-white truncate">{p.name}</p>
+                  <p className="text-[8px] text-gray-500">{p.category} · {p.id}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[12px] font-black text-brand-orange">{bdt(p.price)}</span>
+                    <span className={`px-2 py-0.5 rounded-lg border text-[8px] font-black ${statusBadge(p.status)}`}>{p.status}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-[9px] text-gray-400">Stock: <b className="text-white">{p.stock}</b></span>
+                    <div className="flex items-center space-x-1.5">
+                      <button onClick={() => setStock(p.id, -1)} className="w-6 h-6 rounded-lg bg-[#0a1322] border border-[#1e3050] text-gray-300 hover:border-red-500/40 hover:text-red-400 text-[11px]">−</button>
+                      <button onClick={() => setStock(p.id, 1)} className="w-6 h-6 rounded-lg bg-[#0a1322] border border-[#1e3050] text-gray-300 hover:border-emerald-500/40 hover:text-emerald-400 text-[11px]">+</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'inventory' && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-black text-white flex items-center space-x-2"><Package className="w-4 h-4 text-brand-orange" /><span>Inventory</span></h3>
+            <p className="text-[10px] text-gray-400">Stock levels — low stock highlighted, adjust on the fly.</p>
+          </div>
+          <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl overflow-hidden">
+            <table className="w-full text-left text-[10px]">
+              <thead><tr className="bg-[#0a1322] text-gray-400 text-[9px] uppercase tracking-wider"><th className="px-3 py-2.5">Product</th><th className="px-3 py-2.5">Category</th><th className="px-3 py-2.5">Price</th><th className="px-3 py-2.5">Stock</th><th className="px-3 py-2.5 text-right">Action</th></tr></thead>
+              <tbody className="divide-y divide-[#1e3050]">
+                {products.map(p => (
+                  <tr key={p.id} className="hover:bg-[#132238] transition-colors">
+                    <td className="px-3 py-2.5 font-bold text-gray-200 truncate max-w-[160px]">{p.name}</td>
+                    <td className="px-3 py-2.5 text-gray-400">{p.category}</td>
+                    <td className="px-3 py-2.5 font-mono text-brand-orange font-bold">{bdt(p.price)}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`font-mono font-black ${p.stock <= 0 ? 'text-red-400' : p.stock <= 10 ? 'text-amber-400' : 'text-emerald-400'}`}>{p.stock}</span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center justify-end space-x-1.5">
+                        <button onClick={() => setStock(p.id, -5)} className="px-2 py-1 rounded-lg bg-[#0a1322] border border-[#1e3050] text-gray-300 hover:border-red-500/40 hover:text-red-400 text-[9px] font-black">−5</button>
+                        <button onClick={() => setStock(p.id, 5)} className="px-2 py-1 rounded-lg bg-[#0a1322] border border-[#1e3050] text-gray-300 hover:border-emerald-500/40 hover:text-emerald-400 text-[9px] font-black">+5</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === 'coupons' && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-black text-white flex items-center space-x-2"><Ticket className="w-4 h-4 text-brand-orange" /><span>Coupons & Offers</span></h3>
+            <p className="text-[10px] text-gray-400">Create discount codes customers can use on the storefront.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {coupons.map(c => (
+              <div key={c.id} className="bg-[#101d30] border border-dashed border-brand-orange/40 rounded-2xl p-4 relative overflow-hidden">
+                <div className="absolute -right-3 top-0 bottom-0 w-6 border-l-2 border-dashed border-[#1e3050]" />
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{c.id}</p>
+                <p className="text-lg font-black font-mono text-brand-orange mt-1">{c.code}</p>
+                <p className="text-[10px] text-gray-300 mt-1">{c.discount > 0 ? `${c.discount}% off` : 'Free delivery'}</p>
+                <p className="text-[8px] text-gray-500 mt-1">{c.used} uses</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
