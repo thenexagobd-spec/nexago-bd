@@ -28,7 +28,7 @@ interface OrderToolsDashboardProps {
   showToast?: (message: string, type?: 'success' | 'info') => void;
 }
 
-type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets' | 'reports' | 'customers' | 'topups';
+type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets' | 'reports' | 'customers' | 'topups' | 'lookup';
 
 export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [], onOpenReport, onReportReply, showToast }: OrderToolsDashboardProps) {
   const [tab, setTab] = useState<ToolTab>('audit');
@@ -88,11 +88,13 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     wallet: number; photo?: string;
   }>(null);
   const [lookupCopied, setLookupCopied] = useState(false);
+  const [lookupSearched, setLookupSearched] = useState(false);
   const normP = (p: string) => (p || '').replace(/[^0-9]/g, '');
   const normEmail = (e: string) => (e || '').trim().toLowerCase();
   const runLookup = (query: string) => {
     const q = (query || '').trim();
     if (!q) return;
+    setLookupSearched(true);
     const qLower = q.toLowerCase();
     const qDigits = normP(q);
     const byId = (x: string | undefined) => !!x && x.toLowerCase() === qLower;
@@ -194,6 +196,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
     { key: 'wallets', label: 'Payment Wallets', icon: Wallet },
     { key: 'customers', label: 'Customers', icon: Users, badge: unassignedTopUps.length },
+    { key: 'lookup', label: 'Customer Lookup', icon: UserSearch },
   ];
 
   return (
@@ -710,47 +713,13 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
           </div>
         )}
 
-        {tab === 'customers' && (
+        {tab === 'lookup' && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div>
-                <h3 className="font-black text-white text-sm flex items-center space-x-2"><Users className="w-4 h-4 text-brand-orange" /><span>Customer Directory</span></h3>
-                <p className="text-[10px] text-gray-400">All customers A–Z. Add balance straight to any customer wallet — they see it instantly in the storefront.</p>
-              </div>
-              <button
-                onClick={() => { setCustomerModal({}); setCustForm({ name: '', phone: '', email: '', zone: '' }); }}
-                className="px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors flex items-center space-x-1.5 shrink-0"
-              >
-                <UserPlus className="w-3.5 h-3.5" /><span>Add Customer</span>
-              </button>
+            <div>
+              <h3 className="font-black text-white text-sm flex items-center space-x-2"><UserSearch className="w-4 h-4 text-brand-orange" /><span>Customer Lookup</span></h3>
+              <p className="text-[10px] text-gray-400">Search by permanent ID, phone or Gmail — only the matching account appears.</p>
             </div>
-
-            <div className="relative">
-              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={custSearch}
-                onChange={(e) => setCustSearch(e.target.value)}
-                placeholder="Search by name, phone, email or customer ID..."
-                className="w-full bg-brand-dark/50 border border-brand-border rounded-lg pl-9 pr-3 py-2 text-xs text-gray-200 outline-none focus:border-brand-orange placeholder:text-gray-600"
-              />
-            </div>
-
-            {custIdLive && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center space-x-2 text-[10px]">
-                  <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center"><Check className="w-3.5 h-3.5" /></span>
-                  <div>
-                    <p className="text-emerald-300 font-black">Active Customer Session</p>
-                    <p className="text-emerald-200/70 font-mono">{custIdLive} — orders, wallet & tickets link to this permanent ID</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Dedicated Customer Lookup — search by permanent ID / phone / Gmail → full account profile */}
-            <div id="customer-lookup-panel" className="bg-brand-card border border-brand-border rounded-xl p-3 space-y-2">
-              <p className="text-[10px] font-black text-gray-200 flex items-center space-x-1.5"><UserSearch className="w-3.5 h-3.5 text-brand-orange" /><span>Customer Profile — account details by ID / phone / Gmail</span></p>
+            <div className="bg-brand-card border border-brand-border rounded-xl p-3 space-y-2">
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
@@ -767,6 +736,12 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   <Search className="w-3.5 h-3.5" /><span>Lookup</span>
                 </button>
               </div>
+              {!lookupResult && !lookupSearched && (
+                <p className="text-[10px] text-gray-500">No results yet. Search an ID / phone / Gmail to see the account profile.</p>
+              )}
+              {!lookupResult && lookupSearched && (
+                <p className="text-[10px] text-amber-300 font-bold">No customer found for that ID / phone / Gmail.</p>
+              )}
               {lookupResult && (
                 <div className="bg-brand-dark/50 border border-brand-border/40 rounded-lg p-3 space-y-3">
                   <div className="flex items-center gap-3 flex-wrap">
@@ -815,6 +790,46 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {tab === 'customers' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h3 className="font-black text-white text-sm flex items-center space-x-2"><Users className="w-4 h-4 text-brand-orange" /><span>Customer Directory</span></h3>
+                <p className="text-[10px] text-gray-400">All customers A–Z. Add balance straight to any customer wallet — they see it instantly in the storefront.</p>
+              </div>
+              <button
+                onClick={() => { setCustomerModal({}); setCustForm({ name: '', phone: '', email: '', zone: '' }); }}
+                className="px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors flex items-center space-x-1.5 shrink-0"
+              >
+                <UserPlus className="w-3.5 h-3.5" /><span>Add Customer</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={custSearch}
+                onChange={(e) => setCustSearch(e.target.value)}
+                placeholder="Search by name, phone, email or customer ID..."
+                className="w-full bg-brand-dark/50 border border-brand-border rounded-lg pl-9 pr-3 py-2 text-xs text-gray-200 outline-none focus:border-brand-orange placeholder:text-gray-600"
+              />
+            </div>
+
+            {custIdLive && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center space-x-2 text-[10px]">
+                  <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center"><Check className="w-3.5 h-3.5" /></span>
+                  <div>
+                    <p className="text-emerald-300 font-black">Active Customer Session</p>
+                    <p className="text-emerald-200/70 font-mono">{custIdLive} — orders, wallet & tickets link to this permanent ID</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {unassignedTopUps.length > 0 && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
@@ -916,9 +931,9 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                             </button>
                             <button
                               onClick={() => {
+                                setTab('lookup');
+                                setLookupQuery(c.custId || c.id);
                                 runLookup(c.custId || c.id);
-                                const el = document.getElementById('customer-lookup-panel');
-                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                               }}
                               className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange rounded-lg text-[9px] font-black hover:bg-brand-orange/20 transition-colors"
                             >
