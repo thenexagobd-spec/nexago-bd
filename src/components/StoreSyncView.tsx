@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { CloudUpload, DownloadCloud, RefreshCw, Copy, ExternalLink, Globe, Trash2, CheckCircle2, AlertTriangle, Store } from 'lucide-react';
+import { CloudUpload, DownloadCloud, RefreshCw, Copy, ExternalLink, Globe, Trash2, CheckCircle2, AlertTriangle, Store, Truck, ShieldCheck, ShieldAlert, Users } from 'lucide-react';
 
 interface StoreSyncViewProps {
   storeKey: string;
@@ -19,6 +19,14 @@ interface StoreSyncViewProps {
   onReset: () => void;
   showToast: (message: string, type?: 'success' | 'info') => void;
 }
+
+const PORTAL_SITES = [
+  { file: 'driver.html', label: 'Driver Site', desc: 'Accept deliveries, track earnings & manage your workday.', icon: Truck, color: 'text-sky-400 border-sky-500/30 bg-sky-500/10' },
+  { file: 'store.html', label: 'Store Site', desc: 'Product catalog, inventory, coupons & live storefront sync.', icon: Store, color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
+  { file: 'store-admin.html', label: 'Store Admin Site', desc: 'Store dashboard, staff, orders, payments & support.', icon: ShieldCheck, color: 'text-teal-400 border-teal-500/30 bg-teal-500/10' },
+  { file: 'super-admin.html', label: 'Super Admin Site', desc: 'Full platform control center — every module unlocked.', icon: ShieldAlert, color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' },
+  { file: 'super-admin-staff.html', label: 'Super Admin Staff', desc: 'Orders, order tools, support tickets, notifications & reports.', icon: Users, color: 'text-violet-400 border-violet-500/30 bg-violet-500/10' },
+];
 
 export default function StoreSyncView({
   storeKey,
@@ -165,6 +173,38 @@ export default function StoreSyncView({
             >
               <RefreshCw className="w-3.5 h-3.5 mr-1" /> Open storefront
             </a>
+          </div>
+        </div>
+
+        {/* Role portal sites */}
+        <div className="lg:col-span-2 bg-brand-card border border-brand-border rounded-xl p-5 space-y-4 shadow-sm">
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2 border-b border-brand-border/60 pb-2.5">
+            <ShieldCheck className="w-4 h-4 text-brand-orange" />
+            <span>Role Sites — open each portal in its own tab</span>
+          </h4>
+          <p className="text-[11px] text-gray-400 leading-relaxed">
+            Five dedicated portals on the same NexaGo platform. Each one opens with its own sidebar &amp; panel mode — share the link with that team.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {PORTAL_SITES.map(site => (
+              <a
+                key={site.file}
+                href={`${window.location.origin}/${site.file}`}
+                target="_blank"
+                rel="noreferrer"
+                className="group bg-brand-dark/40 border border-brand-border/50 rounded-xl p-4 hover:border-brand-orange/40 hover:bg-brand-dark/70 transition-all"
+              >
+                <div className={`w-9 h-9 rounded-lg border flex items-center justify-center ${site.color}`}>
+                  <site.icon className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-black text-white mt-2.5 flex items-center space-x-1.5">
+                  <span>{site.label}</span>
+                  <ExternalLink className="w-3 h-3 text-gray-500 group-hover:text-brand-orange transition-colors" />
+                </p>
+                <p className="text-[10px] text-gray-400 leading-relaxed mt-1">{site.desc}</p>
+                <p className="text-[9px] font-mono text-gray-600 mt-2">{site.file}</p>
+              </a>
+            ))}
           </div>
         </div>
 

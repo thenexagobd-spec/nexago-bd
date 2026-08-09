@@ -16,6 +16,11 @@ export default defineConfig(() => {
         input: {
           index: path.resolve(__dirname, 'index.html'),
           customer: path.resolve(__dirname, 'customer.html'),
+          driver: path.resolve(__dirname, 'driver.html'),
+          store: path.resolve(__dirname, 'store.html'),
+          'store-admin': path.resolve(__dirname, 'store-admin.html'),
+          'super-admin': path.resolve(__dirname, 'super-admin.html'),
+          'super-admin-staff': path.resolve(__dirname, 'super-admin-staff.html'),
         },
       },
     },

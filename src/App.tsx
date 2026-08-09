@@ -51,6 +51,8 @@ import {
   Wrench
 } from 'lucide-react';
 
+// Role-based portal sites — each HTML entry (driver.html, store.html, ...) opens
+// the full NexaGo admin panel (super admin access).
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('Dashboard');
