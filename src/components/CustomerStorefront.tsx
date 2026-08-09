@@ -10,7 +10,7 @@ import {
   Camera, Send, Headphones, ScrollText, RefreshCcw, User, Mail, KeyRound, Wrench
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Order, Product, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
+import { Order, Product, RefundRequest, ReturnRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -1339,6 +1339,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [refundNumber, setRefundNumber] = useState('');
   const [refundReason, setRefundReason] = useState('');
 
+  // Return / reverse logistics request
+  const [returns, setReturns] = useState<ReturnRequest[]>(() => getStoredData('sd_returns', []));
+  useEffect(() => setStoredData('sd_returns', returns), [returns]);
+  const [returnModal, setReturnModal] = useState<Order | null>(null);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnNote, setReturnNote] = useState('');
+
   // Payment reminder tracking (avoid repeat reminders per order)
   const [reminded, setReminded] = useState<string[]>(() => getStoredData(LS_KEYS.reminded, []));
   useEffect(() => setStoredData(LS_KEYS.reminded, reminded), [reminded]);
@@ -1856,6 +1863,41 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setRefundReason('');
     setRefundNumber('');
     showToast('Refund request submitted — admin will review soon', 'success');
+  };
+
+  const submitReturn = () => {
+    if (!returnModal) return;
+    if (!returnReason.trim()) { showToast('Select a reason for the return', 'info'); return; }
+    setReturns(prev => [{
+      id: `RT-${Date.now().toString().slice(-5)}`,
+      orderId: returnModal.id,
+      customerId,
+      customerName: customerProfile.name,
+      customerPhone: customerProfile.phone,
+      storeName: returnModal.storeName,
+      amount: returnModal.amount,
+      reason: returnReason.trim(),
+      note: returnNote.trim() || undefined,
+      status: 'Requested',
+      at: Date.now(),
+    }, ...prev]);
+    // Notify store + platform
+    try {
+      const notifs = JSON.parse(localStorage.getItem('sd_notifications') || '[]');
+      localStorage.setItem('sd_notifications', JSON.stringify([
+        { id: `NOTIF-${Date.now().toString().slice(-8)}`, title: '↩️ Return Request — #' + returnModal.id, message: `${customerProfile.name} requested a return for order #${returnModal.id} (৳${returnModal.amount}): ${returnReason.trim()}.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'store' },
+        { id: `NOTIF-${Date.now().toString().slice(-8)}`, title: '↩️ Return Requested', message: `${customerProfile.name} wants to return order #${returnModal.id} (৳${returnModal.amount}).`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'all' },
+        ...notifs,
+      ]));
+    } catch { /* noop */ }
+    setCustomerNotifs(prev => [{
+      id: `CN-${Date.now().toString().slice(-4)}`, title: '↩️ Return Request Submitted',
+      body: `Return for order #${returnModal.id} (৳${returnModal.amount}) submitted — ${returnReason.trim()}. We will arrange pickup soon.`, emoji: '↩️', time: 'Just now', read: false
+    }, ...prev]);
+    setReturnModal(null);
+    setReturnReason('');
+    setReturnNote('');
+    showToast('Return request submitted — pickup will be scheduled', 'success');
   };
 
   const reorder = (ord: Order) => {
@@ -3043,6 +3085,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     const held = ord.paymentStatus === 'Rejected';
                     const reportUnderReview = (oid: string) => reports.some(r => r.orderId === oid && r.status === 'Under Review');
                     const refR = refunds.find(r => r.orderId === ord.id);
+                    const retR = returns.find(r => r.orderId === ord.id);
                     return (
                       <div key={ord.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-emerald-200 transition-colors">
                         <div className="space-y-1">
@@ -3073,6 +3116,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                                 refR.status === 'Rejected' ? 'bg-red-100 text-red-800' :
                                 'bg-amber-100 text-amber-800'
                               }`}>↩ {refR.status === 'Requested' ? 'Refund Requested' : refR.status === 'Processing' ? 'Refund Processing' : refR.status === 'Refunded' ? 'Refunded ✓' : 'Refund Rejected'}</span>
+                            )}
+                            {retR && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                retR.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
+                                retR.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-orange-100 text-orange-800'
+                              }`}>↩ Return: {retR.status === 'Requested' ? 'Awaiting Approval' : retR.status === 'Approved' ? 'Pickup Scheduled' : retR.status === 'Picked Up' ? 'Item Picked Up' : retR.status === 'Completed' ? 'Return Completed' : 'Return Rejected'}</span>
                             )}
                             {ord.estimatedMinutes && active && (
                               <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold">~{ord.estimatedMinutes} min</span>
@@ -3170,6 +3220,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               <button onClick={() => { reorder(ord); }} className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-emerald-200">
                                 <RotateCcw className="w-3 h-3" /><span>{T.reOrder}</span>
                               </button>
+                              {!retR && (
+                                <button onClick={() => { setReturnModal(ord); setReturnReason(''); setReturnNote(''); }} className="px-2.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-orange-200">
+                                  <RotateCcw className="w-3 h-3" /><span>Request Return</span>
+                                </button>
+                              )}
                               <button onClick={() => setRateOrder(ord)} className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-amber-200">
                                 <Star className="w-3 h-3" /><span>Rate</span>
                               </button>
@@ -4177,6 +4232,40 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </div>
             <button onClick={submitRefund} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer">
               Submit Refund Request
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============ RETURN REQUEST MODAL ============ */}
+      {returnModal && (
+        <div className="fixed inset-0 z-[70] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-black text-gray-900 text-sm">↩ Request Return</h3>
+                <p className="text-[10px] text-gray-500">Order #{returnModal.id} · ৳{returnModal.amount.toLocaleString()}</p>
+              </div>
+              <button onClick={() => setReturnModal(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Reason</label>
+              <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="w-full bg-white border border-gray-300 rounded-xl p-2 outline-none focus:border-orange-500 cursor-pointer">
+                <option value="">Select a reason…</option>
+                <option>Wrong item received</option>
+                <option>Item damaged / defective</option>
+                <option>Item not as described</option>
+                <option>Duplicate / extra item</option>
+                <option>Changed my mind</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Details (optional)</label>
+              <textarea value={returnNote} onChange={(e) => setReturnNote(e.target.value)} rows={3} placeholder="Describe the issue — e.g. damaged box, missing parts, etc." className="w-full bg-white border border-gray-300 rounded-xl p-2 outline-none focus:border-orange-500 resize-none" />
+            </div>
+            <p className="text-[9px] text-gray-500">A rider will be scheduled to pick the item up from your address. Refund starts after the store receives it.</p>
+            <button onClick={submitReturn} className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer">
+              Submit Return Request
             </button>
           </div>
         </div>

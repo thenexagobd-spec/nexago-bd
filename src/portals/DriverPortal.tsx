@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Package, Wallet, User, MessageSquare, BarChart3, Phone, Navigation,
   CheckCircle2, Star, LogIn, Power, Send, RefreshCw, MapPin, FileText, AlertCircle,
     History, Inbox, Headphones, Settings, ShieldCheck, LogOut, ChevronRight, Copy, Eye, Truck,
-    X, Bell, Clock
+    X, Bell, Clock, RotateCcw
   } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif } from './portalUtils';
@@ -100,6 +100,15 @@ export default function DriverPortal() {
   useEffect(() => lsSet('sd_driver_autoaccept', autoAccept), [autoAccept]);
   useEffect(() => lsSet('sd_driver_remember', rememberMe), [rememberMe]);
 
+  // Return / reverse-logistics pickups (approved by the store, awaiting rider pickup)
+  const [returns, setReturns] = useState<any[]>(() => lsGet('sd_returns', []));
+  useEffect(() => {
+    const onStorage = () => setReturns(lsGet('sd_returns', []));
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  const pickupJobs = returns.filter(r => r.status === 'Approved');
+
   // Ticking clock for offer countdowns
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -112,8 +121,7 @@ export default function DriverPortal() {
   );
 
   const offers = myOrders.filter(o => o.status === 'Confirmed' && !o.pickedUp);
-  const active = myOrders.filter(o => o.status === 'Processing' || o.status === 'Ongoing');
-  const activeOrder = active[0];
+  const active = myOrders.filter(o => o.status === 'Processing' || o.status === 'Ongoing');  const activeOrder = active[0];
   const done = myOrders.filter(o => o.status === 'Completed');
   const cancelled = myOrders.filter(o => o.status === 'Cancelled');
   const earned = done.reduce((s, o) => s + (o.deliveryCharge || 60), 0) + done.length * 20;
@@ -316,6 +324,7 @@ export default function DriverPortal() {
     { id: 'offers', label: 'New Orders', icon: Bell, badge: offers.length },
     { id: 'active', label: 'Active Delivery', icon: Package, badge: activeOrder ? 1 : 0 },
     { id: 'deliveries', label: 'Deliveries', icon: History },
+    { id: 'returns', label: 'Returns', icon: RotateCcw, badge: pickupJobs.length },
     { id: 'earnings', label: 'Earnings', icon: Wallet },
     { id: 'inbox', label: 'Inbox', icon: Inbox, badge: unreadCount },
     { id: 'support', label: 'Support', icon: Headphones },
@@ -869,6 +878,63 @@ export default function DriverPortal() {
           )}
 
           {/* ============ DELIVERIES ============ */}
+          {tab === 'returns' && (
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-sm font-black text-white flex items-center space-x-2"><RotateCcw className="w-4 h-4 text-brand-orange" /><span>Return Pickups</span></h3>
+                <p className="text-[10px] text-gray-400">Pick up returned items from customers and bring them back to the store.</p>
+              </div>
+              {pickupJobs.length === 0 ? (
+                <p className="text-center text-[10px] text-gray-500 py-10">No return pickups available right now.</p>
+              ) : (
+                <div className="space-y-2">
+                  {pickupJobs.map(r => (
+                    <div key={r.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] font-mono font-black text-brand-orange">#{r.id}</span>
+                          <span className="text-[10px] font-mono text-gray-400">order #{r.orderId}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-lg bg-sky-500/10 text-sky-300 border border-sky-500/30 text-[8px] font-black">Pickup Approved</span>
+                      </div>
+                      <div className="text-[10px] text-gray-300"><b className="text-gray-200">{r.customerName || 'Customer'}</b> · {r.customerPhone || '—'} · {r.storeName || 'Smart Shop'}</div>
+                      <p className="text-[9px] text-gray-400">Reason: <b className="text-gray-200">{r.reason}</b>{r.note ? ` — ${r.note}` : ''}</p>
+                      <div className="flex items-center space-x-2 pt-1">
+                        <button onClick={() => {
+                          const next = returns.map(x => x.id === r.id ? { ...x, status: 'Completed' as any, driverId: me?.id } : x);
+                          setReturns(next);
+                          lsSet('sd_returns', next);
+                          // Notify the customer that the item was picked up
+                          setNotifications(prev => [
+                            makeNotif('📦 Return Item Picked Up', `The rider picked up the item for return #${r.id} — it is on its way back to ${r.storeName || 'the store'}.`, 'order', { audience: 'customer', customerId: r.customerId || r.customerPhone }),
+                            ...prev,
+                          ]);
+                          // Auto-create a refund request so the admin can approve the money back
+                          const amount = typeof r.amount === 'number' ? r.amount : 0;
+                          if (amount > 0) {
+                            const refunds = lsGet<any[]>('ss_refunds', []);
+                            lsSet('ss_refunds', [{
+                              id: `RF-${Date.now().toString().slice(-5)}`,
+                              orderId: r.orderId,
+                              method: 'Smart Wallet',
+                              number: 'Smart Wallet',
+                              amount,
+                              reason: `Return #${r.id} received — item returned to store`,
+                              status: 'Requested',
+                              at: Date.now(),
+                              customerId: r.customerId,
+                            }, ...refunds]);
+                          }
+                          showToast(`Return #${r.id} picked up — store notified`);
+                        }} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black cursor-pointer transition-colors">📦 Picked Up</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {tab === 'deliveries' && (
             <div className="space-y-3">
               <div>

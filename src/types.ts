@@ -248,6 +248,21 @@ export interface RefundRequest {
   customerId?: string;      // who the money goes back to (for admin refund approvals)
 }
 
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  storeName?: string;
+  amount?: number;
+  reason: string;
+  note?: string;
+  status: 'Requested' | 'Approved' | 'Picked Up' | 'Completed' | 'Rejected';
+  at: number;
+  driverId?: string;
+}
+
 export interface Product {
   id: string;
   name: string;

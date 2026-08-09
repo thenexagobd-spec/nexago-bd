@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Inbox, History, CheckCircle2, Package, Send, User, Phone, Power, WifiOff,
   Printer, X, Headphones, MessageSquare, HelpCircle, ShoppingBag, Clock,
-  Check, Store, Bell, Banknote
+  Check, Store, Bell, Banknote, RotateCcw
 } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif } from './portalUtils';
@@ -31,6 +31,13 @@ export default function StorePortal() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
   const [now, setNow] = useState(Date.now());
+  const [returns, setReturns] = useState<any[]>(() => lsGet('sd_returns', []));
+
+  useEffect(() => {
+    const onStorage = () => setReturns(lsGet('sd_returns', []));
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   useEffect(() => lsSet('sd_store_online', storeOnline), [storeOnline]);
 
@@ -62,9 +69,13 @@ export default function StorePortal() {
   const storeNotifs = notifications.filter(n => n.audience === 'all' || n.audience === 'store' || n.audience === 'store-admin' || n.storeId);
   const storeUnread = storeNotifs.filter(n => !n.read).length;
 
+  const myReturns = returns.filter(r => !r.storeName || r.storeName === storeName || r.storeName === 'Smart Shop');
+  const pendingReturns = myReturns.filter(r => r.status === 'Requested');
+
   const nav = [
     { id: 'receive', label: 'Receive Orders', icon: Inbox, badge: incoming.length },
     { id: 'live', label: 'Live Order', icon: Package, badge: live ? 1 : 0 },
+    { id: 'returns', label: 'Returns', icon: RotateCcw, badge: pendingReturns.length },
     { id: 'history', label: 'Order History', icon: History },
     { id: 'alerts', label: 'Alerts', icon: Bell, badge: storeUnread },
     { id: 'account', label: 'Account', icon: User },
@@ -92,6 +103,18 @@ export default function StorePortal() {
     setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({ ...o, status: 'Cancelled' as any }, 'cancelled', 'store', 'Store declined the order') : o)));
     setNotifications(prev => [
       makeNotif('🚫 Order Rejected', `Store declined order #${id} — no rider assigned.`, 'order', { audience: 'all' }),
+      ...prev,
+    ]);
+  };
+
+  const decideReturn = (rid: string, approve: boolean) => {
+    const ret = returns.find(r => r.id === rid);
+    if (!ret) return;
+    const next = returns.map(r => r.id === rid ? { ...r, status: approve ? 'Approved' : 'Rejected' as any } : r);
+    setReturns(next);
+    lsSet('sd_returns', next);
+    setNotifications(prev => [
+      makeNotif(approve ? '↩️ Return Approved' : '↩️ Return Rejected', `Return #${ret.id} for order #${ret.orderId} was ${approve ? 'approved — rider pickup scheduled' : 'rejected'}.`, 'order', { audience: 'customer', customerId: ret.customerId || ret.customerPhone }),
       ...prev,
     ]);
   };
@@ -416,6 +439,48 @@ export default function StorePortal() {
                 ))}
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {tab === 'returns' && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-black text-white flex items-center space-x-2"><RotateCcw className="w-4 h-4 text-brand-orange" /><span>Return Requests</span></h3>
+            <p className="text-[10px] text-gray-400">Customers who want to return delivered items — approve to schedule a rider pickup.</p>
+          </div>
+          {myReturns.length === 0 ? (
+            <p className="text-center text-[10px] text-gray-500 py-10">No return requests yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {myReturns.map(r => (
+                <div key={r.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-[10px] font-mono font-black text-brand-orange">#{r.id}</span>
+                      <span className="text-[10px] font-mono text-gray-400">order #{r.orderId}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-lg border text-[8px] font-black ${
+                      r.status === 'Approved' ? 'bg-sky-500/10 text-sky-300 border-sky-500/30' :
+                      r.status === 'Picked Up' ? 'bg-purple-500/10 text-purple-300 border-purple-500/30' :
+                      r.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' :
+                      r.status === 'Rejected' ? 'bg-red-500/10 text-red-300 border-red-500/30' :
+                      'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                    }`}>{r.status}</span>
+                  </div>
+                  <div className="text-[10px] text-gray-300"><b className="text-gray-200">{r.customerName || 'Customer'}</b> · {r.customerPhone || '—'} · ৳{r.amount || '—'}</div>
+                  <p className="text-[9px] text-gray-400">Reason: <b className="text-gray-200">{r.reason}</b>{r.note ? ` — ${r.note}` : ''}</p>
+                  {r.status === 'Requested' && (
+                    <div className="flex items-center space-x-2 pt-1">
+                      <button onClick={() => decideReturn(r.id, true)} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors">Approve Pickup</button>
+                      <button onClick={() => decideReturn(r.id, false)} className="px-3 py-1.5 bg-brand-dark border border-[#1e3050] hover:bg-[#1a2942] text-gray-300 rounded-lg text-[10px] font-bold cursor-pointer transition-colors">Reject</button>
+                    </div>
+                  )}
+                  {r.status === 'Picked Up' && <p className="text-[9px] text-purple-300 font-bold">📦 Item picked up — returning to your store.</p>}
+                  {r.status === 'Completed' && <p className="text-[9px] text-emerald-300 font-bold">✅ Item received — refund in progress.</p>}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
