@@ -62,8 +62,11 @@ interface WalletTransaction {
   type: 'Top-Up' | 'Order Payment' | 'Refund' | 'Cashback';
   amount: number;
   date: string;
-  status: 'Completed' | 'Pending';
+  status: 'Completed' | 'Pending' | 'Rejected';
   trxId?: string;
+  receipt?: string;
+  sender?: string;
+  method?: string;
 }
 
 interface SupportTicketItem {
@@ -2119,7 +2122,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (!sender.endsWith(last4)) { setAddMoneyError('Last 4 digits must match the sending number'); return; }
     if (!/^[A-Z0-9]{8,20}$/.test(addMoneyTrxId.trim())) { setAddMoneyError('Invalid TrxID — expected 8–20 letters/digits from your SMS'); return; }
     if (!addMoneyReceipt) { setAddMoneyError('Upload the payment screenshot/receipt before submitting'); return; }
-    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Pending', trxId: addMoneyTrxId.trim().toUpperCase() }, ...prev]);
+    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Pending', trxId: addMoneyTrxId.trim().toUpperCase(), receipt: addMoneyReceipt, sender: addMoneySender, method: addMoneyMethod === 'Card' ? 'Card' : addMoneyMethod }, ...prev]);
     setAddMoneyStep('pending');
     showToast('Payment received — admin will verify & add to your wallet', 'info');
   };

@@ -79,6 +79,33 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   }, []);
   const topUpTickets = customerTickets.filter(t => /top[- ]?up|add ?money|wallet/i.test(t.category));
 
+  // Customer wallet top-up transactions (from storefront ss_wtxn_v2) awaiting admin verify
+  const [custTxns, setCustTxns] = useState<Array<{ id: string; type: string; amount: number; date: string; status: string; trxId?: string; receipt?: string; sender?: string; method?: string }>>(() => lsGet('ss_wtxn_v2', []));
+  useEffect(() => {
+    const onStorage = () => setCustTxns(lsGet('ss_wtxn_v2', []));
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  const pendingTopUps = custTxns.filter(t => t.type === 'Top-Up' && t.status === 'Pending');
+  const [walletBal, setWalletBal] = useState<number>(() => lsGet('ss_wallet_v2', 0));
+  useEffect(() => {
+    const onStorage = () => setWalletBal(lsGet('ss_wallet_v2', 0));
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  const verifyTopUp = (tx: { id: string; amount: number; receipt?: string }, approve: boolean) => {
+    const next = custTxns.map(t => t.id === tx.id ? { ...t, status: approve ? 'Completed' : 'Rejected' } : t);
+    setCustTxns(next);
+    lsSet('ss_wtxn_v2', next);
+    if (approve) {
+      const bal = walletBal + tx.amount;
+      setWalletBal(bal);
+      lsSet('ss_wallet_v2', bal);
+    }
+    setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: approve ? 'Top-up approved' : 'Top-up rejected', orderId: tx.id, paymentMethod: 'Wallet Top-Up', amount: tx.amount, at: Date.now() }, ...prev]);
+    showToast && showToast(approve ? `৳${tx.amount.toLocaleString()} credited to wallet` : 'Top-up rejected', approve ? 'success' : 'info');
+  };
+
   // Keep wallet numbers in sync if edited from another tab
   useEffect(() => {
     const onStorage = () => setWalletCfg(lsGet<WalletConfig>(WALLET_CONFIG_KEY, DEFAULT_WALLETS));
@@ -305,33 +332,125 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
 
         {/* ============ TOP-UP REPORTS ============ */}
         {tab === 'topups' && (
-          <div className="space-y-3">
-            <h3 className="font-black text-white text-sm flex items-center space-x-2"><Banknote className="w-4 h-4 text-brand-orange" /><span>Top-Up / Add Money Reports</span></h3>
-            <p className="text-[10px] text-gray-400">Customer tickets filed for Add Money / Top-Up problems (money sent but not credited, wrong amount, etc.). Reply to resolve.</p>
-            {topUpTickets.length === 0 ? (
-              <p className="text-center text-[10px] text-gray-500 py-6 flex items-center justify-center space-x-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /><span>No Add Money reports yet.</span></p>
+          <div className="space-y-4">
+            <div className="bg-brand-dark/50 border border-brand-border/40 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 className="font-black text-white text-sm flex items-center space-x-2"><Banknote className="w-4 h-4 text-brand-orange" /><span>Top-Up / Add Money</span></h3>
+                <p className="text-[10px] text-gray-400">Verify payment screenshots, then credit the wallet — every credit/debit is recorded below.</p>
+              </div>
+              <div className="flex items-center space-x-3 text-right">
+                <div>
+                  <p className="text-[9px] text-gray-500 uppercase tracking-wider">Customer wallet</p>
+                  <p className="text-white font-black font-mono">৳{walletBal.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-gray-500 uppercase tracking-wider">Pending</p>
+                  <p className="text-amber-400 font-black font-mono">{pendingTopUps.length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Pending top-ups to verify */}
+            {pendingTopUps.length === 0 ? (
+              <p className="text-center text-[10px] text-gray-500 py-6 flex items-center justify-center space-x-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /><span>No pending top-ups — all verified.</span></p>
             ) : (
               <div className="space-y-2">
-                {topUpTickets.map(tk => (
-                  <div key={tk.id} className="bg-brand-dark/50 border border-brand-border/50 rounded-xl p-3 space-y-2">
+                {pendingTopUps.map(tx => (
+                  <div key={tx.id} className="bg-brand-dark/50 border border-amber-500/30 rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-2">
-                        <p className="text-gray-100 font-black text-xs font-mono">{tk.id}</p>
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                          tk.status === 'Resolved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20' :
-                          tk.status === 'Under Review' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/20' :
-                          'bg-amber-500/20 text-amber-300 border border-amber-500/20'
-                        }`}>{tk.status || 'Open'}</span>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/20">{tk.category}</span>
+                        <p className="text-gray-100 font-black text-xs font-mono">{tx.id}</p>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/20">⏳ Pending Verify</span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/20">{tx.method || 'Wallet'}</span>
                       </div>
-                      <span className="text-[9px] text-gray-500">{tk.date}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-white font-black font-mono text-sm">+৳{tx.amount.toLocaleString()}</span>
+                      </div>
                     </div>
-                    <p className="text-gray-200 font-bold text-[11px]">{tk.subject}</p>
-                    <p className="text-gray-400 text-[10px] bg-brand-dark/40 border border-brand-border/30 rounded-lg p-2">"{tk.lastMessage}"</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                      <div className="space-y-0.5">
+                        <p className="text-gray-400">Sender: <b className="text-gray-200 font-mono">{tx.sender || '—'}</b></p>
+                        <p className="text-gray-400">TrxID: <b className="text-gray-200 font-mono">{tx.trxId || '—'}</b></p>
+                        <p className="text-gray-400">Date: <span className="text-gray-300">{tx.date}</span></p>
+                      </div>
+                      <div className="flex items-center justify-start sm:justify-end space-x-2">
+                        {tx.receipt && (
+                          <button
+                            onClick={() => setReceiptView(tx.receipt || null)}
+                            className="px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-lg text-[10px] font-bold hover:bg-blue-500/20 transition-colors cursor-pointer"
+                          >View Receipt Photo</button>
+                        )}
+                        <button
+                          onClick={() => verifyTopUp(tx, true)}
+                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                        >✓ Verify & Credit</button>
+                        <button
+                          onClick={() => verifyTopUp(tx, false)}
+                          className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg text-[10px] font-bold hover:bg-red-500/20 transition-colors cursor-pointer"
+                        >✗ Reject</button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
+
+            {/* Wallet ledger (credit/debit) */}
+            <div className="bg-brand-dark/50 border border-brand-border/40 rounded-xl p-3 space-y-2">
+              <h4 className="font-black text-white text-xs flex items-center space-x-2"><History className="w-3.5 h-3.5 text-brand-orange" /><span>Wallet Ledger — Credit / Debit</span></h4>
+              {custTxns.length === 0 ? (
+                <p className="text-center text-[10px] text-gray-500 py-4">No wallet transactions yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {custTxns.slice(0, 20).map(tx => (
+                    <div key={tx.id} className="flex items-center justify-between gap-2 bg-brand-dark/40 border border-brand-border/30 rounded-lg px-2.5 py-1.5 text-[10px]">
+                      <div className="min-w-0 flex items-center space-x-2">
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${tx.type === 'Top-Up' ? 'bg-emerald-500/20 text-emerald-300' : tx.type === 'Refund' ? 'bg-blue-500/20 text-blue-300' : tx.type === 'Cashback' ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300'}`}>
+                          {tx.amount >= 0 ? '↑' : '↓'}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-gray-200 font-bold truncate">{tx.type} <span className="font-mono text-gray-500">{tx.id}</span></p>
+                          <p className="text-[8px] text-gray-500 truncate">{tx.date}{tx.trxId ? ` · ${tx.trxId}` : ''}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className={`font-mono font-black ${tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{tx.amount >= 0 ? `+৳${tx.amount.toLocaleString()}` : `-৳${Math.abs(tx.amount).toLocaleString()}`}</span>
+                        <span className={`block text-[8px] font-bold ${tx.status === 'Completed' ? 'text-emerald-500' : tx.status === 'Rejected' ? 'text-red-400' : 'text-amber-400'}`}>{tx.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Customer tickets for add-money problems */}
+            <div className="space-y-2">
+              <h4 className="font-black text-white text-xs flex items-center space-x-2"><ClipboardList className="w-3.5 h-3.5 text-brand-orange" /><span>Customer Problem Reports</span></h4>
+              {topUpTickets.length === 0 ? (
+                <p className="text-center text-[10px] text-gray-500 py-4">No Add Money problem tickets.</p>
+              ) : (
+                <div className="space-y-2">
+                  {topUpTickets.map(tk => (
+                    <div key={tk.id} className="bg-brand-dark/50 border border-brand-border/50 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center space-x-2">
+                          <p className="text-gray-100 font-black text-xs font-mono">{tk.id}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                            tk.status === 'Resolved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20' :
+                            tk.status === 'Under Review' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/20' :
+                            'bg-amber-500/20 text-amber-300 border border-amber-500/20'
+                          }`}>{tk.status || 'Open'}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/20">{tk.category}</span>
+                        </div>
+                        <span className="text-[9px] text-gray-500">{tk.date}</span>
+                      </div>
+                      <p className="text-gray-200 font-bold text-[11px]">{tk.subject}</p>
+                      <p className="text-gray-400 text-[10px] bg-brand-dark/40 border border-brand-border/30 rounded-lg p-2">"{tk.lastMessage}"</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
         {tab === 'audit' && (
