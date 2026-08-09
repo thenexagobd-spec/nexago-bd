@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { SupportTicket, Order, ChatLogEntry, OrderReportEntry } from '../types';
+import { SupportTicket, Order, ChatLogEntry, OrderReportEntry, Driver } from '../types';
 import { LifeBuoy, Check, AlertCircle, MessageSquare, Send, ArrowLeft, Clock, Search, Package, Scale, ListChecks, History, Activity, Truck, Store, UserX, FileSearch, Wand2, Zap, Timer, Users, X, Sparkles, Navigation, SearchCheck, BookOpen, Wrench, ArrowUpCircle, Smartphone, Bug, Bell, Shield, BarChart3, GitBranch, GitCommit, MessagesSquare, Terminal, Webhook, Database, ClipboardCheck, FileText, Siren, Calculator, ShieldCheck, Inbox, Hourglass, Megaphone, AlertTriangle, ClipboardList, KeyRound, Rocket, Map, Gauge, Monitor, RotateCw, Trash2, FileWarning, GraduationCap, Lock, Workflow, Fingerprint, MapPin, BellRing, IdCard, ArrowRightLeft, Wifi, LayoutTemplate, Lightbulb, Award, CalendarClock, Settings2, Globe, Download, Quote, MapPinned, RefreshCw, TrendingUp, Banknote, Tag, Percent, Star, Cpu, BookOpenCheck, Utensils, Layers, ChevronDown, ScanFace, Loader2, Plus } from 'lucide-react';
 
 interface SupportViewProps {
@@ -16,7 +16,9 @@ interface SupportViewProps {
   chatLog?: ChatLogEntry[];
   reports?: OrderReportEntry[];
   onPaymentRefund?: (orderId: string, amount: number, reason: string) => void;
-  onNotify?: (n: { title: string; message: string; type: 'order' | 'system' | 'driver' | 'payment' }) => void;
+  onNotify?: (n: { title: string; message: string; type: 'order' | 'system' | 'driver' | 'payment'; audience?: 'all' | 'driver' | 'store' | 'store-admin' | 'admin'; driverId?: string }) => void;
+  drivers?: Driver[];
+  onDriversChange?: (drivers: Driver[]) => void;
 }
 
 type FaultParty = 'customer' | 'driver' | 'store';
@@ -298,7 +300,7 @@ const INCIDENT_TEMPLATES: Array<{ id: string; name: string; severity: 'Low' | 'M
   { id: 'IT-05', name: 'Search results stale', severity: 'Low', platform: 'Admin / Multi', desc: 'Index sync stuck for one store' }
 ];
 
-export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, orders = [], chatLog = [], reports = [], onPaymentRefund, onNotify }: SupportViewProps) {
+export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, orders = [], chatLog = [], reports = [], onPaymentRefund, onNotify, drivers = [], onDriversChange }: SupportViewProps) {
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [category, setCategory] = useState<'all' | 'customers' | 'disputes' | 'drivers' | 'technical' | 'users'>('all');
@@ -1576,8 +1578,20 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
     if (party === 'customer' && type === 'credit') {
       if (onPaymentRefund) onPaymentRefund(orderId, amount, note || 'Refund issued');
       onNotify?.({ title: '💰 Refund Issued — ' + orderId, message: `Customer credited Tk ${amount.toFixed(2)}: ${note || 'Refund'}`, type: 'payment' });
-    } else if (party === 'driver' && type === 'debit') {
-      onNotify?.({ title: '⚠️ Driver Fine — ' + orderId, message: `Driver debited Tk ${amount.toFixed(2)}: ${note || 'Fine'}`, type: 'driver' });
+    } else if (party === 'driver') {
+      const order = orders.find(o => o.id === orderId);
+      const d = drivers.find(x => x.id === order?.driverId);
+      if (d && onDriversChange) {
+        const delta = type === 'credit' ? amount : -amount;
+        onDriversChange(drivers.map(x => x.id === d.id ? { ...x, earnings: Math.max(0, (x.earnings || 0) + delta) } : x));
+      }
+      onNotify?.({
+        title: type === 'credit' ? '💰 Wallet Credited — ' + orderId : '⚠️ Wallet Debited — ' + orderId,
+        message: `Driver ${d?.name || 'wallet'} ${type === 'credit' ? 'credited' : 'debited'} Tk ${amount.toFixed(2)}: ${note || (type === 'credit' ? 'Adjustment credit' : 'Fine / adjustment')}`,
+        type: 'driver',
+        audience: 'driver',
+        driverId: order?.driverId,
+      });
     }
   };
 

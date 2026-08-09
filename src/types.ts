@@ -193,6 +193,8 @@ export interface SystemNotification {
   type: 'order' | 'system' | 'driver' | 'payment';
   time: string;
   read: boolean;
+  audience?: 'all' | 'driver' | 'store' | 'store-admin' | 'admin'; // who should see this in their inbox
+  driverId?: string; // if set, only this driver sees it in their inbox
 }
 
 export interface ChatLogEntry {

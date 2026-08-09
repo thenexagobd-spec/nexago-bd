@@ -18,12 +18,13 @@ import {
   Check, Store
 } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useStoreProfile, bdt, statusBadge, lsGet, lsSet } from './portalUtils';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet } from './portalUtils';
 
 export default function StorePortal() {
   const [orders, setOrders] = useOrders();
   const [drivers, setDrivers] = useDrivers();
   const [profile] = useStoreProfile();
+  const [notifications, setNotifications] = useNotifications();
   const [tab, setTab] = useState('receive');
   const [storeOnline, setStoreOnline] = useState<boolean>(lsGet('sd_store_online', true));
   const [printOrder, setPrintOrder] = useState<any>(null);
@@ -76,10 +77,18 @@ export default function StorePortal() {
       driverDeadline: Date.now() + 60 * 1000,
       placedAt: o.placedAt || Date.now(),
     } : o)));
+    setNotifications(prev => [
+      { id: `NOTIF-${Date.now().toString().slice(-6)}`, title: '🚚 Order Confirmed', message: `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'driver', driverId: rider?.id },
+      ...prev,
+    ]);
   };
 
   const rejectOrder = (id: string) => {
     setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: 'Cancelled' as any } : o)));
+    setNotifications(prev => [
+      { id: `NOTIF-${Date.now().toString().slice(-6)}-r`, title: '🚫 Order Rejected', message: `Store declined order #${id} — no rider assigned.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'all' },
+      ...prev,
+    ]);
   };
 
   const startPreparing = (id: string) => {
@@ -88,6 +97,11 @@ export default function StorePortal() {
 
   const markReady = (id: string) => {
     setOrders(prev => prev.map(o => (o.id === id ? { ...o, storeReady: true, preparing: true } : o)));
+    const ord = orders.find(o => o.id === id);
+    setNotifications(prev => [
+      { id: `NOTIF-${Date.now().toString().slice(-6)}-s`, title: '📦 Ready for Pickup', message: `Store marked order #${id} ready — pick it up now.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'driver', driverId: ord?.driverId },
+      ...prev,
+    ]);
   };
 
   const callCustomer = (o: any) => {

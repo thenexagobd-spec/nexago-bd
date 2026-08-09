@@ -15,10 +15,10 @@ import {
   LayoutDashboard, Package, Wallet, User, MessageSquare, BarChart3, Phone, Navigation,
   CheckCircle2, Star, LogIn, Power, Send, RefreshCw, MapPin, FileText, AlertCircle,
     History, Inbox, Headphones, Settings, ShieldCheck, LogOut, ChevronRight, Copy, Eye, Truck,
-    Home, X, Bell, Clock
+    X, Bell, Clock
   } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useWalletTxns, useTickets, bdt, todayStr, statusBadge, lsGet, lsSet } from './portalUtils';
+import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet } from './portalUtils';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
@@ -27,6 +27,7 @@ export default function DriverPortal() {
   const [drivers, setDrivers] = useDrivers();
   const [txns] = useWalletTxns();
   const [tickets, setTickets] = useTickets();
+  const [notifications, setNotifications] = useNotifications();
   const me = drivers[0];
   const [tab, setTab] = useState('dashboard');
   const [authView, setAuthView] = useState<AuthView>('dashboard');
@@ -68,6 +69,27 @@ export default function DriverPortal() {
     setOnline(me?.status !== 'Offline');
   }, [me?.status]);
 
+  // Seed a welcome notification for this driver once
+  useEffect(() => {
+    if (!me) return;
+    if (!notifications.some(n => n.driverId === me.id && n.title.includes('Welcome'))) {
+      setNotifications(prev => [
+        {
+          id: `NOTIF-${me.id}-welcome`,
+          title: '👋 Welcome to The NexaGo BD Driver!',
+          message: `${me.name}, your driver app is live. New order requests and admin updates will arrive here.`,
+          type: 'system',
+          time: 'Just Now',
+          read: false,
+          audience: 'driver',
+          driverId: me.id,
+        },
+        ...prev,
+      ]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
+
   useEffect(() => lsSet('sd_driver_autoaccept', autoAccept), [autoAccept]);
   useEffect(() => lsSet('sd_driver_remember', rememberMe), [rememberMe]);
 
@@ -89,6 +111,9 @@ export default function DriverPortal() {
   const cancelled = myOrders.filter(o => o.status === 'Cancelled');
   const earned = done.reduce((s, o) => s + (o.deliveryCharge || 60), 0) + done.length * 20;
 
+  const myNotifs = notifications.filter(n => n.driverId === me?.id);
+  const unreadCount = myNotifs.filter(n => !n.read).length;
+
   // Auto-accept offers when enabled
   useEffect(() => {
     if (autoAccept && online && offers.length && !activeOrder) {
@@ -98,6 +123,42 @@ export default function DriverPortal() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offers.length, activeOrder, autoAccept, online]);
+
+  // Auto-generate driver-relevant notifications from real events
+  const notifiedRef = useRef<Set<string>>(new Set());
+  const pushNotif = (title: string, message: string, type: 'order' | 'system' | 'driver' | 'payment' = 'system', key: string) => {
+    if (!me) return;
+    if (notifiedRef.current.has(key)) return;
+    notifiedRef.current.add(key);
+    const now = new Date();
+    setNotifications(prev => [
+      {
+        id: `NOTIF-${Date.now().toString().slice(-4)}-${key.slice(0, 6)}`,
+        title,
+        message,
+        type,
+        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+        audience: 'driver',
+        driverId: me.id,
+      },
+      ...prev,
+    ]);
+  };
+  useEffect(() => {
+    if (offers.length && online) {
+      const o = offers[0];
+      pushNotif('🔔 New Order Request', `Order #${o.id} from ${o.storeName} — ${bdt(o.amount)}. Accept within 1 minute.`, 'order', `offer-${o.id}`);
+    }
+  }, [offers, online]);
+  useEffect(() => {
+    const ready = myOrders.find(o => o.status === 'Processing' && o.storeReady && !o.pickedUp);
+    if (ready) pushNotif('📦 Order Ready for Pickup', `Store ${ready.storeName} marked order #${ready.id} ready — pick it up.`, 'order', `ready-${ready.id}`);
+  }, [myOrders]);
+  useEffect(() => {
+    const latest = myOrders.find(o => o.status === 'Completed');
+    if (latest && latest.deliveryProof) pushNotif('✅ Delivery Completed', `Order #${latest.id} delivered — ${bdt(latest.deliveryCharge || 60)} added to earnings.`, 'payment', `done-${latest.id}`);
+  }, [myOrders]);
 
   const toggleDuty = () => {
     if (!me) return;
@@ -231,7 +292,7 @@ export default function DriverPortal() {
     { id: 'active', label: 'Active Delivery', icon: Package, badge: activeOrder ? 1 : 0 },
     { id: 'deliveries', label: 'Deliveries', icon: History },
     { id: 'earnings', label: 'Earnings', icon: Wallet },
-    { id: 'inbox', label: 'Inbox', icon: Inbox },
+    { id: 'inbox', label: 'Inbox', icon: Inbox, badge: unreadCount },
     { id: 'support', label: 'Support', icon: Headphones },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'performance', label: 'Performance', icon: BarChart3 },
@@ -861,33 +922,43 @@ export default function DriverPortal() {
           {/* ============ INBOX ============ */}
           {tab === 'inbox' && (
             <div className="space-y-3">
-              <div>
-                <h3 className="text-sm font-black text-white flex items-center space-x-2"><Inbox className="w-4 h-4 text-brand-orange" /><span>Inbox</span></h3>
-                <p className="text-[10px] text-gray-400">Dispatch updates, payout notices and support replies appear here.</p>
-              </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 flex items-start space-x-3">
-                <div className="w-10 h-10 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0"><Inbox className="w-4 h-4" /></div>
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-bold text-white">No new messages</p>
-                  <p className="text-[9px] text-gray-400 mt-0.5">You're all caught up. New dispatch updates, payout notices and support replies will appear here.</p>
+                  <h3 className="text-sm font-black text-white flex items-center space-x-2"><Inbox className="w-4 h-4 text-brand-orange" /><span>Inbox</span></h3>
+                  <p className="text-[10px] text-gray-400">Admin updates, order statuses, payouts and support replies appear here.</p>
                 </div>
+                <button onClick={() => setNotifications(prev => prev.map(n => (n.driverId && n.driverId === me?.id) || (!n.driverId && !n.audience) ? { ...n, read: true } : n))} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">Mark all read</button>
               </div>
-              <div className="space-y-1.5">
-                <p className="text-gray-400 font-bold uppercase text-[9px]">Recent Activity</p>
-                {[
-                  { icon: Truck, color: 'text-emerald-400', title: 'Welcome to The NexaGo BD Driver!', time: 'Today · 9:00 AM' },
-                  { icon: FileText, color: 'text-brand-orange', title: 'Weekly payout schedule updated — Sundays, bKash/Bank', time: 'Yesterday' },
-                  { icon: Home, color: 'text-sky-400', title: 'Dhanmondi hub operational hours extended to 11 PM', time: '3 days ago' },
-                ].map((m, i) => (
-                  <div key={i} className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 flex items-start space-x-3">
-                    <span className={`w-8 h-8 rounded-full bg-[#0a1322] flex items-center justify-center shrink-0 ${m.color}`}><m.icon className="w-4 h-4" /></span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-white font-bold">{m.title}</p>
-                      <p className={`text-[8px] ${m.color} font-bold`}>{m.time}</p>
-                    </div>
+              {myNotifs.length === 0 ? (
+                <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 flex items-start space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0"><Inbox className="w-4 h-4" /></div>
+                  <div>
+                    <p className="text-[11px] font-bold text-white">No new messages</p>
+                    <p className="text-[9px] text-gray-400 mt-0.5">New dispatch updates, admin notices, order statuses and support replies will appear here.</p>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {myNotifs.map(n => {
+                    const color = n.type === 'order' ? 'text-brand-orange' : n.type === 'payment' ? 'text-emerald-400' : n.type === 'driver' ? 'text-cyan-400' : 'text-sky-400';
+                    return (
+                      <div key={n.id} className={`bg-[#101d30] border rounded-xl p-3 flex items-start space-x-3 ${n.read ? 'border-[#1e3050]' : 'border-brand-orange/40'}`}>
+                        <span className={`w-8 h-8 rounded-full bg-[#0a1322] flex items-center justify-center shrink-0 ${color}`}>
+                          {n.type === 'order' ? <Package className="w-4 h-4" /> : n.type === 'payment' ? <Wallet className="w-4 h-4" /> : n.type === 'driver' ? <Truck className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] text-white font-bold">{n.title}</p>
+                            {!n.read && <span className="w-2 h-2 rounded-full bg-brand-orange shrink-0"></span>}
+                          </div>
+                          <p className="text-[9px] text-gray-400 mt-0.5">{n.message}</p>
+                          <p className={`text-[8px] ${color} font-bold mt-1`}>{n.time}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
