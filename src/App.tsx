@@ -40,6 +40,7 @@ import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
+import { appendTimeline } from './portals/portalUtils';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
@@ -584,6 +585,14 @@ export default function App() {
 
   const applyOrderUpdate = (updatedOrder: Order) => {
     const original = orders.find(o => o.id === updatedOrder.id);
+    // Audit: log every status / driver change in the order timeline
+    if (original) {
+      if (original.status !== updatedOrder.status) {
+        updatedOrder = appendTimeline(updatedOrder, updatedOrder.status.toLowerCase(), 'admin', `Status changed: ${original.status} → ${updatedOrder.status}`);
+      } else if (original.driverId !== updatedOrder.driverId) {
+        updatedOrder = appendTimeline(updatedOrder, 'reassigned', 'admin', `Rider changed: ${original.driverId || 'none'} → ${updatedOrder.driverId || 'none'}`);
+      }
+    }
     if (original && original.status !== 'Completed' && updatedOrder.status === 'Completed' && updatedOrder.driverId) {
       setDrivers(drivers.map(d => d.id === updatedOrder.driverId ? {
         ...d,

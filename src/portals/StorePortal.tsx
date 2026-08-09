@@ -18,7 +18,7 @@ import {
   Check, Store, Bell
 } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet } from './portalUtils';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif } from './portalUtils';
 
 export default function StorePortal() {
   const [orders, setOrders] = useOrders();
@@ -74,36 +74,38 @@ export default function StorePortal() {
 
   const acceptOrder = (id: string) => {
     const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
-    setOrders(prev => prev.map(o => (o.id === id ? {
+    setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
       ...o,
       status: 'Confirmed' as any,
       driverId: rider?.id || 'DRV123456',
       driverDeadline: Date.now() + 60 * 1000,
       placedAt: o.placedAt || Date.now(),
-    } : o)));
+    }, 'accepted', 'store', `Store accepted — rider ${rider?.name || ''} assigned`) : o)));
     setNotifications(prev => [
-      { id: `NOTIF-${Date.now().toString().slice(-6)}`, title: '🚚 Order Confirmed', message: `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'driver', driverId: rider?.id },
+      makeNotif('🚚 Order Confirmed', `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, 'order', { audience: 'driver', driverId: rider?.id }),
+      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — rider ${rider?.name || 'assigned'} on the way.`, 'order', { audience: 'all' }),
       ...prev,
     ]);
   };
 
   const rejectOrder = (id: string) => {
-    setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: 'Cancelled' as any } : o)));
+    setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({ ...o, status: 'Cancelled' as any }, 'cancelled', 'store', 'Store declined the order') : o)));
     setNotifications(prev => [
-      { id: `NOTIF-${Date.now().toString().slice(-6)}-r`, title: '🚫 Order Rejected', message: `Store declined order #${id} — no rider assigned.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'all' },
+      makeNotif('🚫 Order Rejected', `Store declined order #${id} — no rider assigned.`, 'order', { audience: 'all' }),
       ...prev,
     ]);
   };
 
   const startPreparing = (id: string) => {
-    setOrders(prev => prev.map(o => (o.id === id ? { ...o, preparing: true, status: 'Processing' as any } : o)));
+    setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({ ...o, preparing: true, status: 'Processing' as any }, 'preparing', 'store', 'Store started preparing the order') : o)));
   };
 
   const markReady = (id: string) => {
-    setOrders(prev => prev.map(o => (o.id === id ? { ...o, storeReady: true, preparing: true } : o)));
+    setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({ ...o, storeReady: true, preparing: true }, 'ready', 'store', 'Order ready for pickup') : o)));
     const ord = orders.find(o => o.id === id);
     setNotifications(prev => [
-      { id: `NOTIF-${Date.now().toString().slice(-6)}-s`, title: '📦 Ready for Pickup', message: `Store marked order #${id} ready — pick it up now.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'driver', driverId: ord?.driverId },
+      makeNotif('📦 Ready for Pickup', `Store marked order #${id} ready — pick it up now.`, 'order', { audience: 'driver', driverId: ord?.driverId }),
+      makeNotif('📦 Order Ready — #' + id, `Your order is ready for pickup at ${ord?.storeName || 'the store'}.`, 'order', { audience: 'customer', customerId: ord?.customerId || ord?.customerPhone }),
       ...prev,
     ]);
   };
@@ -196,6 +198,11 @@ export default function StorePortal() {
                       <p className="text-gray-500">{o.date} {o.time ? `· ${o.time}` : ''}</p>
                       <p className="text-gray-400 sm:col-span-2 truncate">{o.address || o.pickupLocation || '—'}</p>
                     </div>
+                    {o.scheduledSlot && (
+                      <span className="inline-flex items-center space-x-1 mt-1.5 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-300 text-[9px] font-black">
+                        <Clock className="w-3 h-3" /><span>Scheduled delivery · {o.scheduledSlot}</span>
+                      </span>
+                    )}
                     {o.items && o.items.length > 0 && (
                       <div className="flex items-center space-x-1 mt-1.5 text-[9px] text-gray-400">
                         <Package className="w-3 h-3" /><span>{o.items.length} item{o.items.length === 1 ? '' : 's'}</span>
@@ -345,6 +352,31 @@ export default function StorePortal() {
                 </div>
                 <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg ${liveDriver?.status === 'On-Delivery' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{liveDriver?.status || '—'}</span>
               </div>
+
+              {live.scheduledSlot && (
+                <div className="bg-sky-500/10 border border-sky-500/25 rounded-2xl p-3 flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-sky-400 shrink-0" />
+                  <div><p className="text-[10px] font-bold text-white">Scheduled Delivery</p><p className="text-[9px] text-gray-400">Slot: {live.scheduledSlot} — prepare ahead of time.</p></div>
+                </div>
+              )}
+
+              {(live.timeline?.length || 0) > 0 && (
+                <div className="bg-[#0a1322] border border-[#1e3050] rounded-2xl p-3">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Order Timeline</p>
+                  <div className="space-y-1.5">
+                    {live.timeline!.map((t, i) => (
+                      <div key={i} className="flex items-start space-x-2">
+                        <span className="text-[9px] mt-0.5">{t.actor === 'store' ? '🏪' : t.actor === 'driver' ? '🛵' : t.actor === 'customer' ? '👤' : '🛠️'}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[9px] text-white font-bold uppercase">{t.status}</p>
+                          {t.note && <p className="text-[8px] text-gray-400">{t.note}</p>}
+                        </div>
+                        <span className="text-[8px] text-gray-500 shrink-0">{new Date(t.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Store action area */}
               {live.status === 'Completed' ? (

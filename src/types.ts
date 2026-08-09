@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface OrderTimelineEntry {
+  status: string;
+  actor: 'customer' | 'store' | 'driver' | 'admin' | 'system';
+  note?: string;
+  time: number; // epoch ms
+}
+
 export interface Order {
   id: string; // e.g. "ORD-001248"
   storeName: string;
@@ -43,6 +50,7 @@ export interface Order {
   pickedUp?: boolean;
   extraStores?: string[];
   placedAt?: number; // epoch ms — drives deterministic store→customer tracking progress
+  timeline?: OrderTimelineEntry[]; // audit trail of every status change
   // Send Money / manual payment verification
   paymentStatus?: 'Pending' | 'Approved' | 'Rejected' | 'Paid' | 'COD';
   trxId?: string;          // bKash/Nagad Send Money transaction id

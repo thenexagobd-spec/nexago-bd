@@ -7,9 +7,9 @@
  * localStorage keys as the admin panel.
  */
 import React, { useState } from 'react';
-import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, useDrivers, bdt, statusBadge } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, useDrivers, bdt, statusBadge, appendTimeline, makeNotif } from './portalUtils';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
@@ -71,16 +71,16 @@ export default function StoreAdminPortal() {
   // Store admin accepts a pending customer order → dispatch to the first available driver
   const acceptOrder = (id: string) => {
     const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
-    setOrders(prev => prev.map(o => (o.id === id ? {
+    setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
       ...o,
       status: 'Confirmed' as any,
       driverId: rider?.id || 'DRV123456',
       driverDeadline: Date.now() + 60 * 1000,
       placedAt: o.placedAt || Date.now(),
-    } : o)));
+    }, 'accepted', 'store', `Store admin accepted — rider ${rider?.name || ''} assigned`) : o)));
     setNotifications(prev => [
-      { id: `NOTIF-${Date.now().toString().slice(-6)}-sa`, title: '🚚 Order Accepted & Dispatched', message: `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'driver', driverId: rider?.id },
-      { id: `NOTIF-${Date.now().toString().slice(-6)}-sa2`, title: '🚚 Store Accepted #' + id, message: `Order #${id} accepted — rider ${rider?.name || 'assigned'} is on the way to the store.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'all' },
+      makeNotif('🚚 Order Accepted & Dispatched', `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, 'order', { audience: 'driver', driverId: rider?.id }),
+      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — rider ${rider?.name || 'assigned'} is on the way to the store.`, 'order', { audience: 'all' }),
       ...prev,
     ]);
   };
@@ -212,6 +212,24 @@ export default function StoreAdminPortal() {
                     <p className="text-gray-400 truncate">{o.storeName} · {o.paymentMethod}</p>
                     <p className="text-gray-500">{o.date}</p>
                   </div>
+                  {o.scheduledSlot && (
+                    <span className="inline-flex items-center space-x-1 mt-1.5 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-300 text-[9px] font-black">
+                      <Clock className="w-3 h-3" /><span>Scheduled · {o.scheduledSlot}</span>
+                    </span>
+                  )}
+                  {o.timeline && o.timeline.length > 0 && (
+                    <details className="mt-2 text-[9px] text-gray-400">
+                      <summary className="cursor-pointer font-black text-gray-400 uppercase tracking-widest">Timeline ({o.timeline.length})</summary>
+                      <div className="mt-1.5 space-y-1">
+                        {o.timeline.map((t: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <span className="uppercase font-bold text-gray-300">{t.status}</span>
+                            <span className="text-gray-500">{new Date(t.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                   <div className="flex items-center justify-end space-x-2 mt-3">
                     {o.status !== 'Completed' && o.status !== 'Cancelled' && (
                       <>

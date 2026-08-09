@@ -31,6 +31,28 @@ export const bdt = (n: number) => `৳${(n || 0).toLocaleString()}`;
 
 export const todayStr = () => new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+// Append an audit entry to an order's timeline (keeps at most N entries)
+export const appendTimeline = <T extends { timeline?: any[] }>(order: T, status: string, actor: 'customer' | 'store' | 'driver' | 'admin' | 'system', note?: string): T => {
+  const entry = { status, actor, note, time: Date.now() };
+  const timeline = [...(order.timeline || []), entry];
+  return { ...order, timeline: timeline.slice(-40) };
+};
+
+// Build a notification payload object (targeted) shared by all portals
+export const makeNotif = (title: string, message: string, type: 'order' | 'system' | 'driver' | 'payment', opts: { audience?: string; driverId?: string; customerId?: string; storeId?: string; staffId?: string } = {}): any => ({
+  id: `NOTIF-${Date.now().toString().slice(-8)}`,
+  title,
+  message,
+  type,
+  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  read: false,
+  audience: opts.audience,
+  driverId: opts.driverId,
+  customerId: opts.customerId,
+  storeId: opts.storeId,
+  staffId: opts.staffId,
+});
+
 function useShared<T>(key: string, fallback: T) {
   const [data, setData] = useState<T>(() => lsGet(key, fallback));
   useEffect(() => lsSet(key, data), [key, data]);

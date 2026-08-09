@@ -18,7 +18,7 @@ import {
     X, Bell, Clock
   } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet } from './portalUtils';
+import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif } from './portalUtils';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
@@ -64,6 +64,13 @@ export default function DriverPortal() {
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
   const [deliveryProofName, setDeliveryProofName] = useState<string | null>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [codSettled, setCodSettled] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2800);
+  };
 
   useEffect(() => {
     setOnline(me?.status !== 'Offline');
@@ -182,7 +189,14 @@ export default function DriverPortal() {
   };
 
   const updateStage = (id: string, stage: string, extra: Partial<typeof orders[0]> = {}) => {
-    setOrders(prev => prev.map(x => (x.id === id ? { ...x, driverStage: stage, ...extra } : x)));
+    setOrders(prev => prev.map(x => (x.id === id ? appendTimeline({ ...x, driverStage: stage, ...extra }, stage, 'driver') : x)));
+    const ord = orders.find(x => x.id === id);
+    if (ord) {
+      const notifs: any[] = [];
+      if (stage === 'to_customer') notifs.push(makeNotif('📦 Order Picked Up — #' + id, `Your order is on the way. ${ord.storeName} handed it to ${me?.name || 'the rider'}.`, 'order', { audience: 'customer', customerId: ord.customerId || ord.customerPhone }));
+      if (stage === 'at_customer') notifs.push(makeNotif('🛵 Rider Arrived — #' + id, `${me?.name || 'Your rider'} has arrived at your address.`, 'order', { audience: 'customer', customerId: ord.customerId || ord.customerPhone }));
+      if (notifs.length) setNotifications(prev => [...notifs, ...prev]);
+    }
   };
 
   const handleArriveStore = () => {
@@ -209,13 +223,24 @@ export default function DriverPortal() {
   const handleDeliveryProofSubmitted = () => {
     if (!activeOrder) return;
     if (!deliveryProofName) return;
-    setOrders(prev => prev.map(x => (x.id === activeOrder.id ? { ...x, status: 'Completed' as any, driverStage: 'delivered', deliveryProof: deliveryProofName } : x)));
+    // Delivery PIN verification — if the order carries a PIN, the driver must enter it
+    if (activeOrder.deliveryPin && pinInput.trim() !== activeOrder.deliveryPin) {
+      showToast('Delivery PIN incorrect — enter the PIN the customer shared.');
+      return;
+    }
+    setOrders(prev => prev.map(x => (x.id === activeOrder.id ? appendTimeline({ ...x, status: 'Completed' as any, driverStage: 'delivered', deliveryProof: deliveryProofName, codSettled: codSettled || undefined }, 'delivered', 'driver', 'Delivery completed') : x)));
     if (me) {
       const fee = activeOrder.deliveryCharge || 60;
       setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: 'Online' as any, completedOrders: (d.completedOrders || 0) + 1, earnings: (d.earnings || 0) + fee } : d)));
     }
     setPickupProofName(null);
     setDeliveryProofName(null);
+    setPinInput('');
+    setCodSettled(false);
+    setNotifications(prev => [
+      makeNotif('✅ Delivered — #' + activeOrder.id, `Your order was delivered by ${me?.name || 'the rider'}. Enjoy!`, 'order', { audience: 'customer', customerId: activeOrder.customerId || activeOrder.customerPhone }),
+      ...prev,
+    ]);
   };
 
   const copyOrderNo = (id: string) => {
@@ -737,6 +762,25 @@ export default function DriverPortal() {
                     ))}
                   </div>
 
+                  {/* Audit timeline */}
+                  {(activeOrder.timeline?.length || 0) > 0 && (
+                    <div className="bg-[#0a1322] border border-[#1e3050] rounded-xl p-3">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Order Timeline</p>
+                      <div className="space-y-1.5">
+                        {activeOrder.timeline!.map((t, i) => (
+                          <div key={i} className="flex items-start space-x-2">
+                            <span className="text-[9px] mt-0.5">{t.actor === 'store' ? '🏪' : t.actor === 'driver' ? '🛵' : t.actor === 'customer' ? '👤' : '🛠️'}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[9px] text-white font-bold uppercase">{t.status}</p>
+                              {t.note && <p className="text-[8px] text-gray-400">{t.note}</p>}
+                            </div>
+                            <span className="text-[8px] text-gray-500 shrink-0">{new Date(t.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Stage actions */}
                   <div className="space-y-2">
                     {activeOrder.driverStage === 'to_store' && (
@@ -793,6 +837,24 @@ export default function DriverPortal() {
                               <span>{deliveryProofName ? `Delivery photo: ${deliveryProofName}` : 'Upload delivery proof photo'}</span>
                               <input type="file" accept="image/*" className="hidden" onChange={e => setDeliveryProofName(e.target.files?.[0]?.name || 'delivery.jpg')} />
                             </label>
+                            {activeOrder.deliveryPin && (
+                              <div className="space-y-1">
+                                <p className="text-[9px] font-black text-gray-400 uppercase">Delivery PIN (customer shared)</p>
+                                <input
+                                  value={pinInput}
+                                  onChange={e => setPinInput(e.target.value)}
+                                  inputMode="numeric"
+                                  placeholder="Enter 4-digit PIN"
+                                  className="w-full px-3 py-2 bg-[#0a1322] border border-[#1e3050] rounded-xl text-white text-[12px] font-mono tracking-widest outline-none focus:border-emerald-500"
+                                />
+                              </div>
+                            )}
+                            {/cash|cod/i.test(activeOrder.paymentMethod || '') && (
+                              <label className="w-full py-2.5 bg-[#101d30] border border-[#1e3050] hover:border-emerald-500/40 text-emerald-300 text-[10px] font-black uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
+                                <input type="checkbox" checked={codSettled} onChange={e => setCodSettled(e.target.checked)} className="accent-emerald-500" />
+                                <span>Cash collected: {bdt(activeOrder.codAmount || activeOrder.amount)} — I'll settle to store</span>
+                              </label>
+                            )}
                             <button onClick={handleDeliveryProofSubmitted} className={`w-full py-2.5 text-[11px] font-black uppercase rounded-xl cursor-pointer ${deliveryProofName ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-[#0a1322] border border-[#1e3050] text-gray-500 cursor-not-allowed'}`}>
                               {deliveryProofName ? 'Complete Delivery' : 'Upload delivery proof photo first'}
                             </button>
@@ -1276,6 +1338,11 @@ export default function DriverPortal() {
               Submit Report
             </button>
           </div>
+        </div>
+      )}
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[200] px-4 py-2.5 bg-[#0f1c2e] border border-brand-orange/40 text-white text-[11px] font-bold rounded-xl shadow-2xl">
+          {toast}
         </div>
       )}
     </PortalShell>
