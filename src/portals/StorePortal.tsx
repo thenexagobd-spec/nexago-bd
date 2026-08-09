@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Inbox, History, CheckCircle2, Package, Send, User, Phone, Power, WifiOff,
   Printer, X, Headphones, MessageSquare, HelpCircle, ShoppingBag, Clock,
-  Check, Store, Bell
+  Check, Store, Bell, Banknote
 } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif } from './portalUtils';
@@ -426,6 +426,53 @@ export default function StorePortal() {
             <h3 className="text-sm font-black text-white flex items-center space-x-2"><History className="w-4 h-4 text-brand-orange" /><span>Order History</span></h3>
             <p className="text-[10px] text-gray-400">Completed and cancelled orders for this store.</p>
           </div>
+
+          {/* COD Settlement Ledger */}
+          {(() => {
+            const codDone = mine.filter(o => o.status === 'Completed' && /cash|cod/i.test(o.paymentMethod || ''));
+            const collected = codDone.filter(o => o.codSettled);
+            const uncollected = codDone.filter(o => !o.codSettled);
+            const totalCollected = collected.reduce((s, o) => s + (o.codAmount || o.amount), 0);
+            const totalUncollected = uncollected.reduce((s, o) => s + (o.codAmount || o.amount), 0);
+            if (codDone.length === 0) return null;
+            return (
+              <div className="bg-[#0c1a2b] border border-[#1e3050] rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-xs font-black text-white flex items-center space-x-2"><Banknote className="w-4 h-4 text-emerald-400" /><span>COD Settlement Ledger</span></h4>
+                  <div className="flex items-center space-x-2 text-[9px] font-black">
+                    <span className="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">Collected {bdt(totalCollected)}</span>
+                    <span className="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">Due {bdt(totalUncollected)}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {codDone.map(o => {
+                    const d = drivers.find(x => x.id === o.driverId);
+                    const amt = o.codAmount || o.amount;
+                    return (
+                      <div key={o.id} className="flex items-center justify-between gap-2 bg-[#101d30] border border-[#1e3050] rounded-xl px-3 py-2">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <span className="text-[9px] font-mono font-black text-brand-orange">#{o.id}</span>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-white truncate">{o.customerName}</p>
+                            <p className="text-[9px] text-gray-500">{d ? `${d.name} · ${d.phone || '—'}` : 'No rider'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <span className="text-[10px] font-black font-mono text-white">{bdt(amt)}</span>
+                          {o.codSettled ? (
+                            <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[8px] font-black">Driver collected</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[8px] font-black">Pending pickup</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="flex items-center space-x-2 border-b border-[#1e3050] pb-2 text-[11px] font-bold">
             {(['all', 'completed', 'cancelled'] as const).map(tb => (
               <button key={tb} onClick={() => setHistoryFilter(tb)}
@@ -564,6 +611,28 @@ export default function StorePortal() {
               </div>
             ))}
           </div>
+
+          {/* Store rating from customer feedback (sd_store_ratings) */}
+          {(() => {
+            try {
+              const reg = JSON.parse(localStorage.getItem('sd_store_ratings') || '{}');
+              const agg = reg[storeName];
+              if (!agg || agg.count === 0) return null;
+              const avg = (agg.total / agg.count).toFixed(1);
+              return (
+                <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Customer Rating</p>
+                    <p className="text-xl font-black text-white mt-1 flex items-center space-x-2">
+                      <span className="text-amber-400">{'★'.repeat(Math.round(parseFloat(avg)))}<span className="text-gray-600">{'★'.repeat(5 - Math.round(parseFloat(avg)))}</span></span>
+                      <span className="text-gray-400 text-xs font-mono">{avg} / 5</span>
+                    </p>
+                  </div>
+                  <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">{agg.count} review{agg.count === 1 ? '' : 's'}</span>
+                </div>
+              );
+            } catch { return null; }
+          })()}
 
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-2.5">
             <div className="flex items-center justify-between">

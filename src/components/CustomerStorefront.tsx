@@ -1229,9 +1229,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       try {
         const raw = localStorage.getItem('sd_notifications');
         const list = raw ? JSON.parse(raw) : [];
+        const myId = localStorage.getItem('ss_cust_id') || '';
         setAdminNotifs(list.filter((n: any) => {
           if (n.audience === 'all' || (n.audience === 'customer' && !n.customerId)) return true;
-          if (n.customerId && (n.customerId === customerProfile.phone || n.customerId === customerProfile.name)) return true;
+          if (n.customerId && (n.customerId === customerProfile.phone || n.customerId === customerProfile.name || n.customerId === myId)) return true;
           return false;
         }));
       } catch { /* noop */ }
@@ -1912,6 +1913,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     const drv = liveDriverOf(rateRiderOrder);
     const driverName = drv ? drv.name : rateRiderOrder.driverId || 'Your Rider';
     setRiderRatings(prev => ({ ...prev, [rateRiderOrder.id]: { driverName, score: riderRateVal } }));
+    // Notify the rated rider directly
+    try {
+      const notifs = JSON.parse(localStorage.getItem('sd_notifications') || '[]');
+      localStorage.setItem('sd_notifications', JSON.stringify([{
+        id: `NOTIF-${Date.now().toString().slice(-8)}`, title: '⭐ New Rider Rating',
+        message: `Customer rated you ${riderRateVal}★ after delivering order #${rateRiderOrder.id}.`,
+        type: 'driver', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false,
+        audience: 'driver', driverId: drv?.id || rateRiderOrder.driverId,
+      }, ...notifs]));
+    } catch { /* noop */ }
     setCustomerNotifs(prev => [{
       id: `CN-${Date.now().toString().slice(-4)}`, title: '⭐ Rider Rated!',
       body: `You rated ${driverName} ${riderRateVal}★. Thank you for the feedback!`, emoji: '⭐', time: 'Just now', read: false
@@ -1948,6 +1959,22 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       const agg = prev[key] || { total: 0, count: 0 };
       return { ...prev, [key]: { total: agg.total + rateVal, count: agg.count + 1 } };
     });
+    // Persist to the shared store-rating registry so the store portal can show it
+    try {
+      const reg = JSON.parse(localStorage.getItem('sd_store_ratings') || '{}');
+      const agg = reg[key] || { total: 0, count: 0 };
+      localStorage.setItem('sd_store_ratings', JSON.stringify({ ...reg, [key]: { total: agg.total + rateVal, count: agg.count + 1 } }));
+    } catch { /* noop */ }
+    // Notify the store + platform of the new rating
+    try {
+      const notifs = JSON.parse(localStorage.getItem('sd_notifications') || '[]');
+      localStorage.setItem('sd_notifications', JSON.stringify([{
+        id: `NOTIF-${Date.now().toString().slice(-8)}`, title: '⭐ New Store Rating',
+        message: `${customerProfile.name} rated ${key} ${rateVal}★${rateComment ? ` — "${rateComment}"` : ''}.`,
+        type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false,
+        audience: 'store',
+      }, ...notifs]));
+    } catch { /* noop */ }
     setCustomerNotifs(prev => [{
       id: `CN-${Date.now().toString().slice(-4)}`, title: '⭐ Thank you for rating!',
       body: `Your ${rateVal}-star rating for ${key} has been published.`, emoji: '⭐', time: 'Just now', read: false

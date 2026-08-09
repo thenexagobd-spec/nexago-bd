@@ -326,7 +326,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
-  const verifyTopUp = (tx: { id: string; amount: number; receipt?: string }, approve: boolean) => {
+  const verifyTopUp = (tx: { id: string; amount: number; receipt?: string; customerId?: string }, approve: boolean) => {
     const next = custTxns.map(t => t.id === tx.id ? { ...t, status: approve ? 'Completed' : 'Rejected' } : t);
     setCustTxns(next);
                           lsSet('ss_wtxn_v3', next);
@@ -334,6 +334,15 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
       const bal = walletBal + tx.amount;
       setWalletBal(bal);
       lsSet('ss_wallet_v2', bal);
+    }
+    if (tx.customerId) {
+      const notifs = lsGet<any[]>('sd_notifications', []);
+      lsSet('sd_notifications', [{
+        id: `NOTIF-${Date.now().toString().slice(-8)}`, title: approve ? '💳 Top-Up Approved' : '💳 Top-Up Rejected',
+        message: approve ? `Your top-up of ৳${tx.amount.toLocaleString()} was verified and credited to your wallet.` : `Your top-up request of ৳${tx.amount.toLocaleString()} was rejected. Contact support.`,
+        type: 'payment', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false,
+        audience: 'customer', customerId: tx.customerId,
+      }, ...notifs]);
     }
     setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: approve ? 'Top-up approved' : 'Top-up rejected', orderId: tx.id, paymentMethod: 'Wallet Top-Up', amount: tx.amount, at: Date.now() }, ...prev]);
     showToast && showToast(approve ? `৳${tx.amount.toLocaleString()} credited to wallet` : 'Top-up rejected', approve ? 'success' : 'info');
