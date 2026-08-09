@@ -415,7 +415,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
         ))}
       </div>
 
-      <div className="bg-brand-card border border-brand-border/60 rounded-2xl p-5 text-xs max-w-5xl">
+      <div className="bg-brand-card border border-brand-border/60 rounded-2xl p-5 text-xs max-w-5xl max-h-[65vh] overflow-y-auto">
         {/* ============ VERIFY PAYMENTS ============ */}
         {tab === 'verify' && (
           <div className="space-y-3">
