@@ -899,13 +899,7 @@ export default function DriverPortal() {
                 <p className="text-[10px] text-gray-400">24/7 dispatch control room for active rider emergencies.</p>
               </div>
               <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-5 text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-brand-orange/15 text-brand-orange flex items-center justify-center mx-auto text-xl">🎧</div>
-                <h5 className="text-xs font-bold text-white">24/7 Dispatch Control Room</h5>
-                <p className="text-[9px] text-gray-400">Direct hotline for active rider emergencies and route issues.</p>
-                <a href="tel:+8809612345678" className="inline-block px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black rounded-xl shadow cursor-pointer">
-                  📞 Call Dispatcher (+880 9612)
-                </a>
-                <button onClick={() => setTicketOpen(true)} className="w-full py-2.5 bg-brand-orange/15 border border-brand-orange/40 text-brand-orange hover:bg-brand-orange/25 text-[10px] font-black uppercase rounded-xl cursor-pointer flex items-center justify-center space-x-2 transition-colors">
+                <button onClick={() => setTicketOpen(true)} className="w-full py-3 bg-brand-orange/15 border border-brand-orange/40 text-brand-orange hover:bg-brand-orange/25 text-[10px] font-black uppercase rounded-xl cursor-pointer flex items-center justify-center space-x-2 transition-colors">
                   <MessageSquare className="w-3.5 h-3.5" /><span>Raise a Ticket for Admin</span>
                 </button>
               </div>
