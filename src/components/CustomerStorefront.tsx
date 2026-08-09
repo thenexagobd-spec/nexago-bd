@@ -409,7 +409,7 @@ const LS_KEYS = {
   addr: 'ss_addr',
   pays: 'ss_pays',
   wallet: 'ss_wallet_v2',
-  wtxn: 'ss_wtxn_v2',
+  wtxn: 'ss_wtxn_v3',
   profile: 'ss_profile',
   tickets: 'ss_tickets_v2',
   cart: 'ss_cart',

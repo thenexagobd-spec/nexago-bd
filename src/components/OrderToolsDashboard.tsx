@@ -72,6 +72,8 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   const [custLoyalty, setCustLoyalty] = useState<Record<string, number>>(() => lsGet('ss_admin_cust_loyalty', {}));
   useEffect(() => lsSet('ss_admin_cust_loyalty', custLoyalty), [custLoyalty]);
   const [expandedCust, setExpandedCust] = useState<string | null>(null);
+  const [showCustOrders, setShowCustOrders] = useState<string | null>(null);
+  const [showCustTxns, setShowCustTxns] = useState<string | null>(null);
   const [smsDraft, setSmsDraft] = useState<Record<string, string>>({});
   const [customerModal, setCustomerModal] = useState<null | { editing?: string }>(null);
   const [custForm, setCustForm] = useState({ name: '', phone: '', email: '', zone: '' });
@@ -130,10 +132,10 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   }, []);
   const topUpTickets = customerTickets.filter(t => /top[- ]?up|add ?money|wallet/i.test(t.category));
 
-  // Customer wallet top-up transactions (from storefront ss_wtxn_v2) awaiting admin verify
-  const [custTxns, setCustTxns] = useState<Array<{ id: string; type: string; amount: number; date: string; status: string; trxId?: string; receipt?: string; sender?: string; method?: string; customerId?: string }>>(() => lsGet('ss_wtxn_v2', []));
+  // Customer wallet top-up transactions (from storefront ss_wtxn_v3) awaiting admin verify
+  const [custTxns, setCustTxns] = useState<Array<{ id: string; type: string; amount: number; date: string; status: string; trxId?: string; receipt?: string; sender?: string; method?: string; customerId?: string }>>(() => lsGet('ss_wtxn_v3', []));
   useEffect(() => {
-    const onStorage = () => setCustTxns(lsGet('ss_wtxn_v2', []));
+    const onStorage = () => setCustTxns(lsGet('ss_wtxn_v3', []));
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
@@ -148,7 +150,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   const verifyTopUp = (tx: { id: string; amount: number; receipt?: string }, approve: boolean) => {
     const next = custTxns.map(t => t.id === tx.id ? { ...t, status: approve ? 'Completed' : 'Rejected' } : t);
     setCustTxns(next);
-    lsSet('ss_wtxn_v2', next);
+                          lsSet('ss_wtxn_v3', next);
     if (approve) {
       const bal = walletBal + tx.amount;
       setWalletBal(bal);
@@ -752,7 +754,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
             )}
 
             {/* Dedicated Customer Lookup — search by permanent ID / phone / Gmail → full profile */}
-            <div className="bg-brand-card border border-brand-border rounded-xl p-3 space-y-2">
+            <div id="customer-lookup-panel" className="bg-brand-card border border-brand-border rounded-xl p-3 space-y-2">
               <p className="text-[10px] font-black text-gray-200 flex items-center space-x-1.5"><UserSearch className="w-3.5 h-3.5 text-brand-orange" /><span>Customer Lookup — full profile by ID / phone / Gmail</span></p>
               <div className="flex items-center space-x-2">
                 <input
@@ -882,27 +884,16 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   const loyalty = custLoyalty[c.id] !== undefined ? custLoyalty[c.id] : c.loyalty;
                   const custOrders = orders.filter(o => o.customerName === c.name || o.customerPhone === c.phone || o.customerId === c.custId);
                   const blocked = c.status === 'Blocked';
-                  const custPending = custTxns.filter(t => t.type === 'Top-Up' && t.status === 'Pending' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone));
                   return (
-                    <div key={c.id} className={`bg-brand-dark/50 border rounded-xl overflow-hidden ${blocked ? 'border-red-500/40 opacity-80' : custPending.length > 0 ? 'border-amber-500/50' : 'border-brand-border/40'}`}>
+                    <div key={c.id} className={`bg-brand-dark/50 border rounded-xl overflow-hidden ${blocked ? 'border-red-500/40 opacity-80' : 'border-brand-border/40'}`}>
                       <div className="p-3 flex items-center justify-between gap-3">
                         <div className="flex items-center space-x-3 min-w-0">
                           <div className={`relative w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${blocked ? 'bg-red-500/20 border border-red-500/30 text-red-400' : 'bg-brand-orange/20 border border-brand-orange/30 text-brand-orange'}`}>
                             {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                            {custPending.length > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-white text-[8px] font-black flex items-center justify-center">{custPending.length}</span>}
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center space-x-2">
                               <p className="text-white font-black text-xs truncate">{c.name}</p>
-                              {custPending.length > 0 && (
-                                <button
-                                  onClick={() => setExpandedCust(expandedCust === c.id ? null : c.id)}
-                                  className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1 cursor-pointer hover:bg-amber-500/30 transition-colors"
-                                  title="New add money request — click to view"
-                                >
-                                  <Banknote className="w-2.5 h-2.5" /><span>Add Money Request</span>
-                                </button>
-                              )}
                               {blocked && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-red-500/20 text-red-300 border border-red-500/30">Blocked</span>}
                               {loyalty >= 200 && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">VIP</span>}
                             </div>
@@ -960,6 +951,16 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                             >
                               <PenLine className="w-3 h-3" /><span>Edit</span>
                             </button>
+                            <button
+                              onClick={() => {
+                                runLookup(c.custId || c.id);
+                                const el = document.getElementById('customer-lookup-panel');
+                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange rounded-lg text-[9px] font-black hover:bg-brand-orange/20 transition-colors"
+                            >
+                              <UserSearch className="w-3 h-3" /><span>Profile</span>
+                            </button>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -1013,42 +1014,58 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                           </div>
 
                           <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Order History ({custOrders.length})</p>
-                            {custOrders.length === 0 ? (
-                              <p className="text-[9px] text-gray-500">No orders found for this customer.</p>
-                            ) : (
-                              <div className="space-y-1">
-                                {custOrders.map(o => (
-                                  <div key={o.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
-                                    <span className="font-mono">#{o.id}</span>
-                                    <span className="text-gray-400 truncate">{o.storeName}</span>
-                                    <span className="font-mono text-white font-black">৳{o.amount.toLocaleString()}</span>
-                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-brand-border/40 text-gray-300">{o.status}</span>
-                                  </div>
-                                ))}
-                              </div>
+                            <button
+                              onClick={() => setShowCustOrders(showCustOrders === c.id ? null : c.id)}
+                              className="w-full flex items-center justify-between text-left cursor-pointer"
+                            >
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Order History ({custOrders.length})</span>
+                              <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showCustOrders === c.id ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showCustOrders === c.id && (
+                              custOrders.length === 0 ? (
+                                <p className="text-[9px] text-gray-500 mt-1.5">No orders found for this customer.</p>
+                              ) : (
+                                <div className="space-y-1 mt-1.5">
+                                  {custOrders.map(o => (
+                                    <div key={o.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
+                                      <span className="font-mono">#{o.id}</span>
+                                      <span className="text-gray-400 truncate">{o.storeName}</span>
+                                      <span className="font-mono text-white font-black">৳{o.amount.toLocaleString()}</span>
+                                      <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-brand-border/40 text-gray-300">{o.status}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )
                             )}
                           </div>
 
                           <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><Banknote className="w-3 h-3 text-brand-orange" /><span>Add Money Requests ({custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).length})</span></p>
-                            {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).length === 0 ? (
-                              <p className="text-[9px] text-gray-500">No add money requests for this customer. Use New Add Money to create one.</p>
-                            ) : (
-                              <div className="space-y-1">
-                                {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).map(tx => (
-                                  <div key={tx.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
-                                    <div className="min-w-0 flex items-center space-x-2">
-                                      <span className={`font-mono ${tx.status === 'Completed' ? 'text-emerald-400' : tx.status === 'Rejected' ? 'text-red-400' : 'text-amber-400'}`}>{tx.id}</span>
-                                      <span className="text-gray-500 truncate">{tx.method}{tx.trxId ? ` · ${tx.trxId}` : ''}</span>
+                            <button
+                              onClick={() => setShowCustTxns(showCustTxns === c.id ? null : c.id)}
+                              className="w-full flex items-center justify-between text-left cursor-pointer"
+                            >
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider flex items-center space-x-1"><Banknote className="w-3 h-3 text-brand-orange" /><span>Add Money Requests ({custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).length})</span></span>
+                              <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showCustTxns === c.id ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showCustTxns === c.id && (
+                              custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).length === 0 ? (
+                                <p className="text-[9px] text-gray-500 mt-1.5">No add money requests for this customer. Use New Add Money to create one.</p>
+                              ) : (
+                                <div className="space-y-1 mt-1.5">
+                                  {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.customerId === c.custId || t.sender === c.phone)).map(tx => (
+                                    <div key={tx.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
+                                      <div className="min-w-0 flex items-center space-x-2">
+                                        <span className={`font-mono ${tx.status === 'Completed' ? 'text-emerald-400' : tx.status === 'Rejected' ? 'text-red-400' : 'text-amber-400'}`}>{tx.id}</span>
+                                        <span className="text-gray-500 truncate">{tx.method}{tx.trxId ? ` · ${tx.trxId}` : ''}</span>
+                                      </div>
+                                      <div className="flex items-center space-x-2 shrink-0">
+                                        <span className="font-mono text-white font-black">+৳{tx.amount.toLocaleString()}</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${tx.status === 'Completed' ? 'bg-emerald-500/20 text-emerald-300' : tx.status === 'Rejected' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>{tx.status}</span>
+                                      </div>
                                     </div>
-                                    <div className="flex items-center space-x-2 shrink-0">
-                                      <span className="font-mono text-white font-black">+৳{tx.amount.toLocaleString()}</span>
-                                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${tx.status === 'Completed' ? 'bg-emerald-500/20 text-emerald-300' : tx.status === 'Rejected' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>{tx.status}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                                  ))}
+                                </div>
+                              )
                             )}
                           </div>
 
@@ -1200,7 +1217,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                           const txn = { id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: amt, date: 'Just now', status: 'Pending' as const, trxId: adminTopUp.trxId.trim().toUpperCase() || undefined, sender: adminTopUp.sender.trim(), method: adminTopUp.method, receipt: undefined, customerId: adminTopUpModal || undefined };
                           const next = [txn, ...custTxns];
                           setCustTxns(next);
-                          lsSet('ss_wtxn_v2', next);
+    lsSet('ss_wtxn_v3', next);
                           setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Top-up created', orderId: adminTopUpModal || '', paymentMethod: adminTopUp.method, amount: amt, at: Date.now(), reason: adminTopUp.note.trim() || undefined }, ...prev]);
                           showToast && showToast(`৳${amt.toLocaleString()} ${adminTopUp.method} top-up added — verify in Top-Up tab`, 'info');
                           setAdminTopUpModal(null);
