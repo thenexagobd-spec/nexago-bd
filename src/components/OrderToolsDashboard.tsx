@@ -8,7 +8,8 @@ import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
   ClipboardList, Check, Users, Search, Plus, Phone, MessageCircle, PenLine,
-  Gift, Ban, Mail, ChevronDown, UserPlus, Copy, UserSearch, Ticket, Printer
+  Gift, Ban, Mail, ChevronDown, UserPlus, Copy, UserSearch, Ticket, Printer,
+  FileText, QrCode
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -88,7 +89,10 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     orders: Order[];
     txns: Array<{ id: string; type: string; amount: number; date: string; status: string; trxId?: string; receipt?: string; sender?: string; method?: string; customerId?: string }>;
     tickets: Array<{ id: string; subject: string; category: string; status: string; date: string; lastMessage: string; customerId?: string }>;
+    totalSpent: number; orderCount: number; avgOrder: number;
+    topStore: string; payMethod: string; refundCount: number; addresses: Array<{ title: string; address: string; area: string; isDefault: boolean }>;
   }>(null);
+  const [dossierView, setDossierView] = useState(false);
   const [lookupCopied, setLookupCopied] = useState(false);
   const [lookupSearched, setLookupSearched] = useState(false);
   const normP = (p: string) => (p || '').replace(/[^0-9]/g, '');
@@ -107,43 +111,73 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     const ordersOf = (name: string, phone: string, custId: string) => orders.filter(o => o.customerName === name || o.customerPhone === phone || o.customerId === custId);
     const txnsOf = (id: string, custId: string, phone: string) => custTxns.filter(t => t.customerId === id || t.customerId === custId || t.sender === phone);
     const ticketsOf = (id: string, custId: string, phone: string) => customerTickets.filter(t => t.customerId === custId || t.customerId === id || t.lastMessage.includes(phone));
+    // Extra dossier statistics derived from the customer's own data
+    const statsOf = (name: string, phone: string, custId: string, o: Order[]) => {
+      const ords = o.length ? o : ordersOf(name, phone, custId);
+      const totalSpent = ords.reduce((s, x) => s + (x.amount || 0), 0);
+      const stores: Record<string, number> = {};
+      const pays: Record<string, number> = {};
+      ords.forEach(x => {
+        stores[x.storeName] = (stores[x.storeName] || 0) + 1;
+        if (x.paymentMethod) pays[x.paymentMethod] = (pays[x.paymentMethod] || 0) + 1;
+      });
+      const topStore = Object.keys(stores).sort((a, b) => stores[b] - stores[a])[0] || '—';
+      const payMethod = Object.keys(pays).sort((a, b) => pays[b] - pays[a])[0] || '—';
+      const refundCount = refunds.filter(rf => ords.some(o => o.id === rf.orderId)).length;
+      const addrs = lsGet<Array<{ title: string; address: string; area: string; phone: string; isDefault: boolean }>>('ss_addr', []).filter(a => (a.phone || '').replace(/[^0-9]/g, '') === phone.replace(/[^0-9]/g, '')).map(a => ({ title: a.title, address: a.address, area: a.area, isDefault: a.isDefault }));
+      return { totalSpent, orderCount: ords.length, avgOrder: ords.length ? Math.round(totalSpent / ords.length) : 0, topStore, payMethod, refundCount, addresses: addrs };
+    };
     const found = customers.find(c => byId(c.custId) || byId(c.id) || byPhone(c.phone) || byEmail(c.email));
     if (found) {
       const wallet = custWallet[found.id] || 0;
       const loyalty = custLoyalty[found.id] !== undefined ? custLoyalty[found.id] : found.loyalty;
-      setLookupResult({ customerId: found.custId || found.id, name: found.name, phone: found.phone, email: found.email, zone: found.zone, joined: found.joined, loyalty, status: found.status, wallet, photo: photoOf(found.phone, found.email), orders: ordersOf(found.name, found.phone, found.custId || ''), txns: txnsOf(found.id, found.custId || '', found.phone), tickets: ticketsOf(found.id, found.custId || '', found.phone) });
+      setLookupResult({ customerId: found.custId || found.id, name: found.name, phone: found.phone, email: found.email, zone: found.zone, joined: found.joined, loyalty, status: found.status, wallet, photo: photoOf(found.phone, found.email), orders: ordersOf(found.name, found.phone, found.custId || ''), txns: txnsOf(found.id, found.custId || '', found.phone), tickets: ticketsOf(found.id, found.custId || '', found.phone), ...statsOf(found.name, found.phone, found.custId || '', ordersOf(found.name, found.phone, found.custId || '')) });
       return;
     }
     // Not in directory — check the shared account registry (storefront-created accounts)
     const registry = lsGet<Array<{ customerId: string; name: string; phone: string; email: string }>>('ss_cust_accounts', []);
     const reg = registry.find(a => byId(a.customerId) || byPhone(a.phone) || byEmail(a.email));
     if (reg) {
-      setLookupResult({ customerId: reg.customerId, name: reg.name, phone: reg.phone, email: reg.email, zone: '—', joined: '—', loyalty: 0, status: 'Active', wallet: lsGet<number>('ss_wallet_v2', 0), photo: photoOf(reg.phone, reg.email), orders: ordersOf(reg.name, reg.phone, reg.customerId), txns: txnsOf(reg.customerId, reg.customerId, reg.phone), tickets: ticketsOf(reg.customerId, reg.customerId, reg.phone) });
+      setLookupResult({ customerId: reg.customerId, name: reg.name, phone: reg.phone, email: reg.email, zone: '—', joined: '—', loyalty: 0, status: 'Active', wallet: lsGet<number>('ss_wallet_v2', 0), photo: photoOf(reg.phone, reg.email), orders: ordersOf(reg.name, reg.phone, reg.customerId), txns: txnsOf(reg.customerId, reg.customerId, reg.phone), tickets: ticketsOf(reg.customerId, reg.customerId, reg.phone), ...statsOf(reg.name, reg.phone, reg.customerId, []) });
       return;
     }
     setLookupResult(null);
     showToast && showToast('No customer found for that ID / phone / Gmail', 'info');
   };
 
-  // Printable dossier — opens a clean white document with photo + all info + full history
+  // Printable dossier — opens a clean white document with logo + QR + full history
   const printDossier = () => {
     if (!lookupResult) return;
     const r = lookupResult;
+    const esc = (x: string) => (x || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=${encodeURIComponent(r.customerId)}`;
     const orderRows = r.orders.length
-      ? r.orders.map(o => `<tr><td>${o.id}</td><td>${o.storeName}</td><td>৳${o.amount.toLocaleString()}</td><td>${o.date || ''}</td><td>${o.status}</td></tr>`).join('')
-      : '<tr><td colspan="5" style="text-align:center;color:#888">No orders</td></tr>';
+      ? r.orders.map(o => `<tr><td>${esc(o.id)}</td><td>${esc(o.storeName)}</td><td>৳${(o.amount || 0).toLocaleString()}</td><td>${esc(o.date || '')}</td><td>${esc(o.paymentMethod || '')}</td><td>${esc(o.status)}</td></tr>`).join('')
+      : '<tr><td colspan="6" style="text-align:center;color:#888">No orders</td></tr>';
     const txnRows = r.txns.length
-      ? r.txns.map(t => `<tr><td>${t.id}</td><td>${t.type}</td><td style="color:${t.amount >= 0 ? '#059669' : '#dc2626'}">${t.amount >= 0 ? '+' : ''}৳${t.amount.toLocaleString()}</td><td>${t.trxId || ''}</td><td>${t.status}</td></tr>`).join('')
+      ? r.txns.map(t => `<tr><td>${esc(t.id)}</td><td>${esc(t.type)}</td><td style="color:${(t.amount || 0) >= 0 ? '#059669' : '#dc2626'}">${(t.amount || 0) >= 0 ? '+' : ''}৳${(t.amount || 0).toLocaleString()}</td><td>${esc(t.trxId || '')}</td><td>${esc(t.status)}</td></tr>`).join('')
       : '<tr><td colspan="5" style="text-align:center;color:#888">No wallet activity</td></tr>';
     const ticketRows = r.tickets.length
-      ? r.tickets.map(t => `<tr><td>${t.id}</td><td>${t.subject}</td><td>${t.category}</td><td>${t.date}</td><td>${t.status}</td></tr>`).join('')
+      ? r.tickets.map(t => `<tr><td>${esc(t.id)}</td><td>${esc(t.subject)}</td><td>${esc(t.category)}</td><td>${esc(t.date)}</td><td>${esc(t.status)}</td></tr>`).join('')
       : '<tr><td colspan="5" style="text-align:center;color:#888">No tickets</td></tr>';
+    const refundRows = r.refundCount
+      ? refunds.filter(rf => r.orders.some(o => o.id === rf.orderId))
+        .map(rf => `<tr><td>${esc(rf.id || '')}</td><td>৳${(rf.amount || 0).toLocaleString()}</td><td>${esc(rf.method || '')} ${esc(rf.number || '')}</td><td>${esc(new Date(rf.at).toLocaleDateString('en-US'))}</td><td>${esc(rf.status)}</td></tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:#888">No refunds</td></tr>';
+    const addrRows = r.addresses.length
+      ? r.addresses.map(a => `<tr><td>${esc(a.title)}${a.isDefault ? ' (Default)' : ''}</td><td>${esc(a.address)}</td><td>${esc(a.area)}</td></tr>`).join('')
+      : '<tr><td colspan="3" style="text-align:center;color:#888">No saved addresses</td></tr>';
     const w = window.open('', '_blank', 'width=900,height=700');
     if (!w) { showToast && showToast('Please allow pop-ups to print the dossier', 'info'); return; }
-    w.document.write(`<!doctype html><html><head><title>Customer Dossier — ${r.name}</title><style>
+    w.document.write(`<!doctype html><html><head><title>Customer Dossier — ${esc(r.name)}</title><style>
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:32px;background:#fff}
-      .head{display:flex;align-items:center;gap:20px;border-bottom:3px solid #f97316;padding-bottom:20px;margin-bottom:24px}
+      .topbar{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #f97316;padding-bottom:14px;margin-bottom:20px}
+      .logo{display:flex;align-items:center;gap:10px}
+      .logo-badge{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900}
+      .logo b{font-size:16px;color:#111;letter-spacing:.5px}
+      .logo p{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:2px;margin-top:2px}
+      .head{display:flex;align-items:center;gap:20px;margin-bottom:22px}
       .avatar{width:80px;height:80px;border-radius:16px;object-fit:cover;border:3px solid #f97316}
       .avatar.init{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900}
       h1{font-size:24px;font-weight:800}
@@ -152,11 +186,15 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
       .b-active{background:#d1fae5;color:#065f46;border:1px solid #34d399}
       .b-block{background:#fee2e2;color:#991b1b;border:1px solid #f87171}
       .b-vip{background:#fef3c7;color:#92400e;border:1px solid #fbbf24}
-      .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+      .qr{width:120px;height:120px;border:1px solid #e5e7eb;border-radius:12px;padding:8px;text-align:center;margin-left:auto}
+      .qr img{width:100%;height:auto}
+      .qr p{font-size:7px;color:#9ca3af;margin-top:2px;font-family:Consolas,monospace;word-break:break-all}
+      .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
       .stat{border:1px solid #e5e7eb;border-radius:12px;padding:14px}
       .stat p{font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:1px}
       .stat b{font-size:15px;display:block;margin-top:4px}
-      h2{font-size:14px;font-weight:800;margin:22px 0 10px;padding-left:10px;border-left:4px solid #f97316}
+      .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:6px}
+      .h2{font-size:14px;font-weight:800;margin:20px 0 10px;padding-left:10px;border-left:4px solid #f97316}
       table{width:100%;border-collapse:collapse;font-size:11px}
       th{background:#f97316;color:#fff;text-align:left;padding:8px 10px;font-weight:700}
       td{border-bottom:1px solid #e5e7eb;padding:7px 10px}
@@ -164,33 +202,55 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
       .footer{margin-top:28px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px dashed #d1d5db;padding-top:12px}
       @media print{body{padding:16px}}
     </style></head><body>
+      <div class="topbar">
+        <div class="logo">
+          <div class="logo-badge">N</div>
+          <div><b>NEXAGO</b><p>Smart Delivery Network</p></div>
+        </div>
+        <div style="text-align:right;font-size:9px;color:#9ca3af">OFFICIAL CUSTOMER DOCUMENT<br>Verification &amp; History Report</div>
+      </div>
       <div class="head">
-        ${r.photo ? `<img class="avatar" src="${r.photo}" />` : `<div class="avatar init">${r.name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase()}</div>`}
-        <div>
-          <h1>${r.name}</h1>
+        ${r.photo ? `<img class="avatar" src="${r.photo}" />` : `<div class="avatar init">${esc(r.name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase())}</div>`}
+        <div style="min-width:0">
+          <h1>${esc(r.name)}</h1>
           <div class="badges">
-            <span class="${r.status === 'Blocked' ? 'b-block' : 'b-active'}">${r.status}</span>
+            <span class="${r.status === 'Blocked' ? 'b-block' : 'b-active'}">${esc(r.status)}</span>
             ${r.loyalty >= 200 ? '<span class="b-vip">★ VIP</span>' : ''}
             ${r.loyalty >= 100 && r.loyalty < 200 ? '<span class="b-vip">★ Gold</span>' : ''}
           </div>
-          <div class="meta">${r.phone} &middot; ${r.email}</div>
-          <div class="meta">Permanent ID: ${r.customerId}</div>
+          <div class="meta">${esc(r.phone)} &middot; ${esc(r.email)}</div>
+          <div class="meta">Permanent ID: ${esc(r.customerId)}</div>
+          <div class="meta">Zone: ${esc(r.zone || '—')} &middot; Member Since: ${esc(r.joined || '—')}</div>
+        </div>
+        <div class="qr">
+          <img src="${qrUrl}" alt="QR" />
+          <p>${esc(r.customerId)}</p>
         </div>
       </div>
       <div class="stats">
-        <div class="stat"><p>Zone</p><b>${r.zone || '—'}</b></div>
-        <div class="stat"><p>Member Since</p><b>${r.joined || '—'}</b></div>
-        <div class="stat"><p>Loyalty</p><b>${r.loyalty} pts</b></div>
-        <div class="stat"><p>Wallet</p><b>৳${r.wallet.toLocaleString()}</b></div>
+        <div class="stat"><p>Wallet Balance</p><b>৳${(r.wallet || 0).toLocaleString()}</b></div>
+        <div class="stat"><p>Total Spent</p><b>৳${(r.totalSpent || 0).toLocaleString()}</b></div>
+        <div class="stat"><p>Total Orders</p><b>${r.orderCount}</b></div>
+        <div class="stat"><p>Loyalty Points</p><b>${r.loyalty} pts</b></div>
       </div>
-      <h2>Order History (${r.orders.length})</h2>
-      <table><thead><tr><th>Order ID</th><th>Store</th><th>Amount</th><th>Date</th><th>Status</th></tr></thead><tbody>${orderRows}</tbody></table>
-      <h2>Wallet Activity (${r.txns.length})</h2>
+      <div class="strip">
+        <div class="stat"><p>Avg Order</p><b>৳${(r.avgOrder || 0).toLocaleString()}</b></div>
+        <div class="stat"><p>Top Store</p><b style="font-size:13px">${esc(r.topStore || '—')}</b></div>
+        <div class="stat"><p>Payment Method</p><b style="font-size:13px">${esc(r.payMethod || '—')}</b></div>
+        <div class="stat"><p>Refunds</p><b>${r.refundCount}</b></div>
+      </div>
+      <div class="h2">Order History (${r.orders.length})</div>
+      <table><thead><tr><th>Order ID</th><th>Store</th><th>Amount</th><th>Date</th><th>Payment</th><th>Status</th></tr></thead><tbody>${orderRows}</tbody></table>
+      <div class="h2">Wallet Activity (${r.txns.length})</div>
       <table><thead><tr><th>Transaction</th><th>Type</th><th>Amount</th><th>TrxID</th><th>Status</th></tr></thead><tbody>${txnRows}</tbody></table>
-      <h2>Support Tickets (${r.tickets.length})</h2>
+      <div class="h2">Support Tickets (${r.tickets.length})</div>
       <table><thead><tr><th>Ticket</th><th>Subject</th><th>Category</th><th>Date</th><th>Status</th></tr></thead><tbody>${ticketRows}</tbody></table>
-      <div class="footer">Generated ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })} &middot; NexaGo Customer Dossier</div>
-      <script>window.onload=function(){setTimeout(function(){window.print();},300)}</script>
+      <div class="h2">Refund Requests (${r.refundCount})</div>
+      <table><thead><tr><th>Refund</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th></tr></thead><tbody>${refundRows}</tbody></table>
+      <div class="h2">Saved Addresses (${r.addresses.length})</div>
+      <table><thead><tr><th>Label</th><th>Address</th><th>Area</th></tr></thead><tbody>${addrRows}</tbody></table>
+      <div class="footer">Generated ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })} &middot; NexaGo Smart Delivery Network &middot; Scan QR to verify this customer</div>
+      <script>window.onload=function(){setTimeout(function(){window.print();},600)}</script>
     </body></html>`);
     w.document.close();
   };
@@ -841,6 +901,13 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                       </div>
                       <div className="flex items-center space-x-2 shrink-0">
                         <button
+                          onClick={() => setDossierView(true)}
+                          className="inline-flex items-center space-x-1.5 px-3 py-2 bg-sky-500/15 border border-sky-500/40 text-sky-300 rounded-lg text-[10px] font-black hover:bg-sky-500/25 transition-colors"
+                          title="View official document with QR code & logo"
+                        >
+                          <FileText className="w-3.5 h-3.5" /><span>View</span>
+                        </button>
+                        <button
                           onClick={printDossier}
                           className="inline-flex items-center space-x-1.5 px-3 py-2 bg-brand-orange/15 border border-brand-orange/40 text-brand-orange rounded-lg text-[10px] font-black hover:bg-brand-orange/25 transition-colors"
                           title="Print full dossier with photo"
@@ -944,6 +1011,151 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Full-document viewer — official paper with logo + QR code + all sections */}
+        {dossierView && lookupResult && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-3 overflow-y-auto" onClick={() => setDossierView(false)}>
+            <div className="w-full max-w-2xl bg-white text-gray-800 rounded-2xl shadow-2xl overflow-hidden my-6" onClick={e => e.stopPropagation()}>
+              {/* Paper top bar */}
+              <div className="flex items-center justify-between px-5 py-4 border-b-4 border-brand-orange">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-orange to-orange-600 text-white flex items-center justify-center font-black text-lg">N</div>
+                  <div>
+                    <p className="font-black text-gray-900 leading-none">NEXAGO</p>
+                    <p className="text-[8px] text-gray-500 uppercase tracking-widest">Smart Delivery Network</p>
+                  </div>
+                </div>
+                <p className="text-[9px] text-gray-400 text-right leading-tight">OFFICIAL CUSTOMER DOCUMENT<br />Verification &amp; History Report</p>
+                <button onClick={() => setDossierView(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="max-h-[80vh] overflow-y-auto">
+                {/* Identity row with QR */}
+                <div className="flex items-start gap-4 px-5 pt-5">
+                  {lookupResult.photo ? (
+                    <img src={lookupResult.photo} alt={lookupResult.name} className="w-20 h-20 rounded-xl object-cover border-2 border-brand-orange/60 shrink-0" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-brand-orange to-orange-600 text-white flex items-center justify-center font-black text-2xl shrink-0">
+                      {lookupResult.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2 flex-wrap">
+                      <p className="font-black text-lg text-gray-900">{lookupResult.name}</p>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${lookupResult.status === 'Blocked' ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-emerald-100 text-emerald-700 border border-emerald-300'}`}>{lookupResult.status}</span>
+                      {lookupResult.loyalty >= 200 && <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-700 border border-amber-300">★ VIP</span>}
+                      {lookupResult.loyalty >= 100 && lookupResult.loyalty < 200 && <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-sky-100 text-sky-700 border border-sky-300">★ Gold</span>}
+                    </div>
+                    <p className="text-[11px] text-gray-500 font-mono mt-1">{lookupResult.phone} · {lookupResult.email}</p>
+                    <p className="text-[10px] text-brand-orange font-black font-mono mt-0.5">ID: {lookupResult.customerId}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Zone: {lookupResult.zone || '—'} · Member Since: {lookupResult.joined || '—'}</p>
+                  </div>
+                  <div className="w-[110px] shrink-0 border border-gray-200 rounded-lg p-2 text-center">
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(lookupResult.customerId)}`} alt="QR" className="w-full h-auto" />
+                    <p className="text-[7px] text-gray-400 font-mono mt-1 break-all">{lookupResult.customerId}</p>
+                  </div>
+                </div>
+
+                {/* Financial stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-5 pt-4">
+                  {[
+                    { label: 'Wallet Balance', value: `৳${lookupResult.wallet.toLocaleString()}` },
+                    { label: 'Total Spent', value: `৳${lookupResult.totalSpent.toLocaleString()}` },
+                    { label: 'Total Orders', value: `${lookupResult.orderCount}` },
+                    { label: 'Loyalty Points', value: `${lookupResult.loyalty} pts` },
+                    { label: 'Avg Order', value: `৳${lookupResult.avgOrder.toLocaleString()}` },
+                    { label: 'Top Store', value: lookupResult.topStore || '—' },
+                    { label: 'Payment Method', value: lookupResult.payMethod || '—' },
+                    { label: 'Refunds', value: `${lookupResult.refundCount}` },
+                  ].map(s => (
+                    <div key={s.label} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{s.label}</p>
+                      <p className="text-xs font-bold text-gray-800 mt-0.5 truncate">{s.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Sections */}
+                <div className="space-y-3 px-5 py-4">
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Order History ({lookupResult.orders.length})</p>
+                    <div className="max-h-40 overflow-y-auto">
+                      {lookupResult.orders.length === 0 ? <p className="text-[10px] text-gray-400 p-3">No orders found.</p> : lookupResult.orders.map(o => (
+                        <div key={o.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
+                          <span className="font-mono text-gray-500">#{o.id}</span>
+                          <span className="text-gray-700 truncate">{o.storeName}</span>
+                          <span className="font-mono font-bold">৳{o.amount.toLocaleString()}</span>
+                          <span className="text-gray-400">{o.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Wallet Activity ({lookupResult.txns.length})</p>
+                    <div className="max-h-40 overflow-y-auto">
+                      {lookupResult.txns.length === 0 ? <p className="text-[10px] text-gray-400 p-3">No wallet activity.</p> : lookupResult.txns.map(t => (
+                        <div key={t.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
+                          <span className={`font-mono font-bold ${t.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{t.amount >= 0 ? '+' : ''}{t.amount.toLocaleString()}</span>
+                          <span className="text-gray-600 truncate">{t.type}</span>
+                          <span className="text-gray-400 font-mono truncate">{t.trxId || ''}</span>
+                          <span className="text-gray-400">{t.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Support Tickets ({lookupResult.tickets.length})</p>
+                    <div className="max-h-40 overflow-y-auto">
+                      {lookupResult.tickets.length === 0 ? <p className="text-[10px] text-gray-400 p-3">No tickets.</p> : lookupResult.tickets.map(t => (
+                        <div key={t.id} className="px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-gray-700 font-bold truncate">{t.subject}</span>
+                            <span className="text-gray-400">{t.status}</span>
+                          </div>
+                          <p className="text-[9px] text-gray-400 mt-0.5">{t.category} · {t.date}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Refund Requests ({lookupResult.refundCount})</p>
+                    <div className="max-h-40 overflow-y-auto">
+                      {lookupResult.refundCount === 0 ? <p className="text-[10px] text-gray-400 p-3">No refunds.</p> : refunds.filter(rf => lookupResult.orders.some(o => o.id === rf.orderId)).map(rf => (
+                        <div key={rf.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
+                          <span className="text-gray-700 truncate">{rf.orderId}</span>
+                          <span className="font-mono font-bold">৳{rf.amount.toLocaleString()}</span>
+                          <span className="text-gray-400 truncate">{rf.method} {rf.number}</span>
+                          <span className="text-gray-400">{rf.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Saved Addresses ({lookupResult.addresses.length})</p>
+                    <div className="max-h-40 overflow-y-auto">
+                      {lookupResult.addresses.length === 0 ? <p className="text-[10px] text-gray-400 p-3">No saved addresses.</p> : lookupResult.addresses.map((a, i) => (
+                        <div key={i} className="px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
+                          <p className="font-bold text-gray-700">{a.title}{a.isDefault ? <span className="ml-1 text-[8px] font-black text-emerald-600 uppercase">Default</span> : ''}</p>
+                          <p className="text-gray-500 mt-0.5">{a.address} · {a.area}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-5 pb-5 flex items-center justify-between gap-2">
+                  <p className="text-[9px] text-gray-400">Scan QR to verify this customer · {new Date().toLocaleString('en-US', { dateStyle: 'long' })}</p>
+                  <button onClick={printDossier} className="inline-flex items-center space-x-1.5 px-3 py-2 bg-brand-orange text-white rounded-lg text-[10px] font-black hover:bg-brand-orange-hover transition-colors">
+                    <Printer className="w-3.5 h-3.5" /><span>Print Document</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
