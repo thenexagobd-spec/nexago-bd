@@ -69,6 +69,8 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   const [smsDraft, setSmsDraft] = useState<Record<string, string>>({});
   const [customerModal, setCustomerModal] = useState<null | { editing?: string }>(null);
   const [custForm, setCustForm] = useState({ name: '', phone: '', email: '', zone: '' });
+  const [adminTopUpModal, setAdminTopUpModal] = useState<null | string>(null);
+  const [adminTopUp, setAdminTopUp] = useState({ amount: '', method: 'bKash', sender: '', trxId: '', note: '' });
 
   // Customer-created support tickets (from the storefront), esp. Add Money / Top-Up problems
   const [customerTickets, setCustomerTickets] = useState<Array<{ id: string; subject: string; category: string; status: string; date: string; lastMessage: string }>>(() => lsGet('ss_tickets_v2', []));
@@ -850,6 +852,12 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                             >
                               <Plus className="w-3 h-3" /><span>Add</span>
                             </button>
+                            <button
+                              onClick={() => { setAdminTopUpModal(c.id); setAdminTopUp({ amount: '', method: 'bKash', sender: '', trxId: '', note: '' }); }}
+                              className="ml-auto px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors flex items-center space-x-1 shrink-0"
+                            >
+                              <PlusCircle className="w-3 h-3" /><span>New Add Money</span>
+                            </button>
                           </div>
                         </div>
                       )}
@@ -908,6 +916,79 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold cursor-pointer"
                 >{customerModal.editing ? 'Save Changes' : 'Add Customer'}</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin New Add Money modal */}
+        {adminTopUpModal && (
+          <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4" onClick={() => setAdminTopUpModal(null)}>
+            <div className="bg-brand-card border border-brand-border rounded-2xl max-w-md w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-white text-sm flex items-center space-x-2"><PlusCircle className="w-4 h-4 text-brand-orange" /><span>New Add Money</span></h3>
+                <button onClick={() => setAdminTopUpModal(null)} className="p-1.5 text-gray-400 hover:text-white rounded-lg cursor-pointer"><X className="w-4 h-4" /></button>
+              </div>
+              {(() => {
+                const cust = customers.find(x => x.id === adminTopUpModal);
+                return (
+                  <>
+                    <div className="flex items-center space-x-2.5 bg-brand-dark/50 border border-brand-border/40 rounded-xl p-2.5">
+                      <div className="w-9 h-9 rounded-full bg-brand-orange/20 border border-brand-orange/30 text-brand-orange text-[11px] font-black flex items-center justify-center shrink-0">
+                        {(cust?.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white font-black text-xs">{cust?.name || '—'}</p>
+                        <p className="text-[10px] text-gray-400 font-mono">{cust?.phone || ''} · Wallet ৳{walletBal.toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Amount (৳)</label>
+                        <input type="number" min={0} value={adminTopUp.amount} onChange={(e) => setAdminTopUp({ ...adminTopUp, amount: e.target.value })} placeholder="e.g. 500" className="w-full bg-brand-dark text-gray-200 border border-brand-border rounded-lg px-2.5 py-2 outline-none focus:border-brand-orange placeholder:text-gray-600 font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Payment Method</label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {['bKash', 'Nagad', 'Upay', 'Rocket'].map(m => (
+                            <button key={m} onClick={() => setAdminTopUp({ ...adminTopUp, method: m })} className={`py-2 rounded-lg border text-[10px] font-black transition-all cursor-pointer ${adminTopUp.method === m ? 'border-brand-orange bg-brand-orange/15 text-brand-orange' : 'border-brand-border bg-brand-dark text-gray-400 hover:text-white'}`}>{m}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Sender Number</label>
+                          <input type="tel" value={adminTopUp.sender} onChange={(e) => setAdminTopUp({ ...adminTopUp, sender: e.target.value })} placeholder="01XXXXXXXXX" className="w-full bg-brand-dark text-gray-200 border border-brand-border rounded-lg px-2.5 py-2 outline-none focus:border-brand-orange placeholder:text-gray-600 font-mono" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">TrxID</label>
+                          <input type="text" value={adminTopUp.trxId} onChange={(e) => setAdminTopUp({ ...adminTopUp, trxId: e.target.value })} placeholder="e.g. 355767868763565" className="w-full bg-brand-dark text-gray-200 border border-brand-border rounded-lg px-2.5 py-2 outline-none focus:border-brand-orange placeholder:text-gray-600 font-mono" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Note (optional)</label>
+                        <input type="text" value={adminTopUp.note} onChange={(e) => setAdminTopUp({ ...adminTopUp, note: e.target.value })} placeholder="e.g. Walk-in top-up at store" className="w-full bg-brand-dark text-gray-200 border border-brand-border rounded-lg px-2.5 py-2 outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end space-x-2 pt-1">
+                      <button onClick={() => setAdminTopUpModal(null)} className="px-4 py-2 bg-brand-dark border border-brand-border hover:bg-brand-border/30 text-gray-300 rounded-lg text-xs font-semibold cursor-pointer">Cancel</button>
+                      <button
+                        onClick={() => {
+                          const amt = parseFloat(adminTopUp.amount);
+                          if (isNaN(amt) || amt <= 0) { showToast && showToast('Enter a valid amount', 'info'); return; }
+                          const txn = { id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: amt, date: 'Just now', status: 'Pending' as const, trxId: adminTopUp.trxId.trim().toUpperCase() || undefined, sender: adminTopUp.sender.trim(), method: adminTopUp.method, receipt: undefined };
+                          const next = [txn, ...custTxns];
+                          setCustTxns(next);
+                          lsSet('ss_wtxn_v2', next);
+                          setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Top-up created', orderId: adminTopUpModal || '', paymentMethod: adminTopUp.method, amount: amt, at: Date.now(), reason: adminTopUp.note.trim() || undefined }, ...prev]);
+                          showToast && showToast(`৳${amt.toLocaleString()} ${adminTopUp.method} top-up added — verify in Top-Up tab`, 'info');
+                          setAdminTopUpModal(null);
+                        }}
+                        className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold cursor-pointer"
+                      >Submit for Verify</button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}
