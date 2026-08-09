@@ -8,7 +8,7 @@ import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
   ClipboardList, Check, Users, Search, Plus, Phone, MessageCircle, PenLine,
-  Gift, Ban, Mail, ChevronDown, UserPlus, Copy, UserSearch, Ticket, Receipt
+  Gift, Ban, Mail, ChevronDown, UserPlus, Copy, UserSearch, Ticket
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -85,12 +85,11 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   const [lookupResult, setLookupResult] = useState<null | {
     customerId: string; name: string; phone: string; email: string;
     zone: string; joined: string; loyalty: number; status: string;
-    wallet: number; orders: Order[];
-    txns: Array<{ id: string; type: string; amount: number; date: string; status: string; trxId?: string; receipt?: string; sender?: string; method?: string; customerId?: string }>;
-    tickets: Array<{ id: string; subject: string; category: string; status: string; date: string; lastMessage: string; customerId?: string }>;
+    wallet: number; photo?: string;
   }>(null);
   const [lookupCopied, setLookupCopied] = useState(false);
   const normP = (p: string) => (p || '').replace(/[^0-9]/g, '');
+  const normEmail = (e: string) => (e || '').trim().toLowerCase();
   const runLookup = (query: string) => {
     const q = (query || '').trim();
     if (!q) return;
@@ -99,24 +98,20 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     const byId = (x: string | undefined) => !!x && x.toLowerCase() === qLower;
     const byPhone = (x: string | undefined) => !!x && normP(x) === qDigits;
     const byEmail = (x: string | undefined) => !!x && x.toLowerCase() === qLower;
+    const profilePhoto = lsGet<{ profilePic?: string; phone?: string; email?: string }>('ss_profile', {});
+    const photoOf = (phone: string, email: string) => (profilePhoto && normP(profilePhoto.phone || '') === normP(phone) && normEmail(profilePhoto.email || '') === normEmail(email)) ? profilePhoto.profilePic || '' : '';
     const found = customers.find(c => byId(c.custId) || byId(c.id) || byPhone(c.phone) || byEmail(c.email));
     if (found) {
       const wallet = custWallet[found.id] || 0;
       const loyalty = custLoyalty[found.id] !== undefined ? custLoyalty[found.id] : found.loyalty;
-      const ordersList = orders.filter(o => o.customerName === found.name || o.customerPhone === found.phone || o.customerId === found.custId);
-      const txns = custTxns.filter(t => t.customerId === found.id || t.customerId === found.custId || t.sender === found.phone);
-      const tickets = customerTickets.filter(t => t.customerId === found.custId || t.customerId === found.id || t.lastMessage.includes(found.phone));
-      setLookupResult({ customerId: found.custId || found.id, name: found.name, phone: found.phone, email: found.email, zone: found.zone, joined: found.joined, loyalty, status: found.status, wallet, orders: ordersList, txns, tickets });
+      setLookupResult({ customerId: found.custId || found.id, name: found.name, phone: found.phone, email: found.email, zone: found.zone, joined: found.joined, loyalty, status: found.status, wallet, photo: photoOf(found.phone, found.email) });
       return;
     }
     // Not in directory — check the shared account registry (storefront-created accounts)
     const registry = lsGet<Array<{ customerId: string; name: string; phone: string; email: string }>>('ss_cust_accounts', []);
     const reg = registry.find(a => byId(a.customerId) || byPhone(a.phone) || byEmail(a.email));
     if (reg) {
-      const ordersList = orders.filter(o => o.customerId === reg.customerId || o.customerPhone === reg.phone);
-      const txns = custTxns.filter(t => t.customerId === reg.customerId || t.sender === reg.phone);
-      const tickets = customerTickets.filter(t => t.customerId === reg.customerId || t.lastMessage.includes(reg.phone));
-      setLookupResult({ customerId: reg.customerId, name: reg.name, phone: reg.phone, email: reg.email, zone: '—', joined: '—', loyalty: 0, status: 'Active', wallet: lsGet<number>('ss_wallet_v2', 0), orders: ordersList, txns, tickets });
+      setLookupResult({ customerId: reg.customerId, name: reg.name, phone: reg.phone, email: reg.email, zone: '—', joined: '—', loyalty: 0, status: 'Active', wallet: lsGet<number>('ss_wallet_v2', 0), photo: photoOf(reg.phone, reg.email) });
       return;
     }
     setLookupResult(null);
@@ -753,9 +748,9 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
               </div>
             )}
 
-            {/* Dedicated Customer Lookup — search by permanent ID / phone / Gmail → full profile */}
+            {/* Dedicated Customer Lookup — search by permanent ID / phone / Gmail → full account profile */}
             <div id="customer-lookup-panel" className="bg-brand-card border border-brand-border rounded-xl p-3 space-y-2">
-              <p className="text-[10px] font-black text-gray-200 flex items-center space-x-1.5"><UserSearch className="w-3.5 h-3.5 text-brand-orange" /><span>Customer Lookup — full profile by ID / phone / Gmail</span></p>
+              <p className="text-[10px] font-black text-gray-200 flex items-center space-x-1.5"><UserSearch className="w-3.5 h-3.5 text-brand-orange" /><span>Customer Profile — account details by ID / phone / Gmail</span></p>
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
@@ -774,24 +769,21 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
               </div>
               {lookupResult && (
                 <div className="bg-brand-dark/50 border border-brand-border/40 rounded-lg p-3 space-y-3">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-full bg-brand-orange/20 border border-brand-orange/30 text-brand-orange flex items-center justify-center font-black text-sm">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {lookupResult.photo ? (
+                      <img src={lookupResult.photo} alt={lookupResult.name} className="w-12 h-12 rounded-full object-cover border-2 border-brand-orange/40 shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-brand-orange/20 border border-brand-orange/30 text-brand-orange flex items-center justify-center font-black text-base shrink-0">
                         {lookupResult.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <p className="text-white font-black text-sm truncate">{lookupResult.name}</p>
-                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${lookupResult.status === 'Blocked' ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>{lookupResult.status}</span>
-                          {lookupResult.loyalty >= 200 && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">VIP</span>}
-                        </div>
-                        <p className="text-[10px] text-gray-400 font-mono truncate">{lookupResult.phone} · {lookupResult.email}</p>
-                        <div className="flex items-center space-x-2 mt-0.5">
-                          <span className="text-[9px] text-gray-500">{lookupResult.zone} · joined {lookupResult.joined}</span>
-                          <span className="text-amber-400 font-black text-[9px]">{lookupResult.loyalty} pts</span>
-                          <span className="text-emerald-400 font-black text-[9px]">Wallet: ৳{lookupResult.wallet.toLocaleString()}</span>
-                        </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center space-x-2 flex-wrap">
+                        <p className="text-white font-black text-sm">{lookupResult.name}</p>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${lookupResult.status === 'Blocked' ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>{lookupResult.status}</span>
+                        {lookupResult.loyalty >= 200 && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">VIP</span>}
                       </div>
+                      <p className="text-[10px] text-gray-400 font-mono truncate">{lookupResult.phone} · {lookupResult.email}</p>
                     </div>
                     <button
                       onClick={() => { try { navigator.clipboard.writeText(lookupResult.customerId); setLookupCopied(true); setTimeout(() => setLookupCopied(false), 2000); } catch { /* noop */ } }}
@@ -802,51 +794,22 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><ClipboardList className="w-3 h-3 text-brand-orange" /><span>Order History ({lookupResult.orders.length})</span></p>
-                      {lookupResult.orders.length === 0 ? <p className="text-[9px] text-gray-500">No orders.</p> : (
-                        <div className="space-y-1 max-h-40 overflow-y-auto">
-                          {lookupResult.orders.map(o => (
-                            <div key={o.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
-                              <span className="font-mono">#{o.id}</span>
-                              <span className="text-gray-400 truncate">{o.storeName}</span>
-                              <span className="font-mono text-white font-black">৳{o.amount.toLocaleString()}</span>
-                              <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-brand-border/40 text-gray-300">{o.status}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <p className="text-[8px] font-black text-gray-500 uppercase tracking-wider">Zone</p>
+                      <p className="text-[10px] text-gray-200 font-bold mt-0.5">{lookupResult.zone || '—'}</p>
                     </div>
                     <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><Banknote className="w-3 h-3 text-brand-orange" /><span>Wallet Activity ({lookupResult.txns.length})</span></p>
-                      {lookupResult.txns.length === 0 ? <p className="text-[9px] text-gray-500">No wallet activity.</p> : (
-                        <div className="space-y-1 max-h-40 overflow-y-auto">
-                          {lookupResult.txns.map(t => (
-                            <div key={t.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
-                              <span className={`font-mono ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{t.amount >= 0 ? '+' : ''}{t.amount.toLocaleString()}</span>
-                              <span className="text-gray-500 truncate">{t.type}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${t.status === 'Completed' ? 'bg-emerald-500/20 text-emerald-300' : t.status === 'Rejected' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>{t.status}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <p className="text-[8px] font-black text-gray-500 uppercase tracking-wider">Member Since</p>
+                      <p className="text-[10px] text-gray-200 font-bold mt-0.5">{lookupResult.joined || '—'}</p>
                     </div>
                     <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><Ticket className="w-3 h-3 text-cyan-400" /><span>Support Tickets ({lookupResult.tickets.length})</span></p>
-                      {lookupResult.tickets.length === 0 ? <p className="text-[9px] text-gray-500">No tickets.</p> : (
-                        <div className="space-y-1 max-h-40 overflow-y-auto">
-                          {lookupResult.tickets.map(t => (
-                            <div key={t.id} className="text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-gray-400 truncate">{t.subject}</span>
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${t.status === 'Resolved' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>{t.status}</span>
-                              </div>
-                              <p className="text-[8px] text-gray-500 mt-0.5 truncate">{t.category} · {t.date}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <p className="text-[8px] font-black text-gray-500 uppercase tracking-wider">Loyalty</p>
+                      <p className="text-[10px] text-amber-400 font-bold mt-0.5">{lookupResult.loyalty} pts</p>
+                    </div>
+                    <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
+                      <p className="text-[8px] font-black text-gray-500 uppercase tracking-wider">Wallet Balance</p>
+                      <p className="text-[10px] text-emerald-400 font-bold mt-0.5">৳{lookupResult.wallet.toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
