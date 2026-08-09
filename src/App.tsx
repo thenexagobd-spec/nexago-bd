@@ -450,7 +450,10 @@ export default function App() {
     };
 
     // Auto-assign the nearest online live driver if none was chosen (customer orders)
-    if (!newOrder.driverId && newOrder.pickupCoords) {
+    // Only for non-customer-app flows (simulator/counter). Customer-app orders wait
+    // for the store to accept first, then get dispatched to a driver.
+    const isCustomerApp = newOrder.source === 'customer-app' || newOrder.status === 'Pending';
+    if (!newOrder.driverId && newOrder.pickupCoords && !isCustomerApp) {
       let best: { id: string } | null = null;
       let bestD = Infinity;
       for (const d of liveDrivers) {
@@ -470,9 +473,26 @@ export default function App() {
     if (newOrder.deliveryCoords || newOrder.pickupCoords) {
       handleAddNotification({
         title: `🛒 New Customer Order #${newId}`,
-        message: `${newOrder.customerName} ordered from ${newOrder.storeName} (৳${newOrder.amount.toLocaleString()})${newOrder.driverId ? ` — rider ${newOrder.driverId} auto-assigned` : ''}`,
-        type: 'order'
+        message: `${newOrder.customerName} ordered from ${newOrder.storeName} (৳${newOrder.amount.toLocaleString()})${newOrder.driverId ? ` — rider ${newOrder.driverId} auto-assigned` : ' — waiting for store to accept'}`,
+        type: 'order',
+        audience: 'all'
       });
+      // Tell the store + store admin a new order is waiting for them
+      if (isCustomerApp) {
+        handleAddNotification({
+          title: `🛒 New Order For Store #${newId}`,
+          message: `${newOrder.customerName} ordered from ${newOrder.storeName} (৳${newOrder.amount.toLocaleString()}) — accept to dispatch a rider.`,
+          type: 'order',
+          audience: 'store-admin',
+          storeId: newOrder.storeName
+        });
+        handleAddNotification({
+          title: `📢 Store Action Needed #${newId}`,
+          message: `Accept order #${newId} from ${newOrder.storeName} so a driver can be assigned.`,
+          type: 'system',
+          audience: 'staff'
+        });
+      }
     }
 
     // Create matching transaction log

@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, bdt, statusBadge } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, useDrivers, bdt, statusBadge } from './portalUtils';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
@@ -17,6 +17,7 @@ interface Staff {
 
 export default function StoreAdminPortal() {
   const [orders, setOrders] = useOrders();
+  const [drivers, setDrivers] = useDrivers();
   const [payments, setPayments] = usePayments();
   const [tickets, setTickets] = useTickets();
   const [walletBal, setWalletBal] = useWalletBal();
@@ -66,6 +67,23 @@ export default function StoreAdminPortal() {
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
 
   const updateStatus = (id: string, status: string) => setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: status as any } : o)));
+
+  // Store admin accepts a pending customer order → dispatch to the first available driver
+  const acceptOrder = (id: string) => {
+    const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
+    setOrders(prev => prev.map(o => (o.id === id ? {
+      ...o,
+      status: 'Confirmed' as any,
+      driverId: rider?.id || 'DRV123456',
+      driverDeadline: Date.now() + 60 * 1000,
+      placedAt: o.placedAt || Date.now(),
+    } : o)));
+    setNotifications(prev => [
+      { id: `NOTIF-${Date.now().toString().slice(-6)}-sa`, title: '🚚 Order Accepted & Dispatched', message: `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'driver', driverId: rider?.id },
+      { id: `NOTIF-${Date.now().toString().slice(-6)}-sa2`, title: '🚚 Store Accepted #' + id, message: `Order #${id} accepted — rider ${rider?.name || 'assigned'} is on the way to the store.`, type: 'order', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false, audience: 'all' },
+      ...prev,
+    ]);
+  };
 
   const approveTopUp = (tx: any, ok: boolean) => {
     const next = txns.map(t => (t.id === tx.id ? { ...t, status: ok ? 'Completed' : 'Rejected' } : t));
@@ -197,7 +215,7 @@ export default function StoreAdminPortal() {
                   <div className="flex items-center justify-end space-x-2 mt-3">
                     {o.status !== 'Completed' && o.status !== 'Cancelled' && (
                       <>
-                        <button onClick={() => updateStatus(o.id, 'Confirmed')} className="px-3 py-2 bg-sky-500/15 border border-sky-500/40 text-sky-300 rounded-xl text-[10px] font-black hover:bg-sky-500/25 transition-colors">Confirm</button>
+                        <button onClick={() => acceptOrder(o.id)} className="px-3 py-2 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 rounded-xl text-[10px] font-black hover:bg-emerald-500/25 transition-colors">Accept & Dispatch to Driver</button>
                         <button onClick={() => updateStatus(o.id, 'Processing')} className="px-3 py-2 bg-amber-500/15 border border-amber-500/40 text-amber-300 rounded-xl text-[10px] font-black hover:bg-amber-500/25 transition-colors">Process</button>
                         <button onClick={() => updateStatus(o.id, 'Completed')} className="flex items-center space-x-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-[10px] font-black transition-colors"><CheckCircle2 className="w-3 h-3" /><span>Complete</span></button>
                       </>

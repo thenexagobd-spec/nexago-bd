@@ -104,10 +104,29 @@ function PublicCustomerApp() {
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       source: 'customer-app',
-      placedAt: Date.now()
+      placedAt: Date.now(),
+      status: orderData.status || 'Pending'
     };
     setOrders(prev => [newOrder, ...prev]);
     postOrder(newOrder);
+    // Mirror into the shared portal store so the Store / Store Admin / Driver sites
+    // pick it up live (same keys the admin panel + portals read).
+    try {
+      const sharedKey = 'sd_orders_v2';
+      const raw = localStorage.getItem(sharedKey);
+      const existing = raw ? JSON.parse(raw) : [];
+      localStorage.setItem(sharedKey, JSON.stringify([newOrder, ...existing]));
+      const notifKey = 'sd_notifications';
+      const nRaw = localStorage.getItem(notifKey);
+      const notifs = nRaw ? JSON.parse(nRaw) : [];
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      localStorage.setItem(notifKey, JSON.stringify([
+        { id: `NOTIF-${Date.now().toString().slice(-6)}`, title: '🛒 New Order For Store #' + id, message: `${newOrder.customerName} ordered from ${newOrder.storeName} (৳${(newOrder.amount || 0).toLocaleString()}) — accept to dispatch a rider.`, type: 'order', time, read: false, audience: 'store-admin', storeId: newOrder.storeName },
+        { id: `NOTIF-${Date.now().toString().slice(-6)}-s`, title: '📢 Store Action Needed #' + id, message: `Accept order #${id} from ${newOrder.storeName} so a driver can be assigned.`, type: 'system', time, read: false, audience: 'staff' },
+        { id: `NOTIF-${Date.now().toString().slice(-6)}-a`, title: '🛒 New Customer Order #' + id, message: `${newOrder.customerName} ordered from ${newOrder.storeName} (৳${(newOrder.amount || 0).toLocaleString()}) — waiting for store to accept.`, type: 'order', time, read: false, audience: 'all' },
+        ...notifs
+      ]));
+    } catch { /* noop */ }
     showToast(`Order #${id} placed successfully — our team will confirm shortly!`, 'success');
   };
 

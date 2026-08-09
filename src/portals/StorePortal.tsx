@@ -41,7 +41,7 @@ export default function StorePortal() {
   }, []);
 
   const storeName = profile.storeName || 'Smart Shop';
-  const mine = useMemo(() => orders.filter(o => o.storeName === storeName), [orders, storeName]);
+  const mine = useMemo(() => orders.filter(o => o.storeName === storeName || o.source === 'customer-app' || o.customerName), [orders, storeName]);
 
   const incoming = mine.filter(o => o.status === 'Pending');
   const live = mine.find(o => o.status === 'Processing' || o.status === 'Ongoing' || (o.status === 'Confirmed' && o.driverId));

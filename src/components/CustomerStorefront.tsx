@@ -1775,7 +1775,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       customerName: customerProfile.name,
       storeName: targetStore.name,
       amount: cartGrandTotal,
-      status: isSendMoney ? 'Pending' : 'Confirmed',
+      status: 'Pending',
       paymentMethod: isSendMoney
         ? `${payModal} (Send Money)`
         : paymentMethod === 'Split (Wallet + bKash)' ? `Split (Wallet ৳${splitDeduct} + bKash ৳${cartGrandTotal - splitDeduct})` : paymentMethod,
@@ -1792,7 +1792,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       deliveryCoords: { lat: dest[0], lng: dest[1] },
       pickupCoords: targetStore.pickup,
       pickupLocation: targetStore.name,
-      driverId: assigned ? assigned.id : undefined,
+      driverId: undefined,
       itemCount: cart.reduce((s, i) => s + i.quantity, 0),
       deliveryCharge,
       estimatedMinutes: estimated,
