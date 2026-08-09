@@ -44,12 +44,6 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
 
   // Customer directory (A–Z) with per-customer wallet add
   const [custSearch, setCustSearch] = useState('');
-  const [custIdLive, setCustIdLive] = useState<string>(() => lsGet('ss_cust_id', ''));
-  useEffect(() => {
-    const onStorage = () => setCustIdLive(lsGet('ss_cust_id', ''));
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
   const seedCustomers = () => [
     { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024', loyalty: 120, status: 'Active', custId: 'NEX4654646786' },
     { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 80, status: 'Active', custId: 'NEX3829104756' },
@@ -819,18 +813,6 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
               />
             </div>
 
-            {custIdLive && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center space-x-2 text-[10px]">
-                  <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center"><Check className="w-3.5 h-3.5" /></span>
-                  <div>
-                    <p className="text-emerald-300 font-black">Active Customer Session</p>
-                    <p className="text-emerald-200/70 font-mono">{custIdLive} — orders, wallet & tickets link to this permanent ID</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {unassignedTopUps.length > 0 && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
                 <p className="text-[10px] font-black text-amber-300 flex items-center space-x-1.5"><Banknote className="w-3.5 h-3.5" /><span>New Add Money Request{unassignedTopUps.length > 1 ? 's' : ''} — unassigned</span></p>
@@ -878,7 +860,6 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                             <p className="text-[10px] text-gray-400 font-mono truncate">{c.phone} · {c.email}</p>
                             <p className="text-[9px] text-gray-500 font-mono mt-0.5 flex items-center space-x-1.5">
                               <span>ID: {c.custId || c.id}</span>
-                              {c.custId === custIdLive && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">● Live</span>}
                             </p>
                             <div className="flex items-center space-x-2 text-[9px] text-gray-500 mt-0.5">
                               <span>{c.zone}</span><span>•</span><span>{c.orders} orders</span><span>•</span><span>৳{c.spent.toLocaleString()} spent</span>
