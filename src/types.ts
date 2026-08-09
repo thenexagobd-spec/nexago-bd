@@ -52,7 +52,7 @@ export interface Order {
   placedAt?: number; // epoch ms — drives deterministic store→customer tracking progress
   timeline?: OrderTimelineEntry[]; // audit trail of every status change
   // Send Money / manual payment verification
-  paymentStatus?: 'Pending' | 'Approved' | 'Rejected' | 'Paid' | 'COD';
+  paymentStatus?: 'Pending' | 'Approved' | 'Rejected' | 'Paid' | 'COD' | 'Refunded';
   trxId?: string;          // bKash/Nagad Send Money transaction id
   senderNumber?: string;   // customer mobile that sent the money
   last4?: string;          // last 4 digits / PIN of the sending number (verification)
@@ -245,6 +245,7 @@ export interface RefundRequest {
   reason: string;
   status: 'Requested' | 'Processing' | 'Refunded' | 'Rejected';
   at: number;
+  customerId?: string;      // who the money goes back to (for admin refund approvals)
 }
 
 export interface Product {

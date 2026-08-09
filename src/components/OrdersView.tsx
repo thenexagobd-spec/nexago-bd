@@ -1413,13 +1413,44 @@ export default function OrdersView({
                       <button
                         onClick={() => {
                           setRefunds(prev => prev.map(x => x.id === r.id ? { ...x, status: 'Refunded' } : x));
+                          const ord = orders.find(o => o.id === r.orderId);
+                          const custTarget = ord ? (ord.customerId || ord.customerPhone) : undefined;
+                          // Credit the customer wallet + record the wallet transaction
+                          lsSet('ss_wallet_v2', (lsGet<number>('ss_wallet_v2', 0) || 0) + r.amount);
+                          const wtxns = lsGet<any[]>('ss_wtxn_v3', []);
+                          lsSet('ss_wtxn_v3', [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Refund', amount: r.amount, date: 'Just now', status: 'Completed', customerId: custTarget }, ...wtxns]);
+                          if (ord) onUpdateOrder({ ...ord, paymentStatus: 'Refunded', paymentNote: `Refund of ৳${r.amount} approved by admin` });
+                          if (custTarget) {
+                            const notifs = lsGet<any[]>('sd_notifications', []);
+                            lsSet('sd_notifications', [{
+                              id: `NOTIF-${Date.now().toString().slice(-8)}`, title: '↩️ Refund Approved',
+                              message: `Your refund of ৳${r.amount} for order #${r.orderId} was approved and credited to your wallet.`,
+                              type: 'payment', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false,
+                              audience: 'customer', customerId: custTarget,
+                            }, ...notifs]);
+                          }
                           setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Refunded', orderId: r.orderId, paymentMethod: r.method, amount: r.amount, at: Date.now() }, ...prev]);
                           showToast && showToast(`Refund approved for #${r.orderId} (৳${r.amount})`, 'success');
                         }}
                         className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
-                      >Refunded ✓</button>
+                      >Approve & Pay ✓</button>
                       <button
-                        onClick={() => { setRefunds(prev => prev.map(x => x.id === r.id ? { ...x, status: 'Rejected' } : x)); showToast && showToast('Refund request rejected', 'info'); }}
+                        onClick={() => {
+                          setRefunds(prev => prev.map(x => x.id === r.id ? { ...x, status: 'Rejected' } : x));
+                          const ord = orders.find(o => o.id === r.orderId);
+                          const custTarget = ord ? (ord.customerId || ord.customerPhone) : undefined;
+                          if (custTarget) {
+                            const notifs = lsGet<any[]>('sd_notifications', []);
+                            lsSet('sd_notifications', [{
+                              id: `NOTIF-${Date.now().toString().slice(-8)}`, title: '↩️ Refund Rejected',
+                              message: `Your refund request for order #${r.orderId} (৳${r.amount}) was rejected. Contact support for details.`,
+                              type: 'payment', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), read: false,
+                              audience: 'customer', customerId: custTarget,
+                            }, ...notifs]);
+                          }
+                          setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Rejected', orderId: r.orderId, paymentMethod: r.method, amount: r.amount, at: Date.now() }, ...prev]);
+                          showToast && showToast('Refund request rejected', 'info');
+                        }}
                         className="px-3 py-1.5 bg-brand-dark border border-brand-border hover:bg-brand-border/30 text-gray-300 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
                       >Reject</button>
                     </div>

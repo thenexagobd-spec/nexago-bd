@@ -1845,6 +1845,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       reason: refundReason.trim(),
       status: 'Requested',
       at: Date.now(),
+      customerId,
     }, ...prev]);
     setCustomerNotifs(prev => [{
       id: `CN-${Date.now().toString().slice(-4)}`, title: '↩ Refund Request Submitted',
@@ -1876,14 +1877,32 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (!cancelConfirmId) return;
     const ord = orders.find(o => o.id === cancelConfirmId);
     if (ord) {
-      onUpdateOrder({ ...ord, status: 'Cancelled' });
-      setWalletBalance(prev => prev + ord.amount);
-      setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Refund', amount: ord.amount, date: 'Just now', status: 'Completed', customerId }, ...prev]);
-      setCustomerNotifs(prev => [{
-        id: `CN-${Date.now().toString().slice(-4)}`, title: '↩️ Order Cancelled',
-        body: `Order #${ord.id} was cancelled. ৳${ord.amount} refunded to wallet.`, emoji: '↩️', time: 'Just now', read: false
-      }, ...prev]);
-      showToast(`Order #${ord.id} cancelled — ৳${ord.amount} refunded to wallet`, 'info');
+      const isCOD = /cash|cod/i.test(ord.paymentMethod);
+      onUpdateOrder({ ...ord, status: 'Cancelled', paymentNote: isCOD ? 'Order cancelled by customer' : 'Order cancelled by customer — refund pending admin approval' });
+      if (isCOD) {
+        setCustomerNotifs(prev => [{
+          id: `CN-${Date.now().toString().slice(-4)}`, title: '↩️ Order Cancelled',
+          body: `Order #${ord.id} was cancelled. No online payment was made.`, emoji: '↩️', time: 'Just now', read: false
+        }, ...prev]);
+        showToast(`Order #${ord.id} cancelled`, 'info');
+      } else {
+        setRefunds(prev => [{
+          id: `RF-${Date.now().toString().slice(-5)}`,
+          orderId: ord.id,
+          method: ord.paymentMethod.includes('Wallet') ? 'Smart Wallet' : ord.paymentMethod,
+          number: ord.paymentMethod.includes('Wallet') ? 'Smart Wallet' : customerProfile.phone,
+          amount: ord.amount,
+          reason: 'Order cancelled by customer',
+          status: 'Requested',
+          at: Date.now(),
+          customerId,
+        }, ...prev]);
+        setCustomerNotifs(prev => [{
+          id: `CN-${Date.now().toString().slice(-4)}`, title: '↩️ Order Cancelled — Refund Pending',
+          body: `Order #${ord.id} was cancelled. Refund of ৳${ord.amount} is pending admin approval.`, emoji: '↩️', time: 'Just now', read: false
+        }, ...prev]);
+        showToast(`Order #${ord.id} cancelled — refund ৳${ord.amount} pending admin approval`, 'info');
+      }
     }
     setCancelConfirmId(null);
   };
