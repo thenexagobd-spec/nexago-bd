@@ -91,6 +91,11 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     tickets: Array<{ id: string; subject: string; category: string; status: string; date: string; lastMessage: string; customerId?: string }>;
     totalSpent: number; orderCount: number; avgOrder: number;
     topStore: string; payMethod: string; refundCount: number; addresses: Array<{ title: string; address: string; area: string; isDefault: boolean }>;
+    codTotal: number; deliveryCharge: number; cancelledCount: number; priorityCount: number;
+    avgItems: number; lastActivity: string;
+    parcelSizes: Array<{ size: string; count: number }>;
+    topItems: Array<{ name: string; qty: number }>;
+    scheduledSlots: string[];
   }>(null);
   const [dossierView, setDossierView] = useState(false);
   const [lookupCopied, setLookupCopied] = useState(false);
@@ -125,7 +130,22 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
       const payMethod = Object.keys(pays).sort((a, b) => pays[b] - pays[a])[0] || '—';
       const refundCount = refunds.filter(rf => ords.some(o => o.id === rf.orderId)).length;
       const addrs = lsGet<Array<{ title: string; address: string; area: string; phone: string; isDefault: boolean }>>('ss_addr', []).filter(a => (a.phone || '').replace(/[^0-9]/g, '') === phone.replace(/[^0-9]/g, '')).map(a => ({ title: a.title, address: a.address, area: a.area, isDefault: a.isDefault }));
-      return { totalSpent, orderCount: ords.length, avgOrder: ords.length ? Math.round(totalSpent / ords.length) : 0, topStore, payMethod, refundCount, addresses: addrs };
+      const codTotal = ords.filter(x => (x.paymentMethod || '').toLowerCase().includes('cod')).reduce((s, x) => s + (x.codAmount ?? x.amount ?? 0), 0);
+      const deliveryCharge = ords.reduce((s, x) => s + (x.deliveryCharge || 0), 0);
+      const cancelledCount = ords.filter(x => x.status === 'Cancelled').length;
+      const priorityCount = ords.filter(x => x.priority === 'Express' || x.priority === 'Urgent').length;
+      const qtyOf = (o: Order) => o.items ? o.items.reduce((a, i) => a + (i.quantity || 0), 0) : (o.itemCount || 0);
+      const totalQty = ords.reduce((s, x) => s + qtyOf(x), 0);
+      const avgItems = ords.length ? Math.round(totalQty / ords.length) : 0;
+      const lastActivity = ords.length ? ords[ords.length - 1].date || '—' : '—';
+      const sizeMap: Record<string, number> = {};
+      ords.forEach(x => { if (x.parcelSize) sizeMap[x.parcelSize] = (sizeMap[x.parcelSize] || 0) + 1; });
+      const parcelSizes = Object.keys(sizeMap).sort((a, b) => sizeMap[b] - sizeMap[a]).map(size => ({ size, count: sizeMap[size] }));
+      const itemMap: Record<string, number> = {};
+      ords.forEach(x => (x.items || []).forEach(i => { itemMap[i.name] = (itemMap[i.name] || 0) + (i.quantity || 1); }));
+      const topItems = Object.keys(itemMap).sort((a, b) => itemMap[b] - itemMap[a]).slice(0, 5).map(name => ({ name, qty: itemMap[name] }));
+      const scheduledSlots = Array.from(new Set(ords.map(x => x.scheduledSlot).filter((s): s is string => !!s)));
+      return { totalSpent, orderCount: ords.length, avgOrder: ords.length ? Math.round(totalSpent / ords.length) : 0, topStore, payMethod, refundCount, addresses: addrs, codTotal, deliveryCharge, cancelledCount, priorityCount, avgItems, lastActivity, parcelSizes, topItems, scheduledSlots };
     };
     const found = customers.find(c => byId(c.custId) || byId(c.id) || byPhone(c.phone) || byEmail(c.email));
     if (found) {
@@ -167,6 +187,15 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     const addrRows = r.addresses.length
       ? r.addresses.map(a => `<tr><td>${esc(a.title)}${a.isDefault ? ' (Default)' : ''}</td><td>${esc(a.address)}</td><td>${esc(a.area)}</td></tr>`).join('')
       : '<tr><td colspan="3" style="text-align:center;color:#888">No saved addresses</td></tr>';
+    const itemRows = r.topItems.length
+      ? r.topItems.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty} unit${i.qty > 1 ? 's' : ''}</td></tr>`).join('')
+      : '<tr><td colspan="2" style="text-align:center;color:#888">No item data</td></tr>';
+    const parcelRows = r.parcelSizes.length
+      ? r.parcelSizes.map(p => `<tr><td>${esc(p.size)}</td><td>${p.count} order${p.count > 1 ? 's' : ''}</td></tr>`).join('')
+      : '<tr><td colspan="2" style="text-align:center;color:#888">No parcel data</td></tr>';
+    const slotRows = r.scheduledSlots.length
+      ? r.scheduledSlots.map(s => `<tr><td>${esc(s)}</td></tr>`).join('')
+      : '<tr><td style="text-align:center;color:#888">No scheduled deliveries</td></tr>';
     const w = window.open('', '_blank', 'width=900,height=700');
     if (!w) { showToast && showToast('Please allow pop-ups to print the dossier', 'info'); return; }
     w.document.write(`<!doctype html><html><head><title>Customer Dossier — ${esc(r.name)}</title><style>
@@ -239,6 +268,18 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
         <div class="stat"><p>Payment Method</p><b style="font-size:13px">${esc(r.payMethod || '—')}</b></div>
         <div class="stat"><p>Refunds</p><b>${r.refundCount}</b></div>
       </div>
+      <div class="strip">
+        <div class="stat"><p>COD Total</p><b>৳${(r.codTotal || 0).toLocaleString()}</b></div>
+        <div class="stat"><p>Delivery Charge</p><b>৳${(r.deliveryCharge || 0).toLocaleString()}</b></div>
+        <div class="stat"><p>Cancelled Orders</p><b>${r.cancelledCount}</b></div>
+        <div class="stat"><p>Priority (Expr/Urg)</p><b>${r.priorityCount}</b></div>
+      </div>
+      <div class="strip">
+        <div class="stat"><p>Avg Items / Order</p><b>${r.avgItems}</b></div>
+        <div class="stat"><p>Last Activity</p><b style="font-size:13px">${esc(r.lastActivity || '—')}</b></div>
+        <div class="stat"><p>Saved Addresses</p><b>${r.addresses.length}</b></div>
+        <div class="stat"><p>Scheduled Deliveries</p><b>${r.scheduledSlots.length}</b></div>
+      </div>
       <div class="h2">Order History (${r.orders.length})</div>
       <table><thead><tr><th>Order ID</th><th>Store</th><th>Amount</th><th>Date</th><th>Payment</th><th>Status</th></tr></thead><tbody>${orderRows}</tbody></table>
       <div class="h2">Wallet Activity (${r.txns.length})</div>
@@ -249,6 +290,12 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
       <table><thead><tr><th>Refund</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th></tr></thead><tbody>${refundRows}</tbody></table>
       <div class="h2">Saved Addresses (${r.addresses.length})</div>
       <table><thead><tr><th>Label</th><th>Address</th><th>Area</th></tr></thead><tbody>${addrRows}</tbody></table>
+      <div class="h2">Top Products (${r.topItems.length})</div>
+      <table><thead><tr><th>Product</th><th>Quantity</th></tr></thead><tbody>${itemRows}</tbody></table>
+      <div class="h2">Parcel Size Breakdown (${r.parcelSizes.length})</div>
+      <table><thead><tr><th>Size</th><th>Orders</th></tr></thead><tbody>${parcelRows}</tbody></table>
+      <div class="h2">Scheduled Deliveries (${r.scheduledSlots.length})</div>
+      <table><thead><tr><th>Slot</th></tr></thead><tbody>${slotRows}</tbody></table>
       <div class="footer">Generated ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })} &middot; NexaGo Smart Delivery Network &middot; Scan QR to verify this customer</div>
       <script>window.onload=function(){setTimeout(function(){window.print();},600)}</script>
     </body></html>`);
@@ -1050,7 +1097,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                     </div>
                     <p className="text-[11px] text-gray-500 font-mono mt-1">{lookupResult.phone} · {lookupResult.email}</p>
                     <p className="text-[10px] text-brand-orange font-black font-mono mt-0.5">ID: {lookupResult.customerId}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">Zone: {lookupResult.zone || '—'} · Member Since: {lookupResult.joined || '—'}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Zone: {lookupResult.zone || '—'} · Member Since: {lookupResult.joined || '—'} · Last Activity: {lookupResult.lastActivity || '—'}</p>
                   </div>
                   <div className="w-[110px] shrink-0 border border-gray-200 rounded-lg p-2 text-center">
                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(lookupResult.customerId)}`} alt="QR" className="w-full h-auto" />
@@ -1069,6 +1116,12 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                     { label: 'Top Store', value: lookupResult.topStore || '—' },
                     { label: 'Payment Method', value: lookupResult.payMethod || '—' },
                     { label: 'Refunds', value: `${lookupResult.refundCount}` },
+                    { label: 'COD Total', value: `৳${lookupResult.codTotal.toLocaleString()}` },
+                    { label: 'Delivery Charge', value: `৳${lookupResult.deliveryCharge.toLocaleString()}` },
+                    { label: 'Cancelled Orders', value: `${lookupResult.cancelledCount}` },
+                    { label: 'Priority Orders', value: `${lookupResult.priorityCount}` },
+                    { label: 'Avg Items / Order', value: `${lookupResult.avgItems}` },
+                    { label: 'Last Activity', value: lookupResult.lastActivity || '—' },
                   ].map(s => (
                     <div key={s.label} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                       <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{s.label}</p>
@@ -1137,14 +1190,38 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   </div>
 
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Saved Addresses ({lookupResult.addresses.length})</p>
+                    <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Top Products ({lookupResult.topItems.length})</p>
                     <div className="max-h-40 overflow-y-auto">
-                      {lookupResult.addresses.length === 0 ? <p className="text-[10px] text-gray-400 p-3">No saved addresses.</p> : lookupResult.addresses.map((a, i) => (
-                        <div key={i} className="px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
-                          <p className="font-bold text-gray-700">{a.title}{a.isDefault ? <span className="ml-1 text-[8px] font-black text-emerald-600 uppercase">Default</span> : ''}</p>
-                          <p className="text-gray-500 mt-0.5">{a.address} · {a.area}</p>
+                      {lookupResult.topItems.length === 0 ? <p className="text-[10px] text-gray-400 p-3">No item data.</p> : lookupResult.topItems.map((i, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-2 px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
+                          <span className="text-gray-700 truncate">{i.name}</span>
+                          <span className="font-mono font-bold">{i.qty} unit{i.qty > 1 ? 's' : ''}</span>
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Parcel Size ({lookupResult.parcelSizes.length})</p>
+                      <div className="max-h-40 overflow-y-auto">
+                        {lookupResult.parcelSizes.length === 0 ? <p className="text-[10px] text-gray-400 p-3">No parcel data.</p> : lookupResult.parcelSizes.map((p, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
+                            <span className="text-gray-700">{p.size}</span>
+                            <span className="font-mono font-bold">{p.count} order{p.count > 1 ? 's' : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <p className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-wider">Scheduled Deliveries ({lookupResult.scheduledSlots.length})</p>
+                      <div className="max-h-40 overflow-y-auto">
+                        {lookupResult.scheduledSlots.length === 0 ? <p className="text-[10px] text-gray-400 p-3">No scheduled deliveries.</p> : lookupResult.scheduledSlots.map((s, idx) => (
+                          <div key={idx} className="px-3 py-1.5 text-[10px] border-b border-gray-100 last:border-0">
+                            <span className="text-gray-700">{s}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
