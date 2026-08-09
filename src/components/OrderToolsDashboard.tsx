@@ -8,7 +8,7 @@ import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
   ClipboardList, Check, Users, Search, Plus, Phone, MessageCircle, PenLine,
-  Gift, Ban, Mail, ChevronDown, UserPlus, Copy, UserSearch, Ticket
+  Gift, Ban, Mail, ChevronDown, UserPlus, Copy, UserSearch, Ticket, Printer
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -118,6 +118,76 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     }
     setLookupResult(null);
     showToast && showToast('No customer found for that ID / phone / Gmail', 'info');
+  };
+
+  // Printable dossier — opens a clean white document with photo + all info + full history
+  const printDossier = () => {
+    if (!lookupResult) return;
+    const r = lookupResult;
+    const orderRows = r.orders.length
+      ? r.orders.map(o => `<tr><td>${o.id}</td><td>${o.storeName}</td><td>৳${o.amount.toLocaleString()}</td><td>${o.date || ''}</td><td>${o.status}</td></tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:#888">No orders</td></tr>';
+    const txnRows = r.txns.length
+      ? r.txns.map(t => `<tr><td>${t.id}</td><td>${t.type}</td><td style="color:${t.amount >= 0 ? '#059669' : '#dc2626'}">${t.amount >= 0 ? '+' : ''}৳${t.amount.toLocaleString()}</td><td>${t.trxId || ''}</td><td>${t.status}</td></tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:#888">No wallet activity</td></tr>';
+    const ticketRows = r.tickets.length
+      ? r.tickets.map(t => `<tr><td>${t.id}</td><td>${t.subject}</td><td>${t.category}</td><td>${t.date}</td><td>${t.status}</td></tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:#888">No tickets</td></tr>';
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (!w) { showToast && showToast('Please allow pop-ups to print the dossier', 'info'); return; }
+    w.document.write(`<!doctype html><html><head><title>Customer Dossier — ${r.name}</title><style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:32px;background:#fff}
+      .head{display:flex;align-items:center;gap:20px;border-bottom:3px solid #f97316;padding-bottom:20px;margin-bottom:24px}
+      .avatar{width:80px;height:80px;border-radius:16px;object-fit:cover;border:3px solid #f97316}
+      .avatar.init{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900}
+      h1{font-size:24px;font-weight:800}
+      .meta{color:#666;font-size:12px;margin-top:4px;font-family:Consolas,monospace}
+      .badges span{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;margin-right:6px;margin-top:6px}
+      .b-active{background:#d1fae5;color:#065f46;border:1px solid #34d399}
+      .b-block{background:#fee2e2;color:#991b1b;border:1px solid #f87171}
+      .b-vip{background:#fef3c7;color:#92400e;border:1px solid #fbbf24}
+      .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+      .stat{border:1px solid #e5e7eb;border-radius:12px;padding:14px}
+      .stat p{font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:1px}
+      .stat b{font-size:15px;display:block;margin-top:4px}
+      h2{font-size:14px;font-weight:800;margin:22px 0 10px;padding-left:10px;border-left:4px solid #f97316}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      th{background:#f97316;color:#fff;text-align:left;padding:8px 10px;font-weight:700}
+      td{border-bottom:1px solid #e5e7eb;padding:7px 10px}
+      tr:nth-child(even) td{background:#fafafa}
+      .footer{margin-top:28px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px dashed #d1d5db;padding-top:12px}
+      @media print{body{padding:16px}}
+    </style></head><body>
+      <div class="head">
+        ${r.photo ? `<img class="avatar" src="${r.photo}" />` : `<div class="avatar init">${r.name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase()}</div>`}
+        <div>
+          <h1>${r.name}</h1>
+          <div class="badges">
+            <span class="${r.status === 'Blocked' ? 'b-block' : 'b-active'}">${r.status}</span>
+            ${r.loyalty >= 200 ? '<span class="b-vip">★ VIP</span>' : ''}
+            ${r.loyalty >= 100 && r.loyalty < 200 ? '<span class="b-vip">★ Gold</span>' : ''}
+          </div>
+          <div class="meta">${r.phone} &middot; ${r.email}</div>
+          <div class="meta">Permanent ID: ${r.customerId}</div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><p>Zone</p><b>${r.zone || '—'}</b></div>
+        <div class="stat"><p>Member Since</p><b>${r.joined || '—'}</b></div>
+        <div class="stat"><p>Loyalty</p><b>${r.loyalty} pts</b></div>
+        <div class="stat"><p>Wallet</p><b>৳${r.wallet.toLocaleString()}</b></div>
+      </div>
+      <h2>Order History (${r.orders.length})</h2>
+      <table><thead><tr><th>Order ID</th><th>Store</th><th>Amount</th><th>Date</th><th>Status</th></tr></thead><tbody>${orderRows}</tbody></table>
+      <h2>Wallet Activity (${r.txns.length})</h2>
+      <table><thead><tr><th>Transaction</th><th>Type</th><th>Amount</th><th>TrxID</th><th>Status</th></tr></thead><tbody>${txnRows}</tbody></table>
+      <h2>Support Tickets (${r.tickets.length})</h2>
+      <table><thead><tr><th>Ticket</th><th>Subject</th><th>Category</th><th>Date</th><th>Status</th></tr></thead><tbody>${ticketRows}</tbody></table>
+      <div class="footer">Generated ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })} &middot; NexaGo Customer Dossier</div>
+      <script>window.onload=function(){setTimeout(function(){window.print();},300)}</script>
+    </body></html>`);
+    w.document.close();
   };
 
   // Customer-created support tickets (from the storefront), esp. Add Money / Top-Up problems
@@ -764,13 +834,22 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                         <p className="text-[11px] text-gray-400 font-mono mt-1">{lookupResult.phone} · {lookupResult.email}</p>
                         <p className="text-[10px] text-gray-500 font-mono mt-0.5"><span className="text-brand-orange font-black">ID:</span> {lookupResult.customerId}</p>
                       </div>
-                      <button
-                        onClick={() => { try { navigator.clipboard.writeText(lookupResult.customerId); setLookupCopied(true); setTimeout(() => setLookupCopied(false), 2000); } catch { /* noop */ } }}
-                        className="inline-flex items-center space-x-1.5 px-3 py-2 bg-gray-500/10 border border-gray-500/30 text-gray-300 rounded-lg text-[10px] font-black hover:bg-gray-500/20 transition-colors shrink-0 font-mono"
-                      >
-                        <span>ID: {lookupResult.customerId}</span>
-                        {lookupCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
+                      <div className="flex items-center space-x-2 shrink-0">
+                        <button
+                          onClick={printDossier}
+                          className="inline-flex items-center space-x-1.5 px-3 py-2 bg-brand-orange/15 border border-brand-orange/40 text-brand-orange rounded-lg text-[10px] font-black hover:bg-brand-orange/25 transition-colors"
+                          title="Print full dossier with photo"
+                        >
+                          <Printer className="w-3.5 h-3.5" /><span>Print</span>
+                        </button>
+                        <button
+                          onClick={() => { try { navigator.clipboard.writeText(lookupResult.customerId); setLookupCopied(true); setTimeout(() => setLookupCopied(false), 2000); } catch { /* noop */ } }}
+                          className="inline-flex items-center space-x-1.5 px-3 py-2 bg-gray-500/10 border border-gray-500/30 text-gray-300 rounded-lg text-[10px] font-black hover:bg-gray-500/20 transition-colors shrink-0 font-mono"
+                        >
+                          <span>ID: {lookupResult.customerId}</span>
+                          {lookupCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
