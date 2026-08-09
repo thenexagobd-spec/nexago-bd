@@ -27,7 +27,7 @@ interface OrderToolsDashboardProps {
   showToast?: (message: string, type?: 'success' | 'info') => void;
 }
 
-type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets' | 'reports' | 'customers';
+type ToolTab = 'verify' | 'audit' | 'refunds' | 'analytics' | 'wallets' | 'reports' | 'customers' | 'topups';
 
 export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [], onOpenReport, onReportReply, showToast }: OrderToolsDashboardProps) {
   const [tab, setTab] = useState<ToolTab>('audit');
@@ -57,6 +57,15 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   ];
   const [custWallet, setCustWallet] = useState<Record<string, number>>(() => lsGet('ss_admin_cust_wallet', {}));
   useEffect(() => lsSet('ss_admin_cust_wallet', custWallet), [custWallet]);
+
+  // Customer-created support tickets (from the storefront), esp. Add Money / Top-Up problems
+  const [customerTickets, setCustomerTickets] = useState<Array<{ id: string; subject: string; category: string; status: string; date: string; lastMessage: string }>>(() => lsGet('ss_tickets_v2', []));
+  useEffect(() => {
+    const onStorage = () => setCustomerTickets(lsGet('ss_tickets_v2', []));
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  const topUpTickets = customerTickets.filter(t => /top[- ]?up|add ?money|wallet/i.test(t.category));
 
   // Keep wallet numbers in sync if edited from another tab
   useEffect(() => {
@@ -91,6 +100,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   const tabs: { key: ToolTab; label: string; icon: any; badge?: number }[] = [
     { key: 'verify', label: 'Verify Payments', icon: ShieldCheck, badge: verifyPayments.length },
     { key: 'reports', label: 'Payment Reports', icon: ClipboardList, badge: reports.filter(r => r.status === 'Open').length },
+    { key: 'topups', label: 'Top-Up Reports', icon: Banknote, badge: topUpTickets.length },
     { key: 'audit', label: 'Audit Log', icon: History, badge: auditLog.length },
     { key: 'refunds', label: 'Refund Requests', icon: Banknote, badge: refunds.filter(r => r.status === 'Requested').length },
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
@@ -281,7 +291,37 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
           </div>
         )}
 
-        {/* ============ AUDIT LOG ============ */}
+        {/* ============ TOP-UP REPORTS ============ */}
+        {tab === 'topups' && (
+          <div className="space-y-3">
+            <h3 className="font-black text-white text-sm flex items-center space-x-2"><Banknote className="w-4 h-4 text-brand-orange" /><span>Top-Up / Add Money Reports</span></h3>
+            <p className="text-[10px] text-gray-400">Customer tickets filed for Add Money / Top-Up problems (money sent but not credited, wrong amount, etc.). Reply to resolve.</p>
+            {topUpTickets.length === 0 ? (
+              <p className="text-center text-[10px] text-gray-500 py-6 flex items-center justify-center space-x-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /><span>No Add Money reports yet.</span></p>
+            ) : (
+              <div className="space-y-2">
+                {topUpTickets.map(tk => (
+                  <div key={tk.id} className="bg-brand-dark/50 border border-brand-border/50 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center space-x-2">
+                        <p className="text-gray-100 font-black text-xs font-mono">{tk.id}</p>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                          tk.status === 'Resolved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20' :
+                          tk.status === 'Under Review' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/20' :
+                          'bg-amber-500/20 text-amber-300 border border-amber-500/20'
+                        }`}>{tk.status || 'Open'}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/20">{tk.category}</span>
+                      </div>
+                      <span className="text-[9px] text-gray-500">{tk.date}</span>
+                    </div>
+                    <p className="text-gray-200 font-bold text-[11px]">{tk.subject}</p>
+                    <p className="text-gray-400 text-[10px] bg-brand-dark/40 border border-brand-border/30 rounded-lg p-2">"{tk.lastMessage}"</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {tab === 'audit' && (
           <div className="space-y-3">
             <h3 className="font-black text-white text-sm flex items-center space-x-2"><History className="w-4 h-4 text-brand-orange" /><span>Admin Audit Log</span></h3>
