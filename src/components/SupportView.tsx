@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SupportTicket, Order, ChatLogEntry, OrderReportEntry } from '../types';
-import { LifeBuoy, Check, AlertCircle, MessageSquare, Send, ArrowLeft, Clock, Search, Package, Scale, ListChecks, History, Activity, Truck, Store, UserX, FileSearch, Wand2, Zap, Timer, Users, X, Sparkles, Navigation, SearchCheck, BookOpen, Wrench, ArrowUpCircle, Smartphone, Bug, Bell, Shield, BarChart3, GitBranch, GitCommit, MessagesSquare, Terminal, Webhook, Database, ClipboardCheck, FileText, Siren, Calculator, ShieldCheck, Inbox, Hourglass, Megaphone, AlertTriangle, ClipboardList, KeyRound, Rocket, Map, Gauge, Monitor, RotateCw, Trash2, FileWarning, GraduationCap, Lock, Workflow, Fingerprint, MapPin, BellRing, IdCard, ArrowRightLeft, Wifi, LayoutTemplate, Lightbulb, Award, CalendarClock, Settings2, Globe, Download, Quote, MapPinned, RefreshCw, TrendingUp, Banknote, Tag, Percent, Star, Cpu, BookOpenCheck, Utensils, Layers, ChevronDown, ScanFace, Loader2 } from 'lucide-react';
+import { LifeBuoy, Check, AlertCircle, MessageSquare, Send, ArrowLeft, Clock, Search, Package, Scale, ListChecks, History, Activity, Truck, Store, UserX, FileSearch, Wand2, Zap, Timer, Users, X, Sparkles, Navigation, SearchCheck, BookOpen, Wrench, ArrowUpCircle, Smartphone, Bug, Bell, Shield, BarChart3, GitBranch, GitCommit, MessagesSquare, Terminal, Webhook, Database, ClipboardCheck, FileText, Siren, Calculator, ShieldCheck, Inbox, Hourglass, Megaphone, AlertTriangle, ClipboardList, KeyRound, Rocket, Map, Gauge, Monitor, RotateCw, Trash2, FileWarning, GraduationCap, Lock, Workflow, Fingerprint, MapPin, BellRing, IdCard, ArrowRightLeft, Wifi, LayoutTemplate, Lightbulb, Award, CalendarClock, Settings2, Globe, Download, Quote, MapPinned, RefreshCw, TrendingUp, Banknote, Tag, Percent, Star, Cpu, BookOpenCheck, Utensils, Layers, ChevronDown, ScanFace, Loader2, Plus } from 'lucide-react';
 
 interface SupportViewProps {
   tickets: SupportTicket[];
@@ -1142,6 +1142,37 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
     ];
   });
   const [tierForm, setTierForm] = useState<{ issue: string; customer: string; tier: 'L1' | 'L2' | 'L3' }>({ issue: '', customer: '', tier: 'L1' });
+
+  const [ticketCategories, setTicketCategories] = useState<{ value: string; label: string }[]>(() => {
+    try {
+      const raw = localStorage.getItem('sd_ticket_categories_v1');
+      if (raw && raw !== '[]') {
+        const p = JSON.parse(raw);
+        if (Array.isArray(p) && p.length > 0) return p;
+      }
+    } catch { /* ignore */ }
+    return [
+      { value: 'Order Delivery', label: 'Order Delivery Delay' },
+      { value: 'Payment / Refund', label: 'Payment / Wallet Refund' },
+      { value: 'Missing Item', label: 'Missing or Damaged Item' },
+      { value: 'General Query', label: 'General Query' },
+    ];
+  });
+  const [newTicketCat, setNewTicketCat] = useState('');
+
+  useEffect(() => {
+    try { localStorage.setItem('sd_ticket_categories_v1', JSON.stringify(ticketCategories)); } catch { /* ignore */ }
+  }, [ticketCategories]);
+
+  const addTicketCategory = () => {
+    const v = newTicketCat.trim();
+    if (!v) return;
+    const value = v.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+    if (!value || ticketCategories.some(c => c.value.toLowerCase() === value.toLowerCase())) { setNewTicketCat(''); return; }
+    setTicketCategories(prev => [...prev, { value, label: v }]);
+    setNewTicketCat('');
+  };
+  const removeTicketCategory = (value: string) => setTicketCategories(prev => prev.filter(c => c.value !== value));
 
   useEffect(() => {
     try {
@@ -5903,6 +5934,32 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
               ))}
             </div>
             <p className="text-[9px] text-gray-600 mt-2">Live chat resolves instantly; tickets track complex issues end-to-end; remote desktop connects directly to a user's device for on-screen fixes. Taking a channel offline is audited.</p>
+
+            <div className="mt-3 pt-3 border-t border-brand-border">
+              <p className="text-[10px] font-bold text-white flex items-center space-x-1.5 mb-2"><Tag className="w-3.5 h-3.5 text-amber-400" /><span>Ticket Categories (shown in the customer storefront)</span></p>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {ticketCategories.map(c => (
+                  <span key={c.value} className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-brand-dark/60 border border-brand-border text-[9px] font-bold text-gray-200">
+                    <span>{c.label}</span>
+                    <button onClick={() => removeTicketCategory(c.value)} className="text-gray-500 hover:text-red-400 cursor-pointer transition-colors" title="Remove category"><X className="w-3 h-3" /></button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={newTicketCat}
+                  onChange={(e) => setNewTicketCat(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTicketCategory(); } }}
+                  placeholder="Add a category e.g. Product Quality"
+                  className="flex-1 px-2.5 py-1.5 bg-brand-dark text-[10px] text-gray-200 border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600"
+                />
+                <button onClick={addTicketCategory} className="px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors flex items-center space-x-1">
+                  <Plus className="w-3 h-3" /><span>Add</span>
+                </button>
+              </div>
+              <p className="text-[9px] text-gray-600 mt-2">Categories appear instantly in the customer's Open Support Ticket dropdown. Removing one does not affect already-submitted tickets.</p>
+            </div>
           </div>
 
           {/* Device matrix */}

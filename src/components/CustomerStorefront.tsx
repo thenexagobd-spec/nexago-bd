@@ -1188,6 +1188,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [ticketCategory, setTicketCategory] = useState('Order Delivery');
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketDetail, setTicketDetail] = useState('');
+  const [ticketCategories, setTicketCategories] = useState<{ value: string; label: string }[]>(() => getStoredData('sd_ticket_categories_v1', [
+    { value: 'Order Delivery', label: 'Order Delivery Delay' },
+    { value: 'Payment / Refund', label: 'Payment / Wallet Refund' },
+    { value: 'Missing Item', label: 'Missing or Damaged Item' },
+    { value: 'General Query', label: 'General Query' },
+  ]));
 
   const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: 'Rahim Khan', email: 'rahim.khan@example.com', phone: '01712-345678', sms: true, emailNotif: true, pushNotif: true, profilePic: '' }));
   useEffect(() => setStoredData(LS_KEYS.profile, customerProfile), [customerProfile]);
@@ -4474,11 +4480,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </div>
             <div>
               <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Issue Category</label>
-              <select value={ticketCategory} onChange={(e) => setTicketCategory(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none">
-                <option value="Order Delivery">Order Delivery Delay</option>
-                <option value="Payment / Refund">Payment / Wallet Refund</option>
-                <option value="Missing Item">Missing or Damaged Item</option>
-                <option value="General Query">General Query</option>
+              <select value={ticketCategories.some(c => c.value === ticketCategory) ? ticketCategory : (ticketCategories[0]?.value || 'Order Delivery')} onChange={(e) => setTicketCategory(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none">
+                {ticketCategories.length === 0 && <option value="Order Delivery">Order Delivery Delay</option>}
+                {ticketCategories.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
               </select>
             </div>
             <div>
