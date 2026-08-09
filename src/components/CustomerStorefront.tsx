@@ -63,6 +63,7 @@ interface WalletTransaction {
   amount: number;
   date: string;
   status: 'Completed' | 'Pending';
+  trxId?: string;
 }
 
 interface SupportTicketItem {
@@ -2100,7 +2101,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (!sender.endsWith(last4)) { setAddMoneyError('Last 4 digits must match the sending number'); return; }
     if (!/^[A-Z0-9]{8,20}$/.test(addMoneyTrxId.trim())) { setAddMoneyError('Invalid TrxID — expected 8–20 letters/digits from your SMS'); return; }
     if (!addMoneyReceipt) { setAddMoneyError('Upload the payment screenshot/receipt before submitting'); return; }
-    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Pending' }, ...prev]);
+    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Pending', trxId: addMoneyTrxId.trim().toUpperCase() }, ...prev]);
     setAddMoneyStep('pending');
     showToast('Payment received — admin will verify & add to your wallet', 'info');
   };
@@ -3228,9 +3229,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="divide-y divide-gray-100">
                   {walletTransactions.map((tx) => (
                     <div key={tx.id} className="py-3 flex items-center justify-between text-xs">
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-bold text-gray-900">{tx.type}</p>
                         <p className="text-[10px] text-gray-400">{tx.date} • {tx.id}</p>
+                        {tx.trxId && (
+                          <button
+                            onClick={() => copyText(tx.trxId!, `${tx.type} TrxID`)}
+                            className="mt-1 inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-gray-100 border border-gray-200 text-gray-600 hover:bg-gray-200 cursor-pointer transition-colors font-mono text-[9px]"
+                          >
+                            <span className="truncate max-w-28">TrxID: {tx.trxId}</span>
+                            <Copy className="w-3 h-3 shrink-0" />
+                          </button>
+                        )}
                       </div>
                       <div className="text-right font-mono font-bold">
                         <span className={tx.amount > 0 ? 'text-emerald-600' : 'text-gray-800'}>
