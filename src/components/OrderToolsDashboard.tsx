@@ -89,6 +89,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     return () => window.removeEventListener('storage', onStorage);
   }, []);
   const pendingTopUps = custTxns.filter(t => t.type === 'Top-Up' && t.status === 'Pending');
+  const unassignedTopUps = pendingTopUps.filter(t => !t.customerId || !customers.some(c => c.id === t.customerId));
   const [walletBal, setWalletBal] = useState<number>(() => lsGet('ss_wallet_v2', 0));
   useEffect(() => {
     const onStorage = () => setWalletBal(lsGet('ss_wallet_v2', 0));
@@ -146,7 +147,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
     { key: 'refunds', label: 'Refund Requests', icon: Banknote, badge: refunds.filter(r => r.status === 'Requested').length },
     { key: 'analytics', label: 'Orders Analytics', icon: TrendingUp },
     { key: 'wallets', label: 'Payment Wallets', icon: Wallet },
-    { key: 'customers', label: 'Customers', icon: Users },
+    { key: 'customers', label: 'Customers', icon: Users, badge: unassignedTopUps.length },
   ];
 
   return (
@@ -687,6 +688,28 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                 className="w-full bg-brand-dark/50 border border-brand-border rounded-lg pl-9 pr-3 py-2 text-xs text-gray-200 outline-none focus:border-brand-orange placeholder:text-gray-600"
               />
             </div>
+
+            {unassignedTopUps.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
+                <p className="text-[10px] font-black text-amber-300 flex items-center space-x-1.5"><Banknote className="w-3.5 h-3.5" /><span>New Add Money Request{unassignedTopUps.length > 1 ? 's' : ''} — unassigned</span></p>
+                <div className="space-y-1.5">
+                  {unassignedTopUps.map(tx => (
+                    <div key={tx.id} className="flex items-center justify-between gap-2 flex-wrap bg-brand-dark/50 border border-amber-500/20 rounded-lg px-3 py-2">
+                      <div className="min-w-0 text-[10px]">
+                        <p className="text-gray-200 font-bold">Sender: <span className="font-mono">{tx.sender || '—'}</span> · TrxID: <span className="font-mono">{tx.trxId || '—'}</span> · <span className="font-mono text-amber-300">+৳{tx.amount.toLocaleString()}</span></p>
+                        <p className="text-[9px] text-gray-500">{tx.method} · {tx.date}</p>
+                      </div>
+                      <div className="flex items-center space-x-1.5 shrink-0">
+                        <button
+                          onClick={() => setTab('topups')}
+                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                        >Verify in Top-Up</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               {[...customers]
