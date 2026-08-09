@@ -845,42 +845,62 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   const custOrders = orders.filter(o => o.customerName === c.name || o.customerPhone === c.phone || o.customerId === c.custId);
                   const blocked = c.status === 'Blocked';
                   return (
-                    <div key={c.id} className={`bg-brand-dark/50 border rounded-xl overflow-hidden ${blocked ? 'border-red-500/40 opacity-80' : 'border-brand-border/40'}`}>
-                      <div className="p-3 flex items-center justify-between gap-3">
-                        <div className="flex items-center space-x-3 min-w-0">
-                          <div className={`relative w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${blocked ? 'bg-red-500/20 border border-red-500/30 text-red-400' : 'bg-brand-orange/20 border border-brand-orange/30 text-brand-orange'}`}>
-                            {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                    <div key={c.id} className={`group bg-gradient-to-br from-brand-card to-brand-dark/80 border rounded-xl overflow-hidden transition-all duration-200 hover:border-brand-orange/40 hover:shadow-lg hover:shadow-black/30 ${blocked ? 'border-red-500/40 opacity-80' : 'border-brand-border/40'}`}>
+                      <div className="p-4 flex items-center justify-between gap-4">
+                        <div className="flex items-center space-x-4 min-w-0">
+                          <div className="relative shrink-0">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm shadow-lg ${blocked ? 'bg-gradient-to-br from-red-500/30 to-red-600/30 text-red-400 border border-red-500/40' : 'bg-gradient-to-br from-brand-orange to-orange-600 text-white border border-brand-orange/50'}`}>
+                              {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-card ${blocked ? 'bg-red-500' : 'bg-emerald-400'}`} />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center space-x-2">
-                              <p className="text-white font-black text-xs truncate">{c.name}</p>
-                              {blocked && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-red-500/20 text-red-300 border border-red-500/30">Blocked</span>}
-                              {loyalty >= 200 && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">VIP</span>}
+                              <p className="text-white font-black text-sm truncate">{c.name}</p>
+                              {blocked && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-red-500/20 text-red-300 border border-red-500/30">Blocked</span>}
+                              {loyalty >= 200 && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-gradient-to-r from-amber-500/30 to-yellow-600/30 text-amber-300 border border-amber-500/40">★ VIP</span>}
+                              {loyalty >= 100 && loyalty < 200 && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/30">★ Gold</span>}
                             </div>
-                            <p className="text-[10px] text-gray-400 font-mono truncate">{c.phone} · {c.email}</p>
-                            <p className="text-[9px] text-gray-500 font-mono mt-0.5 flex items-center space-x-1.5">
-                              <span>ID: {c.custId || c.id}</span>
-                            </p>
-                            <div className="flex items-center space-x-2 text-[9px] text-gray-500 mt-0.5">
-                              <span>{c.zone}</span><span>•</span><span>{c.orders} orders</span><span>•</span><span>৳{c.spent.toLocaleString()} spent</span>
-                              <span className="text-amber-400 font-black">• {loyalty} pts</span>
-                              {alloc > 0 && <span className="text-emerald-400 font-black">• Wallet: ৳{alloc}</span>}
-                            </div>
+                            <p className="text-[10px] text-gray-400 font-mono truncate mt-0.5">{c.phone} · {c.email}</p>
+                            <p className="text-[9px] text-gray-500 font-mono mt-0.5"><span className="text-brand-orange">ID:</span> {c.custId || c.id}</p>
                           </div>
                         </div>
                         <div className="shrink-0 flex items-center space-x-1.5">
                           <button
                             onClick={() => setExpandedCust(expandedCust === c.id ? null : c.id)}
-                            className="p-2 bg-brand-dark border border-brand-border rounded-lg text-gray-300 hover:text-white hover:border-brand-orange cursor-pointer transition-colors"
+                            className="p-2.5 bg-brand-dark/60 border border-brand-border rounded-xl text-gray-300 hover:text-white hover:border-brand-orange cursor-pointer transition-all group-hover:border-brand-orange/40"
                             title="View orders & actions"
                           >
-                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedCust === c.id ? 'rotate-180' : ''}`} />
+                            <ChevronDown className={`w-4 h-4 transition-transform ${expandedCust === c.id ? 'rotate-180' : ''}`} />
                           </button>
                         </div>
                       </div>
 
+                      <div className="px-4 pb-4 pt-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Zone</p>
+                          <p className="text-[11px] text-gray-200 font-bold mt-0.5 truncate">{c.zone}</p>
+                        </div>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Orders</p>
+                          <p className="text-[11px] text-gray-200 font-bold mt-0.5">{c.orders}</p>
+                        </div>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Total Spent</p>
+                          <p className="text-[11px] text-emerald-400 font-bold mt-0.5">৳{c.spent.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Loyalty</p>
+                          <p className="text-[11px] text-amber-400 font-bold mt-0.5">{loyalty} pts</p>
+                        </div>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Wallet</p>
+                          <p className={`text-[11px] font-bold mt-0.5 ${alloc > 0 ? 'text-emerald-400' : 'text-gray-500'}`}>{alloc > 0 ? `৳${alloc.toLocaleString()}` : '৳0'}</p>
+                        </div>
+                      </div>
+
                       {expandedCust === c.id && (
-                        <div className="px-3 pb-3 space-y-2">
+                        <div className="px-4 pb-4 space-y-2 border-t border-brand-border/30 pt-3">
                           <div className="flex items-center space-x-2 flex-wrap">
                             <a href={`tel:${c.phone.replace(/[^0-9]/g, '')}`} className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-lg text-[9px] font-black hover:bg-emerald-500/20 transition-colors">
                               <Phone className="w-3 h-3" /><span>Call</span>
