@@ -4938,16 +4938,27 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1.5">Payment Method</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['bKash', 'Nagad', 'Upay', 'Rocket', 'Card'] as const).map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => setAddMoneyMethod(m)}
-                        className={`py-2 rounded-xl border text-center font-black text-[10px] transition-all cursor-pointer ${addMoneyMethod === m ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
-                      >
-                        {m === 'bKash' ? 'bKash' : m === 'Nagad' ? 'Nagad' : m === 'Upay' ? 'Upay' : m === 'Rocket' ? 'Rocket' : 'Card'}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['bKash', 'Nagad', 'Upay', 'Rocket', 'Card'] as const).map((m) => {
+                      const isCard = m === 'Card';
+                      const active = addMoneyMethod === m;
+                      return (
+                        <button
+                          key={m}
+                          onClick={() => !isCard && setAddMoneyMethod(m)}
+                          disabled={isCard}
+                          title={isCard ? 'Card top-up coming soon' : ''}
+                          className={`py-2.5 px-2 rounded-xl border flex items-center justify-center space-x-1.5 transition-all ${isCard
+                            ? 'border-dashed border-gray-300 bg-gray-50 text-gray-400 opacity-60 cursor-not-allowed'
+                            : active ? 'border-emerald-600 bg-emerald-50 shadow-xs' : 'border-gray-200 bg-white hover:bg-gray-50 cursor-pointer'}`}
+                        >
+                          {m === 'bKash' ? <BkashLogo className="w-5 h-5" /> : m === 'Nagad' ? <NagadLogo className="w-5 h-5" /> : m === 'Upay' ? <UpayLogo className="w-5 h-5" /> : m === 'Rocket' ? <RocketLogo className="w-5 h-5" /> : <CreditCard className="w-4 h-4" />}
+                          <span className={`font-black text-[10px] ${active ? 'text-emerald-800' : isCard ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {m === 'bKash' ? 'bKash' : m === 'Nagad' ? 'Nagad' : m === 'Upay' ? 'Upay' : m === 'Rocket' ? 'Rocket' : 'Card · Soon'}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
