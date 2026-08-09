@@ -18,7 +18,7 @@ import {
     Home, X, Bell, Clock
   } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useWalletTxns, bdt, todayStr, statusBadge, lsGet, lsSet } from './portalUtils';
+import { useOrders, useDrivers, useWalletTxns, useTickets, bdt, todayStr, statusBadge, lsGet, lsSet } from './portalUtils';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
@@ -26,9 +26,15 @@ export default function DriverPortal() {
   const [orders, setOrders] = useOrders();
   const [drivers, setDrivers] = useDrivers();
   const [txns] = useWalletTxns();
+  const [tickets, setTickets] = useTickets();
   const me = drivers[0];
   const [tab, setTab] = useState('dashboard');
   const [authView, setAuthView] = useState<AuthView>('dashboard');
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketTopic, setTicketTopic] = useState('Payout / Earnings');
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketPriority, setTicketPriority] = useState('Medium');
+  const [ticketDesc, setTicketDesc] = useState('');
   const [chat, setChat] = useState<{ from: string; msg: string; time: string }[]>([
     { from: 'Dispatch', msg: 'Rahim, 3 deliveries assigned near Dhanmondi. Please start.', time: '9:12 AM' },
   ]);
@@ -165,6 +171,24 @@ export default function DriverPortal() {
     if (!chatMsg.trim()) return;
     setChat(prev => [...prev, { from: 'You', msg: chatMsg.trim(), time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }]);
     setChatMsg('');
+  };
+
+  const submitTicket = () => {
+    if (!ticketSubject.trim() || !ticketDesc.trim()) return;
+    const now = new Date();
+    const newTicket = {
+      id: `TCK-${Date.now().toString().slice(-4)}`,
+      user: `${me?.name || 'Rahim Khan'} (Driver)`,
+      subject: `[${ticketTopic}] ${ticketSubject.trim()}`,
+      priority: ticketPriority as 'Low' | 'Medium' | 'High',
+      status: 'Open' as const,
+      date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      messages: [{ sender: 'user' as const, text: ticketDesc.trim(), time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }],
+    };
+    setTickets(prev => [newTicket, ...prev]);
+    setTicketOpen(false);
+    setTicketSubject('');
+    setTicketDesc('');
   };
 
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
@@ -881,7 +905,33 @@ export default function DriverPortal() {
                 <a href="tel:+8809612345678" className="inline-block px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black rounded-xl shadow cursor-pointer">
                   📞 Call Dispatcher (+880 9612)
                 </a>
+                <button onClick={() => setTicketOpen(true)} className="w-full py-2.5 bg-brand-orange/15 border border-brand-orange/40 text-brand-orange hover:bg-brand-orange/25 text-[10px] font-black uppercase rounded-xl cursor-pointer flex items-center justify-center space-x-2 transition-colors">
+                  <MessageSquare className="w-3.5 h-3.5" /><span>Raise a Ticket for Admin</span>
+                </button>
               </div>
+
+              {/* My tickets */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-400 font-bold uppercase text-[9px]">My Tickets ({tickets.filter(t => /Driver|driver|Shakib|Rahim/i.test(t.user)).length})</p>
+                  <button onClick={() => setTicketOpen(true)} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">+ New</button>
+                </div>
+                {tickets.filter(t => /Driver|driver|Shakib|Rahim/i.test(t.user)).length === 0 ? (
+                  <p className="text-[9px] text-gray-500 text-center py-3 bg-[#101d30] border border-[#1e3050] rounded-xl">No tickets yet — raise one and the admin will reply here.</p>
+                ) : (
+                  tickets.filter(t => /Driver|driver|Shakib|Rahim/i.test(t.user)).slice(0, 5).map(t => (
+                    <div key={t.id} className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-mono text-gray-500">{t.id}</p>
+                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black ${t.status === 'Resolved' ? 'bg-emerald-500/15 text-emerald-300' : t.status === 'In Progress' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300'}`}>{t.status}</span>
+                      </div>
+                      <p className="text-[11px] text-white font-bold mt-1">{t.subject}</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">{t.priority} priority · {t.date}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
               <div className="space-y-1.5 text-[10px]">
                 <p className="text-gray-400 font-bold uppercase text-[9px]">Frequently Asked Questions</p>
                 <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
@@ -1133,6 +1183,42 @@ export default function DriverPortal() {
             </div>
           )}
         </>
+      )}
+
+      {/* ============ TICKET MODAL ============ */}
+      {ticketOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setTicketOpen(false)}>
+          <div className="w-full max-w-md bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h5 className="text-xs font-black text-white flex items-center gap-1.5"><MessageSquare className="w-4 h-4 text-brand-orange" />Raise a Ticket</h5>
+              <button onClick={() => setTicketOpen(false)} className="w-6 h-6 rounded-full bg-[#0a1322] flex items-center justify-center cursor-pointer"><X className="w-3.5 h-3.5 text-white" /></button>
+            </div>
+            <p className="text-[9px] text-gray-400">Send any issue straight to the NexaGo admin — they'll reply in your tickets below.</p>
+            <div>
+              <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Topic</label>
+              <select value={ticketTopic} onChange={e => setTicketTopic(e.target.value)} className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none cursor-pointer">
+                {['Payout / Earnings', 'Order / Delivery Issue', 'Account & Documents', 'Vehicle / Zone Change', 'Technical Support', 'Other'].map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Subject</label>
+              <input value={ticketSubject} onChange={e => setTicketSubject(e.target.value)} placeholder="Short summary of your issue…" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none focus:border-brand-orange" />
+            </div>
+            <div>
+              <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Priority</label>
+              <select value={ticketPriority} onChange={e => setTicketPriority(e.target.value)} className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none cursor-pointer">
+                {['Low', 'Medium', 'High'].map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Description</label>
+              <textarea value={ticketDesc} onChange={e => setTicketDesc(e.target.value)} rows={3} placeholder="Explain what happened…" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none focus:border-brand-orange resize-none" />
+            </div>
+            <button onClick={submitTicket} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[10px] font-black uppercase rounded-xl cursor-pointer transition-colors">
+              Submit Ticket
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ============ REPORT MODAL ============ */}
