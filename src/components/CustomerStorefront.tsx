@@ -67,6 +67,7 @@ interface WalletTransaction {
   receipt?: string;
   sender?: string;
   method?: string;
+  customerId?: string;
 }
 
 interface SupportTicketItem {
@@ -76,6 +77,7 @@ interface SupportTicketItem {
   status: 'Open' | 'Resolved' | 'In Progress' | 'Under Review';
   date: string;
   lastMessage: string;
+  customerId?: string;
 }
 
 interface StoreProduct {
@@ -1213,6 +1215,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: 'Rahim Khan', email: 'rahim.khan@example.com', phone: '01712-345678', sms: true, emailNotif: true, pushNotif: true, profilePic: '' }));
   useEffect(() => setStoredData(LS_KEYS.profile, customerProfile), [customerProfile]);
 
+  // Permanent unique customer ID — generated once at account creation, never changes.
+  // One ID per phone / one ID per Gmail (duplicates are prevented).
+  const [customerId] = useState<string>(() => {
+    let id = getStoredData<string>('ss_cust_id', '');
+    if (!id) {
+      id = 'NEX' + Math.floor(1000000000 + Math.random() * 9000000000).toString();
+      setStoredData('ss_cust_id', id);
+    }
+    return id;
+  });
+  const [custIdCopy, setCustIdCopy] = useState(false);
+
   const [pwd, setPwd] = useState({ old: '', fresh: '', confirm: '' });
   const [showPwdForm, setShowPwdForm] = useState(false);
   const [showProfileCard, setShowProfileCard] = useState(false);
@@ -2122,7 +2136,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (!sender.endsWith(last4)) { setAddMoneyError('Last 4 digits must match the sending number'); return; }
     if (!/^[A-Z0-9]{8,20}$/.test(addMoneyTrxId.trim())) { setAddMoneyError('Invalid TrxID — expected 8–20 letters/digits from your SMS'); return; }
     if (!addMoneyReceipt) { setAddMoneyError('Upload the payment screenshot/receipt before submitting'); return; }
-    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Pending', trxId: addMoneyTrxId.trim().toUpperCase(), receipt: addMoneyReceipt, sender: addMoneySender, method: addMoneyMethod === 'Card' ? 'Card' : addMoneyMethod }, ...prev]);
+    setWalletTransactions(prev => [{ id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: num, date: 'Just now', status: 'Pending', trxId: addMoneyTrxId.trim().toUpperCase(), receipt: addMoneyReceipt, sender: addMoneySender, method: addMoneyMethod === 'Card' ? 'Card' : addMoneyMethod, customerId }, ...prev]);
     setAddMoneyStep('pending');
     showToast('Payment received — admin will verify & add to your wallet', 'info');
   };
@@ -2131,7 +2145,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     e.preventDefault();
     if (!ticketSubject || !ticketDetail) return;
     setTickets(prev => [{
-      id: `TCK-${Math.floor(100 + Math.random() * 900)}`, subject: ticketSubject, category: ticketCategory, status: 'In Progress', date: 'Just now', lastMessage: ticketDetail
+      id: `TCK-${Math.floor(100 + Math.random() * 900)}`, subject: ticketSubject, category: ticketCategory, status: 'In Progress', date: 'Just now', lastMessage: ticketDetail, customerId
     }, ...prev]);
     setIsNewTicketModal(false);
     setTicketSubject('');
@@ -3512,6 +3526,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <div>
                         <p className="font-black text-gray-900 text-sm">{customerProfile.name}</p>
                         <p className="text-[10px] text-gray-500">{customerProfile.email} · {customerProfile.phone}</p>
+                        <button
+                          onClick={() => { copyText(customerId, 'Customer ID'); setCustIdCopy(true); setTimeout(() => setCustIdCopy(false), 2000); }}
+                          className="mt-1.5 inline-flex items-center space-x-1.5 px-2 py-1 rounded-md bg-gray-100 border border-gray-200 text-gray-600 hover:bg-gray-200 cursor-pointer transition-colors font-mono text-[10px]"
+                          title="Copy your permanent customer ID"
+                        >
+                          <span>ID: {customerId}</span>
+                          {custIdCopy ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        </button>
                         <p className="text-[10px] text-gray-400 mt-0.5">{T.tapCameraHint || 'Tap the camera icon to change your profile picture'}</p>
                       </div>
                     </div>

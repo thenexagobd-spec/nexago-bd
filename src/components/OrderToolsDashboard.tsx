@@ -44,20 +44,26 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
 
   // Customer directory (A–Z) with per-customer wallet add
   const [custSearch, setCustSearch] = useState('');
+  const [custIdLive, setCustIdLive] = useState<string>(() => lsGet('ss_cust_id', ''));
+  useEffect(() => {
+    const onStorage = () => setCustIdLive(lsGet('ss_cust_id', ''));
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
   const seedCustomers = () => [
-    { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024', loyalty: 120, status: 'Active' },
-    { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 80, status: 'Active' },
-    { id: 'CUS-003', name: 'Tanvir Ahmed', phone: '01611-444555', email: 'tanvir.a@example.com', orders: 15, spent: 12400, zone: 'Uttara', joined: 'Feb 2024', loyalty: 240, status: 'Active' },
-    { id: 'CUS-004', name: 'Sumaiya Jahan', phone: '01311-666777', email: 'sumaiya.j@example.com', orders: 5, spent: 3180, zone: 'Banani', joined: 'May 2024', loyalty: 45, status: 'Active' },
-    { id: 'CUS-005', name: 'Farhan Hasan', phone: '01911-123456', email: 'farhan.h@example.com', orders: 20, spent: 18750, zone: 'Mirpur', joined: 'Jan 2024', loyalty: 310, status: 'Active' },
-    { id: 'CUS-006', name: 'Nusrat Zaman', phone: '01511-654321', email: 'nusrat.z@example.com', orders: 3, spent: 2450, zone: 'Mohakhali', joined: 'Jun 2024', loyalty: 30, status: 'Active' },
-    { id: 'CUS-007', name: 'Imran Kabir', phone: '01412-888999', email: 'imran.k@example.com', orders: 9, spent: 6740, zone: 'Bashundhara', joined: 'Apr 2024', loyalty: 95, status: 'Active' },
-    { id: 'CUS-008', name: 'Sadia Rahman', phone: '01755-222333', email: 'sadia.r@example.com', orders: 6, spent: 3980, zone: 'Dhanmondi', joined: 'Feb 2024', loyalty: 60, status: 'Active' },
-    { id: 'CUS-009', name: 'Mahmudul Islam', phone: '01877-444555', email: 'mahmudul.i@example.com', orders: 11, spent: 9020, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 150, status: 'Active' },
-    { id: 'CUS-010', name: 'Tasnim Akter', phone: '01933-777888', email: 'tasnim.a@example.com', orders: 2, spent: 1680, zone: 'Uttara', joined: 'Jul 2024', loyalty: 20, status: 'Active' },
+    { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024', loyalty: 120, status: 'Active', custId: 'NEX4654646786' },
+    { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 80, status: 'Active', custId: 'NEX3829104756' },
+    { id: 'CUS-003', name: 'Tanvir Ahmed', phone: '01611-444555', email: 'tanvir.a@example.com', orders: 15, spent: 12400, zone: 'Uttara', joined: 'Feb 2024', loyalty: 240, status: 'Active', custId: 'NEX7712039485' },
+    { id: 'CUS-004', name: 'Sumaiya Jahan', phone: '01311-666777', email: 'sumaiya.j@example.com', orders: 5, spent: 3180, zone: 'Banani', joined: 'May 2024', loyalty: 45, status: 'Active', custId: 'NEX2938475610' },
+    { id: 'CUS-005', name: 'Farhan Hasan', phone: '01911-123456', email: 'farhan.h@example.com', orders: 20, spent: 18750, zone: 'Mirpur', joined: 'Jan 2024', loyalty: 310, status: 'Active', custId: 'NEX1102938475' },
+    { id: 'CUS-006', name: 'Nusrat Zaman', phone: '01511-654321', email: 'nusrat.z@example.com', orders: 3, spent: 2450, zone: 'Mohakhali', joined: 'Jun 2024', loyalty: 30, status: 'Active', custId: 'NEX8475610293' },
+    { id: 'CUS-007', name: 'Imran Kabir', phone: '01412-888999', email: 'imran.k@example.com', orders: 9, spent: 6740, zone: 'Bashundhara', joined: 'Apr 2024', loyalty: 95, status: 'Active', custId: 'NEX5566778899' },
+    { id: 'CUS-008', name: 'Sadia Rahman', phone: '01755-222333', email: 'sadia.r@example.com', orders: 6, spent: 3980, zone: 'Dhanmondi', joined: 'Feb 2024', loyalty: 60, status: 'Active', custId: 'NEX9988776655' },
+    { id: 'CUS-009', name: 'Mahmudul Islam', phone: '01877-444555', email: 'mahmudul.i@example.com', orders: 11, spent: 9020, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 150, status: 'Active', custId: 'NEX3344556677' },
+    { id: 'CUS-010', name: 'Tasnim Akter', phone: '01933-777888', email: 'tasnim.a@example.com', orders: 2, spent: 1680, zone: 'Uttara', joined: 'Jul 2024', loyalty: 20, status: 'Active', custId: 'NEX6677889900' },
   ];
-  const [customers, setCustomers] = useState<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string; loyalty: number; status: 'Active' | 'Blocked' }>>(() => {
-    const stored = lsGet<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string; loyalty: number; status: 'Active' | 'Blocked' }>>('ss_admin_customers', []);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string; loyalty: number; status: 'Active' | 'Blocked'; custId?: string }>>(() => {
+    const stored = lsGet<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string; loyalty: number; status: 'Active' | 'Blocked'; custId?: string }>>('ss_admin_customers', []);
     return stored.length ? stored : seedCustomers();
   });
   useEffect(() => lsSet('ss_admin_customers', customers), [customers]);
@@ -373,6 +379,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
                       <div className="space-y-0.5">
                         <p className="text-gray-400">Sender: <b className="text-gray-200 font-mono">{tx.sender || '—'}</b></p>
+                        {tx.customerId && <p className="text-gray-400">Customer ID: <b className="text-gray-200 font-mono">{tx.customerId}</b></p>}
                         <p className="text-gray-400">TrxID: <b className="text-gray-200 font-mono">{tx.trxId || '—'}</b></p>
                         <p className="text-gray-400">Date: <span className="text-gray-300">{tx.date}</span></p>
                       </div>
@@ -684,10 +691,22 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                 type="text"
                 value={custSearch}
                 onChange={(e) => setCustSearch(e.target.value)}
-                placeholder="Search by name, phone or email..."
+                placeholder="Search by name, phone, email or customer ID..."
                 className="w-full bg-brand-dark/50 border border-brand-border rounded-lg pl-9 pr-3 py-2 text-xs text-gray-200 outline-none focus:border-brand-orange placeholder:text-gray-600"
               />
             </div>
+
+            {custIdLive && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center space-x-2 text-[10px]">
+                  <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center"><Check className="w-3.5 h-3.5" /></span>
+                  <div>
+                    <p className="text-emerald-300 font-black">Active Customer Session</p>
+                    <p className="text-emerald-200/70 font-mono">{custIdLive} — orders, wallet & tickets link to this permanent ID</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {unassignedTopUps.length > 0 && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
@@ -713,7 +732,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
 
             <div className="space-y-2">
               {[...customers]
-                .filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase()))
+                .filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase()) || (c.custId || '').toLowerCase().includes(custSearch.trim().toLowerCase()))
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map(c => {
                   const alloc = custWallet[c.id] || 0;
@@ -745,6 +764,10 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                               {loyalty >= 200 && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">VIP</span>}
                             </div>
                             <p className="text-[10px] text-gray-400 font-mono truncate">{c.phone} · {c.email}</p>
+                            <p className="text-[9px] text-gray-500 font-mono mt-0.5 flex items-center space-x-1.5">
+                              <span>ID: {c.custId || c.id}</span>
+                              {c.custId === custIdLive && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">● Live</span>}
+                            </p>
                             <div className="flex items-center space-x-2 text-[9px] text-gray-500 mt-0.5">
                               <span>{c.zone}</span><span>•</span><span>{c.orders} orders</span><span>•</span><span>৳{c.spent.toLocaleString()} spent</span>
                               <span className="text-amber-400 font-black">• {loyalty} pts</span>
@@ -964,8 +987,8 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                       setCustomers(prev => prev.map(x => x.id === customerModal.editing ? { ...x, name: custForm.name.trim(), phone: custForm.phone.trim(), email: custForm.email.trim(), zone: custForm.zone.trim() } : x));
                       showToast && showToast('Customer updated', 'success');
                     } else {
-                      setCustomers(prev => [{ id: `CUS-${String(prev.length + 1).padStart(3, '0')}`, name: custForm.name.trim(), phone: custForm.phone.trim(), email: custForm.email.trim(), zone: custForm.zone.trim(), orders: 0, spent: 0, joined: new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' }), loyalty: 0, status: 'Active' }, ...prev]);
-                      showToast && showToast('Customer added to directory', 'success');
+                      setCustomers(prev => [{ id: `CUS-${String(prev.length + 1).padStart(3, '0')}`, name: custForm.name.trim(), phone: custForm.phone.trim(), email: custForm.email.trim(), zone: custForm.zone.trim(), orders: 0, spent: 0, joined: new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' }), loyalty: 0, status: 'Active', custId: 'NEX' + Math.floor(1000000000 + Math.random() * 9000000000).toString() }, ...prev]);
+                      showToast && showToast('Customer added — permanent ID assigned', 'success');
                     }
                     setCustomerModal(null);
                   }}
