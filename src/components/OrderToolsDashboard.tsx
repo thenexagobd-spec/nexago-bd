@@ -7,7 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { Order, AdminAuditEntry, RefundRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, OrderReportEntry } from '../types';
 import {
   History, Banknote, TrendingUp, Wallet, X, PlusCircle, ShieldCheck,
-  ClipboardList, Check, Users, Search, Plus
+  ClipboardList, Check, Users, Search, Plus, Phone, MessageCircle, PenLine,
+  Gift, Ban, Mail, ChevronDown, UserPlus
 } from 'lucide-react';
 import { BkashLogo, NagadLogo, UpayLogo, RocketLogo, WALLET_META } from './walletLogos';
 
@@ -43,20 +44,31 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
 
   // Customer directory (A–Z) with per-customer wallet add
   const [custSearch, setCustSearch] = useState('');
-  const seedCustomers = [
-    { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024' },
-    { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024' },
-    { id: 'CUS-003', name: 'Tanvir Ahmed', phone: '01611-444555', email: 'tanvir.a@example.com', orders: 15, spent: 12400, zone: 'Uttara', joined: 'Feb 2024' },
-    { id: 'CUS-004', name: 'Sumaiya Jahan', phone: '01311-666777', email: 'sumaiya.j@example.com', orders: 5, spent: 3180, zone: 'Banani', joined: 'May 2024' },
-    { id: 'CUS-005', name: 'Farhan Hasan', phone: '01911-123456', email: 'farhan.h@example.com', orders: 20, spent: 18750, zone: 'Mirpur', joined: 'Jan 2024' },
-    { id: 'CUS-006', name: 'Nusrat Zaman', phone: '01511-654321', email: 'nusrat.z@example.com', orders: 3, spent: 2450, zone: 'Mohakhali', joined: 'Jun 2024' },
-    { id: 'CUS-007', name: 'Imran Kabir', phone: '01412-888999', email: 'imran.k@example.com', orders: 9, spent: 6740, zone: 'Bashundhara', joined: 'Apr 2024' },
-    { id: 'CUS-008', name: 'Sadia Rahman', phone: '01755-222333', email: 'sadia.r@example.com', orders: 6, spent: 3980, zone: 'Dhanmondi', joined: 'Feb 2024' },
-    { id: 'CUS-009', name: 'Mahmudul Islam', phone: '01877-444555', email: 'mahmudul.i@example.com', orders: 11, spent: 9020, zone: 'Gulshan', joined: 'Mar 2024' },
-    { id: 'CUS-010', name: 'Tasnim Akter', phone: '01933-777888', email: 'tasnim.a@example.com', orders: 2, spent: 1680, zone: 'Uttara', joined: 'Jul 2024' },
+  const seedCustomers = () => [
+    { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024', loyalty: 120, status: 'Active' },
+    { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 80, status: 'Active' },
+    { id: 'CUS-003', name: 'Tanvir Ahmed', phone: '01611-444555', email: 'tanvir.a@example.com', orders: 15, spent: 12400, zone: 'Uttara', joined: 'Feb 2024', loyalty: 240, status: 'Active' },
+    { id: 'CUS-004', name: 'Sumaiya Jahan', phone: '01311-666777', email: 'sumaiya.j@example.com', orders: 5, spent: 3180, zone: 'Banani', joined: 'May 2024', loyalty: 45, status: 'Active' },
+    { id: 'CUS-005', name: 'Farhan Hasan', phone: '01911-123456', email: 'farhan.h@example.com', orders: 20, spent: 18750, zone: 'Mirpur', joined: 'Jan 2024', loyalty: 310, status: 'Active' },
+    { id: 'CUS-006', name: 'Nusrat Zaman', phone: '01511-654321', email: 'nusrat.z@example.com', orders: 3, spent: 2450, zone: 'Mohakhali', joined: 'Jun 2024', loyalty: 30, status: 'Active' },
+    { id: 'CUS-007', name: 'Imran Kabir', phone: '01412-888999', email: 'imran.k@example.com', orders: 9, spent: 6740, zone: 'Bashundhara', joined: 'Apr 2024', loyalty: 95, status: 'Active' },
+    { id: 'CUS-008', name: 'Sadia Rahman', phone: '01755-222333', email: 'sadia.r@example.com', orders: 6, spent: 3980, zone: 'Dhanmondi', joined: 'Feb 2024', loyalty: 60, status: 'Active' },
+    { id: 'CUS-009', name: 'Mahmudul Islam', phone: '01877-444555', email: 'mahmudul.i@example.com', orders: 11, spent: 9020, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 150, status: 'Active' },
+    { id: 'CUS-010', name: 'Tasnim Akter', phone: '01933-777888', email: 'tasnim.a@example.com', orders: 2, spent: 1680, zone: 'Uttara', joined: 'Jul 2024', loyalty: 20, status: 'Active' },
   ];
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string; loyalty: number; status: 'Active' | 'Blocked' }>>(() => {
+    const stored = lsGet<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string; loyalty: number; status: 'Active' | 'Blocked' }>>('ss_admin_customers', []);
+    return stored.length ? stored : seedCustomers();
+  });
+  useEffect(() => lsSet('ss_admin_customers', customers), [customers]);
   const [custWallet, setCustWallet] = useState<Record<string, number>>(() => lsGet('ss_admin_cust_wallet', {}));
   useEffect(() => lsSet('ss_admin_cust_wallet', custWallet), [custWallet]);
+  const [custLoyalty, setCustLoyalty] = useState<Record<string, number>>(() => lsGet('ss_admin_cust_loyalty', {}));
+  useEffect(() => lsSet('ss_admin_cust_loyalty', custLoyalty), [custLoyalty]);
+  const [expandedCust, setExpandedCust] = useState<string | null>(null);
+  const [smsDraft, setSmsDraft] = useState<Record<string, string>>({});
+  const [customerModal, setCustomerModal] = useState<null | { editing?: string }>(null);
+  const [custForm, setCustForm] = useState({ name: '', phone: '', email: '', zone: '' });
 
   // Customer-created support tickets (from the storefront), esp. Add Money / Top-Up problems
   const [customerTickets, setCustomerTickets] = useState<Array<{ id: string; subject: string; category: string; status: string; date: string; lastMessage: string }>>(() => lsGet('ss_tickets_v2', []));
@@ -531,8 +543,18 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
 
         {tab === 'customers' && (
           <div className="space-y-3">
-            <h3 className="font-black text-white text-sm flex items-center space-x-2"><Users className="w-4 h-4 text-brand-orange" /><span>Customer Directory</span></h3>
-            <p className="text-[10px] text-gray-400">All customers A–Z. Add balance straight to any customer wallet — they see it instantly in the storefront.</p>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h3 className="font-black text-white text-sm flex items-center space-x-2"><Users className="w-4 h-4 text-brand-orange" /><span>Customer Directory</span></h3>
+                <p className="text-[10px] text-gray-400">All customers A–Z. Add balance straight to any customer wallet — they see it instantly in the storefront.</p>
+              </div>
+              <button
+                onClick={() => { setCustomerModal({}); setCustForm({ name: '', phone: '', email: '', zone: '' }); }}
+                className="px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors flex items-center space-x-1.5 shrink-0"
+              >
+                <UserPlus className="w-3.5 h-3.5" /><span>Add Customer</span>
+              </button>
+            </div>
 
             <div className="relative">
               <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -546,54 +568,227 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
             </div>
 
             <div className="space-y-2">
-              {[...seedCustomers]
+              {[...customers]
                 .filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase()))
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map(c => {
                   const alloc = custWallet[c.id] || 0;
+                  const loyalty = custLoyalty[c.id] !== undefined ? custLoyalty[c.id] : c.loyalty;
+                  const custOrders = orders.filter(o => o.customerName === c.name || o.customerPhone === c.phone);
+                  const blocked = c.status === 'Blocked';
                   return (
-                    <div key={c.id} className="bg-brand-dark/50 border border-brand-border/40 rounded-xl p-3 flex items-center justify-between gap-3">
-                      <div className="flex items-center space-x-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-brand-orange/20 border border-brand-orange/30 text-brand-orange text-[11px] font-black flex items-center justify-center shrink-0">
-                          {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-white font-black text-xs truncate">{c.name}</p>
-                          <p className="text-[10px] text-gray-400 font-mono truncate">{c.phone} · {c.email}</p>
-                          <div className="flex items-center space-x-2 text-[9px] text-gray-500 mt-0.5">
-                            <span>{c.zone}</span><span>•</span><span>{c.orders} orders</span><span>•</span><span>৳{c.spent.toLocaleString()} spent</span>
-                            {alloc > 0 && <span className="text-emerald-400 font-black">• Wallet: ৳{alloc}</span>}
+                    <div key={c.id} className={`bg-brand-dark/50 border rounded-xl overflow-hidden ${blocked ? 'border-red-500/40 opacity-80' : 'border-brand-border/40'}`}>
+                      <div className="p-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${blocked ? 'bg-red-500/20 border border-red-500/30 text-red-400' : 'bg-brand-orange/20 border border-brand-orange/30 text-brand-orange'}`}>
+                            {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <p className="text-white font-black text-xs truncate">{c.name}</p>
+                              {blocked && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-red-500/20 text-red-300 border border-red-500/30">Blocked</span>}
+                              {loyalty >= 200 && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">VIP</span>}
+                            </div>
+                            <p className="text-[10px] text-gray-400 font-mono truncate">{c.phone} · {c.email}</p>
+                            <div className="flex items-center space-x-2 text-[9px] text-gray-500 mt-0.5">
+                              <span>{c.zone}</span><span>•</span><span>{c.orders} orders</span><span>•</span><span>৳{c.spent.toLocaleString()} spent</span>
+                              <span className="text-amber-400 font-black">• {loyalty} pts</span>
+                              {alloc > 0 && <span className="text-emerald-400 font-black">• Wallet: ৳{alloc}</span>}
+                            </div>
                           </div>
                         </div>
+                        <div className="shrink-0 flex items-center space-x-1.5">
+                          <button
+                            onClick={() => setExpandedCust(expandedCust === c.id ? null : c.id)}
+                            className="p-2 bg-brand-dark border border-brand-border rounded-lg text-gray-300 hover:text-white hover:border-brand-orange cursor-pointer transition-colors"
+                            title="View orders & actions"
+                          >
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedCust === c.id ? 'rotate-180' : ''}`} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="shrink-0 flex items-center space-x-1.5">
-                        <input
-                          type="number"
-                          min={0}
-                          value={alloc === 0 && !custWallet[c.id] ? '' : alloc}
-                          placeholder="৳"
-                          onChange={(e) => setCustWallet(prev => ({ ...prev, [c.id]: Math.max(0, Number(e.target.value) || 0) }))}
-                          className="w-20 bg-brand-dark text-xs font-mono text-gray-200 border border-brand-border rounded-lg px-2 py-1.5 outline-none focus:border-brand-orange"
-                        />
-                        <button
-                          onClick={() => {
-                            const amt = custWallet[c.id] || 0;
-                            if (amt <= 0) { showToast && showToast('Enter an amount to add to wallet', 'info'); return; }
-                            setCustWallet(prev => ({ ...prev, [c.id]: 0 }));
-                            setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Wallet add', orderId: c.id, paymentMethod: 'Wallet', amount: amt, at: Date.now() }, ...prev]);
-                            showToast && showToast(`৳${amt.toLocaleString()} added to ${c.name}'s wallet`, 'success');
-                          }}
-                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors flex items-center space-x-1"
-                        >
-                          <Plus className="w-3 h-3" /><span>Add</span>
-                        </button>
-                      </div>
+
+                      {expandedCust === c.id && (
+                        <div className="px-3 pb-3 space-y-2">
+                          <div className="flex items-center space-x-2 flex-wrap">
+                            <a href={`tel:${c.phone.replace(/[^0-9]/g, '')}`} className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-lg text-[9px] font-black hover:bg-emerald-500/20 transition-colors">
+                              <Phone className="w-3 h-3" /><span>Call</span>
+                            </a>
+                            <a href={`https://wa.me/${c.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-green-500/10 border border-green-500/30 text-green-300 rounded-lg text-[9px] font-black hover:bg-green-500/20 transition-colors">
+                              <MessageCircle className="w-3 h-3" /><span>WhatsApp</span>
+                            </a>
+                            <button
+                              onClick={() => { window.open(`mailto:${c.email}`); }}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-lg text-[9px] font-black hover:bg-blue-500/20 transition-colors"
+                            >
+                              <Mail className="w-3 h-3" /><span>Email</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, status: blocked ? 'Active' : 'Blocked' } : x));
+                                setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: blocked ? 'Unblocked' : 'Blocked', orderId: c.id, paymentMethod: 'Customer', amount: 0, at: Date.now() }, ...prev]);
+                                showToast && showToast(`${blocked ? 'Unblocked' : 'Blocked'} ${c.name}`, blocked ? 'success' : 'info');
+                              }}
+                              className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-colors border ${blocked ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20' : 'bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20'}`}
+                            >
+                              <Ban className="w-3 h-3" /><span>{blocked ? 'Unblock' : 'Block'}</span>
+                            </button>
+                            <button
+                              onClick={() => { setCustomerModal({ editing: c.id }); setCustForm({ name: c.name, phone: c.phone, email: c.email, zone: c.zone }); }}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-gray-500/10 border border-gray-500/30 text-gray-300 rounded-lg text-[9px] font-black hover:bg-gray-500/20 transition-colors"
+                            >
+                              <PenLine className="w-3 h-3" /><span>Edit</span>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
+                              <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><Gift className="w-3 h-3 text-amber-400" /><span>Add Loyalty Points</span></p>
+                              <div className="flex items-center space-x-1.5">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  placeholder="Points"
+                                  onChange={(e) => setCustLoyalty(prev => ({ ...prev, [c.id]: Math.max(0, Number(e.target.value) || 0) }))}
+                                  className="w-24 bg-brand-dark text-xs font-mono text-gray-200 border border-brand-border rounded-lg px-2 py-1.5 outline-none focus:border-brand-orange"
+                                />
+                                <button
+                                  onClick={() => {
+                                    const pts = custLoyalty[c.id];
+                                    if (pts === undefined) { showToast && showToast('Enter points to add', 'info'); return; }
+                                    setCustLoyalty(prev => ({ ...prev, [c.id]: 0 }));
+                                    setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, loyalty: x.loyalty + pts } : x));
+                                    setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Loyalty add', orderId: c.id, paymentMethod: 'Wallet', amount: pts, at: Date.now() }, ...prev]);
+                                    showToast && showToast(`${pts} points added to ${c.name}`, 'success');
+                                  }}
+                                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                                >Add</button>
+                              </div>
+                            </div>
+
+                            <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
+                              <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><Mail className="w-3 h-3 text-cyan-400" /><span>Send SMS / Notify</span></p>
+                              <div className="flex items-center space-x-1.5">
+                                <input
+                                  type="text"
+                                  value={smsDraft[c.id] || ''}
+                                  onChange={(e) => setSmsDraft(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') { const msg = (smsDraft[c.id] || '').trim(); if (msg) { showToast && showToast(`SMS sent to ${c.name}: "${msg}"`, 'success'); setSmsDraft(prev => ({ ...prev, [c.id]: '' })); } } }}
+                                  placeholder="Type message…"
+                                  className="flex-1 bg-brand-dark text-[10px] text-gray-200 border border-brand-border rounded-lg px-2 py-1.5 outline-none focus:border-brand-orange placeholder:text-gray-600 min-w-0"
+                                />
+                                <button
+                                  onClick={() => {
+                                    const msg = (smsDraft[c.id] || '').trim();
+                                    if (!msg) { showToast && showToast('Type a message first', 'info'); return; }
+                                    setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'SMS sent', orderId: c.id, paymentMethod: 'SMS', amount: 0, at: Date.now() }, ...prev]);
+                                    showToast && showToast(`SMS sent to ${c.name}: "${msg}"`, 'success');
+                                    setSmsDraft(prev => ({ ...prev, [c.id]: '' }));
+                                  }}
+                                  className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors shrink-0"
+                                >Send</button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Order History ({custOrders.length})</p>
+                            {custOrders.length === 0 ? (
+                              <p className="text-[9px] text-gray-500">No orders found for this customer.</p>
+                            ) : (
+                              <div className="space-y-1">
+                                {custOrders.map(o => (
+                                  <div key={o.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
+                                    <span className="font-mono">#{o.id}</span>
+                                    <span className="text-gray-400 truncate">{o.storeName}</span>
+                                    <span className="font-mono text-white font-black">৳{o.amount.toLocaleString()}</span>
+                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-brand-border/40 text-gray-300">{o.status}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-2 bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider shrink-0">Add to Wallet</p>
+                            <input
+                              type="number"
+                              min={0}
+                              value={alloc === 0 && !custWallet[c.id] ? '' : alloc}
+                              placeholder="৳"
+                              onChange={(e) => setCustWallet(prev => ({ ...prev, [c.id]: Math.max(0, Number(e.target.value) || 0) }))}
+                              className="w-24 bg-brand-dark text-xs font-mono text-gray-200 border border-brand-border rounded-lg px-2 py-1.5 outline-none focus:border-brand-orange"
+                            />
+                            <button
+                              onClick={() => {
+                                const amt = custWallet[c.id] || 0;
+                                if (amt <= 0) { showToast && showToast('Enter an amount to add to wallet', 'info'); return; }
+                                setCustWallet(prev => ({ ...prev, [c.id]: 0 }));
+                                setAuditLog(prev => [{ id: `AUD-${Date.now().toString().slice(-5)}`, action: 'Wallet add', orderId: c.id, paymentMethod: 'Wallet', amount: amt, at: Date.now() }, ...prev]);
+                                showToast && showToast(`৳${amt.toLocaleString()} added to ${c.name}'s wallet`, 'success');
+                              }}
+                              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors flex items-center space-x-1"
+                            >
+                              <Plus className="w-3 h-3" /><span>Add</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
-              {seedCustomers.filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase())).length === 0 && (
+              {customers.filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase())).length === 0 && (
                 <p className="text-center text-[10px] text-gray-500 py-6">No customers found</p>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Add / Edit customer modal */}
+        {customerModal && (
+          <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4" onClick={() => setCustomerModal(null)}>
+            <div className="bg-brand-card border border-brand-border rounded-2xl max-w-md w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-white text-sm flex items-center space-x-2">
+                  {customerModal.editing ? <><PenLine className="w-4 h-4 text-brand-orange" /><span>Edit Customer</span></> : <><UserPlus className="w-4 h-4 text-brand-orange" /><span>Add Customer</span></>}
+                </h3>
+                <button onClick={() => setCustomerModal(null)} className="p-1.5 text-gray-400 hover:text-white rounded-lg cursor-pointer"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Full Name</label>
+                  <input type="text" value={custForm.name} onChange={(e) => setCustForm({ ...custForm, name: e.target.value })} placeholder="e.g. Ahad Rahman" className="w-full bg-brand-dark text-gray-200 border border-brand-border rounded-lg px-2.5 py-2 outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Phone</label>
+                  <input type="tel" value={custForm.phone} onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })} placeholder="01XXX-XXXXXX" className="w-full bg-brand-dark text-gray-200 border border-brand-border rounded-lg px-2.5 py-2 outline-none focus:border-brand-orange placeholder:text-gray-600 font-mono" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Email</label>
+                  <input type="email" value={custForm.email} onChange={(e) => setCustForm({ ...custForm, email: e.target.value })} placeholder="name@example.com" className="w-full bg-brand-dark text-gray-200 border border-brand-border rounded-lg px-2.5 py-2 outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Zone / Area</label>
+                  <input type="text" value={custForm.zone} onChange={(e) => setCustForm({ ...custForm, zone: e.target.value })} placeholder="e.g. Dhanmondi" className="w-full bg-brand-dark text-gray-200 border border-brand-border rounded-lg px-2.5 py-2 outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                </div>
+              </div>
+              <div className="flex items-center justify-end space-x-2 pt-1">
+                <button onClick={() => setCustomerModal(null)} className="px-4 py-2 bg-brand-dark border border-brand-border hover:bg-brand-border/30 text-gray-300 rounded-lg text-xs font-semibold cursor-pointer">Cancel</button>
+                <button
+                  onClick={() => {
+                    if (!custForm.name.trim() || !custForm.phone.trim()) { showToast && showToast('Name and phone are required', 'info'); return; }
+                    if (customerModal.editing) {
+                      setCustomers(prev => prev.map(x => x.id === customerModal.editing ? { ...x, name: custForm.name.trim(), phone: custForm.phone.trim(), email: custForm.email.trim(), zone: custForm.zone.trim() } : x));
+                      showToast && showToast('Customer updated', 'success');
+                    } else {
+                      setCustomers(prev => [{ id: `CUS-${String(prev.length + 1).padStart(3, '0')}`, name: custForm.name.trim(), phone: custForm.phone.trim(), email: custForm.email.trim(), zone: custForm.zone.trim(), orders: 0, spent: 0, joined: new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' }), loyalty: 0, status: 'Active' }, ...prev]);
+                      showToast && showToast('Customer added to directory', 'success');
+                    }
+                    setCustomerModal(null);
+                  }}
+                  className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold cursor-pointer"
+                >{customerModal.editing ? 'Save Changes' : 'Add Customer'}</button>
+              </div>
             </div>
           </div>
         )}
