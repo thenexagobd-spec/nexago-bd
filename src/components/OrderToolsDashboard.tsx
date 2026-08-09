@@ -835,7 +835,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[65vh] overflow-y-auto pr-1">
               {[...customers]
                 .filter(c => !custSearch.trim() || c.name.toLowerCase().includes(custSearch.trim().toLowerCase()) || c.phone.includes(custSearch.trim()) || c.email.toLowerCase().includes(custSearch.trim().toLowerCase()) || (c.custId || '').toLowerCase().includes(custSearch.trim().toLowerCase()))
                 .sort((a, b) => a.name.localeCompare(b.name))
@@ -845,35 +845,63 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   const custOrders = orders.filter(o => o.customerName === c.name || o.customerPhone === c.phone || o.customerId === c.custId);
                   const blocked = c.status === 'Blocked';
                   return (
-                    <div key={c.id} className={`group flex items-center gap-3 bg-gradient-to-r from-brand-card to-brand-dark/80 border rounded-xl pl-3 pr-2 py-2.5 transition-all duration-150 hover:border-brand-orange/40 hover:shadow-md hover:shadow-black/20 ${blocked ? 'border-red-500/40 opacity-80' : 'border-brand-border/40'}`}>
-                      <div className="relative shrink-0">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shadow-md ${blocked ? 'bg-gradient-to-br from-red-500/30 to-red-600/30 text-red-400 border border-red-500/40' : 'bg-gradient-to-br from-brand-orange to-orange-600 text-white border border-brand-orange/50'}`}>
-                          {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                    <div key={c.id} className={`group bg-gradient-to-br from-brand-card via-brand-dark to-brand-dark/90 border rounded-2xl overflow-hidden transition-all duration-200 hover:border-brand-orange/40 hover:shadow-xl hover:shadow-black/40 hover:-translate-y-0.5 ${blocked ? 'border-red-500/40' : 'border-brand-border/40'}`}>
+                      <div className="relative p-4 bg-gradient-to-r from-brand-orange/15 to-transparent">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center space-x-3 min-w-0">
+                            <div className="relative shrink-0">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm shadow-lg ${blocked ? 'bg-gradient-to-br from-red-500/30 to-red-600/30 text-red-400 border border-red-500/40' : 'bg-gradient-to-br from-brand-orange to-orange-600 text-white border border-brand-orange/50'}`}>
+                                {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                              </div>
+                              <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-brand-card ${blocked ? 'bg-red-500' : 'bg-emerald-400'}`} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-2 flex-wrap">
+                                <p className="text-white font-black text-sm truncate">{c.name}</p>
+                                {blocked && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-red-500/20 text-red-300 border border-red-500/30">Blocked</span>}
+                                {loyalty >= 200 && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-gradient-to-r from-amber-500/30 to-yellow-600/30 text-amber-300 border border-amber-500/40">★ VIP</span>}
+                                {loyalty >= 100 && loyalty < 200 && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/30">★ Gold</span>}
+                              </div>
+                              <p className="text-[10px] text-gray-400 font-mono truncate mt-0.5">{c.phone} · {c.email}</p>
+                              <p className="text-[9px] text-gray-500 font-mono mt-0.5"><span className="text-brand-orange">ID:</span> {c.custId || c.id}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setExpandedCust(expandedCust === c.id ? null : c.id)}
+                            className="p-2 bg-brand-dark/60 border border-brand-border rounded-lg text-gray-300 hover:text-white hover:border-brand-orange cursor-pointer transition-all shrink-0"
+                            title="View orders & actions"
+                          >
+                            <ChevronDown className={`w-4 h-4 transition-transform ${expandedCust === c.id ? 'rotate-180' : ''}`} />
+                          </button>
                         </div>
-                        <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-card ${blocked ? 'bg-red-500' : 'bg-emerald-400'}`} />
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center space-x-2">
-                          <p className="text-white font-black text-xs truncate">{c.name}</p>
-                          {blocked && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-red-500/20 text-red-300 border border-red-500/30 shrink-0">Blocked</span>}
-                          {loyalty >= 200 && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-gradient-to-r from-amber-500/30 to-yellow-600/30 text-amber-300 border border-amber-500/40 shrink-0">★ VIP</span>}
-                          {loyalty >= 100 && loyalty < 200 && <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0">★ Gold</span>}
+
+                      <div className="px-4 pb-4 pt-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Zone</p>
+                          <p className="text-[11px] text-gray-200 font-bold mt-0.5 truncate">{c.zone}</p>
                         </div>
-                        <p className="text-[9px] text-gray-500 font-mono truncate mt-0.5"><span className="text-brand-orange">ID:</span> {c.custId || c.id} · {c.phone}</p>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Orders</p>
+                          <p className="text-[11px] text-gray-200 font-bold mt-0.5">{c.orders}</p>
+                        </div>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Spent</p>
+                          <p className="text-[11px] text-emerald-400 font-bold mt-0.5">৳{c.spent.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Loyalty</p>
+                          <p className="text-[11px] text-amber-400 font-bold mt-0.5">{loyalty} pts</p>
+                        </div>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Wallet</p>
+                          <p className={`text-[11px] font-bold mt-0.5 ${alloc > 0 ? 'text-emerald-400' : 'text-gray-500'}`}>{alloc > 0 ? `৳${alloc.toLocaleString()}` : '৳0'}</p>
+                        </div>
+                        <div className="bg-brand-dark/40 border border-brand-border/30 rounded-xl px-3 py-2 col-span-2 sm:col-span-1">
+                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Total Value</p>
+                          <p className="text-[11px] text-white font-black mt-0.5">৳{c.spent.toLocaleString()}</p>
+                        </div>
                       </div>
-                      <div className="hidden sm:flex items-center gap-2 shrink-0">
-                        <span className="text-[8px] text-gray-500 font-black uppercase tracking-wider px-2 py-1 rounded-md bg-brand-dark/40 border border-brand-border/30"><span className="text-gray-300">{c.orders}</span> orders</span>
-                        <span className="text-[8px] text-gray-500 font-black uppercase tracking-wider px-2 py-1 rounded-md bg-brand-dark/40 border border-brand-border/30"><span className="text-emerald-400">৳{c.spent.toLocaleString()}</span> spent</span>
-                        <span className="text-[8px] text-gray-500 font-black uppercase tracking-wider px-2 py-1 rounded-md bg-brand-dark/40 border border-brand-border/30"><span className="text-amber-400">{loyalty}</span> pts</span>
-                        <span className="text-[8px] text-gray-500 font-black uppercase tracking-wider px-2 py-1 rounded-md bg-brand-dark/40 border border-brand-border/30"><span className={alloc > 0 ? 'text-emerald-400' : 'text-gray-400'}>৳{alloc > 0 ? alloc.toLocaleString() : '0'}</span> wallet</span>
-                      </div>
-                      <button
-                        onClick={() => setExpandedCust(expandedCust === c.id ? null : c.id)}
-                        className="p-2 bg-brand-dark/60 border border-brand-border rounded-lg text-gray-300 hover:text-white hover:border-brand-orange cursor-pointer transition-all shrink-0"
-                        title="View orders & actions"
-                      >
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedCust === c.id ? 'rotate-180' : ''}`} />
-                      </button>
 
                       {expandedCust === c.id && (
                         <div className="px-3 pb-3 pt-2 space-y-2 border-t border-brand-border/30">
