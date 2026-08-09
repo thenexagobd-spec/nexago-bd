@@ -24,7 +24,8 @@ export default function StaffPortal() {
 
   const pending = txns.filter(t => t.status === 'Pending');
   const openTickets = tickets.filter(t => t.status === 'Open');
-  const unread = notifications.filter(n => !n.read).length;
+  const staffNotifs = notifications.filter(n => n.audience === 'all' || n.audience === 'staff' || n.audience === 'admin' || (!n.audience && !n.driverId && !n.customerId && !n.storeId));
+  const unread = staffNotifs.filter(n => !n.read).length;
   const revenue = orders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.amount || 0), 0);
   const byStatus = ['Completed', 'Pending', 'Confirmed', 'Processing', 'Cancelled'].map(st => ({ st, n: orders.filter(o => o.status === st).length }));
 
@@ -249,9 +250,9 @@ export default function StaffPortal() {
             </div>
             <button onClick={markAllRead} className="px-3 py-2 bg-sky-500/15 border border-sky-500/40 text-sky-300 rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-sky-500/25 transition-colors">Mark all read</button>
           </div>
-          {notifications.length === 0 ? <p className="text-center text-[10px] text-gray-500 py-10">No notifications.</p> : (
+          {staffNotifs.length === 0 ? <p className="text-center text-[10px] text-gray-500 py-10">No notifications.</p> : (
             <div className="space-y-2">
-              {notifications.map(n => (
+              {staffNotifs.map(n => (
                 <div key={n.id} className={`bg-[#101d30] border rounded-2xl p-4 ${n.read ? 'border-[#1e3050] opacity-70' : 'border-sky-500/40'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">

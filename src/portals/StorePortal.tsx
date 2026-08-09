@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Inbox, History, CheckCircle2, Package, Send, User, Phone, Power, WifiOff,
   Printer, X, Headphones, MessageSquare, HelpCircle, ShoppingBag, Clock,
-  Check, Store
+  Check, Store, Bell
 } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet } from './portalUtils';
@@ -59,10 +59,14 @@ export default function StorePortal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, incoming.length]);
 
+  const storeNotifs = notifications.filter(n => n.audience === 'all' || n.audience === 'store' || n.audience === 'store-admin' || n.storeId);
+  const storeUnread = storeNotifs.filter(n => !n.read).length;
+
   const nav = [
     { id: 'receive', label: 'Receive Orders', icon: Inbox, badge: incoming.length },
     { id: 'live', label: 'Live Order', icon: Package, badge: live ? 1 : 0 },
     { id: 'history', label: 'Order History', icon: History },
+    { id: 'alerts', label: 'Alerts', icon: Bell, badge: storeUnread },
     { id: 'account', label: 'Account', icon: User },
   ];
 
@@ -442,6 +446,46 @@ export default function StorePortal() {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {tab === 'alerts' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-black text-white flex items-center space-x-2"><Bell className="w-4 h-4 text-brand-orange" /><span>Store Alerts</span></h3>
+              <p className="text-[10px] text-gray-400">Admin announcements and platform updates for your store.</p>
+            </div>
+            <button onClick={() => setNotifications(prev => prev.map(n => (n.audience === 'all' || n.audience === 'store' || n.audience === 'store-admin' || n.storeId) ? { ...n, read: true } : n))} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">Mark all read</button>
+          </div>
+          {storeNotifs.length === 0 ? (
+            <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 flex items-start space-x-3">
+              <div className="w-10 h-10 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0"><Bell className="w-4 h-4" /></div>
+              <div>
+                <p className="text-[11px] font-bold text-white">No new alerts</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">Admin broadcasts and order-related notices will appear here.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {storeNotifs.map(n => {
+                const color = n.type === 'order' ? 'text-brand-orange' : n.type === 'payment' ? 'text-emerald-400' : n.type === 'driver' ? 'text-cyan-400' : 'text-sky-400';
+                return (
+                  <div key={n.id} className={`bg-[#101d30] border rounded-xl p-3 flex items-start space-x-3 ${n.read ? 'border-[#1e3050]' : 'border-brand-orange/40'}`}>
+                    <span className={`w-8 h-8 rounded-full bg-[#0a1322] flex items-center justify-center shrink-0 ${color}`}><Bell className="w-4 h-4" /></span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] text-white font-bold">{n.title}</p>
+                        {!n.read && <span className="w-2 h-2 rounded-full bg-brand-orange shrink-0"></span>}
+                      </div>
+                      <p className="text-[9px] text-gray-400 mt-0.5">{n.message}</p>
+                      <p className={`text-[8px] ${color} font-bold mt-1`}>{n.time}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

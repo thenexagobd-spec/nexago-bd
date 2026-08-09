@@ -13,28 +13,70 @@ interface NotificationsViewProps {
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
   onToggleRead?: (id: string) => void;
+  drivers?: { id: string; name: string }[];
+  customers?: { id: string; name: string }[];
+  stores?: { id: string; name: string }[];
 }
+
+type Recipient = 'all' | 'customers' | 'drivers' | 'stores' | 'staff';
 
 export default function NotificationsView({
   notifications,
   onAddNotification,
   onMarkAllAsRead,
   onClearAll,
-  onToggleRead
+  onToggleRead,
+  drivers = [],
+  customers = [],
+  stores = []
 }: NotificationsViewProps) {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [type, setType] = useState<SystemNotification['type']>('system');
+  const [recipient, setRecipient] = useState<Recipient>('all');
+  const [specific, setSpecific] = useState('');
   const [filter, setFilter] = useState<'all' | SystemNotification['type']>('all');
 
   const filtered = filter === 'all' ? notifications : notifications.filter(n => n.type === filter);
 
+  const recipientOptions: { value: Recipient; label: string }[] = [
+    { value: 'all', label: 'Everyone (All Platform Users)' },
+    { value: 'customers', label: 'Customers' },
+    { value: 'drivers', label: 'Riders / Drivers' },
+    { value: 'stores', label: 'Stores & Merchants' },
+    { value: 'staff', label: 'Staff / Admin' },
+  ];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !message.trim()) return;
-    onAddNotification({ title, message, type });
+    const base: Omit<SystemNotification, 'id' | 'time' | 'read'> = { title, message, type };
+    if (recipient === 'all') {
+      onAddNotification({ ...base, audience: 'all' });
+    } else if (recipient === 'customers') {
+      if (specific) {
+        onAddNotification({ ...base, audience: 'customer', customerId: specific });
+      } else {
+        onAddNotification({ ...base, audience: 'customer' });
+      }
+    } else if (recipient === 'drivers') {
+      if (specific) {
+        onAddNotification({ ...base, audience: 'driver', driverId: specific });
+      } else {
+        onAddNotification({ ...base, audience: 'driver' });
+      }
+    } else if (recipient === 'stores') {
+      if (specific) {
+        onAddNotification({ ...base, audience: 'store-admin', storeId: specific });
+      } else {
+        onAddNotification({ ...base, audience: 'store-admin' });
+      }
+    } else {
+      onAddNotification({ ...base, audience: 'staff' });
+    }
     setTitle('');
     setMessage('');
+    setSpecific('');
   };
 
   return (
@@ -139,11 +181,40 @@ export default function NotificationsView({
           <Send className="w-4 h-4 text-brand-orange" />
           <span>Dispatch Push Alert</span>
         </h3>
-        <p className="text-[11px] text-gray-400 mb-4">Send a push notification alert instantly to all active customers or drivers.</p>
+        <p className="text-[11px] text-gray-400 mb-4">Send a push notification alert to a specific person or a whole group. Each recipient only sees the alerts addressed to them.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-[10px] font-bold text-gray-300 uppercase tracking-wide mb-1">Target Audience Category</label>
+            <label className="block text-[10px] font-bold text-gray-300 uppercase tracking-wide mb-1">Send To</label>
+            <select
+              value={recipient}
+              onChange={(e) => { setRecipient(e.target.value as Recipient); setSpecific(''); }}
+              className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange cursor-pointer"
+            >
+              {recipientOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+          </div>
+
+          {(recipient === 'customers' || recipient === 'drivers' || recipient === 'stores') && (
+            <div>
+              <label className="block text-[10px] font-bold text-gray-300 uppercase tracking-wide mb-1">
+                {recipient === 'customers' ? 'Specific Customer (optional — leave empty for all)' : recipient === 'drivers' ? 'Specific Driver (optional — leave empty for all)' : 'Specific Store (optional — leave empty for all)'}
+              </label>
+              <select
+                value={specific}
+                onChange={(e) => setSpecific(e.target.value)}
+                className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange cursor-pointer"
+              >
+                <option value="">All {recipient}</option>
+                {recipient === 'customers' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {recipient === 'drivers' && drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {recipient === 'stores' && stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-[10px] font-bold text-gray-300 uppercase tracking-wide mb-1">Alert Category</label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as any)}

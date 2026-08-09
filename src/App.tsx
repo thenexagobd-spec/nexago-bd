@@ -1510,6 +1510,9 @@ export default function App() {
             onMarkAllAsRead={handleMarkAllNotificationsAsRead}
             onClearAll={handleClearAllNotifications}
             onToggleRead={(id) => setNotifications(notifications.map(n => n.id === id ? { ...n, read: !n.read } : n))}
+            drivers={drivers.map(d => ({ id: d.id, name: d.name }))}
+            customers={users.filter(u => u.role === 'Customer').map(u => ({ id: u.id || u.phone, name: u.name }))}
+            stores={stores.map(s => ({ id: s.id || s.name, name: s.name }))}
           />
         );
 

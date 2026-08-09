@@ -111,7 +111,7 @@ export default function DriverPortal() {
   const cancelled = myOrders.filter(o => o.status === 'Cancelled');
   const earned = done.reduce((s, o) => s + (o.deliveryCharge || 60), 0) + done.length * 20;
 
-  const myNotifs = notifications.filter(n => n.driverId === me?.id);
+  const myNotifs = notifications.filter(n => n.driverId === me?.id || (!n.driverId && n.audience === 'driver') || n.audience === 'all');
   const unreadCount = myNotifs.filter(n => !n.read).length;
 
   // Auto-accept offers when enabled

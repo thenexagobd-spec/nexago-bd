@@ -972,6 +972,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [customerNotifs, setCustomerNotifs] = useState<CustomerNotif[]>(() => getStoredData(LS_KEYS.notifs, []));
   useEffect(() => setStoredData(LS_KEYS.notifs, customerNotifs), [customerNotifs]);
 
+  // Live-sync admin/platform notifications (sd_notifications) into this customer's inbox
+  const [adminNotifs, setAdminNotifs] = useState<{ id: string; title: string; body: string; time: string; read: boolean }[]>(() => {
+    try { return JSON.parse(localStorage.getItem('sd_notifications') || '[]'); } catch { return []; }
+  });
+  // (admin notification live-sync effect is declared below, after the profile)
+  // Merge admin notifications at the top of the customer inbox list (fresh ones always visible)
+  const mergedNotifs = [...adminNotifs.map(n => ({ id: n.id, title: n.title, body: n.body, emoji: '📣', time: n.time, read: n.read })), ...customerNotifs.filter(n => !n.id.startsWith('SD-ADMIN-'))];
+
   const [totalSpend, setTotalSpend] = useState<number>(() => getStoredData(LS_KEYS.spend, 0));
   useEffect(() => setStoredData(LS_KEYS.spend, totalSpend), [totalSpend]);
 
@@ -1068,7 +1076,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   useEffect(() => setStoredData(LS_KEYS.watchSnap, watchSnapshot), [watchSnapshot]);
 
 
-  const unreadNotifCount = customerNotifs.filter(n => !n.read).length;
+  const unreadNotifCount = mergedNotifs.filter(n => !n.read).length;
   const tier = LOYALTY_TIERS.slice().reverse().find(t => totalSpend >= t.minSpend) || LOYALTY_TIERS[0];
 
   const displayRating = (store: { name: string; rating: number }) => {
@@ -1214,6 +1222,26 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: 'Rahim Khan', email: 'rahim.khan@example.com', phone: '01712-345678', sms: true, emailNotif: true, pushNotif: true, profilePic: '' }));
   useEffect(() => setStoredData(LS_KEYS.profile, customerProfile), [customerProfile]);
+
+  // Live-sync admin/platform notifications (sd_notifications) into this customer's inbox
+  useEffect(() => {
+    const load = () => {
+      try {
+        const raw = localStorage.getItem('sd_notifications');
+        const list = raw ? JSON.parse(raw) : [];
+        setAdminNotifs(list.filter((n: any) => {
+          if (n.audience === 'all' || (n.audience === 'customer' && !n.customerId)) return true;
+          if (n.customerId && (n.customerId === customerProfile.phone || n.customerId === customerProfile.name)) return true;
+          return false;
+        }));
+      } catch { /* noop */ }
+    };
+    load();
+    const onStorage = (e: StorageEvent) => { if (e.key === 'sd_notifications') load(); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerProfile.phone, customerProfile.name]);
 
   // Permanent unique customer ID — generated once at account creation, never changes.
   // One ID per phone / one ID per Gmail (duplicates are prevented).
@@ -2417,16 +2445,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <div className="flex items-center justify-between pb-2 border-b border-white/10 font-bold">
                     <span className="text-white">{T.notifications}</span>
                     {unreadNotifCount > 0 && (
-                      <span onClick={() => { setCustomerNotifs(prev => prev.map(n => ({ ...n, read: true }))); showToast(T.markAllRead, 'info'); }} className="text-[10px] text-emerald-400 cursor-pointer">{T.markAllRead}</span>
+                      <span onClick={() => { setCustomerNotifs(prev => prev.map(n => ({ ...n, read: true }))); setAdminNotifs(prev => prev.map(n => ({ ...n, read: true }))); showToast(T.markAllRead, 'info'); }} className="text-[10px] text-emerald-400 cursor-pointer">{T.markAllRead}</span>
                     )}
                   </div>
                   <div className="py-2 space-y-2 max-h-60 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
-                    {customerNotifs.length === 0 ? (
+                    {mergedNotifs.length === 0 ? (
                       <p className="text-gray-400 py-2 text-center">No notifications</p>
-                    ) : customerNotifs.map(n => (
+                    ) : mergedNotifs.map(n => (
                       <div
                         key={n.id}
-                        onClick={() => setCustomerNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}
+                        onClick={() => { setCustomerNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x)); setAdminNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x)); }}
                         className={`p-2.5 rounded-lg text-[11px] border cursor-pointer transition-colors ${n.read ? 'bg-white/5 border-white/10' : 'bg-emerald-500/15 border-emerald-500/30'}`}
                       >
                         <p className={`font-bold leading-snug ${n.read ? 'text-gray-200' : 'text-white'}`}>{n.emoji} {n.title}</p>
