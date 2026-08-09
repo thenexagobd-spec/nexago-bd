@@ -720,16 +720,27 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   const loyalty = custLoyalty[c.id] !== undefined ? custLoyalty[c.id] : c.loyalty;
                   const custOrders = orders.filter(o => o.customerName === c.name || o.customerPhone === c.phone);
                   const blocked = c.status === 'Blocked';
+                  const custPending = custTxns.filter(t => t.type === 'Top-Up' && t.status === 'Pending' && (t.customerId === c.id || t.sender === c.phone));
                   return (
-                    <div key={c.id} className={`bg-brand-dark/50 border rounded-xl overflow-hidden ${blocked ? 'border-red-500/40 opacity-80' : 'border-brand-border/40'}`}>
+                    <div key={c.id} className={`bg-brand-dark/50 border rounded-xl overflow-hidden ${blocked ? 'border-red-500/40 opacity-80' : custPending.length > 0 ? 'border-amber-500/50' : 'border-brand-border/40'}`}>
                       <div className="p-3 flex items-center justify-between gap-3">
                         <div className="flex items-center space-x-3 min-w-0">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${blocked ? 'bg-red-500/20 border border-red-500/30 text-red-400' : 'bg-brand-orange/20 border border-brand-orange/30 text-brand-orange'}`}>
+                          <div className={`relative w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${blocked ? 'bg-red-500/20 border border-red-500/30 text-red-400' : 'bg-brand-orange/20 border border-brand-orange/30 text-brand-orange'}`}>
                             {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                            {custPending.length > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-white text-[8px] font-black flex items-center justify-center">{custPending.length}</span>}
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center space-x-2">
                               <p className="text-white font-black text-xs truncate">{c.name}</p>
+                              {custPending.length > 0 && (
+                                <button
+                                  onClick={() => setExpandedCust(expandedCust === c.id ? null : c.id)}
+                                  className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1 cursor-pointer hover:bg-amber-500/30 transition-colors"
+                                  title="New add money request — click to view"
+                                >
+                                  <Banknote className="w-2.5 h-2.5" /><span>Add Money Request</span>
+                                </button>
+                              )}
                               {blocked && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-red-500/20 text-red-300 border border-red-500/30">Blocked</span>}
                               {loyalty >= 200 && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">VIP</span>}
                             </div>
