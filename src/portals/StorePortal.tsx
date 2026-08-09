@@ -31,7 +31,7 @@ export default function StorePortal() {
     { id: 'account', label: 'Account', icon: User },
   ];
 
-  const goBack = () => { window.open(`${window.location.origin}/index.html`, '_self'); };
+  const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
 
   const acceptOrder = (id: string) => {
     const rider = drivers[0];
@@ -197,7 +197,7 @@ export default function StorePortal() {
           </div>
 
           <button onClick={goBack} className="w-full py-2.5 bg-brand-orange/15 border border-brand-orange/40 text-brand-orange rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-brand-orange/25 transition-colors">
-            Back to Admin Panel
+            All Role Sites
           </button>
         </div>
       )}

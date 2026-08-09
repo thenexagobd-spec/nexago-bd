@@ -58,7 +58,7 @@ export default function StoreAdminPortal() {
     { id: 'support', label: 'Support', icon: LifeBuoy, badge: tickets.filter(t => t.status === 'Open').length },
   ];
 
-  const goBack = () => { window.open(`${window.location.origin}/index.html`, '_self'); };
+  const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
 
   const updateStatus = (id: string, status: string) => setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: status as any } : o)));
 

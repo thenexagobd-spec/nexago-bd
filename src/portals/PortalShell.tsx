@@ -6,7 +6,7 @@
  * live clock & back-to-admin link, a left icon rail nav, and the content area.
  */
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Clock, Truck } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 export interface PortalNavItem {
   id: string;
@@ -49,12 +49,9 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
             <Clock className="w-3 h-3 text-brand-orange" />
             <span className="font-mono">{clock.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
           </span>
-          <span className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-brand-orange/15 border border-brand-orange/40 text-brand-orange text-[9px] font-black uppercase tracking-wider">
-            <Truck className="w-3 h-3" /><span className="hidden sm:inline">{role}</span><span className="sm:hidden">{role.split(' ')[0]}</span>
+          <span className="flex items-center px-2.5 py-1.5 rounded-lg bg-brand-orange/15 border border-brand-orange/40 text-brand-orange text-[9px] font-black uppercase tracking-wider">
+            <span className="hidden sm:inline">{role}</span><span className="sm:hidden">{role.split(' ')[0]}</span>
           </span>
-          <button onClick={onBack} title="Back" className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#132238] border border-[#1e3050] hover:border-brand-orange/40 text-[9px] font-black uppercase tracking-wider text-gray-300 hover:text-white transition-colors">
-            <ArrowLeft className="w-3 h-3" />
-          </button>
         </div>
       </header>
 

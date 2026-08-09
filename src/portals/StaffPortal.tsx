@@ -37,7 +37,7 @@ export default function StaffPortal() {
     { id: 'reports', label: 'Reports', icon: BarChart3 },
   ];
 
-  const goBack = () => { window.open(`${window.location.origin}/index.html`, '_self'); };
+  const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
 
   const updateStatus = (id: string, status: string) => setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: status as any } : o)));
   const approveTopUp = (tx: any, ok: boolean) => {

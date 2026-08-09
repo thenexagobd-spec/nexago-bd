@@ -21,6 +21,7 @@ export default defineConfig(() => {
           'store-admin': path.resolve(__dirname, 'store-admin.html'),
           'super-admin': path.resolve(__dirname, 'super-admin.html'),
           'super-admin-staff': path.resolve(__dirname, 'super-admin-staff.html'),
+          roles: path.resolve(__dirname, 'roles.html'),
         },
       },
     },
