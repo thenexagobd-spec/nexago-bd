@@ -1098,38 +1098,6 @@ export default function DriverPortal() {
                 </div>
               </div>
 
-              {/* Order stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {[
-                  { label: 'Completed', value: done.length.toString(), color: 'text-emerald-400' },
-                  { label: 'Ongoing', value: active.length.toString(), color: 'text-sky-400' },
-                  { label: 'Total', value: myOrders.length.toString(), color: 'text-white' },
-                  { label: 'Rating', value: (me?.rating?.toFixed(1) || '4.9'), color: 'text-amber-400' },
-                ].map(k => (
-                  <div key={k.label} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 text-center">
-                    <p className={`text-2xl font-black ${k.color}`}>{k.value}</p>
-                    <p className="text-[9px] text-gray-500 uppercase mt-0.5">{k.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { label: 'NID / Documents', value: 'Verified ✓', ok: true },
-                  { label: 'License', value: me?.licenseNumber || 'BD-2023-44512', ok: true },
-                  { label: 'Vehicle', value: me?.vehicleType || 'Yamaha FZ · 12-4451', ok: true },
-                  { label: 'Zone', value: 'Dhanmondi, Dhaka', ok: true },
-                ].map(d => (
-                  <div key={d.label} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{d.label}</p>
-                      <p className="text-[11px] text-gray-200 font-bold mt-1">{d.value}</p>
-                    </div>
-                    {d.ok && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                  </div>
-                ))}
-              </div>
-
               {/* Account menu */}
               <div className="space-y-1.5">
                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Account</p>
