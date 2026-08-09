@@ -1394,6 +1394,17 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                             >
                               <UserSearch className="w-3 h-3" /><span>Profile</span>
                             </button>
+                            <button
+                              onClick={() => {
+                                setLookupQuery(c.custId || c.id);
+                                runLookup(c.custId || c.id);
+                                setDossierView(true);
+                              }}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-sky-500/10 border border-sky-500/30 text-sky-300 rounded-lg text-[9px] font-black hover:bg-sky-500/20 transition-colors"
+                              title="Open official document with QR code"
+                            >
+                              <FileText className="w-3 h-3" /><span>View</span>
+                            </button>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
