@@ -82,7 +82,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   const topUpTickets = customerTickets.filter(t => /top[- ]?up|add ?money|wallet/i.test(t.category));
 
   // Customer wallet top-up transactions (from storefront ss_wtxn_v2) awaiting admin verify
-  const [custTxns, setCustTxns] = useState<Array<{ id: string; type: string; amount: number; date: string; status: string; trxId?: string; receipt?: string; sender?: string; method?: string }>>(() => lsGet('ss_wtxn_v2', []));
+  const [custTxns, setCustTxns] = useState<Array<{ id: string; type: string; amount: number; date: string; status: string; trxId?: string; receipt?: string; sender?: string; method?: string; customerId?: string }>>(() => lsGet('ss_wtxn_v2', []));
   useEffect(() => {
     const onStorage = () => setCustTxns(lsGet('ss_wtxn_v2', []));
     window.addEventListener('storage', onStorage);
@@ -830,6 +830,28 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                             )}
                           </div>
 
+                          <div className="bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1"><Banknote className="w-3 h-3 text-brand-orange" /><span>Add Money Requests ({custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.sender === c.phone)).length})</span></p>
+                            {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.sender === c.phone)).length === 0 ? (
+                              <p className="text-[9px] text-gray-500">No add money requests for this customer. Use New Add Money to create one.</p>
+                            ) : (
+                              <div className="space-y-1">
+                                {custTxns.filter(t => t.type === 'Top-Up' && (t.customerId === c.id || t.sender === c.phone)).map(tx => (
+                                  <div key={tx.id} className="flex items-center justify-between gap-2 text-[9px] text-gray-300 bg-brand-dark border border-brand-border/30 rounded px-2 py-1">
+                                    <div className="min-w-0 flex items-center space-x-2">
+                                      <span className={`font-mono ${tx.status === 'Completed' ? 'text-emerald-400' : tx.status === 'Rejected' ? 'text-red-400' : 'text-amber-400'}`}>{tx.id}</span>
+                                      <span className="text-gray-500 truncate">{tx.method}{tx.trxId ? ` · ${tx.trxId}` : ''}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2 shrink-0">
+                                      <span className="font-mono text-white font-black">+৳{tx.amount.toLocaleString()}</span>
+                                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${tx.status === 'Completed' ? 'bg-emerald-500/20 text-emerald-300' : tx.status === 'Rejected' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>{tx.status}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
                           <div className="flex items-center space-x-2 bg-brand-dark/60 border border-brand-border/40 rounded-lg p-2">
                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider shrink-0">Add to Wallet</p>
                             <input
@@ -975,7 +997,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                         onClick={() => {
                           const amt = parseFloat(adminTopUp.amount);
                           if (isNaN(amt) || amt <= 0) { showToast && showToast('Enter a valid amount', 'info'); return; }
-                          const txn = { id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: amt, date: 'Just now', status: 'Pending' as const, trxId: adminTopUp.trxId.trim().toUpperCase() || undefined, sender: adminTopUp.sender.trim(), method: adminTopUp.method, receipt: undefined };
+                          const txn = { id: `TXN-${Date.now().toString().slice(-3)}`, type: 'Top-Up', amount: amt, date: 'Just now', status: 'Pending' as const, trxId: adminTopUp.trxId.trim().toUpperCase() || undefined, sender: adminTopUp.sender.trim(), method: adminTopUp.method, receipt: undefined, customerId: adminTopUpModal || undefined };
                           const next = [txn, ...custTxns];
                           setCustTxns(next);
                           lsSet('ss_wtxn_v2', next);
