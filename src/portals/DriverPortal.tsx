@@ -29,9 +29,10 @@ export default function DriverPortal() {
   const [txns] = useWalletTxns();
   const [tickets, setTickets] = useTickets();
   const [notifications, setNotifications] = useNotifications();
-  const me = drivers[0];
+  const [sessionId, setSessionId] = useState<string>(() => lsGet('sd_driver_session', ''));
+  const me = drivers.find(d => d.id === sessionId) || drivers[0];
   const [tab, setTab] = useState('dashboard');
-  const [authView, setAuthView] = useState<AuthView>('dashboard');
+  const [authView, setAuthView] = useState<AuthView>(() => (lsGet('sd_driver_session', '') ? 'dashboard' : 'login'));
   const [ticketOpen, setTicketOpen] = useState(false);
   const [ticketTopic, setTicketTopic] = useState('Payout / Earnings');
   const [ticketSubject, setTicketSubject] = useState('');
@@ -72,6 +73,36 @@ export default function DriverPortal() {
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2800);
+  };
+
+  // Authenticate the driver against the shared fleet (id / phone / name) and
+  // start a persistent session so the site opens straight into the dashboard
+  // on every device (phone, tablet, laptop).
+  const handleLogin = () => {
+    const id = loginId.trim().toLowerCase();
+    if (!id) { showToast('Enter your driver ID or phone number'); return; }
+    const found = drivers.find(d =>
+      d.id.toLowerCase() === id ||
+      d.id.replace(/[^0-9]/g, '').endsWith(id.replace(/[^0-9]/g, '')) ||
+      d.phone === id ||
+      d.name.toLowerCase() === id
+    );
+    if (!found) { showToast('Driver not found — check your ID or phone'); return; }
+    if (!loginPass.trim()) { showToast('Enter your password'); return; }
+    setSessionId(found.id);
+    lsSet('sd_driver_session', found.id);
+    setLoginId('');
+    setLoginPass('');
+    setAuthView('dashboard');
+    showToast(`Welcome back, ${found.name.split(' ')[0]}!`);
+  };
+
+  const handleLogout = () => {
+    setSessionId('');
+    lsSet('sd_driver_session', '');
+    setLoginId('');
+    setLoginPass('');
+    setAuthView('login');
   };
 
   useEffect(() => {
@@ -405,12 +436,13 @@ export default function DriverPortal() {
                   <button onClick={() => setAuthView('forgot')} className="text-brand-orange hover:underline font-bold">Forgot Password?</button>
                 </div>
               </div>
-              <button onClick={() => setAuthView('dashboard')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg transition-all">
+              <button onClick={handleLogin} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg transition-all">
                 Login to Portal
               </button>
               <button onClick={() => setAuthView('signup')} className="w-full py-2 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
                 Register New Driver →
               </button>
+              <p className="text-center text-[9px] text-gray-500">Demo: any registered driver ID/phone (e.g. DRV123456 or 01712345678) + any password.</p>
             </>
           )}
 
@@ -1334,7 +1366,7 @@ export default function DriverPortal() {
                   { icon: Headphones, label: 'Support', color: 'text-purple-400', fn: () => setTab('support') },
                   { icon: Settings, label: 'Settings', color: 'text-amber-400', fn: () => setTab('settings') },
                   { icon: ShieldCheck, label: 'Privacy Policy', color: 'text-teal-400', fn: () => setAuthView('terms') },
-                  { icon: LogOut, label: 'Logout', color: 'text-red-400', fn: () => setAuthView('login') },
+                  { icon: LogOut, label: 'Logout', color: 'text-red-400', fn: () => handleLogout() },
                 ].map(item => (
                   <button key={item.label} onClick={item.fn} className="w-full bg-[#101d30] border border-[#1e3050] hover:border-brand-orange/40 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-colors">
                     <span className="flex items-center space-x-2.5">

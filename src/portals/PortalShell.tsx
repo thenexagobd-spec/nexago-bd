@@ -95,10 +95,31 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
         </div>
 
         {/* Content */}
-        <main className="flex-1 min-w-0 p-4 sm:p-6 overflow-y-auto">
+        <main className="flex-1 min-w-0 p-3 sm:p-6 overflow-y-auto pb-20 md:pb-6">
           <div className="max-w-5xl mx-auto space-y-5 fade-in">{children}</div>
         </main>
       </div>
+
+      {/* Mobile bottom nav (app-like, always visible on phones) */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#1e3050] bg-[#0c1626]/95 backdrop-blur flex overflow-x-auto scrollbar-none">
+        {nav.slice(0, 6).map(item => (
+          <button
+            key={item.id}
+            onClick={() => onNav(item.id)}
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-2 px-1 text-[8px] font-black uppercase tracking-wide transition-colors cursor-pointer ${
+              active === item.id ? 'text-brand-orange' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <div className="relative">
+              <item.icon className="w-4 h-4" />
+              {item.badge !== undefined && item.badge > 0 && (
+                <span className="absolute -top-1.5 -right-2 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[7px] font-black flex items-center justify-center">{item.badge}</span>
+              )}
+            </div>
+            <span className="mt-0.5 leading-none truncate max-w-full">{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
