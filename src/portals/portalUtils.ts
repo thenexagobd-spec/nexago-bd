@@ -31,6 +31,25 @@ export const bdt = (n: number) => `৳${(n || 0).toLocaleString()}`;
 
 export const todayStr = () => new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+// ---- QR handoff helpers (deterministic, order-bound) ----
+const HANDBASE = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+export const handoffCodeOf = (orderId: string): string => {
+  const h = String(orderId || 'ORDER').split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0);
+  let n = Math.abs(h);
+  let code = '';
+  for (let i = 0; i < 8; i++) { code += HANDBASE[n % HANDBASE.length]; n = Math.floor(n / HANDBASE.length); }
+  return `NX-${code}`;
+};
+// The exact string encoded into the QR — orderId + code
+export const handoffPayloadOf = (orderId: string) => JSON.stringify({ o: orderId, c: handoffCodeOf(orderId) });
+// Validate a scanned/typed payload against an expected order id
+export const verifyHandoff = (raw: string, orderId: string): boolean => {
+  try {
+    const p = JSON.parse(raw);
+    return !!p && p.o === orderId && p.c === handoffCodeOf(orderId);
+  } catch { return false; }
+};
+
 // Append an audit entry to an order's timeline (keeps at most N entries)
 export const appendTimeline = <T extends { timeline?: any[] }>(order: T, status: string, actor: 'customer' | 'store' | 'driver' | 'admin' | 'system', note?: string): T => {
   const entry = { status, actor, note, time: Date.now() };

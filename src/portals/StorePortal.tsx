@@ -15,10 +15,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Inbox, History, CheckCircle2, Package, Send, User, Phone, Power, WifiOff,
   Printer, X, Headphones, MessageSquare, HelpCircle, ShoppingBag, Clock,
-  Check, Store, Bell, Banknote, RotateCcw
+  Check, Store, Bell, Banknote, RotateCcw, ScanLine, ShieldCheck
 } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif } from './portalUtils';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf } from './portalUtils';
 
 export default function StorePortal() {
   const [orders, setOrders] = useOrders();
@@ -85,12 +86,14 @@ export default function StorePortal() {
 
   const acceptOrder = (id: string) => {
     const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
+    const pickupPin = String(Math.floor(1000 + Math.random() * 9000));
     setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
       ...o,
       status: 'Confirmed' as any,
       driverId: rider?.id || 'DRV123456',
       driverDeadline: Date.now() + 60 * 1000,
       placedAt: o.placedAt || Date.now(),
+      pickupPin,
     }, 'accepted', 'store', `Store accepted — rider ${rider?.name || ''} assigned`) : o)));
     setNotifications(prev => [
       makeNotif('🚚 Order Confirmed', `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, 'order', { audience: 'driver', driverId: rider?.id }),
@@ -117,6 +120,63 @@ export default function StorePortal() {
       makeNotif(approve ? '↩️ Return Approved' : '↩️ Return Rejected', `Return #${ret.id} for order #${ret.orderId} was ${approve ? 'approved — rider pickup scheduled' : 'rejected'}.`, 'order', { audience: 'customer', customerId: ret.customerId || ret.customerPhone }),
       ...prev,
     ]);
+  };
+
+  // QR pickup handoff scanner
+  const [scanOrder, setScanOrder] = useState<any | null>(null);
+  const [scanMsg, setScanMsg] = useState<string | null>(null);
+  const [scanOk, setScanOk] = useState<boolean | null>(null);
+  const [scanManual, setScanManual] = useState('');
+  const [scanErr, setScanErr] = useState('');
+
+  useEffect(() => {
+    if (!scanOrder) return;
+    const scanner = new Html5Qrcode('store-scan-video');
+    let stopped = false;
+    scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } },
+      (text) => {
+        if (stopped) return;
+        if (verifyHandoff(text, scanOrder.id)) {
+          stopped = true;
+          scanner.stop().then(() => scanner.clear()).catch(() => {});
+          applyPickupScan(true);
+        } else {
+          setScanMsg('QR code not valid for this order — try the correct customer QR.');
+          setScanOk(false);
+        }
+      },
+      () => { /* ignore decode errors */ }
+    ).catch(() => setScanMsg('Camera unavailable — type the handoff code manually below.'));
+    return () => { stopped = true; try { scanner.stop().then(() => scanner.clear()).catch(() => {}); } catch { /* noop */ } };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanOrder]);
+
+  const applyPickupScan = (ok: boolean) => {
+    if (!scanOrder) return;
+    setScanOk(ok);
+    setScanMsg(ok ? `✅ Verified — order #${scanOrder.id} handed to the rider.` : '❌ Verification failed — QR/code does not match this order.');
+    if (ok) {
+      const next = { ...scanOrder, pickedUp: true, handoffScanned: { ...(scanOrder.handoffScanned || {}), pickup: true } };
+      setOrders(prev => prev.map(o => (o.id === scanOrder.id ? appendTimeline(next, 'picked up', 'store', 'Pickup verified via QR scan') : o)));
+      setNotifications(prev => [
+        makeNotif('📦 Pickup Verified (QR)', `Store scanned your pickup QR — order #${scanOrder.id} is now with you.`, 'order', { audience: 'driver', driverId: scanOrder.driverId }),
+        makeNotif('📦 Pickup Verified (QR)', `Your order #${scanOrder.id} was verified at pickup by the store.`, 'order', { audience: 'customer', customerId: scanOrder.customerId || scanOrder.customerPhone }),
+        ...prev,
+      ]);
+      setTimeout(() => { setScanOrder(null); setScanMsg(null); setScanOk(null); setScanManual(''); setScanErr(''); }, 1800);
+    }
+  };
+
+  const manualVerify = () => {
+    const code = scanManual.trim();
+    if (!code) { setScanErr('Paste the QR payload or type the NX-XXXX code.'); return; }
+    if (code.startsWith('{')) {
+      if (verifyHandoff(code, scanOrder.id)) { applyPickupScan(true); } else { setScanErr('Payload does not match this order.'); }
+    } else if (code.toUpperCase() === handoffCodeOf(scanOrder.id)) {
+      applyPickupScan(true);
+    } else {
+      setScanErr(`Wrong code — expected ${handoffCodeOf(scanOrder.id)}.`);
+    }
   };
 
   const startPreparing = (id: string) => {
@@ -320,6 +380,16 @@ export default function StorePortal() {
                   <button onClick={() => setPrintOrder(live)} className="flex items-center space-x-1 px-2.5 py-1.5 bg-[#101d30] border border-[#1e3050] text-white text-[8px] font-black uppercase rounded-lg cursor-pointer hover:bg-[#132238]" title="Print receipt">
                     <Printer className="w-3 h-3 text-brand-orange" /><span>Print</span>
                   </button>
+                  {!live.handoffScanned?.pickup && live.status === 'Confirmed' && (
+                    <button onClick={() => { setScanOrder(live); setScanMsg(null); setScanOk(null); setScanManual(''); setScanErr(''); }} className="flex items-center space-x-1 px-2.5 py-1.5 bg-sky-500/15 border border-sky-500/40 text-sky-300 text-[8px] font-black uppercase rounded-lg cursor-pointer hover:bg-sky-500/25" title="Scan pickup QR from the driver">
+                      <ScanLine className="w-3 h-3" /><span>Scan Pickup QR</span>
+                    </button>
+                  )}
+                  {live.handoffScanned?.pickup && (
+                    <span className="flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[8px] font-black uppercase rounded-lg">
+                      <ShieldCheck className="w-3 h-3" /><span>QR Pickup Verified</span>
+                    </span>
+                  )}
                   <span className={`px-2 py-1 rounded-md text-[8px] font-black ${live.status === 'Completed' ? 'bg-emerald-500/15 text-emerald-400' : live.storeReady ? 'bg-blue-500/15 text-blue-400' : live.preparing ? 'bg-amber-500/15 text-amber-400' : 'bg-brand-orange/15 text-brand-orange'}`}>
                     {live.status === 'Completed' ? 'COMPLETED' : live.storeReady ? 'READY' : live.preparing ? 'PREPARING' : live.status === 'Confirmed' ? 'DISPATCHED' : live.status}
                   </span>
@@ -338,6 +408,16 @@ export default function StorePortal() {
                 </div>
                 <p className="text-[9px] leading-relaxed text-gray-400">{live.address || live.pickupLocation || '—'}</p>
               </div>
+
+              {live.status === 'Confirmed' && !live.handoffScanned?.pickup && live.pickupPin && (
+                <div className="bg-gradient-to-r from-amber-500/20 to-[#101d30] border border-amber-500/40 rounded-2xl p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[9px] font-black text-amber-300 uppercase tracking-widest">Give this PIN to the rider</p>
+                    <p className="text-[9px] text-gray-400">Rider enters it in their app to verify pickup.</p>
+                  </div>
+                  <p className="text-3xl font-black font-mono text-amber-300 tracking-[0.2em]">{live.pickupPin}</p>
+                </div>
+              )}
 
               <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl overflow-hidden">
                 <div className="px-3 py-2 border-b border-[#1e3050] flex items-center justify-between">
@@ -854,6 +934,43 @@ export default function StorePortal() {
               <button onClick={() => window.print()} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase rounded-lg cursor-pointer flex items-center space-x-1.5">
                 <Printer className="w-3 h-3" /><span>Print Receipt</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ PICKUP QR SCANNER MODAL ============ */}
+      {scanOrder && (
+        <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl max-w-md w-full p-4 space-y-3 my-auto max-h-[90dvh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-black text-white flex items-center space-x-2"><ScanLine className="w-4 h-4 text-sky-400" /><span>Verify Pickup · #{scanOrder.id}</span></h4>
+              <button onClick={() => setScanOrder(null)} className="p-1.5 text-gray-400 hover:text-white rounded-lg cursor-pointer"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-[10px] text-gray-400">Ask the rider to show the customer's handoff QR (or type the code). Either the QR or the pickup PIN verifies this order.</p>
+            <div className="rounded-xl overflow-hidden bg-black relative" style={{ aspectRatio: '1/1', maxHeight: 260, margin: '0 auto' }}>
+              <div id="store-scan-video" className="w-full h-full" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  value={scanManual}
+                  onChange={(e) => setScanManual(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') manualVerify(); }}
+                  placeholder={`Paste QR payload or type ${handoffCodeOf(scanOrder.id)}`}
+                  className="flex-1 bg-[#0a1322] border border-[#1e3050] text-gray-200 rounded-lg px-3 py-2 text-[11px] font-mono outline-none focus:border-sky-500"
+                />
+                <button onClick={manualVerify} className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[10px] font-black cursor-pointer">Verify</button>
+              </div>
+              {scanErr && <p className="text-[10px] text-red-400 font-bold">{scanErr}</p>}
+              {scanMsg && (
+                <p className={`text-[11px] font-black flex items-center space-x-1.5 ${scanOk ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <ShieldCheck className="w-4 h-4" /><span>{scanMsg}</span>
+                </p>
+              )}
+              {!scanOrder.handoffScanned?.pickup && scanOrder.pickupPin && (
+                <p className="text-[9px] text-gray-400">Or just tell the rider the pickup PIN: <b className="text-amber-300 font-mono text-sm tracking-widest">{scanOrder.pickupPin}</b></p>
+              )}
             </div>
           </div>
         </div>

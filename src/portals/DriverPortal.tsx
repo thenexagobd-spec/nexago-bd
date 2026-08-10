@@ -65,6 +65,7 @@ export default function DriverPortal() {
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
   const [deliveryProofName, setDeliveryProofName] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState('');
+  const [pickupPinInput, setPickupPinInput] = useState('');
   const [codSettled, setCodSettled] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -215,7 +216,18 @@ export default function DriverPortal() {
   const handlePickupConfirmed = () => {
     if (!activeOrder) return;
     if (!pickupProofName) return;
-    updateStage(activeOrder.id, 'to_customer', { status: 'Ongoing' as any, pickedUp: true, pickupProof: pickupProofName });
+    // Pickup PIN verification — the store gives this PIN to the rider at the counter
+    if (activeOrder.pickupPin && pickupPinInput.trim() !== activeOrder.pickupPin) {
+      showToast('Pickup PIN incorrect — ask the store staff for the pickup PIN.');
+      return;
+    }
+    updateStage(activeOrder.id, 'to_customer', { status: 'Ongoing' as any, pickedUp: true, pickupProof: pickupProofName, handoffScanned: { ...(activeOrder.handoffScanned || {}), pickup: true } });
+    // Notify the store + customer that pickup is verified
+    setNotifications(prev => [
+      makeNotif('🛵 Pickup Verified', `Rider ${me?.name || ''} picked up order #${activeOrder.id} (PIN verified) — on the way to the customer.`, 'order', { audience: 'store', storeId: activeOrder.storeId }),
+      makeNotif('🛵 Picked Up — #' + activeOrder.id, `Your order from ${activeOrder.storeName} is on the way.`, 'order', { audience: 'customer', customerId: activeOrder.customerId || activeOrder.customerPhone }),
+      ...prev,
+    ]);
   };
 
   const handleArrived = () => {
@@ -809,13 +821,25 @@ export default function DriverPortal() {
                     )}
                     {activeOrder.driverStage === 'ready_for_pickup' && (
                       <>
+                        {activeOrder.pickupPin && (
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-gray-400 uppercase">Pickup PIN (store staff shared it)</p>
+                            <input
+                              value={pickupPinInput}
+                              onChange={e => setPickupPinInput(e.target.value)}
+                              inputMode="numeric"
+                              placeholder="Enter 4-digit pickup PIN"
+                              className="w-full px-3 py-2 bg-[#0a1322] border border-[#1e3050] rounded-xl text-white text-[12px] font-mono tracking-widest outline-none focus:border-brand-orange"
+                            />
+                          </div>
+                        )}
                         <label className="w-full py-3 bg-[#101d30] border border-dashed border-[#1e3050] hover:border-brand-orange/40 text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
                           <FileText className="w-3.5 h-3.5 text-brand-orange" />
                           <span>{pickupProofName ? `Pickup photo: ${pickupProofName}` : 'Upload pickup order photo'}</span>
                           <input type="file" accept="image/*" className="hidden" onChange={e => setPickupProofName(e.target.files?.[0]?.name || 'pickup.jpg')} />
                         </label>
                         <button onClick={handlePickupConfirmed} className={`w-full py-2.5 text-[11px] font-black uppercase rounded-xl shadow-lg cursor-pointer ${pickupProofName ? 'bg-brand-orange hover:bg-brand-orange-hover text-white' : 'bg-[#0a1322] border border-[#1e3050] text-gray-500 cursor-not-allowed'}`}>
-                          {pickupProofName ? 'Confirm Pickup & Start Delivery' : 'Upload a pickup photo first'}
+                          {pickupProofName ? 'Verify PIN & Confirm Pickup' : 'Upload a pickup photo first'}
                         </button>
                       </>
                     )}

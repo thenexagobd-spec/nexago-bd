@@ -7,10 +7,11 @@ import {
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
   MessageCircle, Share2, LocateFixed, CalendarClock, AlertCircle, Link2,
-  Camera, Send, Headphones, ScrollText, RefreshCcw, User, Mail, KeyRound, Wrench
+  Camera, Send, Headphones, ScrollText, RefreshCcw, User, Mail, KeyRound, Wrench, QrCode
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, ReturnRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
+import { handoffPayloadOf, handoffCodeOf } from '../portals/portalUtils';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -1133,6 +1134,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [customerPhone, setCustomerPhone] = useState<string>('01712-345678');
 
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+  const [qrOrder, setQrOrder] = useState<Order | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
   const [addresses, setAddresses] = useState<SavedAddress[]>(() => getStoredData(LS_KEYS.addr, [
@@ -2102,6 +2104,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   };
 
   const trackingDriver = trackingOrder ? liveDriverOf(trackingOrder) : null;
+  const qrLiveOrder = qrOrder ? (orders.find(o => o.id === qrOrder.id) || qrOrder) : null;
 
   const liveProgressOf = (ord: Order) => {
     const drv = liveDriverOf(ord);
@@ -3191,6 +3194,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                                   <Navigation className="w-3 h-3" /><span>{T.trackDelivery}</span>
                                 </button>
                               )}
+                              {!held && ord.paymentStatus !== 'Pending' && (
+                                <button onClick={() => setQrOrder(ord)} className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-blue-200">
+                                  <QrCode className="w-3 h-3" /><span>QR</span>
+                                </button>
+                              )}
                               {held && (
                                 <button onClick={() => openReSubmit(ord)} className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1 border border-purple-200">
                                   <Send className="w-3 h-3" /><span>Re-send Payment</span>
@@ -4267,6 +4275,33 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <button onClick={submitReturn} className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-md transition-all cursor-pointer">
               Submit Return Request
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============ HANDOFF QR MODAL ============ */}
+      {qrLiveOrder && (
+        <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-4 text-xs my-auto max-h-[90dvh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-black text-gray-900 text-sm flex items-center space-x-2"><QrCode className="w-4 h-4 text-blue-600" /><span>Handoff QR · Order #{qrLiveOrder.id}</span></h3>
+                <p className="text-[10px] text-gray-500">{qrLiveOrder.storeName} · ৳{qrLiveOrder.amount.toLocaleString()}</p>
+              </div>
+              <button onClick={() => setQrOrder(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+            <div className="flex flex-col items-center justify-center p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+              <QRCodeSVG value={handoffPayloadOf(qrLiveOrder.id)} size={180} level="M" />
+              <div className="text-center">
+                <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest">Handoff Code</p>
+                <p className="text-lg font-black font-mono text-gray-900 tracking-[0.2em]">{handoffCodeOf(qrLiveOrder.id)}</p>
+              </div>
+            </div>
+            <div className="space-y-1.5 text-[10px]">
+              <p className="flex items-center space-x-2"><span className={`w-2 h-2 rounded-full ${qrLiveOrder.handoffScanned?.pickup ? 'bg-emerald-500' : 'bg-gray-300'}`} /><span className={qrLiveOrder.handoffScanned?.pickup ? 'text-emerald-700 font-bold' : 'text-gray-500'}>Pickup — store staff scan করে verify করবে</span>{qrLiveOrder.handoffScanned?.pickup && '✅'}</p>
+              <p className="flex items-center space-x-2"><span className={`w-2 h-2 rounded-full ${qrLiveOrder.handoffScanned?.delivery ? 'bg-emerald-500' : 'bg-gray-300'}`} /><span className={qrLiveOrder.handoffScanned?.delivery ? 'text-emerald-700 font-bold' : 'text-gray-500'}>Delivery — driver customer-এর কাছে scan করে verify করবে</span>{qrLiveOrder.handoffScanned?.delivery && '✅'}</p>
+            </div>
+            <p className="text-[9px] text-gray-400 leading-relaxed">এই QR শুধু এই অর্ডারের জন্য — স্ক্রিন থেকে দেখান, ছবি নেওয়ার দরকার নেই। Delivery PIN <b className="font-mono">{qrLiveOrder.deliveryPin || '—'}</b> সাথে রাখুন।</p>
           </div>
         </div>
       )}

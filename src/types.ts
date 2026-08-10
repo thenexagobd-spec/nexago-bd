@@ -45,9 +45,11 @@ export interface Order {
   items?: Array<{ productId: string; name: string; price: number; quantity: number }>;
   scheduledSlot?: string;
   deliveryPin?: string;
+  pickupPin?: string;       // store-issued PIN given to the rider to verify pickup
   splitWalletAmount?: number;
   source?: 'customer-app' | 'pos-dispatch' | 'counter';
   pickedUp?: boolean;
+  handoffScanned?: { pickup?: boolean; delivery?: boolean }; // QR handoff verified at each stage
   extraStores?: string[];
   placedAt?: number; // epoch ms — drives deterministic store→customer tracking progress
   timeline?: OrderTimelineEntry[]; // audit trail of every status change
