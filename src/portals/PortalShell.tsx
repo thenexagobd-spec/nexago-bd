@@ -100,13 +100,14 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
         </main>
       </div>
 
-      {/* Mobile bottom nav (app-like, always visible on phones) */}
+      {/* Mobile bottom nav (app-like, always visible on phones — scrollable so
+          every portal page stays reachable on any screen size) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#1e3050] bg-[#0c1626]/95 backdrop-blur flex overflow-x-auto scrollbar-none">
-        {nav.slice(0, 6).map(item => (
+        {nav.slice(0, 8).map(item => (
           <button
             key={item.id}
             onClick={() => onNav(item.id)}
-            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-2 px-1 text-[8px] font-black uppercase tracking-wide transition-colors cursor-pointer ${
+            className={`flex-1 min-w-[64px] flex flex-col items-center justify-center py-2 px-1 text-[8px] font-black uppercase tracking-wide transition-colors cursor-pointer ${
               active === item.id ? 'text-brand-orange' : 'text-gray-500 hover:text-gray-300'
             }`}
           >

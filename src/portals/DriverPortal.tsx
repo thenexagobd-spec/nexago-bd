@@ -527,8 +527,8 @@ export default function DriverPortal() {
               </div>
               <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-2.5">
                 <div className="space-y-1">
-                  <label className="text-[8px] text-gray-400 uppercase block font-black">Driver Phone or ID</label>
-                  <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="e.g. DRV123456"
+                  <label className="text-[8px] text-gray-400 uppercase block font-black">Driver ID / Phone</label>
+                  <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="e.g. 3667463854"
                     className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] font-mono outline-none focus:border-brand-orange text-white" />
                 </div>
                 <div className="space-y-1">
@@ -918,7 +918,7 @@ export default function DriverPortal() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-1.5 text-center text-[9px]">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center text-[9px]">
                           <div className="bg-[#0a1322] p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Total Distance</p><p className="text-white font-bold mt-0.5">{o.pickupLocation && o.address ? '~4.2 km' : '—'}</p></div>
                           <div className="bg-[#0a1322] p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Est. Time</p><p className="text-brand-orange font-bold mt-0.5">~23 min</p></div>
                           <div className="bg-[#0a1322] p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Delivery Fee</p><p className="text-emerald-400 font-bold mt-0.5">{bdt(o.deliveryCharge || 60)}</p></div>
