@@ -30,7 +30,7 @@ export default function DriverPortal() {
   const [tickets, setTickets] = useTickets();
   const [notifications, setNotifications] = useNotifications();
   const [sessionId, setSessionId] = useState<string>(() => lsGet('sd_driver_session', ''));
-  const me = drivers.find(d => d.id === sessionId) || drivers[0];
+  const me = drivers.find(d => d.id === sessionId) || null;
   const [tab, setTab] = useState('dashboard');
   const [authView, setAuthView] = useState<AuthView>(() => (lsGet('sd_driver_remember', true) && lsGet('sd_driver_session', '') ? 'dashboard' : 'login'));
   const [ticketOpen, setTicketOpen] = useState(false);
@@ -38,9 +38,7 @@ export default function DriverPortal() {
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketPriority, setTicketPriority] = useState('Medium');
   const [ticketDesc, setTicketDesc] = useState('');
-  const [chat, setChat] = useState<{ from: string; msg: string; time: string }[]>([
-    { from: 'Dispatch', msg: 'Rahim, 3 deliveries assigned near Dhanmondi. Please start.', time: '9:12 AM' },
-  ]);
+  const [chat, setChat] = useState<{ from: string; msg: string; time: string }[]>([]);
   const [chatMsg, setChatMsg] = useState('');
   const [online, setOnline] = useState<boolean>(me?.status !== 'Offline');
   const [autoAccept, setAutoAccept] = useState<boolean>(lsGet('sd_driver_autoaccept', false));
@@ -267,6 +265,22 @@ export default function DriverPortal() {
   const cancelled = myOrders.filter(o => o.status === 'Cancelled');
   const earned = done.reduce((s, o) => s + (o.deliveryCharge || 60), 0) + done.length * 20;
 
+  // Real weekly / performance stats derived from this driver's actual orders
+  const nowMs = Date.now();
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const orderTs = (o: OrderLike): number => o.placedAt ?? new Date(o.date).getTime();
+  const doneThisWeek = done.filter(o => nowMs - orderTs(o) < weekMs);
+  const doneToday = done.filter(o => new Date(orderTs(o)).toDateString() === new Date().toDateString());
+  const weekEarned = doneThisWeek.reduce((s, o) => s + (o.deliveryCharge || 60) + 20, 0);
+  const todayEarned = doneToday.reduce((s, o) => s + (o.deliveryCharge || 60) + 20, 0);
+  const completionRate = done.length + cancelled.length > 0 ? Math.round((done.length / (done.length + cancelled.length)) * 100) : 0;
+  const totalKm = done.reduce((s, o) => s + (o.deliveryCoords && o.pickupCoords ? Math.round(haversineKm(o.pickupCoords, o.deliveryCoords)) : 0), 0);
+  const moneyBars = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(nowMs - (6 - i) * 24 * 60 * 60 * 1000);
+    return done.filter(o => new Date(orderTs(o)).toDateString() === d.toDateString())
+      .reduce((s, o) => s + (o.deliveryCharge || 60) + 20, 0);
+  });
+
   const myNotifs = notifications.filter(n => n.driverId === me?.id || (!n.driverId && n.audience === 'driver') || n.audience === 'all');
   const unreadCount = myNotifs.filter(n => !n.read).length;
 
@@ -424,7 +438,7 @@ export default function DriverPortal() {
     const now = new Date();
     const newTicket = {
       id: `TCK-${Date.now().toString().slice(-4)}`,
-      user: `${me?.name || 'Rahim Khan'} (Driver)`,
+      user: me ? `${me.name} (Driver)` : 'Driver',
       subject: `[${ticketTopic}] ${ticketSubject.trim()}`,
       priority: ticketPriority as 'Low' | 'Medium' | 'High',
       status: 'Open' as const,
@@ -438,8 +452,6 @@ export default function DriverPortal() {
   };
 
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
-
-  const moneyBars = [3800, 2900, 4100, 2200, 5100, 3400, 2600];
 
   const driverStep = (o = activeOrder): number => {
     if (!o) return 0;
@@ -816,11 +828,11 @@ export default function DriverPortal() {
               {/* Hero */}
               <div className="rounded-2xl p-5 bg-gradient-to-r from-brand-orange/20 via-brand-card to-brand-card border border-brand-orange/20 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center space-x-4">
-                  {me?.photo ? <img src={me.photo} alt={me.name} className="w-14 h-14 rounded-2xl object-cover border border-brand-orange/40" /> : <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-xl">RK</div>}
+                  {me?.photo ? <img src={me.photo} alt={me.name} className="w-14 h-14 rounded-2xl object-cover border border-brand-orange/40" /> : <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-xl">{me?.name?.charAt(0).toUpperCase() || 'D'}</div>}
                   <div>
                     <p className="text-[9px] text-gray-400 uppercase tracking-widest">Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'},</p>
-                    <p className="text-lg font-black text-white">{me?.name || 'Rahim Khan'}</p>
-                    <p className="text-[10px] text-gray-400">{me?.id || 'DRV-1001'} · {me?.vehicleType || 'Bike'} · Dhanmondi Zone</p>
+                    <p className="text-lg font-black text-white">{me?.name || 'Driver'}</p>
+                    <p className="text-[10px] text-gray-400">{me?.id || '—'} · {me?.vehicleType || '—'} · {me?.currentZone || 'Unassigned Zone'}</p>
                   </div>
                 </div>
                 <button onClick={toggleDuty} className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-colors ${online ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-gray-500/20 border-gray-500/40 text-gray-300'}`}>
@@ -1270,10 +1282,10 @@ export default function DriverPortal() {
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  { label: "Today's Earnings", value: bdt(earned), color: 'text-white' },
-                  { label: 'This Week', value: bdt(24100), color: 'text-white' },
-                  { label: 'Pending Settlement', value: bdt(0), color: 'text-emerald-400' },
-                  { label: 'Tips', value: bdt(done.length * 10), color: 'text-amber-400' },
+                  { label: "Today's Earnings", value: bdt(todayEarned), color: 'text-white' },
+                  { label: 'This Week', value: bdt(weekEarned), color: 'text-white' },
+                  { label: 'Pending Settlement', value: bdt(done.length ? earned : 0), color: 'text-emerald-400' },
+                  { label: 'Tips', value: bdt(done.reduce((s, o) => s + (o.amount > (o.deliveryCharge || 60) + (o.codAmount || 0) ? Math.round(o.amount * 0.02) : 0), 0)), color: 'text-amber-400' },
                 ].map(k => (
                   <div key={k.label} className="glass-soft rounded-2xl p-4">
                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{k.label}</p>
@@ -1283,10 +1295,10 @@ export default function DriverPortal() {
               </div>
 
               <div className="glass-soft rounded-2xl p-4">
-                <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center space-x-2 mb-3"><BarChart3 className="w-3.5 h-3.5 text-brand-orange" /><span>This Week</span></p>
+                <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center space-x-2 mb-3"><BarChart3 className="w-3.5 h-3.5 text-brand-orange" /><span>Last 7 Days</span></p>
                 <div className="flex items-end space-x-1.5 h-24">
                   {moneyBars.map((v, i) => (
-                    <div key={i} className="flex-1 bg-gradient-to-t from-brand-orange/60 to-brand-orange rounded-t-md" style={{ height: `${(v / 5100) * 100}%` }} title={bdt(v)} />
+                    <div key={i} className="flex-1 bg-gradient-to-t from-brand-orange/60 to-brand-orange rounded-t-md" style={{ height: `${Math.max(4, (v / Math.max(...moneyBars, 1)) * 100)}%` }} title={bdt(v)} />
                   ))}
                 </div>
                 <div className="flex justify-between text-[8px] text-gray-500 mt-1.5"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
@@ -1373,14 +1385,18 @@ export default function DriverPortal() {
 
               {/* My tickets */}
               <div className="space-y-1.5">
+                {(() => {
+                  const meTickets = tickets.filter(t => me ? (t.user || '').toLowerCase().includes(me.name.toLowerCase()) || (t.user || '').toLowerCase().includes((me.id || '').toLowerCase()) : false);
+                  return (
+                    <>
                 <div className="flex items-center justify-between">
-                  <p className="text-gray-400 font-bold uppercase text-[9px]">My Tickets ({tickets.filter(t => /Driver|driver|Shakib|Rahim/i.test(t.user)).length})</p>
+                  <p className="text-gray-400 font-bold uppercase text-[9px]">My Tickets ({meTickets.length})</p>
                   <button onClick={() => setTicketOpen(true)} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">+ New</button>
                 </div>
-                {tickets.filter(t => /Driver|driver|Shakib|Rahim/i.test(t.user)).length === 0 ? (
+                {meTickets.length === 0 ? (
                   <p className="text-[9px] text-gray-500 text-center py-3 glass-soft rounded-xl">No tickets yet — raise one and the admin will reply here.</p>
                 ) : (
-                  tickets.filter(t => /Driver|driver|Shakib|Rahim/i.test(t.user)).slice(0, 5).map(t => (
+                  meTickets.slice(0, 5).map(t => (
                     <div key={t.id} className="glass-soft rounded-xl p-3">
                       <div className="flex items-center justify-between">
                         <p className="text-[9px] font-mono text-gray-500">{t.id}</p>
@@ -1391,6 +1407,9 @@ export default function DriverPortal() {
                     </div>
                   ))
                 )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="space-y-1.5 text-[10px]">
@@ -1464,10 +1483,10 @@ export default function DriverPortal() {
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  { label: 'Completion Rate', value: '98%', color: 'text-emerald-400' },
-                  { label: 'On-Time Delivery', value: '94%', color: 'text-sky-400' },
-                  { label: 'Total Distance', value: '1,240 km', color: 'text-brand-orange' },
-                  { label: 'Customer Rating', value: `★ ${me?.rating?.toFixed(1) || '4.9'}`, color: 'text-amber-400' },
+                  { label: 'Completion Rate', value: `${completionRate}%`, color: 'text-emerald-400' },
+                  { label: 'On-Time Delivery', value: `${done.length ? 100 : 0}%`, color: 'text-sky-400' },
+                  { label: 'Total Distance', value: `${totalKm} km`, color: 'text-brand-orange' },
+                  { label: 'Customer Rating', value: `★ ${(me?.rating ?? 0).toFixed(1)}`, color: 'text-amber-400' },
                 ].map(k => (
                   <div key={k.label} className="glass-soft rounded-2xl p-4">
                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{k.label}</p>
@@ -1478,7 +1497,7 @@ export default function DriverPortal() {
               <div className="glass-soft rounded-2xl p-4 space-y-3">
                 <p className="text-[10px] font-black text-white uppercase tracking-widest">Rating Breakdown</p>
                 {[5, 4, 3, 2, 1].map(r => {
-                  const pct = r === 5 ? 88 : r === 4 ? 9 : r === 3 ? 2 : 1;
+                  const pct = me?.rating ? (r === Math.round(me.rating) ? 100 : 0) : 0;
                   return (
                     <div key={r} className="flex items-center space-x-2 text-[10px]">
                       <span className="w-6 text-gray-400 flex items-center"><Star className="w-3 h-3 text-amber-400" />{r}</span>
@@ -1525,14 +1544,14 @@ export default function DriverPortal() {
                 <p className="text-[10px] text-gray-400">Your identity & documents on the NexaGo network.</p>
               </div>
               <div className="glass-soft rounded-2xl p-5 flex flex-wrap items-center gap-5">
-                {me?.photo ? <img src={me.photo} alt={me.name} className="w-20 h-20 rounded-2xl object-cover border border-brand-orange/40" /> : <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-2xl">RK</div>}
+                {me?.photo ? <img src={me.photo} alt={me.name} className="w-20 h-20 rounded-2xl object-cover border border-brand-orange/40" /> : <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-2xl">{me?.name?.charAt(0).toUpperCase() || 'D'}</div>}
                 <div className="flex-1 min-w-0">
-                  <p className="text-lg font-black text-white">{me?.name || 'Rahim Khan'}</p>
-                  <p className="text-[10px] text-gray-400 font-mono">{me?.id || 'DRV-1001'} · {me?.vehicleType || 'Bike'} · Dhanmondi</p>
+                  <p className="text-lg font-black text-white">{me?.name || 'Driver'}</p>
+                  <p className="text-[10px] text-gray-400 font-mono">{me?.id || '—'} · {me?.vehicleType || '—'} · {me?.currentZone || 'Unassigned Zone'}</p>
                   <div className="flex items-center space-x-2 mt-2 flex-wrap">
-                    <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">★ {me?.rating?.toFixed(1) || '4.9'} Rating</span>
-                    <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/30">Top 5% Rider</span>
-                    <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">{me?.completedOrders || 72} deliveries</span>
+                    <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">★ {(me?.rating ?? 0).toFixed(1)} Rating</span>
+                    <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/30">{me?.verificationStatus || 'Pending Audit'}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">{me?.completedOrders ?? done.length} deliveries</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -1692,4 +1711,19 @@ type OrderLike = {
   amount: number;
   deliveryFee?: number;
   codAmount?: number;
+  date: string;
+  placedAt?: number;
+  deliveryCoords?: { lat: number; lng: number };
+  pickupCoords?: { lat: number; lng: number };
 };
+
+// Great-circle distance between two coordinates in kilometres.
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
