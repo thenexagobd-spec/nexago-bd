@@ -80,9 +80,12 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
   const totalLocked = drivers.filter(d => d.dispatchLocked).length;
 
   const filteredDrivers = drivers.filter(driver => {
-    const matchesSearch = driver.name.toLowerCase().includes(search.toLowerCase()) || 
-                          driver.phone.includes(search) || 
-                          driver.id.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase().trim();
+    const matchesSearch = q === '' ||
+      driver.name.toLowerCase().includes(q) ||
+      driver.phone.includes(q) ||
+      (driver.email || '').toLowerCase().includes(q) ||
+      driver.id.toLowerCase().includes(q);
     if (statusFilter === 'All') return matchesSearch;
     if (statusFilter === 'Online' || statusFilter === 'On-Delivery' || statusFilter === 'Offline') return matchesSearch && driver.status === statusFilter;
     if (statusFilter === 'Audit Pending') return matchesSearch && driver.verificationStatus === 'Pending Audit';
@@ -339,7 +342,7 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search drivers by name, phone or ID..."
+            placeholder="Search by driver ID, phone, gmail or name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-brand-dark/80 text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
@@ -495,6 +498,14 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
                     <span>Push Alert</span>
                   </button>
                 </div>
+                {driver.email && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 truncate">
+                      <span className="text-gray-500 font-mono text-[10px]">✉</span>
+                      <span className="font-mono text-[11px] truncate text-gray-300">{driver.email}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

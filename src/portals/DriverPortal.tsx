@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Package, Wallet, User, MessageSquare, BarChart3, Phone, Navigation,
   CheckCircle2, Star, LogIn, Power, Send, RefreshCw, MapPin, FileText, AlertCircle,
     History, Inbox, Headphones, Settings, ShieldCheck, LogOut, ChevronRight, Copy, Eye, Truck,
-    X, Bell, Clock, RotateCcw
+    X, Bell, Clock, RotateCcw, Search
   } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync } from './portalUtils';
@@ -67,6 +67,7 @@ export default function DriverPortal() {
   const [termsChecked, setTermsChecked] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
   const [pendingId, setPendingId] = useState<string>(() => lsGet('sd_driver_pending_id', ''));
+  const [checkStatusInput, setCheckStatusInput] = useState('');
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
   const [deliveryProofName, setDeliveryProofName] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState('');
@@ -554,11 +555,9 @@ export default function DriverPortal() {
                 Register New Driver →
               </button>
               <p className="text-center text-[9px] text-gray-500">Log in with your permanent Driver ID + password. New driver? Register below.</p>
-              {lsGet('sd_driver_pending_id', '') && (
-                <button onClick={() => setAuthView('pending')} className="w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
-                  Check my application status →
-                </button>
-              )}
+              <button onClick={() => { setCheckStatusInput(''); setAuthView('pending'); }} className="w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
+                Check my application status (any device) →
+              </button>
             </>
           )}
 
@@ -645,26 +644,66 @@ export default function DriverPortal() {
 
           {/* ---- PENDING ---- */}
           {authView === 'pending' && (() => {
-            const pendingDriver = pendingId
+            let pendingDriver = pendingId
               ? drivers.find(d => d.id === pendingId) || null
               : null;
+            if (!pendingDriver && checkStatusInput.trim()) {
+              const q = checkStatusInput.trim().toLowerCase();
+              pendingDriver = drivers.find(d =>
+                d.id.toLowerCase() === q ||
+                d.phone.replace(/[^0-9]/g, '').endsWith(q.replace(/[^0-9]/g, '')) ||
+                (d.email || '').toLowerCase() === q
+              ) || null;
+            }
             const approved = pendingDriver && pendingDriver.verificationStatus === 'Verified';
             const pendingCred = pendingDriver ? getCreds()[pendingDriver.id] : undefined;
+            if (!pendingDriver) {
+              return (
+                <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-brand-orange/20 border border-brand-orange/40 flex items-center justify-center text-brand-orange">
+                    <Search className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Check Your Registration Status</h4>
+                    <p className="text-[10px] text-gray-400 mt-1 max-w-[280px] mx-auto">
+                      Enter the permanent Driver ID, phone number or Gmail you registered with to see your application from any device.
+                    </p>
+                  </div>
+                  <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 w-full">
+                    <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Driver ID / Phone / Gmail</label>
+                    <input
+                      type="text"
+                      value={checkStatusInput}
+                      onChange={e => setCheckStatusInput(e.target.value)}
+                      placeholder="e.g. 3667463854"
+                      className="bg-transparent text-xs text-white outline-none w-full mt-1"
+                    />
+                  </div>
+                  <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
+                    ← Back to Login
+                  </button>
+                </div>
+              );
+            }
             return (
             <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center ${approved ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400' : 'bg-amber-500/20 border border-amber-500/40 text-amber-400 animate-pulse'}`}>
                 {approved ? <CheckCircle2 className="w-8 h-8" /> : <Clock className="w-8 h-8" />}
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">{approved ? 'Account Approved' : 'Application Under Review'}</h4>
+                <h4 className="text-sm font-bold text-white">
+                  {approved
+                    ? 'Congratulations! Your account is ready.'
+                    : 'Application Under Review'}
+                </h4>
                 <p className="text-[10px] text-gray-400 mt-1 max-w-[280px] mx-auto">
                   {approved
-                    ? 'The admin has verified your documents. Use your permanent Driver ID and the password below to log in.'
-                    : 'Our dispatch team is verifying your Driving License & NID details. Refresh to check status.'}
+                    ? 'Please login with your permanent Driver ID and the password below to start earning money.'
+                    : 'Our dispatch team is verifying your Driving License & NID details. Check back soon from this link.'}
                 </p>
               </div>
               <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 text-left text-[10px] space-y-1.5 w-full">
-                <div className="flex justify-between"><span className="text-gray-400">Permanent Driver ID:</span><span className="text-white font-mono font-bold">{pendingDriver?.id || pendingId || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Permanent Driver ID:</span><span className="text-white font-mono font-bold">{pendingDriver?.id || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Name:</span><span className="text-white">{pendingDriver?.name || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Phone:</span><span className="text-white">{pendingDriver?.phone || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Gmail:</span><span className="text-white truncate max-w-[150px]">{pendingDriver?.email || '—'}</span></div>
