@@ -36,22 +36,24 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
     <div className="min-h-screen bg-gradient-to-b from-[#060d17] via-[#0a1322] to-[#0a1322] text-gray-100 flex flex-col">
       {/* Top header */}
       <header className="h-14 shrink-0 border-b border-[#1e3050]/60 bg-gradient-to-r from-[#0d1829]/90 via-[#0f1c30]/90 to-[#0d1829]/90 backdrop-blur-xl flex items-center justify-between px-4 sticky top-0 z-40">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-sm shadow-lg">N</div>
-          <div>
-            <p className="font-black tracking-widest leading-none text-sm">NEXAGO</p>
-            <p className="text-[8px] text-gray-400 uppercase tracking-widest mt-0.5">Smart Delivery Network</p>
+        <div className="w-full max-w-7xl mx-auto flex items-center justify-between px-1">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-sm shadow-lg">N</div>
+            <div>
+              <p className="font-black tracking-widest leading-none text-sm">NEXAGO</p>
+              <p className="text-[8px] text-gray-400 uppercase tracking-widest mt-0.5">Smart Delivery Network</p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-2 sm:space-x-3">
-          <span className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#132238] border border-[#1e3050] text-[10px] font-bold text-gray-300">
-            <Clock className="w-3 h-3 text-brand-orange" />
-            <span className="font-mono">{clock.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-          </span>
-          <span className="flex items-center px-2.5 py-1.5 rounded-lg bg-brand-orange/15 border border-brand-orange/40 text-brand-orange text-[9px] font-black uppercase tracking-wider">
-            <span className="hidden sm:inline">{role}</span><span className="sm:hidden">{role.split(' ')[0]}</span>
-          </span>
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <span className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#132238] border border-[#1e3050] text-[10px] font-bold text-gray-300">
+              <Clock className="w-3 h-3 text-brand-orange" />
+              <span className="font-mono">{clock.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            </span>
+            <span className="flex items-center px-2.5 py-1.5 rounded-lg bg-brand-orange/15 border border-brand-orange/40 text-brand-orange text-[9px] font-black uppercase tracking-wider">
+              <span className="hidden sm:inline">{role}</span><span className="sm:hidden">{role.split(' ')[0]}</span>
+            </span>
+          </div>
         </div>
       </header>
 
