@@ -10,3 +10,5 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
+      - key: VITE_RELAY_BASE
+        value: https://nexago-relay.onrender.com
