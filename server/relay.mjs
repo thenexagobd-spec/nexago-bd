@@ -211,6 +211,34 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+
+  // ---- Serve every role portal site live (like the customer storefront) ----
+  // Clean URL -> built html page. Both the pretty route (/driver) and the raw
+  // file route (/driver.html) are supported so every site stays reachable.
+  const SITE_PAGES = {
+    '/admin': 'index.html',
+    '/roles': 'roles.html',
+    '/customer': 'customer.html',
+    '/driver': 'driver.html',
+    '/store': 'customer.html',
+    '/store-site': 'store.html',
+    '/store-admin': 'store-admin.html',
+    '/super-admin': 'super-admin.html',
+    '/super-admin-staff': 'super-admin-staff.html',
+  };
+  const sitePage = SITE_PAGES[url.pathname]
+    || (url.pathname.endsWith('.html') && /^\/[a-z0-9-]+\.html$/.test(url.pathname) ? url.pathname.slice(1) : null);
+  if (sitePage) {
+    const file = path.join(__dirname, '..', 'dist', sitePage);
+    if (fs.existsSync(file)) {
+      fs.readFile(file, (err, data) => {
+        if (err) { res.writeHead(500); res.end(sitePage + ' missing'); return; }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders });
+        res.end(data);
+      });
+      return;
+    }
+  }
   // Built front-end static assets (from vite build)
   if (url.pathname.startsWith('/assets/') || url.pathname === '/icon.svg' || url.pathname === '/vite.svg') {
     if (serveDistFile(res, url.pathname)) return;
