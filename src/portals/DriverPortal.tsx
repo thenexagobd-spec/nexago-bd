@@ -68,6 +68,7 @@ export default function DriverPortal() {
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
   const [pendingId, setPendingId] = useState<string>(() => lsGet('sd_driver_pending_id', ''));
   const [checkStatusInput, setCheckStatusInput] = useState('');
+  const [checkStatusQuery, setCheckStatusQuery] = useState('');
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
   const [deliveryProofName, setDeliveryProofName] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState('');
@@ -555,7 +556,7 @@ export default function DriverPortal() {
                 Register New Driver →
               </button>
               <p className="text-center text-[9px] text-gray-500">Log in with your permanent Driver ID + password. New driver? Register below.</p>
-              <button onClick={() => { setCheckStatusInput(''); setAuthView('pending'); }} className="w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
+              <button onClick={() => { setCheckStatusInput(''); setCheckStatusQuery(''); setAuthView('pending'); }} className="w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
                 Check my application status (any device) →
               </button>
             </>
@@ -647,8 +648,8 @@ export default function DriverPortal() {
             let pendingDriver = pendingId
               ? drivers.find(d => d.id === pendingId) || null
               : null;
-            if (!pendingDriver && checkStatusInput.trim()) {
-              const q = checkStatusInput.trim().toLowerCase();
+            if (!pendingDriver && checkStatusQuery.trim()) {
+              const q = checkStatusQuery.trim().toLowerCase();
               pendingDriver = drivers.find(d =>
                 d.id.toLowerCase() === q ||
                 d.phone.replace(/[^0-9]/g, '').endsWith(q.replace(/[^0-9]/g, '')) ||
@@ -675,10 +676,20 @@ export default function DriverPortal() {
                       type="text"
                       value={checkStatusInput}
                       onChange={e => setCheckStatusInput(e.target.value)}
-                      placeholder="e.g. 3667463854"
+                      onKeyDown={e => { if (e.key === 'Enter') setCheckStatusQuery(checkStatusInput.trim()); }}
+                      placeholder="Your permanent Driver ID, phone or Gmail"
                       className="bg-transparent text-xs text-white outline-none w-full mt-1"
                     />
                   </div>
+                  {checkStatusQuery.trim() && (
+                    <p className="text-[10px] text-red-400 font-bold">No registration found with that ID / phone / Gmail — please check and try again.</p>
+                  )}
+                  <button
+                    onClick={() => setCheckStatusQuery(checkStatusInput.trim())}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-xl shadow-lg"
+                  >
+                    Check Status →
+                  </button>
                   <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
                     ← Back to Login
                   </button>
