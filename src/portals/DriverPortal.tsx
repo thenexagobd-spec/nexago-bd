@@ -32,7 +32,7 @@ export default function DriverPortal() {
   const [sessionId, setSessionId] = useState<string>(() => lsGet('sd_driver_session', ''));
   const me = drivers.find(d => d.id === sessionId) || drivers[0];
   const [tab, setTab] = useState('dashboard');
-  const [authView, setAuthView] = useState<AuthView>(() => (lsGet('sd_driver_session', '') ? 'dashboard' : 'login'));
+  const [authView, setAuthView] = useState<AuthView>(() => (lsGet('sd_driver_remember', true) && lsGet('sd_driver_session', '') ? 'dashboard' : 'login'));
   const [ticketOpen, setTicketOpen] = useState(false);
   const [ticketTopic, setTicketTopic] = useState('Payout / Earnings');
   const [ticketSubject, setTicketSubject] = useState('');
@@ -64,6 +64,7 @@ export default function DriverPortal() {
   const [signupPass, setSignupPass] = useState('');
   const [termsChecked, setTermsChecked] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
+  const [pendingId, setPendingId] = useState<string>('');
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
   const [deliveryProofName, setDeliveryProofName] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState('');
@@ -75,9 +76,38 @@ export default function DriverPortal() {
     setTimeout(() => setToast(null), 2800);
   };
 
-  // Authenticate the driver against the shared fleet (id / phone / name) and
-  // start a persistent session so the site opens straight into the dashboard
-  // on every device (phone, tablet, laptop).
+  // ---- Real driver credentials (no demo bypass) ----
+  // sd_driver_creds: { [driverId]: { phone, password } } — created during signup.
+  // No account can be entered without matching credentials.
+  const CREDS_KEY = 'sd_driver_creds';
+  const getCreds = (): Record<string, { phone: string; password: string }> => {
+    try {
+      const raw = localStorage.getItem(CREDS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  };
+  const saveCreds = (c: Record<string, { phone: string; password: string }>) => {
+    try { localStorage.setItem(CREDS_KEY, JSON.stringify(c)); } catch { /* ignore */ }
+  };
+
+  // Seed credentials for fleet drivers created from the admin panel (which has no
+  // password field) so they can log in too. Default password = the driver's phone
+  // number — they can then register / update via signup.
+  useEffect(() => {
+    const creds = getCreds();
+    let changed = false;
+    for (const d of drivers) {
+      if (d.id && !creds[d.id]) {
+        creds[d.id] = { phone: d.phone || '', password: (d.phone || '').replace(/[^0-9]/g, '') };
+        changed = true;
+      }
+    }
+    if (changed) saveCreds(creds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drivers]);
+
+  // Authenticate the driver against the shared fleet (id / phone / name) AND a
+  // stored password. Without a matching account + password there is no way in.
   const handleLogin = () => {
     const id = loginId.trim().toLowerCase();
     if (!id) { showToast('Enter your driver ID or phone number'); return; }
@@ -87,14 +117,51 @@ export default function DriverPortal() {
       d.phone === id ||
       d.name.toLowerCase() === id
     );
-    if (!found) { showToast('Driver not found — check your ID or phone'); return; }
-    if (!loginPass.trim()) { showToast('Enter your password'); return; }
+    if (!found) { showToast('Driver not found — register a new account first'); return; }
+    const creds = getCreds();
+    const cred = creds[found.id];
+    if (!cred) { showToast('No password set for this account — use the account you registered'); return; }
+    if (cred.password !== loginPass) { showToast('Incorrect password — try again'); return; }
     setSessionId(found.id);
     lsSet('sd_driver_session', found.id);
     setLoginId('');
     setLoginPass('');
     setAuthView('dashboard');
     showToast(`Welcome back, ${found.name.split(' ')[0]}!`);
+  };
+
+  // Signup: register a real driver account + store its password, then require a
+  // fresh login. No demo/bypass button — the pending screen only leads to login.
+  const submitSignup = () => {
+    const requiredDocs = ['license', 'nid', 'registration', 'photo'];
+    const missing = requiredDocs.find(k => !uploadedDocs[k]);
+    if (!signupName.trim() || !signupPhone.trim() || !signupPass.trim()) {
+      showToast('Fill in your name, phone and a password');
+      return;
+    }
+    if (!termsChecked) { showToast('Accept the Terms & Safety Guidelines first'); return; }
+    if (missing) { showToast(`Upload required document: ${missing}`); return; }
+    const existing = drivers.find(d => d.phone === signupPhone.trim());
+    if (existing) { showToast('A driver with this phone number is already registered'); return; }
+    const newId = `DRV${Date.now().toString().slice(-6)}`;
+    const newDriver: typeof drivers[0] = {
+      id: newId,
+      name: signupName.trim(),
+      phone: signupPhone.trim(),
+      vehicleType: signupVehicle,
+      status: 'Offline',
+      completedOrders: 0,
+      earnings: 0,
+      rating: 5,
+      verificationStatus: 'Verified',
+    };
+    setDrivers(prev => [newDriver, ...prev]);
+    const creds = getCreds();
+    creds[newId] = { phone: signupPhone.trim(), password: signupPass };
+    saveCreds(creds);
+    setPendingId(newId);
+    setAuthView('pending');
+    setSignupName(''); setSignupPhone(''); setSignupPass(''); setUploadedDocs({}); setTermsChecked(false);
   };
 
   const handleLogout = () => {
@@ -389,7 +456,14 @@ export default function DriverPortal() {
       nav={nav}
       active={authView === 'dashboard' ? tab : authView}
       onNav={id => {
-        if (authView !== 'dashboard' && (id === 'login' || id === 'signup' || id === 'docs' || id === 'pending' || id === 'forgot' || id === 'terms')) return;
+        // Auth screens (login/signup/docs/pending/forgot/terms) can only move
+        // between auth views — a main portal tab is unreachable until login.
+        if (authView !== 'dashboard') {
+          if (id === 'login' || id === 'signup' || id === 'docs' || id === 'pending' || id === 'forgot' || id === 'terms') {
+            setAuthView(id as AuthView);
+          }
+          return;
+        }
         if (id === 'login' || id === 'signup' || id === 'docs' || id === 'pending' || id === 'forgot' || id === 'terms') {
           setAuthView(id as AuthView);
           return;
@@ -442,7 +516,7 @@ export default function DriverPortal() {
               <button onClick={() => setAuthView('signup')} className="w-full py-2 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
                 Register New Driver →
               </button>
-              <p className="text-center text-[9px] text-gray-500">Demo: any registered driver ID/phone (e.g. DRV123456 or 01712345678) + any password.</p>
+              <p className="text-center text-[9px] text-gray-500">Fleet drivers: password is your phone number (e.g. 01712345678). New driver? Register below.</p>
             </>
           )}
 
@@ -518,7 +592,7 @@ export default function DriverPortal() {
                   </div>
                 ))}
               </div>
-              <button onClick={() => { setAuthView('pending'); }} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-xl shadow-lg mt-3">
+              <button onClick={submitSignup} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-xl shadow-lg mt-3">
                 Submit Application for Approval
               </button>
             </>
@@ -537,12 +611,12 @@ export default function DriverPortal() {
                 </p>
               </div>
               <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 text-left text-[10px] space-y-1.5 w-full">
-                <div className="flex justify-between"><span className="text-gray-400">Driver ID:</span><span className="text-white font-mono font-bold">DRV1001-NEW</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Driver ID:</span><span className="text-white font-mono font-bold">{pendingId || 'DRV1001-NEW'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Submitted:</span><span className="text-white">Today, {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Verification Status:</span><span className="text-amber-400 font-bold">Pending Review</span></div>
               </div>
-              <button onClick={() => setAuthView('dashboard')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg">
-                Bypass / Enter Demo Dashboard →
+              <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg">
+                Back to Login →
               </button>
             </div>
           )}
