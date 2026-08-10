@@ -33,9 +33,9 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a1322] text-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-[#060d17] via-[#0a1322] to-[#0a1322] text-gray-100 flex flex-col">
       {/* Top header */}
-      <header className="h-14 shrink-0 border-b border-[#1e3050] bg-[#0d1829]/80 backdrop-blur flex items-center justify-between px-4 sticky top-0 z-40">
+      <header className="h-14 shrink-0 border-b border-[#1e3050]/60 bg-gradient-to-r from-[#0d1829]/90 via-[#0f1c30]/90 to-[#0d1829]/90 backdrop-blur-xl flex items-center justify-between px-4 sticky top-0 z-40">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-sm shadow-lg">N</div>
           <div>
@@ -57,7 +57,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
 
       <div className="flex-1 flex min-h-0">
         {/* Left icon rail */}
-        <aside className="hidden md:flex flex-col w-20 shrink-0 border-r border-[#1e3050] bg-[#0c1626] py-4 items-center space-y-1 overflow-y-auto">
+        <aside className="hidden md:flex flex-col w-20 shrink-0 border-r border-[#1e3050]/60 bg-gradient-to-b from-[#0c1626]/80 via-[#0e1829]/80 to-[#0c1626]/80 backdrop-blur-sm py-4 items-center space-y-1 overflow-y-auto">
           {nav.map(item => (
             <button
               key={item.id}
@@ -79,7 +79,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
         </aside>
 
         {/* Mobile top nav */}
-        <div className="md:hidden shrink-0 overflow-x-auto border-b border-[#1e3050] bg-[#0c1626] flex space-x-2 px-3 py-2 scrollbar-none">
+        <div className="md:hidden shrink-0 overflow-x-auto border-b border-[#1e3050]/60 bg-gradient-to-r from-[#0c1626]/80 to-[#0e1829]/80 backdrop-blur-sm flex space-x-2 px-3 py-2 scrollbar-none">
           {nav.map(item => (
             <button
               key={item.id}
@@ -102,7 +102,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
 
       {/* Mobile bottom nav (app-like, always visible on phones — scrollable so
           every portal page stays reachable on any screen size) */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#1e3050] bg-[#0c1626]/95 backdrop-blur flex overflow-x-auto scrollbar-none">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#1e3050]/60 bg-gradient-to-r from-[#0c1626]/95 via-[#0e1829]/95 to-[#0c1626]/95 backdrop-blur-xl flex overflow-x-auto scrollbar-none">
         {nav.slice(0, 8).map(item => (
           <button
             key={item.id}

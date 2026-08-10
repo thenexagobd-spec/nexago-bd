@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Package, Wallet, User, MessageSquare, BarChart3, Phone, Navigation,
   CheckCircle2, Star, LogIn, Power, Send, RefreshCw, MapPin, FileText, AlertCircle,
     History, Inbox, Headphones, Settings, ShieldCheck, LogOut, ChevronRight, Copy, Eye, Truck,
-    X, Bell, Clock, RotateCcw, Search
+    X, Bell, Clock, RotateCcw, Search, Lock
   } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync } from './portalUtils';
@@ -520,45 +520,62 @@ export default function DriverPortal() {
           {/* ---- LOGIN ---- */}
           {authView === 'login' && (
             <>
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-orange to-amber-500 text-white flex items-center justify-center mx-auto text-3xl font-bold shadow-xl">
-                  <Truck className="w-8 h-8" />
+              {/* Ambient glow */}
+              <div className="absolute top-24 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-brand-orange/10 blur-3xl pointer-events-none"></div>
+              <div className="relative text-center space-y-3">
+                <div className="relative w-20 h-20 mx-auto">
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-tr from-brand-orange to-amber-400 opacity-40 blur-xl"></div>
+                  <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-brand-orange via-orange-500 to-amber-500 text-white flex items-center justify-center text-3xl font-black shadow-2xl shadow-brand-orange/30 border border-white/20">
+                    <Truck className="w-9 h-9" />
+                  </div>
                 </div>
-                <h4 className="text-base font-black text-white tracking-wide">The NexaGo BD Driver</h4>
-                <p className="text-[10px] text-gray-400">Enter credentials to access dispatch portal</p>
+                <div className="space-y-1.5">
+                  <p className="text-[8px] tracking-[0.3em] uppercase text-brand-orange font-black">NexaGo BD</p>
+                  <h4 className="text-lg font-black text-white tracking-wide">The NexaGo BD Driver</h4>
+                  <p className="text-[10px] text-gray-400">Enter credentials to access the dispatch portal</p>
+                </div>
               </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-2.5">
-                <div className="space-y-1">
-                  <label className="text-[8px] text-gray-400 uppercase block font-black">Driver ID / Phone</label>
-                  <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="e.g. 3667463854"
-                    className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] font-mono outline-none focus:border-brand-orange text-white" />
+              <div className="relative rounded-3xl bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] shadow-2xl shadow-black/40 p-5 space-y-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Driver ID / Phone</label>
+                  <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
+                    <User className="w-4 h-4 text-brand-orange/70 shrink-0" />
+                    <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="e.g. 3667463854"
+                      className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[8px] text-gray-400 uppercase block font-black">Password</label>
-                  <div className="flex items-center gap-2 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Password</label>
+                  <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
+                    <Lock className="w-4 h-4 text-brand-orange/70 shrink-0" />
                     <input type={showPassword ? 'text' : 'password'} value={loginPass} onChange={e => setLoginPass(e.target.value)}
-                      placeholder="••••••••" className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white" />
+                      placeholder="••••••••" className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
                     <button onClick={() => setShowPassword(!showPassword)} className="text-gray-400 hover:text-white cursor-pointer">
                       <Eye className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px]">
+                <div className="flex items-center justify-between text-[10px] pt-0.5">
                   <label className="flex items-center space-x-1.5 cursor-pointer text-gray-300">
                     <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="rounded border-white/20 text-brand-orange focus:ring-0" />
                     <span>Remember Me</span>
                   </label>
                   <button onClick={() => setAuthView('forgot')} className="text-brand-orange hover:underline font-bold">Forgot Password?</button>
                 </div>
+                <button onClick={handleLogin} className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-black uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99]">
+                  Login to Portal
+                </button>
               </div>
-              <button onClick={handleLogin} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg transition-all">
-                Login to Portal
-              </button>
-              <button onClick={() => setAuthView('signup')} className="w-full py-2 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
+              <div className="relative flex items-center gap-3 text-[8px] text-gray-500 font-bold uppercase tracking-widest">
+                <span className="flex-1 h-px bg-gradient-to-r from-transparent to-[#24395c]"></span>
+                <span>New to NexaGo?</span>
+                <span className="flex-1 h-px bg-gradient-to-l from-transparent to-[#24395c]"></span>
+              </div>
+              <button onClick={() => setAuthView('signup')} className="w-full py-3 bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] hover:border-brand-orange/50 hover:from-[#1b2f4d] hover:to-brand-card text-gray-200 hover:text-white text-[11px] font-bold rounded-xl cursor-pointer transition-all">
                 Register New Driver →
               </button>
-              <p className="text-center text-[9px] text-gray-500">Log in with your permanent Driver ID + password. New driver? Register below.</p>
-              <button onClick={() => { setCheckStatusInput(''); setCheckStatusQuery(''); setAuthView('pending'); }} className="w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
+              <p className="relative text-center text-[9px] text-gray-500">Log in with your permanent Driver ID + password. New driver? Register below.</p>
+              <button onClick={() => { setCheckStatusInput(''); setCheckStatusQuery(''); setAuthView('pending'); }} className="relative w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
                 Check my application status (any device) →
               </button>
             </>
@@ -580,20 +597,20 @@ export default function DriverPortal() {
                   { label: 'NID Number', val: signupNid, set: setSignupNid, type: 'text' },
                   { label: 'Driving License Number', val: signupLicense, set: setSignupLicense, type: 'text' },
                 ].map(f => (
-                  <div key={f.label} className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                  <div key={f.label} className="glass-soft rounded-xl p-3">
                     <label className="text-[7.5px] text-gray-400 uppercase block font-bold">{f.label}</label>
                     <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full mt-1" />
                   </div>
                 ))}
-                <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                <div className="glass-soft rounded-xl p-3">
                   <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Vehicle Type</label>
                   <select value={signupVehicle} onChange={e => setSignupVehicle(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full mt-1 cursor-pointer">
                     {['Motorcycle (150cc)', 'Electric Scooter / EV', 'Bicycle Courier', 'Covered Van / Car'].map(v => (
-                      <option key={v} value={v} className="bg-[#101d30]">{v}</option>
+                      <option key={v} value={v} className="glass-soft">{v}</option>
                     ))}
                   </select>
                 </div>
-                <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                <div className="glass-soft rounded-xl p-3">
                   <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Your Permanent Driver ID</label>
                   <p className="text-[10px] text-emerald-400 mt-1">Auto-generated after approval — e.g. 3667463854. You will also receive a random password.</p>
                 </div>
@@ -625,7 +642,7 @@ export default function DriverPortal() {
                   { key: 'insurance', label: 'Tax Token & Insurance Policy', required: false },
                   { key: 'photo', label: 'Profile Photo / Selfie with Vehicle', required: true },
                 ].map(docItem => (
-                  <div key={docItem.key} className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 flex items-center justify-between">
+                  <div key={docItem.key} className="glass-soft rounded-xl p-3 flex items-center justify-between">
                     <div>
                       <p className="text-[11px] text-white font-bold">{docItem.label}</p>
                       <p className="text-[8px] text-gray-400">{uploadedDocs[docItem.key] || (docItem.required ? 'Required' : 'Optional')}</p>
@@ -672,7 +689,7 @@ export default function DriverPortal() {
                       Enter the permanent Driver ID, phone number or Gmail you registered with to see your application from any device.
                     </p>
                   </div>
-                  <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 w-full">
+                  <div className="glass-soft rounded-xl p-3 w-full">
                     <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Driver ID / Phone / Gmail</label>
                     <input
                       type="text"
@@ -692,7 +709,7 @@ export default function DriverPortal() {
                   >
                     Check Status →
                   </button>
-                  <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
+                  <button onClick={() => setAuthView('login')} className="w-full py-2.5 glass-soft hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
                     ← Back to Login
                   </button>
                 </div>
@@ -715,7 +732,7 @@ export default function DriverPortal() {
                     : 'Our dispatch team is verifying your Driving License & NID details. Check back soon from this link.'}
                 </p>
               </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 text-left text-[10px] space-y-1.5 w-full">
+              <div className="glass-soft rounded-xl p-3 text-left text-[10px] space-y-1.5 w-full">
                 <div className="flex justify-between"><span className="text-gray-400">Permanent Driver ID:</span><span className="text-white font-mono font-bold">{pendingDriver?.id || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Name:</span><span className="text-white">{pendingDriver?.name || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Phone:</span><span className="text-white">{pendingDriver?.phone || '—'}</span></div>
@@ -750,7 +767,7 @@ export default function DriverPortal() {
                 <span className="w-4" />
               </div>
               <p className="text-[10px] text-gray-400">Enter your registered mobile phone number to receive a 6-digit OTP verification code.</p>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+              <div className="glass-soft rounded-xl p-3">
                 <label className="text-[8px] text-gray-400 uppercase block font-black">Registered Phone Number</label>
                 <input type="tel" defaultValue="+880 1234-567890" className="bg-transparent text-xs text-white font-mono outline-none w-full mt-1" />
               </div>
@@ -774,7 +791,7 @@ export default function DriverPortal() {
                   { id: 't2', title: '2. Payout & Commission Rates', desc: 'Standard commission is 15% per fulfilled delivery. Weekly settlement happens every Sunday.' },
                   { id: 't3', title: '3. Order Cancellation Policy', desc: 'Unauthorized order cancellation will lead to temporary account freeze.' },
                 ].map(term => (
-                  <div key={term.id} className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                  <div key={term.id} className="glass-soft rounded-xl p-3">
                     <button onClick={() => setExpandedTerm(expandedTerm === term.id ? null : term.id)} className="w-full text-left flex justify-between items-center font-bold text-white cursor-pointer">
                       <span>{term.title}</span>
                       <span className="text-brand-orange">{expandedTerm === term.id ? '−' : '+'}</span>
@@ -797,7 +814,7 @@ export default function DriverPortal() {
           {tab === 'dashboard' && (
             <div className="space-y-5">
               {/* Hero */}
-              <div className="rounded-2xl p-5 bg-gradient-to-r from-brand-orange/20 via-[#101d30] to-[#101d30] border border-brand-orange/20 flex flex-wrap items-center justify-between gap-4">
+              <div className="rounded-2xl p-5 bg-gradient-to-r from-brand-orange/20 via-brand-card to-brand-card border border-brand-orange/20 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center space-x-4">
                   {me?.photo ? <img src={me.photo} alt={me.name} className="w-14 h-14 rounded-2xl object-cover border border-brand-orange/40" /> : <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-xl">RK</div>}
                   <div>
@@ -813,7 +830,7 @@ export default function DriverPortal() {
 
               {/* Duty status banner */}
               {!online ? (
-                <div className="rounded-2xl p-6 bg-[#101d30] border border-[#1e3050] text-center space-y-3">
+                <div className="rounded-2xl p-6 glass-soft text-center space-y-3">
                   <p className="text-[11px] font-black text-red-400 uppercase tracking-wide">You're Offline</p>
                   <p className="text-[11px] text-gray-400">To receive orders, go online by tapping <b className="text-white">Start Working</b></p>
                   <button onClick={toggleDuty} className="w-full max-w-xs mx-auto py-3 bg-brand-orange hover:bg-brand-orange-hover text-white text-[11px] font-black uppercase rounded-2xl cursor-pointer shadow-lg">
@@ -824,12 +841,12 @@ export default function DriverPortal() {
                 <>
                   {/* Active delivery card */}
                   {activeOrder && (
-                    <div className="bg-[#101d30] border border-brand-orange/40 rounded-2xl p-4 space-y-2.5 shadow-md">
+                    <div className="glass-soft border border-brand-orange/40 rounded-2xl p-4 space-y-2.5 shadow-md">
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] text-brand-orange font-black uppercase tracking-wider">Active Delivery</p>
                         <div className="flex items-center space-x-1.5">
                           <span className="text-sm font-black text-white font-mono tracking-wider">#{activeOrder.id}</span>
-                          <button onClick={() => copyOrderNo(activeOrder.id)} className="p-1 bg-[#0a1322] border border-[#1e3050] rounded-md cursor-pointer hover:bg-[#132238]"><Copy className="w-3 h-3 text-brand-orange" /></button>
+                          <button onClick={() => copyOrderNo(activeOrder.id)} className="p-1 glass-input rounded-md cursor-pointer hover:bg-[#132238]"><Copy className="w-3 h-3 text-brand-orange" /></button>
                         </div>
                       </div>
                       <p className="text-[11px] font-black text-white truncate">{activeOrder.storeName}</p>
@@ -850,7 +867,7 @@ export default function DriverPortal() {
                   {/* Refresh ring when idle */}
                   {!activeOrder && (
                     <div className="flex flex-col items-center justify-center py-6">
-                      <button onClick={() => setTab('offers')} className="relative w-14 h-14 rounded-full bg-[#101d30] border border-brand-orange/40 flex items-center justify-center cursor-pointer group" title="Check for new orders">
+                      <button onClick={() => setTab('offers')} className="relative w-14 h-14 rounded-full glass-soft border border-brand-orange/40 flex items-center justify-center cursor-pointer group" title="Check for new orders">
                         <span className="absolute inset-0 rounded-full border-2 border-dashed border-brand-orange/50"></span>
                         <RefreshCw className="w-6 h-6 text-brand-orange animate-spin" />
                       </button>
@@ -872,13 +889,13 @@ export default function DriverPortal() {
                 <p className="text-[10px] text-gray-400">Store accepted these orders and dispatched them to you — accept within 1 minute or it auto-cancels.</p>
               </div>
               {!online ? (
-                <div className="rounded-2xl p-6 bg-[#101d30] border border-[#1e3050] text-center">
+                <div className="rounded-2xl p-6 glass-soft text-center">
                   <p className="text-[11px] font-black text-red-400 uppercase">You're Offline</p>
                   <p className="text-[10px] text-gray-400 mt-1">Go online to receive order requests.</p>
                   <button onClick={toggleDuty} className="mt-3 px-5 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[10px] font-black uppercase rounded-xl">Start Working</button>
                 </div>
               ) : offers.length === 0 ? (
-                <div className="rounded-2xl p-8 bg-[#101d30] border border-[#1e3050] text-center space-y-2">
+                <div className="rounded-2xl p-8 glass-soft text-center space-y-2">
                   <RefreshCw className="w-8 h-8 text-gray-600 mx-auto" />
                   <p className="text-[11px] text-white font-bold">No new orders right now</p>
                   <p className="text-[10px] text-gray-400">New dispatched orders will appear here.</p>
@@ -888,7 +905,7 @@ export default function DriverPortal() {
                   {offers.map(o => {
                     const remaining = o.driverDeadline ? Math.max(0, Math.round((o.driverDeadline - now) / 1000)) : 60;
                     return (
-                      <div key={o.id} className="bg-[#101d30] border border-brand-orange/30 rounded-2xl p-4 space-y-3">
+                      <div key={o.id} className="glass-soft border border-brand-orange/30 rounded-2xl p-4 space-y-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center space-x-2">
                             <p className="text-[12px] font-mono text-brand-orange font-black">#{o.id}</p>
@@ -921,10 +938,10 @@ export default function DriverPortal() {
                         </div>
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center text-[9px]">
-                          <div className="bg-[#0a1322] p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Total Distance</p><p className="text-white font-bold mt-0.5">{o.pickupLocation && o.address ? '~4.2 km' : '—'}</p></div>
-                          <div className="bg-[#0a1322] p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Est. Time</p><p className="text-brand-orange font-bold mt-0.5">~23 min</p></div>
-                          <div className="bg-[#0a1322] p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Delivery Fee</p><p className="text-emerald-400 font-bold mt-0.5">{bdt(o.deliveryCharge || 60)}</p></div>
-                          <div className="bg-[#0a1322] p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Total Payable</p><p className="text-white font-bold mt-0.5">{bdt(o.amount)}</p></div>
+                          <div className="glass-input p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Total Distance</p><p className="text-white font-bold mt-0.5">{o.pickupLocation && o.address ? '~4.2 km' : '—'}</p></div>
+                          <div className="glass-input p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Est. Time</p><p className="text-brand-orange font-bold mt-0.5">~23 min</p></div>
+                          <div className="glass-input p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Delivery Fee</p><p className="text-emerald-400 font-bold mt-0.5">{bdt(o.deliveryCharge || 60)}</p></div>
+                          <div className="glass-input p-2 rounded-lg border border-[#1e3050]"><p className="text-gray-400">Total Payable</p><p className="text-white font-bold mt-0.5">{bdt(o.amount)}</p></div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">
@@ -947,7 +964,7 @@ export default function DriverPortal() {
           {tab === 'active' && (
             <div className="space-y-3">
               {!activeOrder ? (
-                <div className="rounded-2xl p-8 bg-[#101d30] border border-[#1e3050] text-center space-y-2">
+                <div className="rounded-2xl p-8 glass-soft text-center space-y-2">
                   <Package className="w-8 h-8 text-gray-600 mx-auto" />
                   <p className="text-[11px] text-white font-bold">No active delivery</p>
                   <p className="text-[10px] text-gray-400">Accept a new order to start delivering.</p>
@@ -963,13 +980,13 @@ export default function DriverPortal() {
                   </div>
 
                   {/* Trip summary */}
-                  <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-2 shadow-lg">
+                  <div className="glass-soft rounded-2xl p-4 space-y-2 shadow-lg">
                     <p className="text-[10px] font-bold text-white uppercase tracking-wider">Delivery Summary</p>
                     <div className="flex items-center justify-between gap-2"><span className="text-[9px] text-gray-400 font-bold uppercase">Restaurant</span><span className="text-[10px] font-black text-white truncate">{activeOrder.storeName}</span></div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[9px] text-gray-400 font-bold uppercase">Order No.</span>
                       <span className="flex items-center space-x-1.5"><span className="text-sm font-black text-brand-orange font-mono tracking-wider">#{activeOrder.id}</span>
-                        <button onClick={() => copyOrderNo(activeOrder.id)} className="p-1 bg-[#0a1322] border border-[#1e3050] rounded-md cursor-pointer hover:bg-[#132238]"><Copy className="w-3 h-3 text-brand-orange" /></button>
+                        <button onClick={() => copyOrderNo(activeOrder.id)} className="p-1 glass-input rounded-md cursor-pointer hover:bg-[#132238]"><Copy className="w-3 h-3 text-brand-orange" /></button>
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-2"><span className="text-[9px] text-gray-400 font-bold uppercase">To Restaurant</span><span className="text-[10px] font-black text-white">{activeOrder.pickupLocation || activeOrder.address || '—'}</span></div>
@@ -982,7 +999,7 @@ export default function DriverPortal() {
                   </div>
 
                   {/* Step timeline */}
-                  <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-2.5">
+                  <div className="glass-soft rounded-2xl p-4 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] font-bold text-white uppercase tracking-wider">Delivery Progress</p>
                       <span className="px-2 py-0.5 rounded-lg bg-brand-orange/15 text-brand-orange text-[8px] font-black">{driverStep(activeOrder) >= 6 ? 'Completed' : 'Live'}</span>
@@ -996,7 +1013,7 @@ export default function DriverPortal() {
                       { done: driverStep(activeOrder) >= 6, icon: '🏠', label: 'Delivered', desc: 'Order handed over to customer', time: driverStep(activeOrder) >= 6 ? 'Done' : 'Upcoming' },
                     ].map((s, i) => (
                       <div key={i} className="flex items-start space-x-2.5">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${s.done ? 'bg-emerald-500 text-white' : 'bg-[#0a1322] text-gray-500 border border-[#1e3050]'}`}>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${s.done ? 'bg-emerald-500 text-white' : 'glass-input text-gray-500 border border-[#1e3050]'}`}>
                           {s.done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <span className="text-[10px]">{s.icon}</span>}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1012,7 +1029,7 @@ export default function DriverPortal() {
 
                   {/* Audit timeline */}
                   {(activeOrder.timeline?.length || 0) > 0 && (
-                    <div className="bg-[#0a1322] border border-[#1e3050] rounded-xl p-3">
+                    <div className="glass-input rounded-xl p-3">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Order Timeline</p>
                       <div className="space-y-1.5">
                         {activeOrder.timeline!.map((t, i) => (
@@ -1042,7 +1059,7 @@ export default function DriverPortal() {
                       </>
                     )}
                     {activeOrder.driverStage === 'waiting_store' && (
-                      <div className="w-full py-3 bg-[#101d30] border border-[#1e3050] text-gray-300 text-[10px] font-bold text-center rounded-xl">
+                      <div className="w-full py-3 glass-soft text-gray-300 text-[10px] font-bold text-center rounded-xl">
                         Waiting for Store App to mark the order ready
                       </div>
                     )}
@@ -1056,16 +1073,16 @@ export default function DriverPortal() {
                               onChange={e => setPickupPinInput(e.target.value)}
                               inputMode="numeric"
                               placeholder="Enter 4-digit pickup PIN"
-                              className="w-full px-3 py-2 bg-[#0a1322] border border-[#1e3050] rounded-xl text-white text-[12px] font-mono tracking-widest outline-none focus:border-brand-orange"
+                              className="w-full px-3 py-2 glass-input rounded-xl text-white text-[12px] font-mono tracking-widest outline-none focus:border-brand-orange"
                             />
                           </div>
                         )}
-                        <label className="w-full py-3 bg-[#101d30] border border-dashed border-[#1e3050] hover:border-brand-orange/40 text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
+                        <label className="w-full py-3 glass-soft border border-dashed border-[#1e3050] hover:border-brand-orange/40 text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
                           <FileText className="w-3.5 h-3.5 text-brand-orange" />
                           <span>{pickupProofName ? `Pickup photo: ${pickupProofName}` : 'Upload pickup order photo'}</span>
                           <input type="file" accept="image/*" className="hidden" onChange={e => setPickupProofName(e.target.files?.[0]?.name || 'pickup.jpg')} />
                         </label>
-                        <button onClick={handlePickupConfirmed} className={`w-full py-2.5 text-[11px] font-black uppercase rounded-xl shadow-lg cursor-pointer ${pickupProofName ? 'bg-brand-orange hover:bg-brand-orange-hover text-white' : 'bg-[#0a1322] border border-[#1e3050] text-gray-500 cursor-not-allowed'}`}>
+                        <button onClick={handlePickupConfirmed} className={`w-full py-2.5 text-[11px] font-black uppercase rounded-xl shadow-lg cursor-pointer ${pickupProofName ? 'bg-brand-orange hover:bg-brand-orange-hover text-white' : 'glass-input text-gray-500 cursor-not-allowed'}`}>
                           {pickupProofName ? 'Verify PIN & Confirm Pickup' : 'Upload a pickup photo first'}
                         </button>
                       </>
@@ -1081,7 +1098,7 @@ export default function DriverPortal() {
                           </button>
                         )}
                         {activeOrder.driverStage === 'to_customer' && (
-                          <button onClick={handleArrived} className="w-full py-2.5 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-white text-[11px] font-black uppercase rounded-xl cursor-pointer">
+                          <button onClick={handleArrived} className="w-full py-2.5 glass-soft hover:bg-[#132238] text-white text-[11px] font-black uppercase rounded-xl cursor-pointer">
                             I've Arrived at Customer
                           </button>
                         )}
@@ -1092,7 +1109,7 @@ export default function DriverPortal() {
                         )}
                         {(activeOrder.driverStage === 'at_customer' || activeOrder.driverStage === 'customer_reported') && (
                           <>
-                            <label className="w-full py-3 bg-[#101d30] border border-dashed border-[#1e3050] hover:border-emerald-500/40 text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
+                            <label className="w-full py-3 glass-soft border border-dashed border-[#1e3050] hover:border-emerald-500/40 text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
                               <FileText className="w-3.5 h-3.5 text-emerald-400" />
                               <span>{deliveryProofName ? `Delivery photo: ${deliveryProofName}` : 'Upload delivery proof photo'}</span>
                               <input type="file" accept="image/*" className="hidden" onChange={e => setDeliveryProofName(e.target.files?.[0]?.name || 'delivery.jpg')} />
@@ -1105,17 +1122,17 @@ export default function DriverPortal() {
                                   onChange={e => setPinInput(e.target.value)}
                                   inputMode="numeric"
                                   placeholder="Enter 4-digit PIN"
-                                  className="w-full px-3 py-2 bg-[#0a1322] border border-[#1e3050] rounded-xl text-white text-[12px] font-mono tracking-widest outline-none focus:border-emerald-500"
+                                  className="w-full px-3 py-2 glass-input rounded-xl text-white text-[12px] font-mono tracking-widest outline-none focus:border-emerald-500"
                                 />
                               </div>
                             )}
                             {/cash|cod/i.test(activeOrder.paymentMethod || '') && (
-                              <label className="w-full py-2.5 bg-[#101d30] border border-[#1e3050] hover:border-emerald-500/40 text-emerald-300 text-[10px] font-black uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
+                              <label className="w-full py-2.5 glass-soft hover:border-emerald-500/40 text-emerald-300 text-[10px] font-black uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
                                 <input type="checkbox" checked={codSettled} onChange={e => setCodSettled(e.target.checked)} className="accent-emerald-500" />
                                 <span>Cash collected: {bdt(activeOrder.codAmount || activeOrder.amount)} — I'll settle to store</span>
                               </label>
                             )}
-                            <button onClick={handleDeliveryProofSubmitted} className={`w-full py-2.5 text-[11px] font-black uppercase rounded-xl cursor-pointer ${deliveryProofName ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-[#0a1322] border border-[#1e3050] text-gray-500 cursor-not-allowed'}`}>
+                            <button onClick={handleDeliveryProofSubmitted} className={`w-full py-2.5 text-[11px] font-black uppercase rounded-xl cursor-pointer ${deliveryProofName ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'glass-input text-gray-500 cursor-not-allowed'}`}>
                               {deliveryProofName ? 'Complete Delivery' : 'Upload delivery proof photo first'}
                             </button>
                           </>
@@ -1140,7 +1157,7 @@ export default function DriverPortal() {
               ) : (
                 <div className="space-y-2">
                   {pickupJobs.map(r => (
-                    <div key={r.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-2">
+                    <div key={r.id} className="glass-soft rounded-2xl p-4 space-y-2">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center space-x-2">
                           <span className="text-[10px] font-mono font-black text-brand-orange">#{r.id}</span>
@@ -1195,7 +1212,7 @@ export default function DriverPortal() {
               {myOrders.length === 0 ? <p className="text-center text-[10px] text-gray-500 py-10">No deliveries assigned yet.</p> : (
                 <div className="space-y-2">
                   {myOrders.map(o => (
-                    <div key={o.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
+                    <div key={o.id} className="glass-soft rounded-2xl p-4">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center space-x-2">
                           <p className="text-[11px] font-mono text-brand-orange font-black">#{o.id}</p>
@@ -1258,14 +1275,14 @@ export default function DriverPortal() {
                   { label: 'Pending Settlement', value: bdt(0), color: 'text-emerald-400' },
                   { label: 'Tips', value: bdt(done.length * 10), color: 'text-amber-400' },
                 ].map(k => (
-                  <div key={k.label} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
+                  <div key={k.label} className="glass-soft rounded-2xl p-4">
                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{k.label}</p>
                     <p className={`text-xl font-black mt-1 ${k.color}`}>{k.value}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
+              <div className="glass-soft rounded-2xl p-4">
                 <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center space-x-2 mb-3"><BarChart3 className="w-3.5 h-3.5 text-brand-orange" /><span>This Week</span></p>
                 <div className="flex items-end space-x-1.5 h-24">
                   {moneyBars.map((v, i) => (
@@ -1279,12 +1296,12 @@ export default function DriverPortal() {
                 Withdraw to bKash / Bank
               </button>
 
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
+              <div className="glass-soft rounded-2xl p-4">
                 <p className="text-[10px] font-black text-white uppercase tracking-widest mb-3">Payout History</p>
                 {txns.length === 0 ? <p className="text-[10px] text-gray-500 py-4 text-center">No payouts yet.</p> : (
                   <div className="space-y-1.5">
                     {txns.slice(0, 6).map(t => (
-                      <div key={t.id} className="flex items-center justify-between gap-2 bg-[#0a1322] border border-[#1e3050] rounded-lg px-3 py-2 text-[10px]">
+                      <div key={t.id} className="flex items-center justify-between gap-2 glass-input rounded-lg px-3 py-2 text-[10px]">
                         <div>
                           <p className="text-gray-200 font-bold">{t.type}</p>
                           <p className="text-[8px] text-gray-500 font-mono">{t.id} · {t.date}</p>
@@ -1309,7 +1326,7 @@ export default function DriverPortal() {
                 <button onClick={() => setNotifications(prev => prev.map(n => (n.driverId && n.driverId === me?.id) || (!n.driverId && !n.audience) ? { ...n, read: true } : n))} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">Mark all read</button>
               </div>
               {myNotifs.length === 0 ? (
-                <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 flex items-start space-x-3">
+                <div className="glass-soft rounded-2xl p-4 flex items-start space-x-3">
                   <div className="w-10 h-10 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0"><Inbox className="w-4 h-4" /></div>
                   <div>
                     <p className="text-[11px] font-bold text-white">No new messages</p>
@@ -1321,8 +1338,8 @@ export default function DriverPortal() {
                   {myNotifs.map(n => {
                     const color = n.type === 'order' ? 'text-brand-orange' : n.type === 'payment' ? 'text-emerald-400' : n.type === 'driver' ? 'text-cyan-400' : 'text-sky-400';
                     return (
-                      <div key={n.id} className={`bg-[#101d30] border rounded-xl p-3 flex items-start space-x-3 ${n.read ? 'border-[#1e3050]' : 'border-brand-orange/40'}`}>
-                        <span className={`w-8 h-8 rounded-full bg-[#0a1322] flex items-center justify-center shrink-0 ${color}`}>
+                      <div key={n.id} className={`glass-soft border rounded-xl p-3 flex items-start space-x-3 ${n.read ? 'border-[#1e3050]' : 'border-brand-orange/40'}`}>
+                        <span className={`w-8 h-8 rounded-full glass-input flex items-center justify-center shrink-0 ${color}`}>
                           {n.type === 'order' ? <Package className="w-4 h-4" /> : n.type === 'payment' ? <Wallet className="w-4 h-4" /> : n.type === 'driver' ? <Truck className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
                         </span>
                         <div className="flex-1 min-w-0">
@@ -1348,7 +1365,7 @@ export default function DriverPortal() {
                 <h3 className="text-sm font-black text-white flex items-center space-x-2"><Headphones className="w-4 h-4 text-brand-orange" /><span>Driver Helpline Support</span></h3>
                 <p className="text-[10px] text-gray-400">24/7 dispatch control room for active rider emergencies.</p>
               </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-5 text-center space-y-2">
+              <div className="glass-soft rounded-2xl p-5 text-center space-y-2">
                 <button onClick={() => setTicketOpen(true)} className="w-full py-3 bg-brand-orange/15 border border-brand-orange/40 text-brand-orange hover:bg-brand-orange/25 text-[10px] font-black uppercase rounded-xl cursor-pointer flex items-center justify-center space-x-2 transition-colors">
                   <MessageSquare className="w-3.5 h-3.5" /><span>Raise a Ticket for Admin</span>
                 </button>
@@ -1361,10 +1378,10 @@ export default function DriverPortal() {
                   <button onClick={() => setTicketOpen(true)} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">+ New</button>
                 </div>
                 {tickets.filter(t => /Driver|driver|Shakib|Rahim/i.test(t.user)).length === 0 ? (
-                  <p className="text-[9px] text-gray-500 text-center py-3 bg-[#101d30] border border-[#1e3050] rounded-xl">No tickets yet — raise one and the admin will reply here.</p>
+                  <p className="text-[9px] text-gray-500 text-center py-3 glass-soft rounded-xl">No tickets yet — raise one and the admin will reply here.</p>
                 ) : (
                   tickets.filter(t => /Driver|driver|Shakib|Rahim/i.test(t.user)).slice(0, 5).map(t => (
-                    <div key={t.id} className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                    <div key={t.id} className="glass-soft rounded-xl p-3">
                       <div className="flex items-center justify-between">
                         <p className="text-[9px] font-mono text-gray-500">{t.id}</p>
                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-black ${t.status === 'Resolved' ? 'bg-emerald-500/15 text-emerald-300' : t.status === 'In Progress' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300'}`}>{t.status}</span>
@@ -1378,15 +1395,15 @@ export default function DriverPortal() {
 
               <div className="space-y-1.5 text-[10px]">
                 <p className="text-gray-400 font-bold uppercase text-[9px]">Frequently Asked Questions</p>
-                <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                <div className="glass-soft rounded-xl p-3">
                   <p className="text-[11px] text-white font-bold">How are weekly payouts calculated?</p>
                   <p className="text-gray-400 text-[9px] mt-0.5">Earnings are transferred every Sunday directly to your bKash or Bank account.</p>
                 </div>
-                <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                <div className="glass-soft rounded-xl p-3">
                   <p className="text-[11px] text-white font-bold">What to do in case of heavy traffic / rain delay?</p>
                   <p className="text-gray-400 text-[9px] mt-0.5">Use the in-app chat button on transit view to notify the customer immediately.</p>
                 </div>
-                <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
+                <div className="glass-soft rounded-xl p-3">
                   <p className="text-[11px] text-white font-bold">Can I change my vehicle type?</p>
                   <p className="text-gray-400 text-[9px] mt-0.5">Contact support to update your vehicle after re-verifying your documents.</p>
                 </div>
@@ -1407,13 +1424,13 @@ export default function DriverPortal() {
                   { label: 'Distance Unit', value: 'Kilometers (km)' },
                   { label: 'Ringer / Notification Tone', value: 'Default · Dispatch Bell' },
                 ].map((s, i) => (
-                  <div key={i} className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 flex items-center justify-between">
+                  <div key={i} className="glass-soft rounded-xl p-3 flex items-center justify-between">
                     <p className="text-gray-400">{s.label}</p>
                     <p className="text-white font-bold text-[11px]">{s.value}</p>
                   </div>
                 ))}
               </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 flex items-center justify-between">
+              <div className="glass-soft rounded-xl p-3 flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-bold text-white">Push Notifications</p>
                   <p className="text-[8px] text-gray-400">New order, payout & support alerts</p>
@@ -1422,7 +1439,7 @@ export default function DriverPortal() {
                   <div className={`w-4 h-4 rounded-full bg-white transition-all shadow ${notifOn ? 'ml-auto' : ''}`}></div>
                 </button>
               </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 flex items-center justify-between">
+              <div className="glass-soft rounded-xl p-3 flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-bold text-white">Auto-accept orders</p>
                   <p className="text-[8px] text-gray-400">{autoAccept ? 'ON — new orders are received automatically' : 'OFF — accept each order manually'}</p>
@@ -1431,7 +1448,7 @@ export default function DriverPortal() {
                   <div className={`w-4 h-4 rounded-full bg-white transition-all shadow ${autoAccept ? 'ml-auto' : ''}`}></div>
                 </button>
               </div>
-              <button onClick={() => { /* version */ }} className="w-full bg-[#101d30] border border-[#1e3050] p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-[#132238]">
+              <button onClick={() => { /* version */ }} className="w-full glass-soft p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-[#132238]">
                 <p className="text-[10px] text-gray-400">App Version</p>
                 <p className="text-white font-bold text-[11px]">v1.4.2 ✓</p>
               </button>
@@ -1452,20 +1469,20 @@ export default function DriverPortal() {
                   { label: 'Total Distance', value: '1,240 km', color: 'text-brand-orange' },
                   { label: 'Customer Rating', value: `★ ${me?.rating?.toFixed(1) || '4.9'}`, color: 'text-amber-400' },
                 ].map(k => (
-                  <div key={k.label} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
+                  <div key={k.label} className="glass-soft rounded-2xl p-4">
                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{k.label}</p>
                     <p className={`text-xl font-black mt-1 ${k.color}`}>{k.value}</p>
                   </div>
                 ))}
               </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-3">
+              <div className="glass-soft rounded-2xl p-4 space-y-3">
                 <p className="text-[10px] font-black text-white uppercase tracking-widest">Rating Breakdown</p>
                 {[5, 4, 3, 2, 1].map(r => {
                   const pct = r === 5 ? 88 : r === 4 ? 9 : r === 3 ? 2 : 1;
                   return (
                     <div key={r} className="flex items-center space-x-2 text-[10px]">
                       <span className="w-6 text-gray-400 flex items-center"><Star className="w-3 h-3 text-amber-400" />{r}</span>
-                      <div className="flex-1 h-2 bg-[#0a1322] rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-amber-500 to-brand-orange" style={{ width: `${pct}%` }} /></div>
+                      <div className="flex-1 h-2 glass-input rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-amber-500 to-brand-orange" style={{ width: `${pct}%` }} /></div>
                       <span className="text-gray-400 w-8 text-right font-mono">{pct}%</span>
                     </div>
                   );
@@ -1481,11 +1498,11 @@ export default function DriverPortal() {
                 <h3 className="text-sm font-black text-white flex items-center space-x-2"><MessageSquare className="w-4 h-4 text-brand-orange" /><span>Dispatch Chat</span></h3>
                 <p className="text-[10px] text-gray-400">Talk to the dispatch team in real time.</p>
               </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 h-96 flex flex-col">
+              <div className="glass-soft rounded-2xl p-4 h-96 flex flex-col">
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                   {chat.map((m, i) => (
                     <div key={i} className={`flex ${m.from === 'You' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-[10px] ${m.from === 'You' ? 'bg-brand-orange text-white' : 'bg-[#0a1322] border border-[#1e3050] text-gray-200'}`}>
+                      <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-[10px] ${m.from === 'You' ? 'bg-brand-orange text-white' : 'glass-input text-gray-200'}`}>
                         <p className="font-black text-[8px] uppercase tracking-wider opacity-70 mb-0.5">{m.from} · {m.time}</p>
                         <p>{m.msg}</p>
                       </div>
@@ -1493,7 +1510,7 @@ export default function DriverPortal() {
                   ))}
                 </div>
                 <div className="flex items-center space-x-2 mt-3">
-                  <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Type a message…" className="flex-1 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[10px] outline-none focus:border-brand-orange" />
+                  <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Type a message…" className="flex-1 glass-input rounded-xl px-3 py-2.5 text-[10px] outline-none focus:border-brand-orange" />
                   <button onClick={sendChat} className="p-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl transition-colors"><Send className="w-4 h-4" /></button>
                 </div>
               </div>
@@ -1507,7 +1524,7 @@ export default function DriverPortal() {
                 <h3 className="text-sm font-black text-white flex items-center space-x-2"><User className="w-4 h-4 text-brand-orange" /><span>My Profile</span></h3>
                 <p className="text-[10px] text-gray-400">Your identity & documents on the NexaGo network.</p>
               </div>
-              <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-5 flex flex-wrap items-center gap-5">
+              <div className="glass-soft rounded-2xl p-5 flex flex-wrap items-center gap-5">
                 {me?.photo ? <img src={me.photo} alt={me.name} className="w-20 h-20 rounded-2xl object-cover border border-brand-orange/40" /> : <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-2xl">RK</div>}
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-black text-white">{me?.name || 'Rahim Khan'}</p>
@@ -1519,7 +1536,7 @@ export default function DriverPortal() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button className="p-2.5 bg-[#0a1322] border border-[#1e3050] hover:border-emerald-500/40 text-emerald-300 rounded-xl"><Phone className="w-4 h-4" /></button>
+                  <button className="p-2.5 glass-input hover:border-emerald-500/40 text-emerald-300 rounded-xl"><Phone className="w-4 h-4" /></button>
                   <button onClick={toggleDuty} className="flex items-center space-x-2 px-4 py-2.5 bg-brand-orange/15 border border-brand-orange/40 text-brand-orange rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-brand-orange/25 transition-colors">
                     <LogIn className="w-3.5 h-3.5" /><span>{online ? 'Go Offline' : 'Go Online'}</span>
                   </button>
@@ -1528,7 +1545,7 @@ export default function DriverPortal() {
 
               {/* Online / auto-accept toggles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-3.5 flex items-center justify-between">
+                <div className="glass-soft rounded-2xl p-3.5 flex items-center justify-between">
                   <div>
                     <p className={`text-[10px] font-black ${online ? 'text-emerald-400' : 'text-red-400'}`}>{online ? "You're Online" : "You're Offline"}</p>
                     <p className="text-[8px] text-gray-400">Accept orders to start earning</p>
@@ -1537,7 +1554,7 @@ export default function DriverPortal() {
                     <div className={`w-4 h-4 rounded-full bg-white transition-all shadow ${online ? 'ml-auto' : ''}`}></div>
                   </button>
                 </div>
-                <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-3.5 flex items-center justify-between">
+                <div className="glass-soft rounded-2xl p-3.5 flex items-center justify-between">
                   <div>
                     <p className={`text-[10px] font-black ${autoAccept ? 'text-emerald-400' : 'text-gray-300'}`}>Auto-accept orders</p>
                     <p className="text-[8px] text-gray-400">{autoAccept ? 'ON — received automatically' : 'OFF — accept each order manually'}</p>
@@ -1562,7 +1579,7 @@ export default function DriverPortal() {
                   { icon: ShieldCheck, label: 'Privacy Policy', color: 'text-teal-400', fn: () => setAuthView('terms') },
                   { icon: LogOut, label: 'Logout', color: 'text-red-400', fn: () => handleLogout() },
                 ].map(item => (
-                  <button key={item.label} onClick={item.fn} className="w-full bg-[#101d30] border border-[#1e3050] hover:border-brand-orange/40 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-colors">
+                  <button key={item.label} onClick={item.fn} className="w-full glass-soft hover:border-brand-orange/40 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-colors">
                     <span className="flex items-center space-x-2.5">
                       <item.icon className={`w-4 h-4 ${item.color}`} />
                       <span className={`text-[10px] font-bold ${item.label === 'Logout' ? 'text-red-400' : 'text-white'}`}>{item.label}</span>
@@ -1589,7 +1606,7 @@ export default function DriverPortal() {
               <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg">
                 Already a Driver? Login →
               </button>
-              <button onClick={() => setAuthView('signup')} className="w-full py-2.5 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
+              <button onClick={() => setAuthView('signup')} className="w-full py-2.5 glass-soft hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
                 Start Registration →
               </button>
             </div>
@@ -1600,31 +1617,31 @@ export default function DriverPortal() {
       {/* ============ TICKET MODAL ============ */}
       {ticketOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setTicketOpen(false)}>
-          <div className="w-full max-w-md bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md glass-soft rounded-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h5 className="text-xs font-black text-white flex items-center gap-1.5"><MessageSquare className="w-4 h-4 text-brand-orange" />Raise a Ticket</h5>
-              <button onClick={() => setTicketOpen(false)} className="w-6 h-6 rounded-full bg-[#0a1322] flex items-center justify-center cursor-pointer"><X className="w-3.5 h-3.5 text-white" /></button>
+              <button onClick={() => setTicketOpen(false)} className="w-6 h-6 rounded-full glass-input flex items-center justify-center cursor-pointer"><X className="w-3.5 h-3.5 text-white" /></button>
             </div>
             <p className="text-[9px] text-gray-400">Send any issue straight to the NexaGo admin — they'll reply in your tickets below.</p>
             <div>
               <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Topic</label>
-              <select value={ticketTopic} onChange={e => setTicketTopic(e.target.value)} className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none cursor-pointer">
+              <select value={ticketTopic} onChange={e => setTicketTopic(e.target.value)} className="w-full glass-input rounded-xl px-3 py-2.5 text-[11px] text-white outline-none cursor-pointer">
                 {['Payout / Earnings', 'Order / Delivery Issue', 'Account & Documents', 'Vehicle / Zone Change', 'Technical Support', 'Other'].map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Subject</label>
-              <input value={ticketSubject} onChange={e => setTicketSubject(e.target.value)} placeholder="Short summary of your issue…" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none focus:border-brand-orange" />
+              <input value={ticketSubject} onChange={e => setTicketSubject(e.target.value)} placeholder="Short summary of your issue…" className="w-full glass-input rounded-xl px-3 py-2.5 text-[11px] text-white outline-none focus:border-brand-orange" />
             </div>
             <div>
               <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Priority</label>
-              <select value={ticketPriority} onChange={e => setTicketPriority(e.target.value)} className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none cursor-pointer">
+              <select value={ticketPriority} onChange={e => setTicketPriority(e.target.value)} className="w-full glass-input rounded-xl px-3 py-2.5 text-[11px] text-white outline-none cursor-pointer">
                 {['Low', 'Medium', 'High'].map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Description</label>
-              <textarea value={ticketDesc} onChange={e => setTicketDesc(e.target.value)} rows={3} placeholder="Explain what happened…" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none focus:border-brand-orange resize-none" />
+              <textarea value={ticketDesc} onChange={e => setTicketDesc(e.target.value)} rows={3} placeholder="Explain what happened…" className="w-full glass-input rounded-xl px-3 py-2.5 text-[11px] text-white outline-none focus:border-brand-orange resize-none" />
             </div>
             <button onClick={submitTicket} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[10px] font-black uppercase rounded-xl cursor-pointer transition-colors">
               Submit Ticket
@@ -1636,20 +1653,20 @@ export default function DriverPortal() {
       {/* ============ REPORT MODAL ============ */}
       {reportOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setReportOpen(null)}>
-          <div className="w-full max-w-md bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md glass-soft rounded-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h5 className="text-xs font-black text-white flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-red-400" />Report Order #{reportOpen}</h5>
-              <button onClick={() => setReportOpen(null)} className="w-6 h-6 rounded-full bg-[#0a1322] flex items-center justify-center cursor-pointer"><X className="w-3.5 h-3.5 text-white" /></button>
+              <button onClick={() => setReportOpen(null)} className="w-6 h-6 rounded-full glass-input flex items-center justify-center cursor-pointer"><X className="w-3.5 h-3.5 text-white" /></button>
             </div>
             <div>
               <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Reason</label>
-              <select value={reportReason} onChange={e => setReportReason(e.target.value)} className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] text-white outline-none cursor-pointer">
+              <select value={reportReason} onChange={e => setReportReason(e.target.value)} className="w-full glass-input rounded-xl px-3 py-2.5 text-[11px] text-white outline-none cursor-pointer">
                 {['Customer unreachable', 'Wrong address', 'Order damaged', 'Payment issue', 'Other'].map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Description</label>
-              <textarea value={reportDesc} onChange={e => setReportDesc(e.target.value)} rows={3} placeholder="Add details…" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5 text-[11px] outline-none focus:border-brand-orange resize-none" />
+              <textarea value={reportDesc} onChange={e => setReportDesc(e.target.value)} rows={3} placeholder="Add details…" className="w-full glass-input rounded-xl px-3 py-2.5 text-[11px] outline-none focus:border-brand-orange resize-none" />
             </div>
             <button onClick={submitReport} className="w-full py-2.5 bg-red-500/15 border border-red-500/30 hover:bg-red-500/25 text-red-300 text-[10px] font-black uppercase rounded-xl cursor-pointer">
               Submit Report
