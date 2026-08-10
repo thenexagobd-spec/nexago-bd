@@ -180,7 +180,9 @@ export default function DriverPortal() {
       showToast('This phone / gmail / NID / license is already registered — you can only register once');
       return;
     }
-    const newId = `3${Math.floor(100000000 + Math.random() * 899999999)}`.slice(0, 10);
+    let newId = '';
+    do { newId = `3${Math.floor(100000000 + Math.random() * 899999999)}`.slice(0, 10); }
+    while (drivers.some(d => d.id === newId));
     const newDriver: typeof drivers[0] = {
       id: newId,
       name: signupName.trim(),
