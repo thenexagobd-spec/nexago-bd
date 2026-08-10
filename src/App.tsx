@@ -642,7 +642,10 @@ export default function App() {
   };
 
   // Drivers
-  const handleAddDriver = (driverData: Omit<Driver, 'id' | 'completedOrders' | 'earnings'>) => {    const newId = `DRV123${456 + drivers.length + 1}`;
+  const handleAddDriver = (driverData: Omit<Driver, 'id' | 'completedOrders' | 'earnings'>) => {
+    let newId = '';
+    do { newId = `3${Math.floor(100000000 + Math.random() * 899999999)}`.slice(0, 10); }
+    while (drivers.some(d => d.id === newId));
     const newDriver: Driver = {
       ...driverData,
       id: newId,
@@ -650,11 +653,36 @@ export default function App() {
       earnings: 0
     };
     setDrivers([...drivers, newDriver]);
-    showToast(`Driver ${driverData.name} registered successfully!`);
+    // Generate a permanent login password for admin-created fleet drivers so
+    // they can log in on the driver site immediately.
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let pwd = '';
+    for (let i = 0; i < 8; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+    let creds: Record<string, { phone: string; password: string }> = {};
+    try { creds = JSON.parse(localStorage.getItem('sd_driver_creds') || '{}'); } catch { creds = {}; }
+    creds[newId] = { phone: driverData.phone || '', password: pwd };
+    localStorage.setItem('sd_driver_creds', JSON.stringify(creds));
+    showToast(`Driver ${driverData.name} registered! ID: ${newId} · Password: ${pwd}`, 'success');
   };
 
   const handleUpdateDriver = (updatedDriver: Driver) => {
+    const prev = drivers.find(d => d.id === updatedDriver.id);
     setDrivers(drivers.map(d => d.id === updatedDriver.id ? updatedDriver : d));
+    // When an admin approves a pending registration, generate the driver's
+    // permanent random password into sd_driver_creds so they can log in with
+    // their numeric driver ID + this password.
+    const justApproved = prev && prev.verificationStatus !== 'Verified' && updatedDriver.verificationStatus === 'Verified';
+    if (justApproved) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+      let pwd = '';
+      for (let i = 0; i < 8; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+      let creds: Record<string, { phone: string; password: string }> = {};
+      try { creds = JSON.parse(localStorage.getItem('sd_driver_creds') || '{}'); } catch { creds = {}; }
+      creds[updatedDriver.id] = { phone: updatedDriver.phone || '', password: pwd };
+      localStorage.setItem('sd_driver_creds', JSON.stringify(creds));
+      showToast(`Driver ${updatedDriver.name} approved! Password: ${pwd}`, 'success');
+      return;
+    }
     showToast(`Driver profile ${updatedDriver.id} updated.`);
   };
 

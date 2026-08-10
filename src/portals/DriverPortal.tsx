@@ -60,11 +60,13 @@ export default function DriverPortal() {
   const [rememberMe, setRememberMe] = useState(lsGet('sd_driver_remember', true));
   const [signupName, setSignupName] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
+  const [signupGmail, setSignupGmail] = useState('');
+  const [signupNid, setSignupNid] = useState('');
+  const [signupLicense, setSignupLicense] = useState('');
   const [signupVehicle, setSignupVehicle] = useState('Motorcycle (150cc)');
-  const [signupPass, setSignupPass] = useState('');
   const [termsChecked, setTermsChecked] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
-  const [pendingId, setPendingId] = useState<string>('');
+  const [pendingId, setPendingId] = useState<string>(() => lsGet('sd_driver_pending_id', ''));
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
   const [deliveryProofName, setDeliveryProofName] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState('');
@@ -92,12 +94,13 @@ export default function DriverPortal() {
 
   // Seed credentials for fleet drivers created from the admin panel (which has no
   // password field) so they can log in too. Default password = the driver's phone
-  // number — they can then register / update via signup.
+  // number. Drivers awaiting audit (new registrations) are skipped — they only get
+  // a password when the admin approves them.
   useEffect(() => {
     const creds = getCreds();
     let changed = false;
     for (const d of drivers) {
-      if (d.id && !creds[d.id]) {
+      if (d.id && d.verificationStatus !== 'Pending Audit' && !creds[d.id]) {
         creds[d.id] = { phone: d.phone || '', password: (d.phone || '').replace(/[^0-9]/g, '') };
         changed = true;
       }
@@ -118,9 +121,13 @@ export default function DriverPortal() {
       d.name.toLowerCase() === id
     );
     if (!found) { showToast('Driver not found — register a new account first'); return; }
+    if (found.verificationStatus === 'Pending Audit') {
+      showToast('Account not approved yet — wait for admin approval');
+      return;
+    }
     const creds = getCreds();
     const cred = creds[found.id];
-    if (!cred) { showToast('No password set for this account — use the account you registered'); return; }
+    if (!cred) { showToast('No password set for this account — admin must approve first'); return; }
     if (cred.password !== loginPass) { showToast('Incorrect password — try again'); return; }
     setSessionId(found.id);
     lsSet('sd_driver_session', found.id);
@@ -130,38 +137,68 @@ export default function DriverPortal() {
     showToast(`Welcome back, ${found.name.split(' ')[0]}!`);
   };
 
-  // Signup: register a real driver account + store its password, then require a
-  // fresh login. No demo/bypass button — the pending screen only leads to login.
+  // Signup: register a real driver account with documents, then require admin
+  // approval. No demo/bypass button — the pending screen only leads to login.
+  // Every driver gets a permanent numeric ID (e.g. 3667463854); once the admin
+  // approves (App.tsx handleUpdateDriver) a random password is generated into
+  // sd_driver_creds and the driver logs in with ID + that password.
   const submitSignup = () => {
     const requiredDocs = ['license', 'nid', 'registration', 'photo'];
     const missing = requiredDocs.find(k => !uploadedDocs[k]);
-    if (!signupName.trim() || !signupPhone.trim() || !signupPass.trim()) {
-      showToast('Fill in your name, phone and a password');
+    if (!signupName.trim() || !signupPhone.trim() || !signupGmail.trim() || !signupNid.trim() || !signupLicense.trim()) {
+      showToast('Fill in your name, phone, gmail, NID and driving license');
+      return;
+    }
+    if (!/^\+?88?01\d{9}$/.test(signupPhone.replace(/[^0-9]/g, ''))) {
+      showToast('Enter a valid Bangladeshi phone number (e.g. 01712345678)');
+      return;
+    }
+    if (!/^[\w.+-]+@gmail\.com$/i.test(signupGmail.trim())) {
+      showToast('Enter a valid Gmail address (name@gmail.com)');
+      return;
+    }
+    if (signupNid.replace(/[^0-9]/g, '').length < 10) {
+      showToast('Enter a valid NID number (10+ digits)');
+      return;
+    }
+    if (signupLicense.trim().length < 5) {
+      showToast('Enter a valid driving license number');
       return;
     }
     if (!termsChecked) { showToast('Accept the Terms & Safety Guidelines first'); return; }
     if (missing) { showToast(`Upload required document: ${missing}`); return; }
-    const existing = drivers.find(d => d.phone === signupPhone.trim());
-    if (existing) { showToast('A driver with this phone number is already registered'); return; }
-    const newId = `DRV${Date.now().toString().slice(-6)}`;
+    const normPhone = signupPhone.replace(/[^0-9]/g, '');
+    const dup = drivers.find(d =>
+      (d.phone && d.phone.replace(/[^0-9]/g, '') === normPhone) ||
+      (d.email && d.email.toLowerCase() === signupGmail.trim().toLowerCase()) ||
+      (d.nidNumber && d.nidNumber.replace(/[^0-9]/g, '') === signupNid.replace(/[^0-9]/g, '')) ||
+      (d.licenseNumber && d.licenseNumber.trim().toUpperCase() === signupLicense.trim().toUpperCase())
+    );
+    if (dup) {
+      showToast('This phone / gmail / NID / license is already registered — you can only register once');
+      return;
+    }
+    const newId = `3${Math.floor(100000000 + Math.random() * 899999999)}`.slice(0, 10);
     const newDriver: typeof drivers[0] = {
       id: newId,
       name: signupName.trim(),
       phone: signupPhone.trim(),
+      email: signupGmail.trim().toLowerCase(),
+      nidNumber: signupNid.trim(),
+      licenseNumber: signupLicense.trim().toUpperCase(),
       vehicleType: signupVehicle,
       status: 'Offline',
       completedOrders: 0,
       earnings: 0,
       rating: 5,
-      verificationStatus: 'Verified',
+      verificationStatus: 'Pending Audit',
     };
     setDrivers(prev => [newDriver, ...prev]);
-    const creds = getCreds();
-    creds[newId] = { phone: signupPhone.trim(), password: signupPass };
-    saveCreds(creds);
     setPendingId(newId);
+    lsSet('sd_driver_pending_id', newId);
     setAuthView('pending');
-    setSignupName(''); setSignupPhone(''); setSignupPass(''); setUploadedDocs({}); setTermsChecked(false);
+    setSignupName(''); setSignupPhone(''); setSignupGmail(''); setSignupNid(''); setSignupLicense('');
+    setUploadedDocs({}); setTermsChecked(false);
   };
 
   const handleLogout = () => {
@@ -516,7 +553,12 @@ export default function DriverPortal() {
               <button onClick={() => setAuthView('signup')} className="w-full py-2 bg-[#101d30] border border-[#1e3050] hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
                 Register New Driver →
               </button>
-              <p className="text-center text-[9px] text-gray-500">Fleet drivers: password is your phone number (e.g. 01712345678). New driver? Register below.</p>
+              <p className="text-center text-[9px] text-gray-500">Log in with your permanent Driver ID + password. New driver? Register below.</p>
+              {lsGet('sd_driver_pending_id', '') && (
+                <button onClick={() => setAuthView('pending')} className="w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
+                  Check my application status →
+                </button>
+              )}
             </>
           )}
 
@@ -532,6 +574,9 @@ export default function DriverPortal() {
                 {[
                   { label: 'Full Name (Bangla/English)', val: signupName, set: setSignupName, type: 'text' },
                   { label: 'Mobile Phone (+880)', val: signupPhone, set: setSignupPhone, type: 'tel' },
+                  { label: 'Gmail Address', val: signupGmail, set: setSignupGmail, type: 'email' },
+                  { label: 'NID Number', val: signupNid, set: setSignupNid, type: 'text' },
+                  { label: 'Driving License Number', val: signupLicense, set: setSignupLicense, type: 'text' },
                 ].map(f => (
                   <div key={f.label} className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
                     <label className="text-[7.5px] text-gray-400 uppercase block font-bold">{f.label}</label>
@@ -547,8 +592,8 @@ export default function DriverPortal() {
                   </select>
                 </div>
                 <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3">
-                  <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Create Password</label>
-                  <input type="password" value={signupPass} onChange={e => setSignupPass(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full mt-1" />
+                  <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Your Permanent Driver ID</label>
+                  <p className="text-[10px] text-emerald-400 mt-1">Auto-generated after approval — e.g. 3667463854. You will also receive a random password.</p>
                 </div>
                 <label className="flex items-center space-x-1.5 text-[9px] text-gray-300 cursor-pointer">
                   <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)} className="rounded border-white/20 text-brand-orange" />
@@ -599,27 +644,50 @@ export default function DriverPortal() {
           )}
 
           {/* ---- PENDING ---- */}
-          {authView === 'pending' && (
-            <div className="flex flex-col items-center justify-center py-10 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 animate-pulse">
-                <Clock className="w-8 h-8" />
+          {authView === 'pending' && (() => {
+            const pendingDriver = pendingId
+              ? drivers.find(d => d.id === pendingId) || null
+              : null;
+            const approved = pendingDriver && pendingDriver.verificationStatus === 'Verified';
+            const pendingCred = pendingDriver ? getCreds()[pendingDriver.id] : undefined;
+            return (
+            <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${approved ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400' : 'bg-amber-500/20 border border-amber-500/40 text-amber-400 animate-pulse'}`}>
+                {approved ? <CheckCircle2 className="w-8 h-8" /> : <Clock className="w-8 h-8" />}
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">Application Under Review</h4>
-                <p className="text-[10px] text-gray-400 mt-1 max-w-[260px] mx-auto">
-                  Our dispatch team is verifying your Driving License & NID details. Estimated time: 2 - 4 hours.
+                <h4 className="text-sm font-bold text-white">{approved ? 'Account Approved' : 'Application Under Review'}</h4>
+                <p className="text-[10px] text-gray-400 mt-1 max-w-[280px] mx-auto">
+                  {approved
+                    ? 'The admin has verified your documents. Use your permanent Driver ID and the password below to log in.'
+                    : 'Our dispatch team is verifying your Driving License & NID details. Refresh to check status.'}
                 </p>
               </div>
               <div className="bg-[#101d30] border border-[#1e3050] rounded-xl p-3 text-left text-[10px] space-y-1.5 w-full">
-                <div className="flex justify-between"><span className="text-gray-400">Driver ID:</span><span className="text-white font-mono font-bold">{pendingId || 'DRV1001-NEW'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Submitted:</span><span className="text-white">Today, {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Verification Status:</span><span className="text-amber-400 font-bold">Pending Review</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Permanent Driver ID:</span><span className="text-white font-mono font-bold">{pendingDriver?.id || pendingId || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Name:</span><span className="text-white">{pendingDriver?.name || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Phone:</span><span className="text-white">{pendingDriver?.phone || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Gmail:</span><span className="text-white truncate max-w-[150px]">{pendingDriver?.email || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">NID:</span><span className="text-white font-mono">{pendingDriver?.nidNumber || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Driving License:</span><span className="text-white font-mono">{pendingDriver?.licenseNumber || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Verification:</span>
+                  <span className={approved ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>{approved ? 'Verified' : 'Pending Review'}</span>
+                </div>
+                {approved && pendingCred?.password && (
+                  <div className="flex justify-between items-center border-t border-[#1e3050] pt-1.5 mt-1">
+                    <span className="text-gray-400">Random Password:</span>
+                    <span className="text-brand-orange font-mono font-black tracking-widest cursor-pointer" onClick={() => { navigator.clipboard?.writeText(pendingCred.password); showToast('Password copied'); }}>{pendingCred.password}</span>
+                  </div>
+                )}
               </div>
-              <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg">
-                Back to Login →
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full">
+                <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg">
+                  {approved ? 'Login with this Password →' : 'Back to Login →'}
+                </button>
+              </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* ---- FORGOT PASSWORD ---- */}
           {authView === 'forgot' && (

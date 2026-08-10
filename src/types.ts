@@ -103,6 +103,7 @@ export interface Driver {
   commissionRate?: number;
   verificationStatus?: 'Verified' | 'Pending Audit' | 'Rejected';
   codCashCollected?: number;
+  email?: string;
   nidNumber?: string;
   licenseNumber?: string;
   documents?: DriverDocument[];
