@@ -486,12 +486,12 @@ export default function DriverPortal() {
   ];
 
   const registerNav = authNav.filter(n => n.id !== 'register');
-  const nav = authView === 'dashboard' ? authNav : registerNav;
+  const nav = authView === 'dashboard' ? authNav : [];
 
   return (
     <PortalShell
       role="Driver Site"
-      tagline={`${me?.name || 'Rahim Khan'} · ${me?.id || 'DRV-1001'}`}
+      tagline={authView === 'dashboard' ? `${me?.name || 'Driver'} · ${me?.id || ''}` : 'NexaGo BD Driver Portal'}
       nav={nav}
       active={authView === 'dashboard' ? tab : authView}
       onNav={id => {
@@ -514,7 +514,7 @@ export default function DriverPortal() {
     >
       {/* ============ AUTH / ONBOARDING SCREENS ============ */}
       {authView !== 'dashboard' && (
-        <div className="max-w-lg mx-auto space-y-4 fade-in">
+        <div className="max-w-lg mx-auto space-y-4 fade-in min-h-[calc(100vh-3.5rem)] flex flex-col justify-center py-6">
           {/* ---- LOGIN ---- */}
           {authView === 'login' && (
             <>
