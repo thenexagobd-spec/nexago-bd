@@ -6,7 +6,7 @@
  * All portals read/write the SAME keys the admin panel uses, so data stays in
  * sync across sites in the same browser.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Order, Driver, Product, Payment, SupportTicket, SystemNotification, User } from '../types';
 import { defaultDrivers, defaultUsers, defaultPayments, defaultSupportTickets, defaultNotifications } from '../data';
 
@@ -26,6 +26,127 @@ export const lsSet = <T,>(key: string, v: T) => {
     /* ignore */
   }
 };
+
+// ---- Live cloud sync (same engine every role site uses) ----
+// Maps each shared localStorage key to its cloud state key so a push from one
+// portal (driver/store/store-admin/staff) is visible live on every other site,
+// exactly like the customer storefront's Live Storefront & Cloud Sync.
+export const CLOUD_KEY_MAP: Record<string, string> = {
+  sd_orders_v2: 'orders',
+  sd_drivers: 'drivers',
+  sd_products: 'products',
+  sd_payments: 'payments',
+  sd_tickets: 'tickets',
+  sd_users: 'users',
+  sd_stores: 'stores',
+  sd_returns: 'returns',
+  ss_refunds: 'refunds',
+  ss_wallet_v2: 'wallet',
+  ss_wtxn_v3: 'walletTxns',
+  sd_store_ratings: 'ratings',
+  sd_coupons: 'coupons',
+  sd_store_online: 'storeOnline',
+  sd_store_profile: 'profile',
+  sd_notifications: 'notifications',
+};
+
+// The product catalog is owned by the super admin panel (it pushes products as
+// a full replace). Role sites only read it, so it is never pushed back up.
+const CLOUD_PUSH_EXCLUDE = new Set(['sd_products']);
+
+const API_BASE = ((import.meta.env.VITE_RELAY_BASE as string) || window.location.origin).replace(/\/+$/, '');
+
+const cloudKeyOf = () =>
+  new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main';
+
+const unionByIdArr = <T extends { id?: any }>(a: T[], b: T[]) => {
+  const byId = new Map<string, T>();
+  (a || []).forEach(x => { if (x && x.id) byId.set(String(x.id), x); });
+  (b || []).forEach(x => { if (x && x.id) byId.set(String(x.id), x); });
+  return Array.from(byId.values());
+};
+
+// Pull the cloud state into the shared localStorage keys (union by id so a
+// portal never drops data a different site wrote), then push the local snapshot
+// back up so changes made here appear on every other site.
+export function useCloudSync() {
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'online' | 'offline'>('idle');
+  useEffect(() => {
+    let cancelled = false;
+    const key = cloudKeyOf();
+    const url = `${API_BASE}/api/state?key=${encodeURIComponent(key)}`;
+    const sig = () => JSON.stringify(Object.keys(CLOUD_KEY_MAP).map(k => lsGet(k, null)));
+
+    const pull = async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return false;
+        const data = await res.json();
+        const state = data && data.state;
+        if (!state || typeof state !== 'object') return false;
+        let changed = false;
+        for (const [localKey, cloudKey] of Object.entries(CLOUD_KEY_MAP)) {
+          const cloudVal = (state as any)[cloudKey];
+          if (cloudVal === undefined) continue;
+          const localVal = lsGet<any[] | number | Record<string, any> | string | null>(localKey, null);
+          let next: any;
+          if (Array.isArray(cloudVal)) {
+            next = unionByIdArr(Array.isArray(localVal) ? localVal as any[] : [], cloudVal);
+          } else if (cloudVal && typeof cloudVal === 'object') {
+            next = { ...(localVal && typeof localVal === 'object' ? localVal as object : {}), ...cloudVal };
+          } else {
+            next = cloudVal;
+          }
+          const a = JSON.stringify(next);
+          const b = JSON.stringify(localVal);
+          if (a !== b) { lsSet(localKey, next); changed = true; }
+        }
+        if (changed) window.dispatchEvent(new Event('storage'));
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const push = async () => {
+      try {
+        const payload: Record<string, any> = {};
+        for (const [localKey, cloudKey] of Object.entries(CLOUD_KEY_MAP)) {
+          if (CLOUD_PUSH_EXCLUDE.has(localKey)) continue;
+          const val = lsGet<any>(localKey, null);
+          if (val !== null) payload[cloudKey] = val;
+        }
+        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // Subscribe to storage changes from any tab/site of this browser so local
+    // edits (orders accepted, drivers toggled online, refunds approved, ...) are
+    // pushed to the cloud for every other role site to see live.
+    const onStorage = () => { push(); };
+    window.addEventListener('storage', onStorage);
+
+    (async () => {
+      const ok = await pull();
+      if (!cancelled) setSyncState(ok ? 'online' : 'offline');
+      await push();
+      if (!cancelled) setSyncState('online');
+    })();
+    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 5000);
+    const pushTimer = setInterval(() => { push(); }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('storage', onStorage);
+      clearInterval(pullTimer);
+      clearInterval(pushTimer);
+    };
+  }, []);
+  return syncState;
+}
 
 export const bdt = (n: number) => `৳${(n || 0).toLocaleString()}`;
 

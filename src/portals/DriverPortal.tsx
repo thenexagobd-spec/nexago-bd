@@ -18,11 +18,12 @@ import {
     X, Bell, Clock, RotateCcw
   } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif } from './portalUtils';
+import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync } from './portalUtils';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
 export default function DriverPortal() {
+  useCloudSync();
   const [orders, setOrders] = useOrders();
   const [drivers, setDrivers] = useDrivers();
   const [txns] = useWalletTxns();

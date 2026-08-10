@@ -9,13 +9,14 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, useDrivers, bdt, statusBadge, appendTimeline, makeNotif } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, useDrivers, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync } from './portalUtils';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
 }
 
 export default function StoreAdminPortal() {
+  useCloudSync();
   const [orders, setOrders] = useOrders();
   const [drivers, setDrivers] = useDrivers();
   const [payments, setPayments] = usePayments();

@@ -9,9 +9,10 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, LifeBuoy, Bell, BarChart3, CheckCircle2, TrendingUp, Ticket } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge } from './portalUtils';
+import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync } from './portalUtils';
 
 export default function StaffPortal() {
+  useCloudSync();
   const [orders, setOrders] = useOrders();
   const [tickets, setTickets] = useTickets();
   const [notifications, setNotifications] = useNotifications();

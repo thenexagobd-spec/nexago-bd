@@ -79,34 +79,41 @@ function saveStore(key, obj) {
 // Merge a client push into the stored state. Banner counters coming from the
 // live storefront (impressions/clicks) survive subsequent admin pushes, and
 // customer-placed orders + notifications are merged (union by id) so they
-// survive admin pushes too.
+// survive admin pushes too. Every role site (driver/store/admin/staff) pushes
+// the same shared keys (orders, drivers, notifications, products, payments,
+// tickets, returns, refunds, wallet txns, ratings, stores, users, coupons),
+// and array keys are merged union-by-id so no site's data is ever dropped.
+function unionById(existing, incomingArr) {
+  const byId = new Map((Array.isArray(existing) ? existing : []).map((x) => [x && x.id, x]));
+  for (const item of incomingArr) if (item && item.id) byId.set(item.id, item);
+  return Array.from(byId.values());
+}
+
 function mergeState(stored, incoming) {
   const merged = { ...(stored.state || {}) };
-  if (Array.isArray(incoming.products)) merged.products = incoming.products;
-  if (Array.isArray(incoming.orders)) {
-    const existing = Array.isArray(merged.orders) ? merged.orders : [];
-    const byId = new Map(existing.map((o) => [o && o.id, o]));
-    for (const o of incoming.orders) if (o && o.id) byId.set(o.id, o);
-    merged.orders = Array.from(byId.values());
+  const arrayUnion = new Set(['orders', 'notifications', 'drivers', 'payments', 'tickets', 'users', 'stores', 'returns', 'refunds', 'walletTxns', 'ratings', 'coupons']);
+  for (const [k, v] of Object.entries(incoming || {})) {
+    if (k === 'banners') {
+      if (Array.isArray(v)) {
+        const storedBanners = Array.isArray(merged.banners) ? merged.banners : [];
+        merged.banners = v.map((b) => {
+          const prev = storedBanners.find((x) => x && x.id === b.id);
+          return {
+            ...b,
+            impressions: Math.max(Number(b.impressions || 0), Number(prev?.impressions || 0)),
+            clicks: Math.max(Number(b.clicks || 0), Number(prev?.clicks || 0))
+          };
+        });
+      }
+    } else if (Array.isArray(v)) {
+      merged[k] = arrayUnion.has(k) ? unionById(merged[k], v) : v;
+    } else if (v && typeof v === 'object') {
+      merged[k] = { ...(merged[k] && typeof merged[k] === 'object' ? merged[k] : {}), ...v };
+    } else {
+      merged[k] = v;
+    }
   }
-  if (Array.isArray(incoming.notifications)) {
-    const existing = Array.isArray(merged.notifications) ? merged.notifications : [];
-    const byId = new Map(existing.map((n) => [n && n.id, n]));
-    for (const n of incoming.notifications) if (n && n.id) byId.set(n.id, n);
-    merged.notifications = Array.from(byId.values()).slice(0, 100);
-  }
-  if (Array.isArray(incoming.banners)) {
-    const storedBanners = Array.isArray(merged.banners) ? merged.banners : [];
-    merged.banners = incoming.banners.map((b) => {
-      const prev = storedBanners.find((x) => x && x.id === b.id);
-      return {
-        ...b,
-        impressions: Math.max(Number(b.impressions || 0), Number(prev?.impressions || 0)),
-        clicks: Math.max(Number(b.clicks || 0), Number(prev?.clicks || 0))
-      };
-    });
-  }
-  if (incoming.profile && typeof incoming.profile === 'object') merged.profile = incoming.profile;
+  if (Array.isArray(merged.notifications)) merged.notifications = merged.notifications.slice(0, 100);
   return { version: 1, updatedAt: new Date().toISOString(), state: merged };
 }
 
