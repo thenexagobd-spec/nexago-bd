@@ -55,7 +55,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
         </div>
       </header>
 
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 w-full max-w-7xl mx-auto">
         {/* Left icon rail */}
         <aside className="hidden md:flex flex-col w-20 shrink-0 border-r border-[#1e3050]/60 bg-gradient-to-b from-[#0c1626]/80 via-[#0e1829]/80 to-[#0c1626]/80 backdrop-blur-sm py-4 items-center space-y-1 overflow-y-auto">
           {nav.map(item => (
