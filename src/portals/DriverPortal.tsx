@@ -78,6 +78,38 @@ export default function DriverPortal() {
     setTimeout(() => setToast(null), 2800);
   };
 
+  const docInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Read a selected photo (camera or gallery) as a base64 data URL and save it
+  // permanently into uploadedDocs — the actual image is stored, not a fake name.
+  const handleDocFile = (key: string, file: File | null | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      if (!dataUrl.startsWith('data:image')) { showToast('Please choose an image file (JPG/PNG)'); return; }
+      setUploadedDocs(prev => ({ ...prev, [key]: dataUrl }));
+    };
+    reader.onerror = () => showToast('Could not read that image — try again');
+    reader.readAsDataURL(file);
+  };
+
+  const triggerDocInput = (key: string, mode: 'camera' | 'gallery') => {
+    const el = docInputRefs.current[key];
+    if (!el) return;
+    el.setAttribute('capture', mode === 'camera' ? 'environment' : '');
+    el.click();
+  };
+
+  const requiredDocs = ['license', 'nid', 'registration', 'photo'];
+  const docMeta: { key: string; label: string; docType: 'NID Card' | 'Driving License' | 'Vehicle Registration' | 'Profile Photo' | 'Other'; required: boolean }[] = [
+    { key: 'license', label: 'Driving License (Front & Back)', docType: 'Driving License', required: true },
+    { key: 'nid', label: 'National ID (NID) Smart Card', docType: 'NID Card', required: true },
+    { key: 'registration', label: 'Vehicle Registration Certificate', docType: 'Vehicle Registration', required: true },
+    { key: 'insurance', label: 'Tax Token & Insurance Policy', docType: 'Other', required: false },
+    { key: 'photo', label: 'Profile Photo / Selfie with Vehicle', docType: 'Profile Photo', required: true },
+  ];
+
   // ---- Real driver credentials (no demo bypass) ----
   // sd_driver_creds: { [driverId]: { phone, password } } — created during signup.
   // No account can be entered without matching credentials.
@@ -143,7 +175,6 @@ export default function DriverPortal() {
   // approves (App.tsx handleUpdateDriver) a random password is generated into
   // sd_driver_creds and the driver logs in with ID + that password.
   const submitSignup = () => {
-    const requiredDocs = ['license', 'nid', 'registration', 'photo'];
     const missing = requiredDocs.find(k => !uploadedDocs[k]);
     if (!signupName.trim() || !signupPhone.trim() || !signupGmail.trim() || !signupNid.trim() || !signupLicense.trim()) {
       showToast('Fill in your name, phone, gmail, NID and driving license');
@@ -194,6 +225,15 @@ export default function DriverPortal() {
       earnings: 0,
       rating: 5,
       verificationStatus: 'Pending Audit',
+      documents: docMeta
+        .filter(d => uploadedDocs[d.key])
+        .map(d => ({
+          type: d.docType,
+          fileName: `${d.label.split(' ')[0]}.jpg`,
+          submittedAt: new Date().toLocaleString('en-GB'),
+          status: 'Pending' as const,
+          dataUrl: uploadedDocs[d.key],
+        })),
     };
     setDrivers(prev => [newDriver, ...prev]);
     setPendingId(newId);
@@ -332,7 +372,7 @@ export default function DriverPortal() {
 
   const toggleDuty = () => {
     if (!me) return;
-    if (online && activeOrder) return;
+    if (online && activeOrder) { showToast('Finish the active delivery before going offline'); return; }
     const next = online ? 'Offline' : 'Online';
     setOnline(!online);
     setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: next as any } : d)));
@@ -631,7 +671,18 @@ export default function DriverPortal() {
                   <span>I agree to the <button onClick={() => setAuthView('terms')} className="text-brand-orange underline">Terms & Safety Guidelines</button></span>
                 </label>
               </div>
-              <button onClick={() => setAuthView('docs')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg mt-3">
+              <button onClick={() => {
+                if (!signupName.trim() || !signupPhone.trim() || !signupGmail.trim() || !signupNid.trim() || !signupLicense.trim()) {
+                  showToast('Fill in your name, phone, gmail, NID and driving license first');
+                  return;
+                }
+                if (!/^\+?88?01\d{9}$/.test(signupPhone.replace(/[^0-9]/g, ''))) { showToast('Enter a valid Bangladeshi phone number (e.g. 01712345678)'); return; }
+                if (!/^[\w.+-]+@gmail\.com$/i.test(signupGmail.trim())) { showToast('Enter a valid Gmail address (name@gmail.com)'); return; }
+                if (signupNid.replace(/[^0-9]/g, '').length < 10) { showToast('Enter a valid NID number (10+ digits)'); return; }
+                if (signupLicense.trim().length < 5) { showToast('Enter a valid driving license number'); return; }
+                if (!termsChecked) { showToast('Accept the Terms & Safety Guidelines first'); return; }
+                setAuthView('docs');
+              }} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg mt-3">
                 Continue to Document Upload →
               </button>
             </>
@@ -647,24 +698,36 @@ export default function DriverPortal() {
               </div>
               <p className="text-[10px] text-gray-400">Upload clear photos of your official documents for dispatch approval.</p>
               <div className="space-y-2">
-                {[
-                  { key: 'license', label: 'Driving License (Front & Back)', required: true },
-                  { key: 'nid', label: 'National ID (NID) Smart Card', required: true },
-                  { key: 'registration', label: 'Vehicle Registration Certificate', required: true },
-                  { key: 'insurance', label: 'Tax Token & Insurance Policy', required: false },
-                  { key: 'photo', label: 'Profile Photo / Selfie with Vehicle', required: true },
-                ].map(docItem => (
-                  <div key={docItem.key} className="glass-soft rounded-xl p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-[11px] text-white font-bold">{docItem.label}</p>
-                      <p className="text-[8px] text-gray-400">{uploadedDocs[docItem.key] || (docItem.required ? 'Required' : 'Optional')}</p>
+                {docMeta.map(docItem => (
+                  <div key={docItem.key} className="glass-soft rounded-xl p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] text-white font-bold">{docItem.label}</p>
+                        <p className="text-[8px] text-gray-400">{uploadedDocs[docItem.key] ? 'Image saved & locked — replace to change' : (docItem.required ? 'Required — use Camera or Gallery' : 'Optional — use Camera or Gallery')}</p>
+                      </div>
+                      {uploadedDocs[docItem.key] && (
+                        <button onClick={() => setUploadedDocs(prev => { const n = { ...prev }; delete n[docItem.key]; return n; })} className="text-[8px] text-red-400 hover:underline font-bold">Remove</button>
+                      )}
                     </div>
-                    <button
-                      onClick={() => setUploadedDocs(prev => ({ ...prev, [docItem.key]: `${docItem.label.split(' ')[0]}.jpg` }))}
-                      className={`px-2.5 py-1.5 rounded-lg text-[9px] font-bold cursor-pointer transition-all border ${uploadedDocs[docItem.key] ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' : 'bg-brand-orange/10 text-brand-orange border-brand-orange/30 hover:bg-brand-orange hover:text-white'}`}
-                    >
-                      {uploadedDocs[docItem.key] ? '✓ Uploaded' : 'Upload File'}
-                    </button>
+                    {uploadedDocs[docItem.key] ? (
+                      <img src={uploadedDocs[docItem.key]} alt={docItem.label} className="mt-2 w-full h-32 object-cover rounded-lg border border-emerald-500/40" />
+                    ) : null}
+                    <div className="flex items-center space-x-2 mt-2">
+                      <button onClick={() => triggerDocInput(docItem.key, 'camera')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-brand-orange/10 text-brand-orange border-brand-orange/30 hover:bg-brand-orange hover:text-white">
+                        📷 Camera
+                      </button>
+                      <button onClick={() => triggerDocInput(docItem.key, 'gallery')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-sky-500/10 text-sky-300 border-sky-500/30 hover:bg-sky-500 hover:text-white">
+                        🖼️ Gallery
+                      </button>
+                      <input
+                        ref={el => { docInputRefs.current[docItem.key] = el; }}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={e => { handleDocFile(docItem.key, e.target.files?.[0]); e.target.value = ''; }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -745,7 +808,11 @@ export default function DriverPortal() {
                 </p>
               </div>
               <div className="glass-soft rounded-xl p-3 text-left text-[10px] space-y-1.5 w-full">
-                <div className="flex justify-between"><span className="text-gray-400">Permanent Driver ID:</span><span className="text-white font-mono font-bold">{pendingDriver?.id || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Permanent Driver ID:</span>
+                  {approved
+                    ? <span className="text-white font-mono font-bold">{pendingDriver?.id || '—'}</span>
+                    : <span className="text-gray-500 italic">Assigned after approval</span>}
+                </div>
                 <div className="flex justify-between"><span className="text-gray-400">Name:</span><span className="text-white">{pendingDriver?.name || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Phone:</span><span className="text-white">{pendingDriver?.phone || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Gmail:</span><span className="text-white truncate max-w-[150px]">{pendingDriver?.email || '—'}</span></div>
@@ -835,9 +902,14 @@ export default function DriverPortal() {
                     <p className="text-[10px] text-gray-400">{me?.id || '—'} · {me?.vehicleType || '—'} · {me?.currentZone || 'Unassigned Zone'}</p>
                   </div>
                 </div>
-                <button onClick={toggleDuty} className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-colors ${online ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-gray-500/20 border-gray-500/40 text-gray-300'}`}>
-                  <Power className="w-3.5 h-3.5" /><span>{online ? (activeOrder ? 'On-Delivery' : 'Online') : 'Offline'}</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button onClick={toggleDuty} className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-colors ${online ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-gray-500/20 border-gray-500/40 text-gray-300'}`}>
+                    <Power className="w-3.5 h-3.5" /><span>{online ? (activeOrder ? 'On-Delivery' : 'Online') : 'Offline'}</span>
+                  </button>
+                  <button onClick={handleLogout} title="Logout" className="flex items-center space-x-2 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-[10px] font-black uppercase tracking-wider hover:bg-red-500 hover:text-white transition-colors">
+                    <LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Logout</span>
+                  </button>
+                </div>
               </div>
 
               {/* Duty status banner */}

@@ -76,6 +76,7 @@ export interface DriverDocument {
   fileName: string;
   submittedAt: string;
   status: 'Pending' | 'Verified' | 'Rejected';
+  dataUrl?: string;
 }
 
 export interface DriverStatusLog {

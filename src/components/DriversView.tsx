@@ -580,21 +580,49 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              <div className="bg-brand-dark/60 p-3 rounded-lg border border-brand-border/40 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">National ID (NID) Number:</span>
-                  <span className="font-mono font-bold text-white">{auditingDriver.nidNumber || '1992261048291039'}</span>
+              <div className="space-y-4 text-xs">
+                <div className="bg-brand-dark/60 p-3 rounded-lg border border-brand-border/40 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">National ID (NID) Number:</span>
+                    <span className="font-mono font-bold text-white">{auditingDriver.nidNumber || '—'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">BRTA Driving License:</span>
+                    <span className="font-mono font-bold text-white">{auditingDriver.licenseNumber || '—'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Vehicle Specification:</span>
+                    <span className="font-bold text-brand-orange">{auditingDriver.vehicleType}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Phone / Email:</span>
+                    <span className="font-bold text-white">{auditingDriver.phone || '—'}{auditingDriver.email ? ` · ${auditingDriver.email}` : ''}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">BRTA Driving License:</span>
-                  <span className="font-mono font-bold text-white">{auditingDriver.licenseNumber || 'DK-DL-2021-98432'}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Vehicle Specification:</span>
-                  <span className="font-bold text-brand-orange">{auditingDriver.vehicleType}</span>
-                </div>
-              </div>
+
+                {(auditingDriver.documents?.length ? auditingDriver.documents : []).length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Submitted Documents</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(auditingDriver.documents || []).map((doc, i) => (
+                        <div key={i} className="bg-brand-dark/60 p-2 rounded-lg border border-brand-border/40">
+                          {doc.dataUrl ? (
+                            <img src={doc.dataUrl} alt={doc.type} className="w-full h-24 object-cover rounded-md border border-brand-border/40" />
+                          ) : (
+                            <div className="w-full h-24 flex items-center justify-center text-[9px] text-gray-500">No image</div>
+                          )}
+                          <p className="text-[8px] text-gray-400 mt-1.5">{doc.type}</p>
+                          <p className="text-[8px] text-gray-500">Submitted {doc.submittedAt}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {!auditingDriver.documents?.length && (
+                  <div className="bg-brand-dark/60 p-3 rounded-lg border border-brand-border/40 text-[9px] text-gray-500">
+                    No scanned documents attached to this driver profile.
+                  </div>
+                )}
 
               <div className="space-y-2">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Audit Controls & Verification Status</p>
