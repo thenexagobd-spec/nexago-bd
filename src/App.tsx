@@ -1063,14 +1063,16 @@ export default function App() {
             address: newStoreAddress,
             rating: 5.0,
             orders: 0,
-            status: 'Active'
+            status: 'Active',
+            siteUrl: `${window.location.origin}/store-site?key=${encodeURIComponent(newId)}`,
+            adminUrl: `${window.location.origin}/store-admin?key=${encodeURIComponent(newId)}`,
           };
           
           setStores([...stores, newStore]);
           setNewStoreName('');
           setNewStoreAddress('');
           setIsAddingStore(false);
-          showToast(`Store "${newStore.name}" registered successfully!`, "success");
+          showToast(`Store "${newStore.name}" registered — store site + admin links generated!`, "success");
         };
 
         return (
@@ -1166,28 +1168,35 @@ export default function App() {
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-[9px] text-brand-orange font-bold uppercase tracking-wider flex items-center space-x-1">
                             <Link className="w-2.5 h-2.5 mr-0.5" />
-                            Merchant Dashboard Link
+                            Store Live Links (auto-generated)
                           </span>
                           <span className="text-[9px] text-gray-500 font-bold uppercase">ID: {s.id}</span>
                         </div>
-                        <div className="flex items-center space-x-1.5">
-                          <input 
-                            type="text" 
-                            readOnly 
-                            value={dashboardUrl}
-                            className="flex-1 bg-[#0c1624] px-2 py-1 text-[10px] font-mono text-gray-300 rounded border border-brand-border/30 select-all outline-none"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(dashboardUrl);
-                              showToast(`Link copied for ${s.name}`, "success");
-                            }}
-                            className="p-1.5 bg-brand-dark hover:bg-brand-orange/10 border border-brand-border hover:border-brand-orange/30 text-gray-400 hover:text-brand-orange rounded cursor-pointer transition-all"
-                            title="Copy Merchant Link"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        {[
+                          { label: 'Store Site', url: `${window.location.origin}/store-site?key=${encodeURIComponent(s.id)}` },
+                          { label: 'Store Admin', url: `${window.location.origin}/store-admin?key=${encodeURIComponent(s.id)}` },
+                          { label: 'Merchant Dashboard', url: `${window.location.origin}${window.location.pathname}?storeId=${s.id}` },
+                        ].map(l => (
+                          <div key={l.label} className="flex items-center space-x-1.5 mb-1.5 last:mb-0">
+                            <span className="text-[8px] font-black text-gray-500 uppercase tracking-wider w-28 shrink-0">{l.label}</span>
+                            <input 
+                              type="text" 
+                              readOnly 
+                              value={l.url}
+                              className="flex-1 bg-[#0c1624] px-2 py-1 text-[10px] font-mono text-gray-300 rounded border border-brand-border/30 select-all outline-none"
+                            />
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(l.url);
+                                showToast(`${l.label} link copied for ${s.name}`, "success");
+                              }}
+                              className="p-1.5 bg-brand-dark hover:bg-brand-orange/10 border border-brand-border hover:border-brand-orange/30 text-gray-400 hover:text-brand-orange rounded cursor-pointer transition-all"
+                              title={`Copy ${l.label} Link`}
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
