@@ -119,7 +119,7 @@ function unionById(existing, incomingArr) {
 
 function mergeState(stored, incoming) {
   const merged = { ...(stored.state || {}) };
-  const arrayUnion = new Set(['orders', 'notifications', 'drivers', 'payments', 'tickets', 'users', 'stores', 'products', 'categories', 'inventory', 'staff', 'reviews', 'marketing', 'returns', 'refunds', 'walletTxns', 'ratings', 'coupons']);
+  const arrayUnion = new Set(['orders', 'notifications', 'drivers', 'payments', 'tickets', 'users', 'stores', 'branches', 'products', 'categories', 'inventory', 'staff', 'reviews', 'marketing', 'returns', 'refunds', 'walletTxns', 'ratings', 'coupons']);
   for (const [k, v] of Object.entries(incoming || {})) {
     if (k === 'banners') {
       if (Array.isArray(v)) {

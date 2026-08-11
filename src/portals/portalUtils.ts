@@ -41,6 +41,7 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_tickets: 'tickets',
   sd_users: 'users',
   sd_stores: 'stores',
+  sd_store_branches: 'branches',
   sd_returns: 'returns',
   ss_refunds: 'refunds',
   ss_wallet_v2: 'wallet',
@@ -242,6 +243,7 @@ export const useTickets = () => useShared<SupportTicket[]>('sd_tickets', []);
 export const useNotifications = () => useShared<SystemNotification[]>('sd_notifications', []);
 export const useUsers = () => useShared<User[]>('sd_users', []);
 export const useStores = () => useShared<any[]>('sd_stores', []);
+export const useBranches = () => useShared<any[]>('sd_store_branches', []);
 export const useWalletBal = () => useShared<number>('ss_wallet_v2', 0);
 export const useWalletTxns = () => useShared<any[]>('ss_wtxn_v3', []);
 export const useStoreProfile = () => useShared<{ storeName: string; storeSub: string; whatsapp: string }>('sd_store_profile', { storeName: '', storeSub: '', whatsapp: '' });

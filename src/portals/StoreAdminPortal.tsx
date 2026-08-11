@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2 } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet } from './portalUtils';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
@@ -46,6 +46,7 @@ export default function StoreAdminPortal() {
   const [reviews, setReviews] = useReviews();
   const [notifications, setNotifications] = useNotifications();
   const [stores, setStores] = useStores();
+  const [branches] = useBranches();
   const [storeAdminApps, setStoreAdminApps] = useStoreAdminApps();
   const [storeAdminCreds] = useStoreAdminCreds();
   const [tab, setTab] = useState('dashboard');
@@ -57,15 +58,20 @@ export default function StoreAdminPortal() {
   const [signup, setSignup] = useState({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
   const [submittedAppId, setSubmittedAppId] = useState('');
-  const activeApplication = storeAdminApps.find((a: any) => a.adminId === sessionAdminId && a.status === 'Verified');
-  const activeStoreId = activeApplication?.storeId || '';
+  const branchSession = branches.find((b: any) => b.branchAdminId === sessionAdminId && b.status === 'Active');
+  const activeApplication = storeAdminApps.find((a: any) => ((a.adminId === sessionAdminId) || (branchSession && a.storeId === branchSession.storeId)) && a.status === 'Verified');
+  const activeStoreId = branchSession?.storeId || activeApplication?.storeId || '';
   const activeStoreName = activeApplication?.storeName || 'Approved Store';
-  const myOrders = orders.filter(o => (activeStoreId && (o as any).storeId === activeStoreId) || o.storeName === activeStoreName);
+  const myBranches = branches.filter((b: any) => b.storeId === activeStoreId);
+  const queryBranchId = new URLSearchParams(window.location.search).get('branch') || '';
+  const activeBranchId = branchSession?.id || queryBranchId || localStorage.getItem(`sd_active_branch_${activeStoreId}`) || myBranches[0]?.id || '';
+  const activeBranch = myBranches.find((b: any) => b.id === activeBranchId);
+  const myOrders = orders.filter(o => activeBranchId ? (o as any).branchId === activeBranchId : ((activeStoreId && (o as any).storeId === activeStoreId) || o.storeName === activeStoreName));
   const myOrderIds = new Set(myOrders.map(o => o.id));
-  const myProducts = products.filter((p: any) => p.storeId === activeStoreId);
+  const myProducts = products.filter((p: any) => p.storeId === activeStoreId && (!activeBranchId || p.branchId === activeBranchId));
   const myPayments = payments.filter(p => myOrderIds.has(p.orderId));
-  const myCategories = categories.filter((c: any) => c.storeId === activeStoreId);
-  const coupons = allCoupons.filter((c: any) => c.storeId === activeStoreId);
+  const myCategories = categories.filter((c: any) => c.storeId === activeStoreId && (!activeBranchId || !c.branchId || c.branchId === activeBranchId));
+  const coupons = allCoupons.filter((c: any) => c.storeId === activeStoreId && (!activeBranchId || !c.branchId || c.branchId === activeBranchId));
   const myReviews = reviews.filter((r: any) => r.storeId === activeStoreId || r.storeName === activeStoreName || myProducts.some((p: any) => p.id === r.productId));
   const [search, setSearch] = useState('');
   const [newProd, setNewProd] = useState({ name: '', price: '', stock: '', category: '' });
@@ -96,6 +102,7 @@ export default function StoreAdminPortal() {
   const nav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Orders', icon: ClipboardList, badge: myOrders.filter(o => o.status === 'Pending').length },
+    { id: 'branches', label: 'Branches', icon: Store, badge: myBranches.length },
     { id: 'products', label: 'Products', icon: Box, badge: outStock.length },
     { id: 'categories', label: 'Categories', icon: FolderOpen },
     { id: 'inventory', label: 'Inventory', icon: Package, badge: lowStock.length },
@@ -154,7 +161,8 @@ export default function StoreAdminPortal() {
     const id = loginId.trim();
     const cred = storeAdminCreds[id];
     const app = storeAdminApps.find((a: any) => a.adminId === id && a.status === 'Verified');
-    if (!cred || !app || cred.password !== loginPassword) return;
+    const branch = branches.find((b: any) => b.branchAdminId === id && b.branchPassword === loginPassword && b.status === 'Active');
+    if ((!cred || !app || cred.password !== loginPassword) && !branch) return;
     localStorage.setItem('sd_store_admin_session', id);
     setSessionAdminId(id);
     setTab('dashboard');
@@ -211,6 +219,8 @@ export default function StoreAdminPortal() {
       status: Number(newProd.stock) <= 0 ? 'Out of Stock' : Number(newProd.stock) <= 10 ? 'Low Stock' : 'In Stock',
       image: '',
       storeId: activeStoreId,
+      branchId: activeBranchId,
+      branchName: activeBranch?.name || '',
     };
     setProducts(prev => [p, ...prev]);
     setNewProd({ name: '', price: '', stock: '', category: '' });
@@ -218,13 +228,13 @@ export default function StoreAdminPortal() {
 
   const addCategory = () => {
     if (!newCategory.trim() || !activeStoreId) return;
-    setCategories(prev => [{ id: `CAT-${Date.now().toString().slice(-5)}`, name: newCategory.trim(), itemsCount: 0, status: 'Active', storeId: activeStoreId, storeName: activeStoreName }, ...prev]);
+    setCategories(prev => [{ id: `CAT-${Date.now().toString().slice(-5)}`, name: newCategory.trim(), itemsCount: 0, status: 'Active', storeId: activeStoreId, storeName: activeStoreName, branchId: activeBranchId, branchName: activeBranch?.name || '' }, ...prev]);
     setNewCategory('');
   };
 
   const addCoupon = () => {
     if (!newCoupon.code.trim() || !newCoupon.discount.trim() || !activeStoreId) return;
-    setAllCoupons(prev => [{ id: `CPN-${Date.now().toString().slice(-5)}`, code: newCoupon.code.trim().toUpperCase(), discount: newCoupon.discount.trim(), minOrder: Number(newCoupon.minOrder) || 0, usages: 0, status: 'Active', storeId: activeStoreId, storeName: activeStoreName }, ...prev]);
+    setAllCoupons(prev => [{ id: `CPN-${Date.now().toString().slice(-5)}`, code: newCoupon.code.trim().toUpperCase(), discount: newCoupon.discount.trim(), minOrder: Number(newCoupon.minOrder) || 0, usages: 0, status: 'Active', storeId: activeStoreId, storeName: activeStoreName, branchId: activeBranchId, branchName: activeBranch?.name || '' }, ...prev]);
     setNewCoupon({ code: '', discount: '', minOrder: '' });
   };
 
@@ -350,7 +360,7 @@ export default function StoreAdminPortal() {
               <div>
                 <p className="text-[9px] text-gray-400 uppercase tracking-widest">Store Admin Console</p>
                 <p className="text-lg font-black text-white">{activeStoreName}</p>
-                <p className="text-[10px] text-gray-400">Store ID {activeStoreId} · {staff.length} staff online</p>
+                <p className="text-[10px] text-gray-400">Store ID {activeStoreId} · Branch {activeBranchId || 'All'} · {staff.length} staff online</p>
               </div>
             </div>
             <button onClick={() => setTab('tools')} className="flex items-center space-x-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors">
@@ -360,6 +370,7 @@ export default function StoreAdminPortal() {
               {[
                 { label: 'Store Site', url: `${window.location.origin}/store?key=${activeStoreId}` },
                 { label: 'Store Admin', url: `${window.location.origin}/store-admin?key=${activeStoreId}` },
+                { label: 'Branch Admin', url: `${window.location.origin}/store-admin?key=${activeStoreId}&branch=${activeBranchId}` },
               ].map(link => (
                 <button key={link.label} onClick={() => navigator.clipboard.writeText(link.url)} className="flex items-center gap-1.5 rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-[9px] font-black uppercase text-gray-300">
                   <Copy className="h-3 w-3" /> {link.label}
@@ -413,6 +424,41 @@ export default function StoreAdminPortal() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'branches' && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="flex items-center space-x-2 text-sm font-black text-white"><Store className="h-4 w-4 text-brand-orange" /><span>Branch List</span></h3>
+            <p className="text-[10px] text-gray-400">Each branch has its own ID, login, link, products, orders, stock and sales.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {myBranches.map((b: any) => {
+              const bOrders = orders.filter(o => (o as any).branchId === b.id);
+              const bProducts = products.filter((p: any) => p.branchId === b.id);
+              const bRevenue = bOrders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.amount || 0), 0);
+              const branchLink = `${window.location.origin}/store-admin?key=${activeStoreId}&branch=${b.id}`;
+              return (
+                <div key={b.id} className={`rounded-2xl border p-4 ${b.id === activeBranchId ? 'border-brand-orange bg-brand-orange/10' : 'border-[#1e3050] bg-[#101d30]'}`}>
+                  <p className="font-mono text-[10px] font-black text-brand-orange">{b.id}</p>
+                  <p className="mt-1 text-sm font-black text-white">{b.name}</p>
+                  <p className="text-[9px] text-gray-500">{b.address}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg bg-[#0a1322] p-2"><p className="text-xs font-black text-white">{bOrders.length}</p><p className="text-[8px] text-gray-500">Orders</p></div>
+                    <div className="rounded-lg bg-[#0a1322] p-2"><p className="text-xs font-black text-white">{bProducts.length}</p><p className="text-[8px] text-gray-500">Products</p></div>
+                    <div className="rounded-lg bg-[#0a1322] p-2"><p className="text-xs font-black text-emerald-400">{bdt(bRevenue)}</p><p className="text-[8px] text-gray-500">Sales</p></div>
+                  </div>
+                  <div className="mt-3 grid gap-1 rounded-lg bg-[#0a1322] p-2 text-[9px]">
+                    <p>Login ID: <b className="text-white">{b.branchAdminId || 'Not generated'}</b></p>
+                    <p>Password: <b className="text-white">{b.branchPassword || 'Not generated'}</b></p>
+                    <button onClick={() => navigator.clipboard.writeText(branchLink)} className="mt-1 rounded-lg border border-brand-orange/30 px-2 py-1 font-black uppercase text-brand-orange">Copy Branch Link</button>
+                  </div>
+                  <button onClick={() => { localStorage.setItem(`sd_active_branch_${activeStoreId}`, b.id); window.location.href = branchLink; }} className="mt-3 w-full rounded-xl bg-brand-orange px-3 py-2 text-[10px] font-black uppercase text-white">Open This Branch</button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

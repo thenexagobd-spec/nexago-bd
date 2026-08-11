@@ -162,6 +162,7 @@ export default function App() {
   const [categories, setCategories] = useState<any[]>(() => getStoredData('sd_categories', []));
 
   const [stores, setStores] = useState<any[]>(() => getStoredData<any[]>('sd_stores', []).filter(s => !/^STR-0[1-5]$/.test(s.id || '') || s.adminId));
+  const [branches, setBranches] = useState<any[]>(() => getStoredData('sd_store_branches', []));
   const [storeAdminApps, setStoreAdminApps] = useState<any[]>(() => getStoredData('sd_store_admin_apps', []));
   const [storeAdminCreds, setStoreAdminCreds] = useState<Record<string, { password: string; storeId: string }>>(() => getStoredData('sd_store_admin_creds', {}));
 
@@ -242,6 +243,7 @@ export default function App() {
   useEffect(() => { setStoredData('sd_tickets', supportTickets); }, [supportTickets]);
   useEffect(() => { setStoredData('sd_notifications', notifications); }, [notifications]);
   useEffect(() => { setStoredData('sd_stores', stores); }, [stores]);
+  useEffect(() => { setStoredData('sd_store_branches', branches); }, [branches]);
   useEffect(() => { setStoredData('sd_store_admin_apps', storeAdminApps); }, [storeAdminApps]);
   useEffect(() => { setStoredData('sd_store_admin_creds', storeAdminCreds); }, [storeAdminCreds]);
 
@@ -281,6 +283,7 @@ export default function App() {
         products,
         categories,
         stores,
+        branches,
         coupons,
         reviews,
         banners,
@@ -312,6 +315,7 @@ export default function App() {
         if (Array.isArray(data.state.products)) setProducts(data.state.products);
         if (Array.isArray(data.state.categories)) setCategories(data.state.categories);
         if (Array.isArray(data.state.stores)) setStores(data.state.stores);
+        if (Array.isArray(data.state.branches)) setBranches(data.state.branches);
         if (Array.isArray(data.state.coupons)) setCoupons(data.state.coupons);
         if (Array.isArray(data.state.reviews)) setReviews(data.state.reviews);
         if (Array.isArray(data.state.banners)) setBanners(data.state.banners);
@@ -351,6 +355,7 @@ export default function App() {
       const hasCloud = data && data.state && (
         (Array.isArray(data.state.products) && data.state.products.length) ||
         (Array.isArray(data.state.stores) && data.state.stores.length) ||
+        (Array.isArray(data.state.branches) && data.state.branches.length) ||
         (Array.isArray(data.state.categories) && data.state.categories.length) ||
         (Array.isArray(data.state.coupons) && data.state.coupons.length) ||
         (Array.isArray(data.state.banners) && data.state.banners.length) ||
@@ -374,7 +379,7 @@ export default function App() {
     if (firstSyncRun.current) { firstSyncRun.current = false; return; }
     const t = setTimeout(() => { pushState(true); }, 1500);
     return () => clearTimeout(t);
-  }, [products, categories, stores, coupons, reviews, banners, orders, notifications]);
+  }, [products, categories, stores, branches, coupons, reviews, banners, orders, notifications]);
 
   // On first load: seed the cloud with local data if the cloud is empty (local stays authoritative)
   useEffect(() => { seedCloudIfEmpty(); }, []);
@@ -1119,6 +1124,20 @@ export default function App() {
               adminUrl: `${window.location.origin}/store-admin?key=${encodeURIComponent(app.storeId)}`,
             };
             setStores(prev => prev.some(s => s.id === app.storeId) ? prev.map(s => s.id === app.storeId ? { ...s, ...storeRecord } : s) : [storeRecord, ...prev]);
+            const primaryBranchPassword = Math.random().toString(36).slice(2, 10).toUpperCase();
+            setBranches(prev => prev.some((b: any) => b.id === `${app.storeId}-BR-001`) ? prev : [{
+              id: `${app.storeId}-BR-001`,
+              storeId: app.storeId,
+              name: app.storeName,
+              address: app.storeAddress,
+              status: 'Active',
+              manager: app.ownerName,
+              phone: app.phone,
+              branchAdminId: `${app.storeId}-BR-001-ADMIN`,
+              branchPassword: primaryBranchPassword,
+              adminUrl: `${window.location.origin}/store-admin?key=${encodeURIComponent(app.storeId)}&branch=${encodeURIComponent(`${app.storeId}-BR-001`)}`,
+              createdAt: new Date().toLocaleString('en-GB'),
+            }, ...prev]);
             showToast(`Store admin approved. ID: ${app.adminId} · Password: ${password}`, 'success');
           } else {
             showToast(`Store admin application ${app.adminId} rejected.`, 'info');
@@ -1337,6 +1356,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {stores.map(s => {
                 const dashboardUrl = `${window.location.origin}${window.location.pathname}?storeId=${s.id}`;
+                const storeBranches = branches.filter((b: any) => b.storeId === s.id);
                 return (
                   <div key={s.id} className="bg-brand-card border border-brand-border rounded-xl p-5 flex flex-col justify-between shadow-lg hover:border-brand-border-hover transition-all">
                     <div>
@@ -1349,7 +1369,47 @@ export default function App() {
                           {s.status}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400 font-medium mb-3">{s.address}</p>
+                      <p className="text-xs text-gray-400 font-medium mb-2">{s.address}</p>
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        <span className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[9px] font-black uppercase text-sky-300">{storeBranches.length} Branches</span>
+                        <button onClick={() => {
+                          const name = window.prompt('Branch name');
+                          if (!name) return;
+                          const address = window.prompt('Branch address') || '';
+                          const branchNo = String(storeBranches.length + 1).padStart(3, '0');
+                          const branchId = `${s.id}-BR-${branchNo}`;
+                          const branchPassword = Math.random().toString(36).slice(2, 10).toUpperCase();
+                          const branch = {
+                            id: branchId,
+                            storeId: s.id,
+                            name,
+                            address,
+                            status: 'Active',
+                            manager: s.ownerName || '',
+                            phone: s.phone || '',
+                            branchAdminId: `${branchId}-ADMIN`,
+                            branchPassword,
+                            adminUrl: `${window.location.origin}/store-admin?key=${encodeURIComponent(s.id)}&branch=${encodeURIComponent(branchId)}`,
+                            createdAt: new Date().toLocaleString('en-GB')
+                          };
+                          setBranches(prev => prev.some((b: any) => b.id === branch.id) ? prev : [branch, ...prev]);
+                          showToast(`Branch ${branch.id} added. Login: ${branch.branchAdminId} / ${branchPassword}`, 'success');
+                        }} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-2 py-1 text-[9px] font-black uppercase text-brand-orange">+ Add Branch</button>
+                      </div>
+                      {storeBranches.length > 0 && (
+                        <div className="mb-3 grid gap-1">
+                          {storeBranches.slice(0, 4).map((b: any) => (
+                            <div key={b.id} className="grid grid-cols-[1fr_auto] gap-2 rounded-lg bg-[#080e17] px-2 py-1 text-[9px]">
+                              <div className="min-w-0">
+                                <span className="font-mono text-brand-orange">{b.id}</span>
+                                <span className="ml-2 truncate text-gray-300">{b.name}</span>
+                                <p className="font-mono text-[8px] text-gray-500">{b.branchAdminId}</p>
+                              </div>
+                              <button onClick={() => navigator.clipboard.writeText(b.adminUrl || `${window.location.origin}/store-admin?key=${s.id}&branch=${b.id}`)} className="text-brand-orange">Copy</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       {/* URL Block for Merchant Entrance */}
                       <div className="bg-[#080e17] border border-brand-border/40 rounded-lg p-2.5 mb-4">
