@@ -57,7 +57,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
         </div>
       </header>
 
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 flex-col md:flex-row">
         {/* Left icon rail — fixed overlay so the content column stays truly
             centered on the screen (the rail does not shift it sideways) */}
         <aside className="hidden md:flex fixed left-0 top-14 bottom-0 z-30 flex-col w-20 border-r border-[#1e3050]/60 bg-gradient-to-b from-[#0c1626]/80 via-[#0e1829]/80 to-[#0c1626]/80 backdrop-blur-sm py-4 items-center space-y-1 overflow-y-auto">
@@ -82,7 +82,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
         </aside>
 
         {/* Mobile top nav */}
-        <div className="md:hidden shrink-0 overflow-x-auto border-b border-[#1e3050]/60 bg-gradient-to-r from-[#0c1626]/80 to-[#0e1829]/80 backdrop-blur-sm flex space-x-2 px-3 py-2 scrollbar-none">
+        <div className="md:hidden w-full shrink-0 overflow-x-auto border-b border-[#1e3050]/60 bg-gradient-to-r from-[#0c1626]/80 to-[#0e1829]/80 backdrop-blur-sm flex space-x-2 px-3 py-2 scrollbar-none">
           {nav.map(item => (
             <button
               key={item.id}
@@ -98,7 +98,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
         </div>
 
         {/* Content */}
-        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto p-3 pb-20 sm:p-4 md:pb-6 md:pl-20 lg:p-6">
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto p-3 pb-20 sm:p-4 md:py-6 md:pr-6 md:pl-24">
           <div className="mx-auto max-w-5xl space-y-5 fade-in">{children}</div>
         </main>
       </div>

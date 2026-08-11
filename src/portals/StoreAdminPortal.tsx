@@ -231,7 +231,7 @@ export default function StoreAdminPortal() {
                       </div>
                     </details>
                   )}
-                  <div className="flex items-center justify-end space-x-2 mt-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2 mt-3">
                     {o.status !== 'Completed' && o.status !== 'Cancelled' && (
                       <>
                         <button onClick={() => acceptOrder(o.id)} className="px-3 py-2 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 rounded-xl text-[10px] font-black hover:bg-emerald-500/25 transition-colors">Accept & Dispatch to Driver</button>
@@ -256,9 +256,9 @@ export default function StoreAdminPortal() {
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <input value={newProd.name} onChange={e => setNewProd(prev => ({ ...prev, name: e.target.value }))} placeholder="Product name" className="min-w-0 flex-1 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
-              <input value={newProd.price} onChange={e => setNewProd(prev => ({ ...prev, price: e.target.value }))} placeholder="Price ৳" type="number" className="w-24 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
-              <input value={newProd.stock} onChange={e => setNewProd(prev => ({ ...prev, stock: e.target.value }))} placeholder="Stock" type="number" className="w-20 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
-              <button onClick={addProduct} className="flex items-center space-x-1.5 px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl text-[10px] font-black transition-colors"><Plus className="w-3.5 h-3.5" /><span>Add</span></button>
+              <input value={newProd.price} onChange={e => setNewProd(prev => ({ ...prev, price: e.target.value }))} placeholder="Price ৳" type="number" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange sm:w-24" />
+              <input value={newProd.stock} onChange={e => setNewProd(prev => ({ ...prev, stock: e.target.value }))} placeholder="Stock" type="number" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange sm:w-20" />
+              <button onClick={addProduct} className="flex items-center justify-center space-x-1.5 px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl text-[10px] font-black transition-colors sm:self-stretch"><Plus className="w-3.5 h-3.5" /><span>Add</span></button>
             </div>
           </div>
           <div className="relative">
@@ -415,8 +415,8 @@ export default function StoreAdminPortal() {
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 flex flex-wrap items-center gap-2">
             <input value={stf.name} onChange={e => setStf(prev => ({ ...prev, name: e.target.value }))} placeholder="Name" className="flex-1 min-w-[140px] bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
             <input value={stf.role} onChange={e => setStf(prev => ({ ...prev, role: e.target.value }))} placeholder="Role" className="flex-1 min-w-[120px] bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
-            <input value={stf.phone} onChange={e => setStf(prev => ({ ...prev, phone: e.target.value }))} placeholder="Phone" className="w-36 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
-            <button onClick={addStaff} className="flex items-center space-x-1.5 px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl text-[10px] font-black transition-colors"><UserPlus className="w-3.5 h-3.5" /><span>Hire</span></button>
+            <input value={stf.phone} onChange={e => setStf(prev => ({ ...prev, phone: e.target.value }))} placeholder="Phone" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange sm:w-36" />
+            <button onClick={addStaff} className="flex w-full items-center justify-center space-x-1.5 px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl text-[10px] font-black transition-colors sm:w-auto"><UserPlus className="w-3.5 h-3.5" /><span>Hire</span></button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {staff.map(s => (
@@ -535,7 +535,7 @@ export default function StoreAdminPortal() {
                     </div>
                     <span className={`px-2 py-1 rounded-lg border text-[8px] font-black ${t.status === 'Open' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : t.status === 'Closed' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-sky-500/20 text-sky-300 border-sky-500/30'}`}>{t.status}</span>
                   </div>
-                  <div className="flex items-center justify-end space-x-2 mt-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2 mt-3">
                     <button onClick={() => replyTicket(t.id, false)} className="px-3 py-1.5 bg-sky-500/15 border border-sky-500/40 text-sky-300 rounded-lg text-[9px] font-black hover:bg-sky-500/25 transition-colors">In Progress</button>
                     <button onClick={() => replyTicket(t.id, true)} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[9px] font-black transition-colors">✓ Close</button>
                   </div>
