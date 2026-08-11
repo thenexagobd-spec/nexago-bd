@@ -1205,6 +1205,55 @@ export default function App() {
           showToast(`${page} Store Admin access updated.`, 'success');
         };
 
+        const takeStoreAdminAction = (store: any, action: 'warning' | 'review' | 'suspend' | 'freeze' | 'restrict' | 'blacklist' | 'restore') => {
+          const reason = window.prompt(`Required reason for ${action.toUpperCase()} action against ${store.name}`);
+          if (!reason?.trim()) {
+            showToast('Action reason is required and permanently saved.', 'info');
+            return;
+          }
+          setStores(prev => prev.map((s: any) => {
+            if (s.id !== store.id) return s;
+            const currentPages = s.adminPages && s.adminPages.length ? s.adminPages : DEFAULT_STORE_ADMIN_PAGES;
+            const next: any = {
+              ...s,
+              adminRiskStatus: action === 'restore' ? 'Clear' : action,
+              paymentsFrozen: action === 'freeze' || (action !== 'restore' && s.paymentsFrozen),
+              riskUpdatedAt: new Date().toLocaleString('en-GB'),
+              riskActionLog: [
+                ...(s.riskActionLog || []),
+                { action, reason: reason.trim(), actor: 'super-admin', time: new Date().toISOString() },
+              ],
+            };
+            if (action === 'suspend' || action === 'blacklist') next.status = action === 'blacklist' ? 'Blacklisted' : 'Suspended';
+            if (action === 'restrict') next.adminPages = currentPages.filter((id: string) => ['dashboard', 'support', 'alerts'].includes(id));
+            if (action === 'restore') {
+              next.status = 'Active';
+              next.paymentsFrozen = false;
+              next.adminPages = currentPages.length > 3 ? currentPages : DEFAULT_STORE_ADMIN_PAGES;
+            }
+            return next;
+          }));
+          setStoreAdminApps(prev => prev.map((app: any) => app.storeId === store.id ? {
+            ...app,
+            riskStatus: action === 'restore' ? 'Clear' : action,
+            riskActionLog: [
+              ...(app.riskActionLog || []),
+              { action, reason: reason.trim(), actor: 'super-admin', time: new Date().toISOString() },
+            ],
+          } : app));
+          setNotifications(prev => [{
+            id: `NOTIF-${Date.now().toString().slice(-8)}`,
+            title: `Store Admin Action: ${action.toUpperCase()}`,
+            message: reason.trim(),
+            type: 'system',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: false,
+            audience: 'store-admin',
+            storeId: store.id,
+          }, ...prev]);
+          showToast(`${action.toUpperCase()} action saved for ${store.name}.`, action === 'restore' ? 'success' : 'info');
+        };
+
         const handleCreateStore = (e: React.FormEvent) => {
           e.preventDefault();
           const missingDoc = storeDocMeta.find(d => d.required && !newStoreDocs[d.key]);
@@ -1616,6 +1665,38 @@ export default function App() {
                             Send Request
                           </button>
                         </div>
+                      </div>
+                      <div className="bg-[#080e17] border border-red-500/20 rounded-lg p-2.5 mb-4">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-wider text-red-300">Suspicious Store Admin Action</p>
+                            <p className="text-[8px] text-gray-500">Every action needs reason and stays in permanent audit history.</p>
+                          </div>
+                          <span className="rounded border border-red-500/25 bg-red-500/10 px-2 py-1 text-[8px] font-black uppercase text-red-300">{s.adminRiskStatus || 'Clear'}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                          {[
+                            ['warning', 'Warn'],
+                            ['review', 'Review'],
+                            ['restrict', 'Restrict'],
+                            ['freeze', 'Freeze Pay'],
+                            ['suspend', 'Suspend'],
+                            ['blacklist', 'Blacklist'],
+                            ['restore', 'Restore'],
+                          ].map(([action, label]) => (
+                            <button key={action} type="button" onClick={() => takeStoreAdminAction(s, action as any)} className={`rounded-lg border px-2 py-1.5 text-[8px] font-black uppercase ${action === 'restore' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                        {(s.riskActionLog || []).length > 0 && (
+                          <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/10 p-2">
+                            <p className="text-[8px] font-black uppercase text-red-300">Risk Action History</p>
+                            {(s.riskActionLog || []).slice(-3).map((log: any, i: number) => (
+                              <p key={i} className="mt-1 text-[8px] text-gray-300">{log.action}: {log.reason}</p>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 

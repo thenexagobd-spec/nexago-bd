@@ -65,6 +65,7 @@ export default function StoreAdminPortal() {
   const activeApplication = storeAdminApps.find((a: any) => ((a.adminId === sessionAdminId) || (branchSession && a.storeId === branchSession.storeId)) && a.status === 'Verified');
   const activeStoreId = branchSession?.storeId || activeApplication?.storeId || '';
   const activeStore = stores.find((s: any) => s.id === activeStoreId);
+  const storeAccessBlocked = ['Suspended', 'Blacklisted'].includes(activeStore?.status || '') || ['suspend', 'blacklist'].includes(activeStore?.adminRiskStatus || '');
   const activeStoreName = activeApplication?.storeName || 'Approved Store';
   const myBranches = branches.filter((b: any) => b.storeId === activeStoreId);
   const queryBranchId = new URLSearchParams(window.location.search).get('branch') || '';
@@ -186,6 +187,8 @@ export default function StoreAdminPortal() {
     const cred = storeAdminCreds[id];
     const app = storeAdminApps.find((a: any) => a.adminId === id && a.status === 'Verified');
     const branch = branches.find((b: any) => b.branchAdminId === id && b.branchPassword === loginPassword && b.status === 'Active');
+    const loginStore = stores.find((s: any) => s.id === (app?.storeId || branch?.storeId));
+    if (['Suspended', 'Blacklisted'].includes(loginStore?.status || '') || ['suspend', 'blacklist'].includes(loginStore?.adminRiskStatus || '')) return;
     if ((!cred || !app || cred.password !== loginPassword) && !branch) return;
     localStorage.setItem('sd_store_admin_session', id);
     setSessionAdminId(id);
@@ -352,7 +355,7 @@ export default function StoreAdminPortal() {
 
   const filtered = myProducts.filter(p => !search.trim() || p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
 
-  if (!activeApplication) {
+  if (!activeApplication || storeAccessBlocked) {
     const tracked = storeAdminApps.find((a: any) => a.adminId === trackId.trim() || a.adminId === submittedAppId);
     const approvedCred = tracked ? storeAdminCreds[tracked.adminId] : null;
     return (
