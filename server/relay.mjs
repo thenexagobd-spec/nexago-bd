@@ -16,10 +16,15 @@ const DATA_ENCRYPTION_KEY = process.env.NEXAGO_DATA_ENCRYPTION_KEY || '';
 const SECURITY_ALERT_WEBHOOK = process.env.NEXAGO_SECURITY_ALERT_WEBHOOK || '';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXAGO_TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || process.env.NEXAGO_TELEGRAM_CHAT_ID || '';
-const SUPER_ADMIN_USERS = (process.env.NEXAGO_SUPER_ADMIN_USERS || '').split(',').map((x) => x.trim()).filter(Boolean);
-const SUPER_ADMIN_PASSWORD = process.env.NEXAGO_SUPER_ADMIN_PASSWORD || '';
-const SUPER_ADMIN_PASSWORD_CHANGE_CODE = process.env.NEXAGO_SUPER_ADMIN_PASSWORD_CHANGE_CODE || '';
-const SUPER_ADMIN_LOGIN_SECRET_CODE = process.env.NEXAGO_SUPER_ADMIN_LOGIN_SECRET_CODE || SUPER_ADMIN_PASSWORD_CHANGE_CODE;
+function cleanEnvSecret(value) {
+  const raw = String(value || '').trim();
+  return raw.replace(/^["']|["']$/g, '').trim();
+}
+
+const SUPER_ADMIN_USERS = (process.env.NEXAGO_SUPER_ADMIN_USERS || '').split(',').map((x) => cleanEnvSecret(x)).filter(Boolean);
+const SUPER_ADMIN_PASSWORD = cleanEnvSecret(process.env.NEXAGO_SUPER_ADMIN_PASSWORD);
+const SUPER_ADMIN_PASSWORD_CHANGE_CODE = cleanEnvSecret(process.env.NEXAGO_SUPER_ADMIN_PASSWORD_CHANGE_CODE);
+const SUPER_ADMIN_LOGIN_SECRET_CODE = cleanEnvSecret(process.env.NEXAGO_SUPER_ADMIN_LOGIN_SECRET_CODE) || SUPER_ADMIN_PASSWORD_CHANGE_CODE;
 
 import os from 'node:os';
 
@@ -552,7 +557,7 @@ const server = http.createServer((req, res) => {
     readBody(req).then((body) => {
       const role = String(body.role || '').trim();
       const userId = String(body.userId || '').trim();
-      const password = String(body.password || '');
+      const password = cleanEnvSecret(body.password);
       const storeId = String(body.storeId || '').trim();
       const branchId = String(body.branchId || '').trim();
       if (!role || !userId || password.length < 8) { sendJson(res, 400, { ok: false, error: 'role, userId and 8+ char password required' }); return; }
@@ -580,7 +585,7 @@ const server = http.createServer((req, res) => {
     readBody(req).then((body) => {
       const userId = String(body.userId || '').trim();
       const password = String(body.password || '');
-      const secretCode = String(body.secretCode || '');
+      const secretCode = cleanEnvSecret(body.secretCode);
       ensureEnvSuperAdmins(key);
       const users = readSecurity(`users-${safeKey(key)}`, {});
       const found = findSecurityUser(users, userId);
@@ -705,9 +710,9 @@ const server = http.createServer((req, res) => {
       ensureEnvSuperAdmins(key);
       const session = requireSession(req, key);
       if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
-      const currentPassword = String(body.currentPassword || '');
-      const newPassword = String(body.newPassword || '');
-      const secretCode = String(body.secretCode || '');
+      const currentPassword = cleanEnvSecret(body.currentPassword);
+      const newPassword = cleanEnvSecret(body.newPassword);
+      const secretCode = cleanEnvSecret(body.secretCode);
       if (!SUPER_ADMIN_PASSWORD_CHANGE_CODE) {
         appendAudit(key, { actor: session.userId, role: session.role, action: 'super-admin-password-change-denied', ip: clientIp(req), reason: 'secret code env missing' });
         sendJson(res, 503, { ok: false, error: 'SECRET_CODE_NOT_CONFIGURED' });
