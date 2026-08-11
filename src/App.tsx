@@ -286,7 +286,10 @@ export default function App() {
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'online' | 'offline'>('idle');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [profile, setProfile] = useState(() => getStoredData('sd_store_profile', { storeName: '', storeSub: '', whatsapp: '' }));
-  const apiBase = ((import.meta.env.VITE_RELAY_BASE as string) || window.location.origin).replace(/\/+$/, '');
+  const configuredApiBase = ((import.meta.env.VITE_RELAY_BASE as string) || '').replace(/\/+$/, '');
+  const apiBase = window.location.hostname.endsWith('.onrender.com')
+    ? window.location.origin
+    : (configuredApiBase || window.location.origin).replace(/\/+$/, '');
   const storefrontUrl = `${apiBase}/store?key=${encodeURIComponent(storeKey)}`;
 
   const handleStoreKeyChange = (key: string) => {
