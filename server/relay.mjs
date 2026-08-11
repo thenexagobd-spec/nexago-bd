@@ -16,6 +16,9 @@ const DATA_ENCRYPTION_KEY = process.env.NEXAGO_DATA_ENCRYPTION_KEY || '';
 const SECURITY_ALERT_WEBHOOK = process.env.NEXAGO_SECURITY_ALERT_WEBHOOK || '';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXAGO_TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || process.env.NEXAGO_TELEGRAM_CHAT_ID || '';
+const SUPER_ADMIN_USERS = (process.env.NEXAGO_SUPER_ADMIN_USERS || '').split(',').map((x) => x.trim()).filter(Boolean);
+const SUPER_ADMIN_PASSWORD = process.env.NEXAGO_SUPER_ADMIN_PASSWORD || '';
+const SUPER_ADMIN_PASSWORD_CHANGE_CODE = process.env.NEXAGO_SUPER_ADMIN_PASSWORD_CHANGE_CODE || '';
 
 import os from 'node:os';
 
@@ -218,6 +221,29 @@ function requireSession(req, key) {
   const session = sessions[token];
   if (!session || Date.now() > Number(session.expiresAt || 0)) return null;
   return { token, ...session };
+}
+
+function ensureEnvSuperAdmins(key) {
+  if (!SUPER_ADMIN_USERS.length || !SUPER_ADMIN_PASSWORD) return;
+  const users = readSecurity(`users-${safeKey(key)}`, {});
+  let changed = false;
+  for (const userId of SUPER_ADMIN_USERS) {
+    if (!users[userId]) {
+      users[userId] = {
+        userId,
+        role: 'super-admin',
+        storeId: '',
+        branchId: '',
+        status: 'Active',
+        password: hashPassword(SUPER_ADMIN_PASSWORD),
+        createdAt: new Date().toISOString(),
+        lastPasswordChangeAt: new Date().toISOString(),
+        source: 'env-seed',
+      };
+      changed = true;
+    }
+  }
+  if (changed) writeSecurity(`users-${safeKey(key)}`, users);
 }
 
 function storeFile(key) {
@@ -520,6 +546,7 @@ const server = http.createServer((req, res) => {
     readBody(req).then((body) => {
       const userId = String(body.userId || '').trim();
       const password = String(body.password || '');
+      ensureEnvSuperAdmins(key);
       const users = readSecurity(`users-${safeKey(key)}`, {});
       const user = users[userId];
       if (!user || user.status !== 'Active' || !verifyPassword(password, user.password)) {
@@ -551,6 +578,53 @@ const server = http.createServer((req, res) => {
     const session = requireSession(req, key);
     if (!session) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
     sendJson(res, 200, { ok: true, session });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/super-admin/password') {
+    if (!rateLimit(req, 'super-admin-password', 6, 60_000)) { sendSecurityAlert('super-admin-password-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '' }); sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      ensureEnvSuperAdmins(key);
+      const session = requireSession(req, key);
+      if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+      const currentPassword = String(body.currentPassword || '');
+      const newPassword = String(body.newPassword || '');
+      const secretCode = String(body.secretCode || '');
+      if (!SUPER_ADMIN_PASSWORD_CHANGE_CODE) {
+        appendAudit(key, { actor: session.userId, role: session.role, action: 'super-admin-password-change-denied', ip: clientIp(req), reason: 'secret code env missing' });
+        sendJson(res, 503, { ok: false, error: 'SECRET_CODE_NOT_CONFIGURED' });
+        return;
+      }
+      if (secretCode !== SUPER_ADMIN_PASSWORD_CHANGE_CODE) {
+        appendAudit(key, { actor: session.userId, role: session.role, action: 'super-admin-password-change-denied', ip: clientIp(req), reason: 'invalid secret code' });
+        sendSecurityAlert('super-admin-password-change-denied', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'invalid secret code' });
+        sendJson(res, 403, { ok: false, error: 'INVALID_SECRET_CODE' });
+        return;
+      }
+      if (newPassword.length < 8) { sendJson(res, 400, { ok: false, error: 'NEW_PASSWORD_TOO_SHORT' }); return; }
+      const users = readSecurity(`users-${safeKey(key)}`, {});
+      const actor = users[session.userId];
+      if (!actor || !verifyPassword(currentPassword, actor.password)) {
+        appendAudit(key, { actor: session.userId, role: session.role, action: 'super-admin-password-change-denied', ip: clientIp(req), reason: 'current password mismatch' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_CURRENT_PASSWORD' });
+        return;
+      }
+      const changedUsers = Object.values(users).filter((user) =>
+        user?.role === 'super-admin' && (user.userId === session.userId || user.source === 'env-seed' || SUPER_ADMIN_USERS.includes(user.userId))
+      );
+      const nextHash = hashPassword(newPassword);
+      for (const user of changedUsers) {
+        users[user.userId] = {
+          ...user,
+          password: nextHash,
+          lastPasswordChangeAt: new Date().toISOString(),
+          passwordChangedBy: session.userId,
+        };
+      }
+      writeSecurity(`users-${safeKey(key)}`, users);
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'super-admin-password-changed', ip: clientIp(req), reason: body.reason || 'secret code verified', newValue: { changedUsers: changedUsers.map((u) => u.userId) } });
+      sendJson(res, 200, { ok: true, changedUsers: changedUsers.map((u) => u.userId) });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
 

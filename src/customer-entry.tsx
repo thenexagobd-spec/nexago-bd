@@ -44,11 +44,14 @@ function PublicCustomerApp() {
   };
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/storefront?key=${encodeURIComponent(KEY)}`)
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error('storefront fetch failed'))))
-      .then(d => {
-        const realProducts = Array.isArray(d.products) ? d.products.filter((p: any) => !KEY.startsWith('STR-') || p.storeId === KEY) : [];
-        setProducts(realProducts.map((p: any): Product => ({
+    let cancelled = false;
+    const pullLive = () => {
+      fetch(`${API_BASE}/api/storefront?key=${encodeURIComponent(KEY)}`)
+        .then(r => (r.ok ? r.json() : Promise.reject(new Error('storefront fetch failed'))))
+        .then(d => {
+          if (cancelled) return;
+          const realProducts = Array.isArray(d.products) ? d.products.filter((p: any) => !KEY.startsWith('STR-') || p.storeId === KEY) : [];
+          setProducts(realProducts.map((p: any): Product => ({
             id: p.id,
             name: p.name,
             price: Number(p.promoPrice || p.price || 0),
@@ -57,17 +60,22 @@ function PublicCustomerApp() {
             status: Number(p.stock || 0) <= 0 ? 'Out of Stock' : Number(p.stock || 0) <= 10 ? 'Low Stock' : 'In Stock',
             image: p.image || ''
           })));
-      })
-      .catch(() => {});
-    fetch(`${API_BASE}/api/state?key=${encodeURIComponent(KEY)}`)
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error('state fetch failed'))))
-      .then(d => {
-        if (d && d.state && Array.isArray(d.state.stores)) {
-          setStores(KEY.startsWith('STR-') ? d.state.stores.filter((s: any) => s.id === KEY) : d.state.stores);
-        }
-        if (d && Array.isArray(d.state && d.state.orders) && d.state.orders.length) setOrders(d.state.orders);
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+      fetch(`${API_BASE}/api/state?key=${encodeURIComponent(KEY)}`)
+        .then(r => (r.ok ? r.json() : Promise.reject(new Error('state fetch failed'))))
+        .then(d => {
+          if (cancelled) return;
+          if (d && d.state && Array.isArray(d.state.stores)) {
+            setStores(KEY.startsWith('STR-') ? d.state.stores.filter((s: any) => s.id === KEY) : d.state.stores);
+          }
+          if (d && Array.isArray(d.state && d.state.orders) && d.state.orders.length) setOrders(d.state.orders);
+        })
+        .catch(() => {});
+    };
+    pullLive();
+    const timer = setInterval(pullLive, 2000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, []);
 
   const postOrder = (order: Order) => {

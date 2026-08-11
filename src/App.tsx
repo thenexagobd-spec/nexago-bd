@@ -97,6 +97,12 @@ export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('Dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const isSuperAdminRoute = window.location.pathname.includes('super-admin') || window.location.pathname.endsWith('/admin') || window.location.pathname.endsWith('/index.html');
+  const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(() => localStorage.getItem('sd_super_admin_login') === 'verified');
+  const [superAdminLogin, setSuperAdminLogin] = useState({ user: '', password: '' });
+  const [superAdminLoginError, setSuperAdminLoginError] = useState('');
+  const [superAdminPasswordForm, setSuperAdminPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '', secretCode: '' });
+  const [superAdminPasswordError, setSuperAdminPasswordError] = useState('');
 
   // Standalone Store Portal state
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(() => {
@@ -4189,6 +4195,100 @@ export default function App() {
     );
   }
 
+  const handleSuperAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const userId = superAdminLogin.user.trim();
+    securityApi('/login', { userId, password: superAdminLogin.password }).then((data) => {
+      if (data.user?.role !== 'super-admin') throw new Error('not super admin');
+      localStorage.setItem('sd_security_session', data.token);
+      localStorage.setItem('sd_super_admin_login', 'verified');
+      setIsSuperAdminLoggedIn(true);
+      setSuperAdminLoginError('');
+      securityAudit('super-admin-login-success', { actor: userId, reason: 'server verified super admin login' });
+      showToast('Super Admin login successful.', 'success');
+    }).catch(() => {
+      setSuperAdminLoginError('Invalid Super Admin username/email or password.');
+      securityAudit('super-admin-login-failed', { actor: userId || 'unknown', reason: 'server rejected super admin login' });
+    });
+  };
+
+  const handleSuperAdminPasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (superAdminPasswordForm.newPassword !== superAdminPasswordForm.confirmPassword) {
+      setSuperAdminPasswordError('New password and confirm password do not match.');
+      return;
+    }
+    securityApi('/super-admin/password', {
+      currentPassword: superAdminPasswordForm.currentPassword,
+      newPassword: superAdminPasswordForm.newPassword,
+      secretCode: superAdminPasswordForm.secretCode,
+      reason: 'Super Admin changed login password from secured dashboard',
+    }).then((data) => {
+      setSuperAdminPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '', secretCode: '' });
+      setSuperAdminPasswordError('');
+      securityAudit('super-admin-password-change-ui-success', { actor: 'super-admin', reason: 'secret code verified', newValue: { changedUsers: data.changedUsers || [] } });
+      showToast('Super Admin password changed securely.', 'success');
+    }).catch((err) => {
+      setSuperAdminPasswordError(String(err?.message || 'Password change failed. Check current password and secret code.'));
+      securityAudit('super-admin-password-change-ui-failed', { actor: 'super-admin', reason: 'server rejected password change' });
+    });
+  };
+
+  if (isSuperAdminRoute && !isSuperAdminLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[#070d16] text-gray-100 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.18),transparent_28%)]" />
+        <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl border border-brand-border bg-[#0c1624] shadow-2xl">
+          <div className="grid min-h-[560px] lg:grid-cols-[1fr_420px]">
+            <div className="flex flex-col justify-between p-6 sm:p-8">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-brand-orange/30 bg-brand-orange/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-brand-orange">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Secured Super Admin
+                </div>
+                <h1 className="mt-6 max-w-xl text-3xl font-black leading-tight text-white sm:text-4xl">The NexaGo BD Control Center</h1>
+                <p className="mt-3 max-w-lg text-sm leading-6 text-gray-400">Protected dashboard access for platform records, store approvals, staff controls, security audit and emergency operations.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  ['Security', 'Audit alerts active'],
+                  ['Access', 'Role protected'],
+                  ['Data', 'Store isolated'],
+                ].map(([title, sub]) => (
+                  <div key={title} className="rounded-xl border border-brand-border bg-[#080e17] p-3">
+                    <p className="text-[10px] font-black uppercase text-white">{title}</p>
+                    <p className="mt-1 text-[9px] text-gray-500">{sub}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <form onSubmit={handleSuperAdminLogin} className="flex flex-col justify-center border-t border-brand-border bg-[#101d30] p-6 sm:p-8 lg:border-l lg:border-t-0">
+              <div className="mb-6">
+                <p className="text-[10px] font-black uppercase tracking-widest text-brand-orange">Login Required</p>
+                <h2 className="mt-2 text-xl font-black text-white">Super Admin Dashboard</h2>
+                <p className="mt-1 text-[11px] text-gray-400">Enter authorized username/email and password.</p>
+              </div>
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Username / Email</span>
+                  <input value={superAdminLogin.user} onChange={e => setSuperAdminLogin(prev => ({ ...prev, user: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Username or email" autoComplete="username" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Password</span>
+                  <input value={superAdminLogin.password} onChange={e => setSuperAdminLogin(prev => ({ ...prev, password: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Password" type="password" autoComplete="current-password" />
+                </label>
+                {superAdminLoginError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">{superAdminLoginError}</p>}
+                <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white shadow-lg transition-colors hover:bg-brand-orange-hover">
+                  <ShieldCheck className="h-4 w-4" /> Open Super Admin
+                </button>
+              </div>
+              <p className="mt-5 text-center text-[10px] text-gray-500">All login attempts are audited by the security system.</p>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (activeTab === 'Customer Site') {
     return (
       <CustomerStorefront
@@ -4318,6 +4418,9 @@ export default function App() {
 
           <button
             onClick={() => {
+              localStorage.removeItem('sd_super_admin_login');
+              setIsSuperAdminLoggedIn(false);
+              setSuperAdminLogin({ user: '', password: '' });
               showToast("Session reset. Welcome to The NexaGo BD Admin Panel!", "info");
               setActiveTab('Dashboard');
             }}
@@ -4326,6 +4429,48 @@ export default function App() {
             <LogOut className="w-4 h-4 shrink-0" />
             <span>Logout</span>
           </button>
+
+          {activePanelMode === 'super_admin' && (
+            <form onSubmit={handleSuperAdminPasswordChange} className="mt-3 rounded-xl border border-brand-border bg-[#070e17] p-3 space-y-2">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-wider text-brand-orange">Password Control</p>
+                <p className="mt-0.5 text-[8px] leading-relaxed text-gray-500">Secret code required before changing Super Admin login.</p>
+              </div>
+              <input
+                value={superAdminPasswordForm.currentPassword}
+                onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                type="password"
+                placeholder="Current password"
+                className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange"
+              />
+              <input
+                value={superAdminPasswordForm.newPassword}
+                onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                type="password"
+                placeholder="New password"
+                className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange"
+              />
+              <input
+                value={superAdminPasswordForm.confirmPassword}
+                onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                type="password"
+                placeholder="Confirm new password"
+                className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange"
+              />
+              <input
+                value={superAdminPasswordForm.secretCode}
+                onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, secretCode: e.target.value }))}
+                type="password"
+                inputMode="numeric"
+                placeholder="Secret code"
+                className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange"
+              />
+              {superAdminPasswordError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[8px] font-bold text-red-300">{superAdminPasswordError}</p>}
+              <button type="submit" className="w-full rounded-lg bg-brand-orange px-3 py-2 text-[9px] font-black uppercase tracking-wider text-white hover:bg-brand-orange-hover">
+                Change Password
+              </button>
+            </form>
+          )}
         </nav>
 
         {/* Profile Footer */}
@@ -4409,6 +4554,9 @@ export default function App() {
 
               <button
                 onClick={() => {
+                  localStorage.removeItem('sd_super_admin_login');
+                  setIsSuperAdminLoggedIn(false);
+                  setSuperAdminLogin({ user: '', password: '' });
                   showToast("Session reset. Welcome to The NexaGo BD Admin Panel!", "info");
                   setActiveTab('Dashboard');
                   setIsMobileSidebarOpen(false);
@@ -4418,6 +4566,18 @@ export default function App() {
                 <LogOut className="w-4 h-4 shrink-0" />
                 <span>Logout</span>
               </button>
+
+              {activePanelMode === 'super_admin' && (
+                <form onSubmit={handleSuperAdminPasswordChange} className="mt-3 rounded-xl border border-brand-border bg-[#070e17] p-3 space-y-2">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-brand-orange">Password Control</p>
+                  <input value={superAdminPasswordForm.currentPassword} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))} type="password" placeholder="Current password" className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange" />
+                  <input value={superAdminPasswordForm.newPassword} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))} type="password" placeholder="New password" className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange" />
+                  <input value={superAdminPasswordForm.confirmPassword} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))} type="password" placeholder="Confirm new password" className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange" />
+                  <input value={superAdminPasswordForm.secretCode} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, secretCode: e.target.value }))} type="password" inputMode="numeric" placeholder="Secret code" className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange" />
+                  {superAdminPasswordError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[8px] font-bold text-red-300">{superAdminPasswordError}</p>}
+                  <button type="submit" className="w-full rounded-lg bg-brand-orange px-3 py-2 text-[9px] font-black uppercase tracking-wider text-white hover:bg-brand-orange-hover">Change Password</button>
+                </form>
+              )}
             </nav>
 
             <div className="p-4 border-t border-brand-border bg-brand-dark/30 flex items-center justify-between">
