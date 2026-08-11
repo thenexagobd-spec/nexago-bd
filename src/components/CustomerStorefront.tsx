@@ -151,211 +151,9 @@ const nearestAreaOf = (lat: number, lng: number) => {
 
 const U = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=600`;
 
-const STORE_DEFS: StoreDef[] = [
-  {
-    id: 'S1', name: 'Fresh Mart', subtext: 'The NexaGo BD', category: 'Grocery',
-    badgeColor: 'bg-emerald-600 text-white', rating: 4.6, reviewsCount: '230+',
-    deliveryTime: '30-40 min', deliveryFee: 40,
-    image: U('photo-1542838132-92c53300491e'), logoText: 'Fresh Mart', logoBg: 'bg-emerald-100 text-emerald-800',
-    pickup: { lat: 23.7806, lng: 90.4009 },
-    catalog: [
-      { id: 'S1-P1', name: 'Fresh Apples (Premium)', price: 180, category: 'Fruits & Veg', stock: 45, status: 'In Stock', unit: '1 kg', desc: 'Crisp, juicy imported apples. Perfect for snacks & salads.', image: U('photo-1560806887-1e4cd0b6cbd6') },
-      { id: 'S1-P2', name: 'Organic Bananas', price: 90, category: 'Fruits & Veg', stock: 120, status: 'In Stock', unit: '12 pcs', desc: 'Farm-fresh sweet bananas, rich in potassium.', image: U('photo-1571771894821-ce9b6c11b08e') },
-      { id: 'S1-P3', name: 'Miniket Rice 5kg', price: 380, category: 'Rice & Grains', stock: 35, status: 'In Stock', unit: '5 kg', desc: 'Premium Miniket rice, soft and aromatic.', image: U('photo-1586201375761-83865001e31c') },
-      { id: 'S1-P4', name: 'Whole Milk 1L', price: 95, category: 'Dairy & Eggs', stock: 60, status: 'In Stock', unit: '1 L', desc: 'Full-cream pasteurised cow milk, farm fresh daily.', image: U('photo-1550583724-b2692b85b150') },
-      { id: 'S1-P5', name: 'Fresh Farm Eggs (Dozen)', price: 145, category: 'Dairy & Eggs', stock: 80, status: 'In Stock', unit: '12 pcs', desc: 'Grade-A brown eggs from local farms.', image: U('photo-1582722872445-44dc5f7e3c8f') },
-      { id: 'S1-P6', name: 'Brown Bread 400g', price: 65, category: 'Bakery', stock: 15, status: 'In Stock', unit: '400 g', desc: 'Whole-grain brown bread, high fibre.', image: U('photo-1509440159596-0249088772ff') },
-      { id: 'S1-P7', name: 'Tomatoes (Local)', price: 80, category: 'Fruits & Veg', stock: 9, status: 'Low Stock', unit: '1 kg', desc: 'Vine-ripened local tomatoes.', image: U('photo-1546094096-0df4bcaaa337') },
-      { id: 'S1-P8', name: 'Onion (Local)', price: 65, category: 'Fruits & Veg', stock: 50, status: 'In Stock', unit: '1 kg', desc: 'Fresh local onions.', image: U('photo-1508747703725-719777637510') },
-      { id: 'S1-P9', name: 'Soybean Oil 2L', price: 350, category: 'Oil & Ghee', stock: 28, status: 'In Stock', unit: '2 L', desc: 'Refined soybean cooking oil.', image: U('photo-1474979266404-7eaacbcd87c5') },
-      { id: 'S1-P10', name: 'White Sugar 1kg', price: 130, category: 'Sugar & Salt', stock: 0, status: 'Out of Stock', unit: '1 kg', desc: 'Fine granulated sugar.', image: U('photo-1584744982491-665216d95f8b') },
-    ]
-  },
-  {
-    id: 'S2', name: 'Daily Shopper', subtext: 'Supermarket', category: 'Supermarket',
-    badgeColor: 'bg-orange-500 text-white', rating: 4.5, reviewsCount: '180+',
-    deliveryTime: '40-50 min', deliveryFee: 50,
-    image: U('photo-1578916171728-46686eac8d58'), logoText: 'DS', logoBg: 'bg-orange-100 text-orange-800',
-    pickup: { lat: 23.7822, lng: 90.4145 },
-    catalog: [
-      { id: 'S2-P1', name: 'Toilet Paper 12 Roll', price: 420, category: 'Household', stock: 30, status: 'In Stock', unit: '12 rolls', desc: '3-ply soft toilet rolls.', image: U('photo-1584634731339-252c581abfc5') },
-      { id: 'S2-P2', name: 'Detergent Powder 1kg', price: 210, category: 'Household', stock: 40, status: 'In Stock', unit: '1 kg', desc: 'Stain-removing laundry detergent.', image: U('photo-1585699324551-f6c309eedeca') },
-      { id: 'S2-P3', name: 'Dishwash Liquid 500ml', price: 120, category: 'Household', stock: 25, status: 'In Stock', unit: '500 ml', desc: 'Lemon-fresh dishwashing liquid.', image: U('photo-1620381131645-6c135a50e3cb') },
-      { id: 'S2-P4', name: 'Shampoo 350ml', price: 320, category: 'Personal Care', stock: 18, status: 'In Stock', unit: '350 ml', desc: 'Anti-dandruff herbal shampoo.', image: U('photo-1556228720-195a672e8a03') },
-      { id: 'S2-P5', name: 'Toothpaste 150g', price: 140, category: 'Personal Care', stock: 55, status: 'In Stock', unit: '150 g', desc: 'Fluoride protection toothpaste.', image: U('photo-1585421514738-01798e13b998') },
-      { id: 'S2-P6', name: 'Bath Soap (3 Pack)', price: 180, category: 'Personal Care', stock: 7, status: 'Low Stock', unit: '3 pcs', desc: 'Moisturising bath soap bars.', image: U('photo-1583947215259-38e31be8751f') },
-      { id: 'S2-P7', name: 'Instant Noodles (5 Pack)', price: 175, category: 'Snacks', stock: 0, status: 'Out of Stock', unit: '5 pcs', desc: 'Quick-cook masala noodles.', image: U('photo-1612929633738-8fe44f7ec841') },
-      { id: 'S2-P8', name: 'Family Biscuits 500g', price: 160, category: 'Snacks', stock: 42, status: 'In Stock', unit: '500 g', desc: 'Crunchy tea-time biscuits.', image: U('photo-1558961363-fa8fdf82db35') },
-    ]
-  },
-  {
-    id: 'S3', name: 'Spice Garden', subtext: 'Bangladeshi · Indian', category: 'Restaurant',
-    badgeColor: 'bg-red-600 text-white', rating: 4.7, reviewsCount: '320+',
-    deliveryTime: '35-45 min', deliveryFee: 60,
-    image: U('photo-1517248135467-4c7edcad34c4'), logoText: 'SG', logoBg: 'bg-red-100 text-red-800',
-    pickup: { lat: 23.7539, lng: 90.3836 },
-    catalog: [
-      { id: 'S3-P1', name: 'Kacchi Biryani', price: 420, category: 'Biryani', stock: 30, status: 'In Stock', unit: '1 plate', desc: 'Fragrant basmati kacchi with tender mutton.', image: U('photo-1596797038530-2c107229654b') },
-      { id: 'S3-P2', name: 'Chicken Biryani', price: 280, category: 'Biryani', stock: 40, status: 'In Stock', unit: '1 plate', desc: 'Classic chicken biryani with mint raita.', image: U('photo-1563379091339-03b21ab4a4f8') },
-      { id: 'S3-P3', name: 'Beef Bhuna', price: 480, category: 'Mains', stock: 22, status: 'In Stock', unit: '1 plate', desc: 'Slow-cooked spicy beef bhuna.', image: U('photo-1604908176997-125f25cc6f3d') },
-      { id: 'S3-P4', name: 'Tandoori Chicken (Half)', price: 380, category: 'Mains', stock: 16, status: 'In Stock', unit: 'half', desc: 'Char-grilled tandoori chicken.', image: U('photo-1604503468506-a8da13d82791') },
-      { id: 'S3-P5', name: 'Garlic Naan', price: 80, category: 'Breads', stock: 50, status: 'In Stock', unit: '1 pc', desc: 'Fresh tandoor naan with garlic butter.', image: U('photo-1601050690597-df0568f70950') },
-      { id: 'S3-P6', name: 'Veg Curry & Rice', price: 180, category: 'Mains', stock: 8, status: 'Low Stock', unit: '1 plate', desc: 'Mixed vegetable curry with steamed rice.', image: U('photo-1512621776951-a57141f2eefd') },
-      { id: 'S3-P7', name: 'Misti Doi', price: 120, category: 'Dessert', stock: 25, status: 'In Stock', unit: '1 cup', desc: 'Traditional caramelised sweet yoghurt.', image: U('photo-1551024506-0bccd828d307') },
-      { id: 'S3-P8', name: 'Lemon Mint Sharbat', price: 90, category: 'Drinks', stock: 0, status: 'Out of Stock', unit: '1 glass', desc: 'Refreshing mint lemonade.', image: U('photo-1600271886742-f049cd451bba') },
-    ]
-  },
-  {
-    id: 'S4', name: 'Burger House', subtext: 'Fast Food · Burgers', category: 'Fast Food',
-    badgeColor: 'bg-amber-600 text-white', rating: 4.4, reviewsCount: '150+',
-    deliveryTime: '25-35 min', deliveryFee: 40,
-    image: U('photo-1568901346375-23c9450c58cd'), logoText: 'BH', logoBg: 'bg-amber-100 text-amber-800',
-    pickup: { lat: 23.7936, lng: 90.4045 },
-    catalog: [
-      { id: 'S4-P1', name: 'Classic Beef Burger', price: 320, category: 'Burgers', stock: 35, status: 'In Stock', unit: '1 pc', desc: 'Juicy beef patty, cheese, fresh veggies.', image: U('photo-1568901346375-23c9450c58cd') },
-      { id: 'S4-P2', name: 'Zinger Chicken Burger', price: 280, category: 'Burgers', stock: 30, status: 'In Stock', unit: '1 pc', desc: 'Crispy fried chicken zinger.', image: U('photo-1550547660-d9450f859349') },
-      { id: 'S4-P3', name: 'French Fries (Large)', price: 130, category: 'Sides', stock: 60, status: 'In Stock', unit: 'large', desc: 'Golden crispy fries with dip.', image: U('photo-1573080496219-bb080dd4f877') },
-      { id: 'S4-P4', name: 'BBQ Wings (6 pc)', price: 260, category: 'Sides', stock: 20, status: 'In Stock', unit: '6 pcs', desc: 'Smoky grilled BBQ wings.', image: U('photo-1567620832903-9fc6debc209f') },
-      { id: 'S4-P5', name: 'Chocolate Shake', price: 190, category: 'Drinks', stock: 12, status: 'In Stock', unit: '1 glass', desc: 'Thick cold chocolate milkshake.', image: U('photo-1572490122747-3968b75cc699') },
-      { id: 'S4-P6', name: 'Cold Coffee', price: 170, category: 'Drinks', stock: 9, status: 'Low Stock', unit: '1 glass', desc: 'Iced blended coffee.', image: U('photo-1461023058943-07fcbe16d735') },
-      { id: 'S4-P7', name: 'Cheese Fries', price: 180, category: 'Sides', stock: 0, status: 'Out of Stock', unit: '1 box', desc: 'Fries loaded with cheese sauce.', image: U('photo-1541592106381-b31e9677c0e5') },
-    ]
-  },
-  {
-    id: 'S5', name: 'MedPlus', subtext: 'Pharmacy', category: 'Pharmacy',
-    badgeColor: 'bg-blue-600 text-white', rating: 4.6, reviewsCount: '210+',
-    deliveryTime: '30-40 min', deliveryFee: 40,
-    image: U('photo-1586015555751-63bb77f4322a'), logoText: 'MP', logoBg: 'bg-blue-100 text-blue-800',
-    pickup: { lat: 23.8096, lng: 90.4144 },
-    catalog: [
-      { id: 'S5-P1', name: 'Paracetamol 500mg (20)', price: 30, category: 'Pain Relief', stock: 100, status: 'In Stock', unit: '20 tabs', desc: 'Fever & headache relief tablets.', image: U('photo-1584308666744-24d5c474f2ae') },
-      { id: 'S5-P2', name: 'Vitamin C 1000mg (30)', price: 450, category: 'Vitamins', stock: 40, status: 'In Stock', unit: '30 tabs', desc: 'Immune support effervescent.', image: U('photo-1587854692152-cbe660dbde88') },
-      { id: 'S5-P3', name: 'Digital Thermometer', price: 250, category: 'Devices', stock: 15, status: 'In Stock', unit: '1 pc', desc: 'Fast digital body thermometer.', image: U('photo-1583947581279-4eec4ae225d1') },
-      { id: 'S5-P4', name: 'Antiseptic Bandage', price: 60, category: 'First Aid', stock: 50, status: 'In Stock', unit: '1 pc', desc: 'Waterproof wound bandage.', image: U('photo-1576091160399-112ba8d25d1d') },
-      { id: 'S5-P5', name: 'Hand Sanitizer 100ml', price: 110, category: 'First Aid', stock: 5, status: 'Low Stock', unit: '100 ml', desc: '70% alcohol hand sanitiser.', image: U('photo-1585386959984-a4155224a1ad') },
-      { id: 'S5-P6', name: 'BP Monitor (Digital)', price: 1850, category: 'Devices', stock: 8, status: 'In Stock', unit: '1 pc', desc: 'Automatic arm blood pressure monitor.', image: U('photo-1584384358998-1c3b19760f2f') },
-      { id: 'S5-P7', name: 'Antacid 250ml', price: 140, category: 'Digestive', stock: 0, status: 'Out of Stock', unit: '250 ml', desc: 'Fast heartburn & acidity relief.', image: U('photo-1471864190281-a93a3070b6de') },
-    ]
-  },
-  {
-    id: 'S6', name: 'Fresh Valley', subtext: 'Fruits & Vegetables', category: 'Fruits & Veg',
-    badgeColor: 'bg-green-700 text-white', rating: 4.5, reviewsCount: '160+',
-    deliveryTime: '20-30 min', deliveryFee: 30,
-    image: U('photo-1610832958506-aa56368176cf'), logoText: 'FV', logoBg: 'bg-green-100 text-green-800',
-    pickup: { lat: 23.7864, lng: 90.4097 },
-    catalog: [
-      { id: 'S6-P1', name: 'Ripe Mangoes (Alphonso)', price: 150, category: 'Fruits', stock: 40, status: 'In Stock', unit: '1 kg', desc: 'Sweet juicy seasonal mangoes.', image: U('photo-1553279768-865429fa0078') },
-      { id: 'S6-P2', name: 'Seedless Watermelon', price: 160, category: 'Fruits', stock: 20, status: 'In Stock', unit: '1 pc', desc: 'Fresh whole watermelon.', image: U('photo-1587049352846-4a222e784d38') },
-      { id: 'S6-P3', name: 'Cucumber', price: 40, category: 'Vegetables', stock: 70, status: 'In Stock', unit: '500 g', desc: 'Crisp fresh cucumbers.', image: U('photo-1604977042946-1eecc30f269e') },
-      { id: 'S6-P4', name: 'Carrot', price: 70, category: 'Vegetables', stock: 55, status: 'In Stock', unit: '1 kg', desc: 'Fresh orange carrots.', image: U('photo-1447175008436-054170c2e979') },
-      { id: 'S6-P5', name: 'Green Coriander', price: 25, category: 'Herbs', stock: 30, status: 'In Stock', unit: '100 g', desc: 'Fresh coriander leaves.', image: U('photo-1532336414038-cf19250c5757') },
-      { id: 'S6-P6', name: 'Ginger', price: 130, category: 'Vegetables', stock: 6, status: 'Low Stock', unit: '500 g', desc: 'Fresh local ginger.', image: U('photo-1596040033229-a9821ebd058d') },
-      { id: 'S6-P7', name: 'Strawberries', price: 290, category: 'Fruits', stock: 0, status: 'Out of Stock', unit: '250 g', desc: 'Imported fresh strawberries.', image: U('photo-1464965911861-746a04b4bca6') },
-    ]
-  },
-  {
-    id: 'S7', name: 'Meat Express', subtext: 'Meat & Fish Shop', category: 'Meat & Fish',
-    badgeColor: 'bg-rose-700 text-white', rating: 4.3, reviewsCount: '120+',
-    deliveryTime: '30-40 min', deliveryFee: 50,
-    image: U('photo-1607623814075-e51df1bdc82f'), logoText: 'ME', logoBg: 'bg-rose-100 text-rose-800',
-    pickup: { lat: 23.7998, lng: 90.3665 },
-    catalog: [
-      { id: 'S7-P1', name: 'Beef (Boneless)', price: 980, category: 'Beef', stock: 30, status: 'In Stock', unit: '1 kg', desc: 'Fresh local beef, cut to order.', image: U('photo-1544025162-d76694265947') },
-      { id: 'S7-P2', name: 'Broiler Chicken', price: 230, category: 'Chicken', stock: 45, status: 'In Stock', unit: '1 kg', desc: 'Fresh dressed broiler chicken.', image: U('photo-1604503468506-a8da13d82791') },
-      { id: 'S7-P3', name: 'Rui Fish', price: 420, category: 'Fish', stock: 20, status: 'In Stock', unit: '1 kg', desc: 'Fresh pond rui fish.', image: U('photo-1498654200943-1088dd4438ae') },
-      { id: 'S7-P4', name: 'Mutton (Boneless)', price: 1350, category: 'Mutton', stock: 12, status: 'In Stock', unit: '1 kg', desc: 'Tender local mutton.', image: U('photo-1602470520998-f4a52199a3d6') },
-      { id: 'S7-P5', name: 'Shrimp (Medium)', price: 850, category: 'Fish', stock: 8, status: 'Low Stock', unit: '1 kg', desc: 'Medium size fresh shrimp.', image: U('photo-1559737558-2f5a35f4523b') },
-      { id: 'S7-P6', name: 'Beef Liver', price: 320, category: 'Beef', stock: 0, status: 'Out of Stock', unit: '500 g', desc: 'Fresh beef liver.', image: U('photo-1579895994587-0711b75ea737') },
-    ]
-  },
-  {
-    id: 'S8', name: 'Cake Cottage', subtext: 'Bakery · Cakes', category: 'Bakery',
-    badgeColor: 'bg-purple-600 text-white', rating: 4.7, reviewsCount: '190+',
-    deliveryTime: '25-35 min', deliveryFee: 40,
-    image: U('photo-1578985545062-69928b1d9587'), logoText: 'CC', logoBg: 'bg-purple-100 text-purple-800',
-    pickup: { lat: 23.7917, lng: 90.4192 },
-    catalog: [
-      { id: 'S8-P1', name: 'Black Forest Cake', price: 950, category: 'Cakes', stock: 10, status: 'In Stock', unit: '1 kg', desc: 'Classic chocolate cherry black forest.', image: U('photo-1578985545062-69928b1d9587') },
-      { id: 'S8-P2', name: 'Chocolate Truffle Cake', price: 1100, category: 'Cakes', stock: 8, status: 'In Stock', unit: '1 kg', desc: 'Rich Belgian chocolate truffle.', image: U('photo-1587248720327-8eb72564be1e') },
-      { id: 'S8-P3', name: 'Vanilla Cupcake', price: 120, category: 'Pastries', stock: 24, status: 'In Stock', unit: '1 pc', desc: 'Fluffy vanilla cupcake with frosting.', image: U('photo-1574085733277-851d9d856a3a') },
-      { id: 'S8-P4', name: 'Butter Croissant', price: 90, category: 'Pastries', stock: 18, status: 'In Stock', unit: '1 pc', desc: 'Flaky buttery croissant.', image: U('photo-1555507036-ab1f4038808a') },
-      { id: 'S8-P5', name: 'Chocolate Chip Cookie', price: 80, category: 'Biscuits', stock: 40, status: 'In Stock', unit: '1 pc', desc: 'Warm gooey chocolate chip cookie.', image: U('photo-1499636136210-6f4ee915583e') },
-      { id: 'S8-P6', name: 'Red Velvet Slice', price: 250, category: 'Cakes', stock: 5, status: 'Low Stock', unit: '1 slice', desc: 'Cream cheese red velvet slice.', image: U('photo-1606983340126-99ab4feaa64a') },
-      { id: 'S8-P7', name: 'Brownie (4 pc)', price: 320, category: 'Pastries', stock: 0, status: 'Out of Stock', unit: '4 pcs', desc: 'Fudgy walnut brownies.', image: U('photo-1606313564200-e75d5e30476c') },
-    ]
-  },
-];
+const STORE_DEFS: StoreDef[] = [];
 
-const BN_NAMES: Record<string, string> = {
-  'Fresh Mart': 'ফ্রেশ মার্ট',
-  'Daily Shopper': 'ডেইলি শপার',
-  'Spice Garden': 'স্পাইস গার্ডেন',
-  'Burger House': 'বার্গার হাউস',
-  'MedPlus': 'মেডপ্লাস',
-  'Fresh Valley': 'ফ্রেশ ভ্যালি',
-  'Meat Express': 'মিট এক্সপ্রেস',
-  'Cake Cottage': 'কেক কটেজ',
-  'Fresh Apples (Premium)': 'তাজা আপেল (প্রিমিয়াম)',
-  'Organic Bananas': 'অর্গানিক কলা',
-  'Miniket Rice 5kg': 'মিনিকেট চাল ৫ কেজি',
-  'Whole Milk 1L': 'ফুল ক্রিম দুধ ১ লিটার',
-  'Fresh Farm Eggs (Dozen)': 'তাজা ফার্ম ডিম (১ ডজন)',
-  'Brown Bread 400g': 'ব্রাউন ব্রেড ৪০০ গ্রাম',
-  'Tomatoes (Local)': 'টমেটো (দেশি)',
-  'Onion (Local)': 'পেঁয়াজ (দেশি)',
-  'Soybean Oil 2L': 'সয়াবিন তেল ২ লিটার',
-  'White Sugar 1kg': 'সাদা চিনি ১ কেজি',
-  'Toilet Paper 12 Roll': 'টয়লেট পেপার ১২ রোল',
-  'Detergent Powder 1kg': 'ডিটারজেন্ট পাউডার ১ কেজি',
-  'Dishwash Liquid 500ml': 'ডিশওয়াশ লিকুইড ৫০০ মিলি',
-  'Shampoo 350ml': 'শ্যাম্পু ৩৫০ মিলি',
-  'Toothpaste 150g': 'টুথপেস্ট ১৫০ গ্রাম',
-  'Bath Soap (3 Pack)': 'বাথ সাবান (৩ প্যাক)',
-  'Instant Noodles (5 Pack)': 'ইনস্ট্যান্ট নুডলস (৫ প্যাক)',
-  'Family Biscuits 500g': 'ফ্যামিলি বিস্কুট ৫০০ গ্রাম',
-  'Kacchi Biryani': 'কাচ্চি বিরিয়ানি',
-  'Chicken Biryani': 'চিকেন বিরিয়ানি',
-  'Beef Bhuna': 'গরুর ভুনা',
-  'Tandoori Chicken (Half)': 'তন্দুরি চিকেন (অর্ধেক)',
-  'Garlic Naan': 'গার্লিক নান',
-  'Veg Curry & Rice': 'সবজি তরকারি ও ভাত',
-  'Misti Doi': 'মিষ্টি দই',
-  'Lemon Mint Sharbat': 'লেবু মিন্ট শরবত',
-  'Classic Beef Burger': 'ক্লাসিক বিফ বার্গার',
-  'Zinger Chicken Burger': 'জিঙ্গার চিকেন বার্গার',
-  'French Fries (Large)': 'ফ্রেঞ্চ ফ্রাই (লার্জ)',
-  'BBQ Wings (6 pc)': 'বিবিকিউ উইংস (৬ পিস)',
-  'Chocolate Shake': 'চকলেট শেক',
-  'Cold Coffee': 'কোল্ড কফি',
-  'Cheese Fries': 'চিজ ফ্রাই',
-  'Paracetamol 500mg (20)': 'প্যারাসিটামল ৫০০মিগ্রা (২০)',
-  'Vitamin C 1000mg (30)': 'ভিটামিন সি ১০০০মিগ্রা (৩০)',
-  'Digital Thermometer': 'ডিজিটাল থার্মোমিটার',
-  'Antiseptic Bandage': 'অ্যান্টিসেপটিক ব্যান্ডেজ',
-  'Hand Sanitizer 100ml': 'হ্যান্ড স্যানিটাইজার ১০০ মিলি',
-  'BP Monitor (Digital)': 'বিপি মনিটর (ডিজিটাল)',
-  'Antacid 250ml': 'অ্যান্টাসিড ২৫০ মিলি',
-  'Ripe Mangoes (Alphonso)': 'পাকা আম (আলফানসো)',
-  'Seedless Watermelon': 'বীজবিহীন তরমুজ',
-  'Cucumber': 'শসা',
-  'Carrot': 'গাজর',
-  'Green Coriander': 'ধনেপাতা',
-  'Ginger': 'আদা',
-  'Strawberries': 'স্ট্রবেরি',
-  'Beef (Boneless)': 'গরুর মাংস (বোনলেস)',
-  'Broiler Chicken': 'ব্রয়লার মুরগি',
-  'Rui Fish': 'রুই মাছ',
-  'Mutton (Boneless)': 'খাসির মাংস (বোনলেস)',
-  'Shrimp (Medium)': 'চিংড়ি (মাঝারি)',
-  'Beef Liver': 'গরুর কলিজা',
-  'Black Forest Cake': 'ব্ল্যাক ফরেস্ট কেক',
-  'Chocolate Truffle Cake': 'চকলেট ট্রাফল কেক',
-  'Vanilla Cupcake': 'ভ্যানিলা কাপকেক',
-  'Butter Croissant': 'বাটার ক্রোয়াসাঁ',
-  'Chocolate Chip Cookie': 'চকলেট চিপ কুকি',
-  'Red Velvet Slice': 'রেড ভেলভেট স্লাইস',
-  'Brownie (4 pc)': 'ব্রাউনি (৪ পিস)',
-};
+const BN_NAMES: Record<string, string> = {};
 
 const CATEGORIES = ['All', 'Grocery', 'Supermarket', 'Restaurant', 'Fast Food', 'Bakery', 'Pharmacy', 'Fruits & Veg', 'Meat & Fish'];
 
@@ -391,19 +189,9 @@ const STATUS_BN: Record<string, string> = {
   'Order delivered to your door': 'অর্ডার আপনার দরজায় পৌঁছেছে',
 };
 
-const BANNERS = [
-  { emoji: '🛒', title: 'Eid Special Sale', sub: 'Biggest festival discount up to 40% off', bg: 'from-emerald-500 to-teal-500', cta: 'Shop Now' },
-  { emoji: '🍕', title: 'Free Delivery', sub: 'On all orders above ৳500', bg: 'from-orange-400 to-orange-400', cta: 'Order Food' },
-  { emoji: '💊', title: 'Medicine in 30 min', sub: 'MedPlus pharmacy now at your doorstep', bg: 'from-sky-500 to-sky-400', cta: 'Order Medicine' },
-  { emoji: '🥭', title: 'Fresh Fruits & Veg', sub: 'Farm-fresh daily from Fresh Valley', bg: 'from-green-500 to-emerald-400', cta: 'Buy Fresh' },
-];
+const BANNERS: Array<{ emoji: string; title: string; sub: string; bg: string; cta: string }> = [];
 
-const COUPONS = [
-  { code: 'EID2024', discountText: '৳100 Flat Discount', desc: 'On orders above ৳500 from any store', validTill: '31 Aug 2026', discountValue: 100, minOrder: 500 },
-  { code: 'FREESHIP', discountText: 'Free Delivery', desc: '100% free delivery on all grocery orders', validTill: '15 Aug 2026', isFreeShip: true, discountValue: 0, minOrder: 200 },
-  { code: 'SUMMER15', discountText: '15% Off (max ৳150)', desc: 'On bakery & restaurant orders above ৳400', validTill: '10 Aug 2026', discountValue: 150, minOrder: 400 },
-  { code: 'SMARTSHOP', discountText: '৳50 Smart Cashback', desc: 'Direct cashback to your wallet', validTill: '31 Dec 2026', discountValue: 50, minOrder: 0 },
-];
+const COUPONS: Array<{ code: string; discountText: string; desc: string; validTill: string; discountValue: number; minOrder: number; isFreeShip?: boolean }> = [];
 
 const LS_KEYS = {
   favs: 'ss_favs',
@@ -554,7 +342,7 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     yourBasket: 'Your Basket',
     items: 'Items',
     basketEmpty: 'Basket is empty. Add items from the menu.',
-    couponCode: 'Coupon code (EID2024)',
+    couponCode: 'Coupon code',
     apply: 'Apply',
     subtotal: 'Subtotal',
     vat: 'VAT (5%)',
@@ -745,7 +533,7 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     yourBasket: 'আপনার ঝুড়ি',
     items: 'আইটেম',
     basketEmpty: 'ঝুড়ি খালি। মেনু থেকে পণ্য যোগ করুন।',
-    couponCode: 'কুপন কোড (EID2024)',
+    couponCode: 'কুপন কোড',
     apply: 'প্রয়োগ',
     subtotal: 'সাবটোটাল',
     vat: 'ভ্যাট (৫%)',
@@ -1096,28 +884,49 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     }
   };
 
-  // Live admin-inventory sync: admin price/stock changes flow into the customer catalog
+  // Live admin-inventory sync: build the customer catalog only from real admin data.
   const syncedStores = useMemo(() => {
-    const override = new globalThis.Map<string, { price: number; stock: number }>();
-    for (const p of products) {
-      override.set(p.name.toLowerCase(), { price: p.price, stock: p.stock });
-    }
-    return STORE_DEFS.map(s => ({
-      ...s,
-      catalog: s.catalog.map(prod => {
-        const ov = override.get(prod.name.toLowerCase());
-        if (!ov) return prod;
-        const stock = ov.stock;
-        return { ...prod, price: ov.price, stock, status: stock === 0 ? 'Out of Stock' : (stock <= 8 ? 'Low Stock' : 'In Stock') };
-      })
-    }));
-  }, [products]);
+    return stores.map((store): StoreDef => {
+      const catalog = products
+        .filter((p: any) => p.storeId === store.id)
+        .map((p: any): StoreProduct => {
+          const stock = Number(p.stock || 0);
+          return {
+            id: p.id,
+            name: p.name,
+            price: Number(p.price || 0),
+            category: p.category || 'General',
+            stock,
+            status: stock === 0 ? 'Out of Stock' : (stock <= 8 ? 'Low Stock' : 'In Stock'),
+            unit: p.unit || 'pcs',
+            desc: p.desc || p.description || '',
+            image: p.image || '',
+          };
+        });
+      return {
+        id: store.id,
+        name: store.name,
+        subtext: store.address || '',
+        category: store.category || 'Store',
+        badgeColor: 'bg-emerald-50 text-emerald-700',
+        rating: Number(store.rating || 0),
+        reviewsCount: String(store.reviewsCount || 0),
+        deliveryTime: store.deliveryTime || 'Real-time',
+        deliveryFee: Number(store.deliveryFee || 0),
+        image: store.image || '',
+        logoText: store.name,
+        logoBg: 'bg-emerald-100 text-emerald-800',
+        pickup: store.pickup || { lat: 23.8103, lng: 90.4125 },
+        catalog,
+      };
+    });
+  }, [products, stores]);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'Recommended' | 'Rating' | 'Fastest'>('Recommended');
 
-  const [favoriteStoreIds, setFavoriteStoreIds] = useState<string[]>(() => getStoredData(LS_KEYS.favs, ['S1', 'S3']));
+  const [favoriteStoreIds, setFavoriteStoreIds] = useState<string[]>(() => getStoredData(LS_KEYS.favs, []));
   useEffect(() => setStoredData(LS_KEYS.favs, favoriteStoreIds), [favoriteStoreIds]);
 
   const [cart, setCart] = useState<Array<{ product: StoreProduct; quantity: number; note?: string }>>(() => getStoredData(LS_KEYS.cart, []));
@@ -5685,3 +5494,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     </div>
   );
 };
+
+
+

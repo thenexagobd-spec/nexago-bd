@@ -111,11 +111,11 @@ function mapOrderToSim(ord: Order) {
 
 const DEFAULT_SIM_ORDER = {
   id: 'ORD-000001',
-  storeName: 'Fresh Mart',
-  storeAddress: 'Dhanmondi 27, Dhaka',
-  customerName: 'Rahim Khan',
-  customerPhone: '+880 1712-345678',
-  customerAddress: 'House 42, Road 8A, Dhanmondi, Dhaka',
+  storeName: 'Store',
+  storeAddress: '',
+  customerName: 'Customer',
+  customerPhone: '',
+  customerAddress: '',
   distance: '4.2 km',
   storeToYou: '1.3 km',
   youToCustomer: '2.9 km',
@@ -183,8 +183,8 @@ onCouponsChange, onStaffChange, onReviewsChange, onMarketingChange, onReport, on
   // Orders that have ever been picked up by the driver. Once an order is picked up it must NEVER
   // return to the store — cancel + re-activate always resumes the delivery (driver + customer).
   const pickedUpOrderIdsRef = useRef<Set<string>>(new Set());
-  const simStores = stores.length ? stores : [{ id: 'ST-1', name: 'Fresh Mart', address: 'Dhanmondi 27, Dhaka', status: 'Open', rating: 4.6, orders: 320, category: 'Grocery' }];
-  const simProducts = products.length ? products : [{ id: 'P-1', name: 'Fresh Apples', price: 180, stock: 40, status: 'In Stock' }];
+  const simStores = stores;
+  const simProducts = products;
   const isPosOrder = (ord: any) => !!ord && (ord.source === 'pos-dispatch' || String(ord.id || '').startsWith('POS-'));
   const storeAdminOrderCount = Math.max(
     realOrders.filter(o => !isPosOrder(o) && o.storeName === (realOrders[realOrders.length - 1]?.storeName || DEFAULT_SIM_ORDER.storeName)).length,
@@ -340,20 +340,20 @@ onCouponsChange, onStaffChange, onReviewsChange, onMarketingChange, onReport, on
     return () => clearTimeout(t);
   }, []);
 
-  const simReviews = useMemo(() => [
-    { name: 'Rafiq Hasan', rating: 5, text: 'Extremely fresh items, delivery was fast!', time: '2 days ago' },
-    { name: 'Sarah Khan', rating: 4, text: 'Great quality but slightly delayed.', time: '5 days ago' },
-    { name: 'Nusrat Jahan', rating: 5, text: 'Highly recommended! Packed safely.', time: '1 week ago' },
-    { name: 'Monirul Islam', rating: 3, text: 'Good products, packaging could be better.', time: '2 weeks ago' },
-  ], []);
+  const simReviews = useMemo(() => reviews.map((r: any) => ({
+    name: r.customer || r.customerName || 'Customer',
+    rating: r.rating || 5,
+    text: r.comment || r.text || '',
+    time: r.date || 'Recent',
+  })), [reviews]);
 
   const applySimCoupon = (code: string) => {
     const c = simCoupons.find(x => x.code === code.toUpperCase());
     if (!c) { if (showToast) custShowToast('Invalid coupon code', 'error'); return; }
-    if (simCartTotal < c.min) { if (showToast) custShowToast(`Minimum order Tk ${c.min} required`, 'error'); return; }
+    if (simCartTotal < (c.minOrder || 0)) { if (showToast) custShowToast(`Minimum order Tk ${c.minOrder || 0} required`, 'error'); return; }
     setCustAppliedCoupon(c.code);
     setCustCoupon(c.code);
-    if (showToast) custShowToast(`Coupon ${c.code} applied — ${c.label}`, 'success');
+    if (showToast) custShowToast(`Coupon ${c.code} applied`, 'success');
   };
 
   const custFaq = [
@@ -362,7 +362,7 @@ onCouponsChange, onStaffChange, onReviewsChange, onMarketingChange, onReport, on
     { q: 'How long does delivery take?', a: 'Standard delivery takes 25-40 minutes depending on your area and store availability.' },
     { q: 'Can I cancel my order?', a: 'Yes, you can cancel from the Orders tab while the order is in Confirmed or Preparing status. A small fee may apply.' },
     { q: 'How do I get a refund?', a: 'Refunds are processed within 3-5 working days to your original payment method.' },
-    { q: 'Where is my coupon code?', a: 'Coupons can be applied in the cart. Try FREEGO, EID20 or SAVE40.' },
+    { q: 'Where is my coupon code?', a: 'Coupons created by the store or super admin can be applied in the cart.' },
   ];
   // Persist the active delivery so a browser refresh / tab switch keeps the order on all apps.
   // The core state below is lazy-initialized FROM this payload, so the very first render already
@@ -1733,20 +1733,19 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
   const custSelectedStore = simStores.find(s => s.id === custStoreId) || null;
   const simCartCount = custCart.reduce((s, i) => s + i.qty, 0);
   const simCartTotal = custCart.reduce((s, i) => s + i.price * i.qty, 0);
-  const simCoupons = [
-    { code: 'FREEGO', label: 'Free Delivery', min: 500, type: 'free' },
-    { code: 'EID20', label: '20% OFF', min: 1000, type: 'pct20' },
-    { code: 'SAVE40', label: 'Tk 40 OFF', min: 300, type: 'flat40' },
-  ];
+  const simCoupons = coupons.filter(c => c.status !== 'Paused' && c.status !== 'Inactive');
   const simCouponDiscount = useMemo(() => {
     if (!custAppliedCoupon || !simCartTotal) return 0;
     const c = simCoupons.find(x => x.code === custAppliedCoupon);
-    if (!c || simCartTotal < c.min) return 0;
-    if (c.type === 'pct20') return Math.round(simCartTotal * 0.2);
-    if (c.type === 'flat40') return Math.min(40, simCartTotal);
-    return 0;
-  }, [custAppliedCoupon, simCartTotal]);
-  const simFreeByCoupon = custAppliedCoupon === 'FREEGO' && simCartTotal >= 500;
+    if (!c || simCartTotal < (c.minOrder || 0)) return 0;
+    const discountText = String(c.discount || '').toLowerCase();
+    if (discountText.includes('free')) return 0;
+    const pct = discountText.match(/(\d+)\s*%/);
+    if (pct) return Math.round(simCartTotal * (Number(pct[1]) / 100));
+    const flat = discountText.match(/(\d+)/);
+    return flat ? Math.min(Number(flat[1]), simCartTotal) : 0;
+  }, [custAppliedCoupon, simCartTotal, simCoupons]);
+  const simFreeByCoupon = !!simCoupons.find(c => c.code === custAppliedCoupon && String(c.discount || '').toLowerCase().includes('free') && simCartTotal >= (c.minOrder || 0));
   const simSelectedOffer = (custSelectedStore?.offer || '').toLowerCase();
   const simStoreFreeDelivery = simSelectedOffer.includes('free delivery') && simCartTotal >= 500;
   const simDeliveryFee = simCartTotal > 0
@@ -3002,7 +3001,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
                         {[
                           { icon: '✅', title: 'Order delivered', time: '10 min ago', body: 'Your order #NX-0918 was delivered successfully.' },
                           { icon: '🛵', title: 'Rider nearby', time: '32 min ago', body: 'Rahim is 2 minutes away with your order.' },
-                          { icon: '🏷', title: 'Coupon available', time: '1 hour ago', body: 'EID20 gives you 20% off on orders over Tk 1000.' },
+                          { icon: '🏷', title: 'Coupon available', time: '1 hour ago', body: 'A real store coupon is available when admin publishes one.' },
                           { icon: '🎁', title: 'New user offer', time: 'Today', body: 'Get Tk 40 OFF on your first order.' },
                         ].map((n, i) => (
                           <div key={i} className="bg-white/[0.05] border border-white/10 rounded-xl p-2.5 flex space-x-2">

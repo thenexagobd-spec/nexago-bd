@@ -22,32 +22,12 @@ const API_BASE = window.location.origin;
 
 // Simulated live GPS riders — the customer "Track Delivery" screen follows
 // the nearest online driver in real time (same engine as the admin Live Map).
-const SEED_DRIVERS = [
-  { id: 'DRV-1001', name: 'Rahim Khan', status: 'On-Delivery', vehicleType: 'Bike', phone: '01712345678' },
-  { id: 'DRV-1002', name: 'Shakib Hasan', status: 'On-Delivery', vehicleType: 'Bike', phone: '01812345678' },
-  { id: 'DRV-1003', name: 'Monirul Islam', status: 'Online', vehicleType: 'Bike', phone: '01912345678' },
-  { id: 'DRV-1004', name: 'Karim Uddin', status: 'Online', vehicleType: 'Bike', phone: '01612345678' },
-];
-
-const SEED_STORES = [
-  { id: 'STR-01', name: 'Fresh Mart', address: 'Dhanmondi, Dhaka', status: 'Active', rating: 4.8, orders: 1240, category: 'Grocery' },
-  { id: 'STR-02', name: 'Daily Grocery', address: 'Gulshan, Dhaka', status: 'Active', rating: 4.6, orders: 980, category: 'Grocery' },
-  { id: 'STR-03', name: 'Green Basket', address: 'Uttara, Dhaka', status: 'Active', rating: 4.7, orders: 840, category: 'Fruits & Veg' },
-  { id: 'STR-04', name: 'Super Shop', address: 'Mirpur, Dhaka', status: 'Active', rating: 4.5, orders: 720, category: 'Department Store' },
-  { id: 'STR-05', name: 'Save Mart', address: 'Banani, Dhaka', status: 'Active', rating: 4.4, orders: 530, category: 'Grocery' },
-];
-
-const SEED_PRODUCTS: Product[] = [
-  { id: 'PROD-101', name: 'Fresh Apples (Premium)', category: 'Fruits & Vegetables', stock: 45, price: 180, status: 'In Stock', image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&q=80&w=600' },
-  { id: 'PROD-102', name: 'Organic Bananas', category: 'Fruits & Vegetables', stock: 120, price: 90, status: 'In Stock', image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&q=80&w=600' },
-  { id: 'PROD-103', name: 'Miniket Rice 5kg', category: 'Rice & Grains', stock: 35, price: 380, status: 'In Stock', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600' },
-  { id: 'PROD-104', name: 'Jasmine Rice 1kg', category: 'Rice & Grains', stock: 8, price: 150, status: 'Low Stock', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600' },
-  { id: 'PROD-105', name: 'Whole Milk 1L', category: 'Dairy & Eggs', stock: 0, price: 95, status: 'Out of Stock', image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&q=80&w=600' },
-  { id: 'PROD-106', name: 'Fresh Farm Eggs (Dozen)', category: 'Dairy & Eggs', stock: 80, price: 145, status: 'In Stock', image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&q=80&w=600' },
-];
+const SEED_DRIVERS: any[] = [];
+const SEED_STORES: any[] = [];
+const SEED_PRODUCTS: Product[] = [];
 
 function PublicCustomerApp() {
-  const [stores] = useState(SEED_STORES);
+  const [stores, setStores] = useState<any[]>(SEED_STORES);
   const [products, setProducts] = useState<Product[]>(SEED_PRODUCTS);
   const CUST_ORDERS_KEY = 'nexago_customer_orders';
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -67,8 +47,8 @@ function PublicCustomerApp() {
     fetch(`${API_BASE}/api/storefront?key=${encodeURIComponent(KEY)}`)
       .then(r => (r.ok ? r.json() : Promise.reject(new Error('storefront fetch failed'))))
       .then(d => {
-        if (Array.isArray(d.products) && d.products.length) {
-          setProducts(d.products.map((p: any): Product => ({
+        const realProducts = Array.isArray(d.products) ? d.products.filter((p: any) => !KEY.startsWith('STR-') || p.storeId === KEY) : [];
+        setProducts(realProducts.map((p: any): Product => ({
             id: p.id,
             name: p.name,
             price: Number(p.promoPrice || p.price || 0),
@@ -77,12 +57,14 @@ function PublicCustomerApp() {
             status: Number(p.stock || 0) <= 0 ? 'Out of Stock' : Number(p.stock || 0) <= 10 ? 'Low Stock' : 'In Stock',
             image: p.image || ''
           })));
-        }
       })
       .catch(() => {});
     fetch(`${API_BASE}/api/state?key=${encodeURIComponent(KEY)}`)
       .then(r => (r.ok ? r.json() : Promise.reject(new Error('state fetch failed'))))
       .then(d => {
+        if (d && d.state && Array.isArray(d.state.stores)) {
+          setStores(KEY.startsWith('STR-') ? d.state.stores.filter((s: any) => s.id === KEY) : d.state.stores);
+        }
         if (d && Array.isArray(d.state && d.state.orders) && d.state.orders.length) setOrders(d.state.orders);
       })
       .catch(() => {});

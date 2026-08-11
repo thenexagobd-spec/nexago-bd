@@ -150,11 +150,7 @@ export default function App() {
 
   const [inventory, setInventory] = useState<any[]>(() => getStoredData<any[]>('sd_inventory', []).filter(i => !/^INV-30[1-4]$/.test(i.id || '')));
 
-  const [coupons, setCoupons] = useState([
-    { id: 'CPN-01', code: 'EID20', discount: '20% Off', minOrder: 1000, usages: 420, status: 'Active' },
-    { id: 'CPN-02', code: 'FREEGO', discount: 'Free Delivery', minOrder: 500, usages: 980, status: 'Active' },
-    { id: 'CPN-03', code: 'GROCERY5', discount: '৳50 Flat Off', minOrder: 400, usages: 150, status: 'Active' },
-  ]);
+  const [coupons, setCoupons] = useState<any[]>(() => getStoredData('sd_coupons', []));
 
   const [staff, setStaff] = useState<any[]>(() => getStoredData('sd_staff', []));
 
@@ -208,6 +204,13 @@ export default function App() {
   useEffect(() => { setStoredData('sd_users', users); }, [users]);
   useEffect(() => { setStoredData('sd_payments', payments); }, [payments]);
   useEffect(() => { setStoredData('sd_vehicles', vehicles); }, [vehicles]);
+  useEffect(() => { setStoredData('sd_products', products); }, [products]);
+  useEffect(() => { setStoredData('sd_categories', categories); }, [categories]);
+  useEffect(() => { setStoredData('sd_inventory', inventory); }, [inventory]);
+  useEffect(() => { setStoredData('sd_coupons', coupons); }, [coupons]);
+  useEffect(() => { setStoredData('sd_staff', staff); }, [staff]);
+  useEffect(() => { setStoredData('sd_reviews', reviews); }, [reviews]);
+  useEffect(() => { setStoredData('sd_marketing', marketing); }, [marketing]);
   useEffect(() => { setStoredData('sd_banners', banners); }, [banners]);
   useEffect(() => { setStoredData('sd_tickets', supportTickets); }, [supportTickets]);
   useEffect(() => { setStoredData('sd_notifications', notifications); }, [notifications]);
@@ -225,7 +228,7 @@ export default function App() {
   const [storeKey, setStoreKey] = useState<string>(() => localStorage.getItem('sd_store_key') || 'nexago-main');
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'online' | 'offline'>('idle');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
-  const [profile, setProfile] = useState(() => getStoredData('sd_store_profile', { storeName: 'Smart Shop', storeSub: 'NexaGo BD Delivery', whatsapp: '' }));
+  const [profile, setProfile] = useState(() => getStoredData('sd_store_profile', { storeName: '', storeSub: '', whatsapp: '' }));
   const apiBase = ((import.meta.env.VITE_RELAY_BASE as string) || window.location.origin).replace(/\/+$/, '');
   const storefrontUrl = `${apiBase}/store?key=${encodeURIComponent(storeKey)}`;
 
@@ -236,7 +239,7 @@ export default function App() {
   };
 
   const handleProfileChange = (p: { storeName: string; storeSub: string; whatsapp: string }) => {
-    const next = { storeName: p.storeName.trim() || 'Smart Shop', storeSub: p.storeSub.trim() || 'NexaGo BD Delivery', whatsapp: p.whatsapp.trim() };
+    const next = { storeName: p.storeName.trim(), storeSub: p.storeSub.trim(), whatsapp: p.whatsapp.trim() };
     setProfile(next);
     setStoredData('sd_store_profile', next);
     showToast('Store branding saved — pushed to customer site', 'success');
@@ -249,6 +252,10 @@ export default function App() {
         updatedAt: new Date().toISOString(),
         profile,
         products,
+        categories,
+        stores,
+        coupons,
+        reviews,
         banners,
         orders,
         notifications
@@ -274,9 +281,13 @@ export default function App() {
       const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`);
       if (!res.ok) throw new Error('http ' + res.status);
       const data = await res.json();
-      if (data && data.state && data.state.updatedAt && (data.state.products || data.state.banners)) {
-        if (Array.isArray(data.state.products) && data.state.products.length) setProducts(data.state.products);
-        if (Array.isArray(data.state.banners) && data.state.banners.length) setBanners(data.state.banners);
+      if (data && data.state && data.state.updatedAt && (data.state.products || data.state.banners || data.state.stores)) {
+        if (Array.isArray(data.state.products)) setProducts(data.state.products);
+        if (Array.isArray(data.state.categories)) setCategories(data.state.categories);
+        if (Array.isArray(data.state.stores)) setStores(data.state.stores);
+        if (Array.isArray(data.state.coupons)) setCoupons(data.state.coupons);
+        if (Array.isArray(data.state.reviews)) setReviews(data.state.reviews);
+        if (Array.isArray(data.state.banners)) setBanners(data.state.banners);
         if (Array.isArray(data.state.orders)) setOrders(data.state.orders);
         if (Array.isArray(data.state.notifications)) setNotifications(data.state.notifications);
         setLastSyncAt(data.state.updatedAt);
@@ -312,6 +323,9 @@ export default function App() {
       const data = await res.json();
       const hasCloud = data && data.state && (
         (Array.isArray(data.state.products) && data.state.products.length) ||
+        (Array.isArray(data.state.stores) && data.state.stores.length) ||
+        (Array.isArray(data.state.categories) && data.state.categories.length) ||
+        (Array.isArray(data.state.coupons) && data.state.coupons.length) ||
         (Array.isArray(data.state.banners) && data.state.banners.length) ||
         (Array.isArray(data.state.orders) && data.state.orders.length)
       );
@@ -333,7 +347,7 @@ export default function App() {
     if (firstSyncRun.current) { firstSyncRun.current = false; return; }
     const t = setTimeout(() => { pushState(true); }, 1500);
     return () => clearTimeout(t);
-  }, [products, banners, orders, notifications]);
+  }, [products, categories, stores, coupons, reviews, banners, orders, notifications]);
 
   // On first load: seed the cloud with local data if the cloud is empty (local stays authoritative)
   useEffect(() => { seedCloudIfEmpty(); }, []);
@@ -1328,7 +1342,14 @@ export default function App() {
                 <p className="text-xs text-gray-400">Configure promotional discounts and code triggers</p>
               </div>
               <button 
-                onClick={() => showToast("Coupon additions are locked in demo sandbox.", "info")}
+                onClick={() => {
+                  const code = window.prompt('Coupon code');
+                  if (!code) return;
+                  const discount = window.prompt('Discount display', '10% Off') || '10% Off';
+                  const minOrder = Number(window.prompt('Minimum order amount', '0') || 0);
+                  setCoupons(prev => [{ id: `CPN-${Date.now().toString().slice(-5)}`, code: code.trim().toUpperCase(), discount, minOrder, usages: 0, status: 'Active' }, ...prev]);
+                  showToast(`Coupon ${code.trim().toUpperCase()} created`, 'success');
+                }}
                 className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
               >
                 + Create Promo Code
@@ -3471,12 +3492,10 @@ export default function App() {
             const computedSubtotal = Math.max(0, Math.round((orderAmount - deliveryFee) / 1.05));
             const computedTax = Math.max(0, orderAmount - computedSubtotal - deliveryFee);
             
-            // Generate deterministic mock items that sum to exactly computedSubtotal
-            const receiptItems = [
-              { name: products[0]?.name || 'Fresh Apples (Premium)', qty: 1, price: Math.round(computedSubtotal * 0.4) },
-              { name: products[1]?.name || 'Organic Bananas', qty: 2, price: Math.round((computedSubtotal * 0.3) / 2) },
-              { name: products[2]?.name || 'Miniket Rice 5kg', qty: 1, price: computedSubtotal - Math.round(computedSubtotal * 0.4) - (Math.round((computedSubtotal * 0.3) / 2) * 2) }
-            ];
+            const realOrderItems = Array.isArray((printingReceiptOrder as any).items) ? (printingReceiptOrder as any).items : [];
+            const receiptItems = realOrderItems.length
+              ? realOrderItems.map((item: any) => ({ name: item.name || item.productName || 'Order item', qty: item.quantity || item.qty || 1, price: item.price || item.amount || 0 }))
+              : [{ name: 'Order subtotal', qty: 1, price: computedSubtotal }];
 
             return (
               <div id="printable-receipt-modal" className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print:static print:bg-white print:p-0 print:m-0">
@@ -4418,7 +4437,7 @@ export default function App() {
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Campaign Subtitle Description</label>
-                    <input name="subtitle" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Use coupon code EID20" />
+                    <input name="subtitle" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Use your real coupon code" />
                   </div>
                 </>
               )}

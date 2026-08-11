@@ -59,10 +59,10 @@ export default function StoreDashboardView({
   const getY = (val: number) => height - paddingY - (val * (height - paddingY * 2)) / 500;
 
   // Dynamic store overview counters synced with state additions
-  const dispProductsCount = 151 + productsCount;
-  const dispCategoriesCount = 6 + categoriesCount;
-  const dispCustomersCount = 2340 + customersCount;
-  const dispReviewsCount = 321 + reviewsCount;
+  const dispProductsCount = productsCount;
+  const dispCategoriesCount = categoriesCount;
+  const dispCustomersCount = customersCount;
+  const dispReviewsCount = reviewsCount;
 
   return (
     <div className={`${isTightMode ? 'space-y-3' : 'space-y-6'} fade-in`}>
