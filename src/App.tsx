@@ -973,6 +973,7 @@ export default function App() {
       { name: 'Support Tickets', icon: LifeBuoy, badgeCount: supportTickets.filter(t => t.status === 'Open').length },
       { name: 'Notifications', icon: Bell, badgeCount: unreadNotifCount },
       { name: 'Reports & Analytics', icon: BarChart3 },
+      { name: 'Security Control', icon: ShieldCheck },
       { name: 'Settings', icon: Settings },
     ];
 
@@ -4585,7 +4586,7 @@ export default function App() {
             <span>Logout</span>
           </button>
 
-          {activePanelMode === 'super_admin' && (
+          {false && activePanelMode === 'super_admin' && (
             <form onSubmit={handleSuperAdminPasswordChange} className="mt-3 rounded-xl border border-brand-border bg-[#070e17] p-3 space-y-2">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-wider text-brand-orange">Password Control</p>
@@ -4627,7 +4628,7 @@ export default function App() {
             </form>
           )}
 
-          {activePanelMode === 'super_admin' && (
+          {false && activePanelMode === 'super_admin' && (
             <div className="mt-3 rounded-xl border border-brand-border bg-[#070e17] p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -4764,7 +4765,7 @@ export default function App() {
                 <span>Logout</span>
               </button>
 
-              {activePanelMode === 'super_admin' && (
+              {false && activePanelMode === 'super_admin' && (
                 <form onSubmit={handleSuperAdminPasswordChange} className="mt-3 rounded-xl border border-brand-border bg-[#070e17] p-3 space-y-2">
                   <p className="text-[9px] font-black uppercase tracking-wider text-brand-orange">Password Control</p>
                   <input value={superAdminPasswordForm.currentPassword} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))} type="password" placeholder="Current password" className="w-full rounded-lg border border-brand-border bg-[#0c1624] px-2.5 py-2 text-[10px] text-white outline-none focus:border-brand-orange" />
@@ -4933,6 +4934,88 @@ export default function App() {
               onOpenQuickAction={(action) => setQuickActionModal(action)}
               isTightMode={isTightMode}
             />
+          )}
+
+          {activeTab === 'Security Control' && activePanelMode === 'super_admin' && (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-orange">Super Admin Security</p>
+                  <h2 className="mt-1 text-xl font-black text-white">Password Control & Live Devices</h2>
+                  <p className="mt-1 text-xs text-gray-400">Manage Super Admin password and monitor every active device session.</p>
+                </div>
+                <button type="button" onClick={refreshSuperAdminSessions} className="rounded-xl border border-brand-border bg-[#0c1624] px-4 py-2 text-[10px] font-black uppercase text-gray-200 hover:border-brand-orange">
+                  Refresh Devices
+                </button>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
+                <form onSubmit={handleSuperAdminPasswordChange} className="rounded-xl border border-brand-border bg-[#0c1624] p-4 space-y-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-brand-orange">Password Control</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-gray-400">Current password, new password and secret code are required. Every change is audited.</p>
+                  </div>
+                  <input value={superAdminPasswordForm.currentPassword} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))} type="password" placeholder="Current password" className="w-full rounded-lg border border-brand-border bg-[#070e17] px-3 py-2.5 text-xs text-white outline-none focus:border-brand-orange" />
+                  <input value={superAdminPasswordForm.newPassword} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))} type="password" placeholder="New password" className="w-full rounded-lg border border-brand-border bg-[#070e17] px-3 py-2.5 text-xs text-white outline-none focus:border-brand-orange" />
+                  <input value={superAdminPasswordForm.confirmPassword} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))} type="password" placeholder="Confirm new password" className="w-full rounded-lg border border-brand-border bg-[#070e17] px-3 py-2.5 text-xs text-white outline-none focus:border-brand-orange" />
+                  <input value={superAdminPasswordForm.secretCode} onChange={e => setSuperAdminPasswordForm(prev => ({ ...prev, secretCode: e.target.value }))} type="password" inputMode="numeric" placeholder="Secret code" className="w-full rounded-lg border border-brand-border bg-[#070e17] px-3 py-2.5 text-xs text-white outline-none focus:border-brand-orange" />
+                  {superAdminPasswordError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">{superAdminPasswordError}</p>}
+                  <button type="submit" className="w-full rounded-xl bg-brand-orange px-4 py-3 text-[10px] font-black uppercase tracking-wider text-white hover:bg-brand-orange-hover">Change Password</button>
+                </form>
+
+                <div className="rounded-xl border border-brand-border bg-[#0c1624] p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-brand-orange">Live Devices</p>
+                      <p className="mt-1 text-[11px] text-gray-400">{superAdminSessions.filter(s => s.active).length} active / {superAdminSessions.length} total device sessions</p>
+                    </div>
+                    {superAdminSessionsError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">{superAdminSessionsError}</p>}
+                  </div>
+                  <div className="overflow-x-auto rounded-xl border border-brand-border/60">
+                    <table className="w-full min-w-[760px] text-left text-xs">
+                      <thead className="bg-[#070e17] text-[9px] uppercase text-gray-400">
+                        <tr>
+                          <th className="px-3 py-3">User</th>
+                          <th className="px-3 py-3">Device</th>
+                          <th className="px-3 py-3">IP</th>
+                          <th className="px-3 py-3">Location</th>
+                          <th className="px-3 py-3">Status</th>
+                          <th className="px-3 py-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-border/50">
+                        {superAdminSessions.map((session) => (
+                          <tr key={session.tokenId} className="hover:bg-[#101d30]">
+                            <td className="px-3 py-3 font-bold text-white">{session.userId || 'Unknown'}</td>
+                            <td className="max-w-[260px] truncate px-3 py-3 text-[10px] text-gray-400">{session.device || 'Unknown device'}</td>
+                            <td className="px-3 py-3 font-mono text-[10px] text-gray-300">{session.ip || 'No IP'}</td>
+                            <td className="px-3 py-3">
+                              {session.location ? (
+                                <button type="button" onClick={() => setSelectedDeviceSession(session)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/15">
+                                  Open Live
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-gray-500">Waiting permission</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase ${session.active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-300'}`}>{session.status || (session.active ? 'Active' : 'Inactive')}</span></td>
+                            <td className="px-3 py-3">
+                              <div className="flex justify-end gap-2">
+                                <button type="button" onClick={() => updateSuperAdminSession(session.tokenId, 'inactive')} className="rounded-lg border border-amber-500/30 px-2.5 py-1.5 text-[9px] font-black uppercase text-amber-300 hover:bg-amber-500/10">Inactive</button>
+                                <button type="button" onClick={() => updateSuperAdminSession(session.tokenId, 'block')} className="rounded-lg border border-red-500/30 px-2.5 py-1.5 text-[9px] font-black uppercase text-red-300 hover:bg-red-500/10">Block</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {!superAdminSessions.length && (
+                          <tr><td colSpan={6} className="px-3 py-10 text-center text-xs text-gray-500">No device session found.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {activeTab === 'Dashboard' && activePanelMode === 'delivery' && (
