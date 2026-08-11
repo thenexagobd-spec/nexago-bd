@@ -70,7 +70,12 @@ export default function StoreAdminPortal() {
   const queryBranchId = new URLSearchParams(window.location.search).get('branch') || '';
   const activeBranchId = branchSession?.id || queryBranchId || localStorage.getItem(`sd_active_branch_${activeStoreId}`) || myBranches[0]?.id || '';
   const activeBranch = myBranches.find((b: any) => b.id === activeBranchId);
-  const myOrders = orders.filter(o => activeBranchId ? (o as any).branchId === activeBranchId : ((activeStoreId && (o as any).storeId === activeStoreId) || o.storeName === activeStoreName));
+  const isMyStoreRecord = (record: any) => {
+    if (!activeStoreId) return false;
+    if (activeBranchId && record.branchId && record.branchId !== activeBranchId) return false;
+    return record.storeId === activeStoreId || record.storeName === activeStoreName;
+  };
+  const myOrders = orders.filter(o => activeBranchId ? (o as any).branchId === activeBranchId : isMyStoreRecord(o));
   const myOrderIds = new Set(myOrders.map(o => o.id));
   const myProducts = products.filter((p: any) => p.storeId === activeStoreId && (!activeBranchId || p.branchId === activeBranchId));
   const myPayments = payments.filter(p => myOrderIds.has(p.orderId));
@@ -85,8 +90,12 @@ export default function StoreAdminPortal() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [stf, setStf] = useState({ name: '', role: '', phone: '' });
 
-  const pending = txns.filter(t => t.status === 'Pending');
+  const myTxns = txns.filter(t => t.storeId === activeStoreId || myOrderIds.has(t.orderId));
+  const pending = myTxns.filter(t => t.status === 'Pending');
   const refunds = JSON.parse(localStorage.getItem('ss_refunds') || '[]');
+  const myRefunds = refunds.filter((r: any) => r.storeId === activeStoreId || myOrderIds.has(r.orderId));
+  const myTickets = tickets.filter((t: any) => t.storeId === activeStoreId || t.storeName === activeStoreName || myOrderIds.has(t.orderId));
+  const myWalletBal = myTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   useEffect(() => {
     if (!activeStoreId) return;
     setStaff(JSON.parse(localStorage.getItem(`sd_store_staff_${activeStoreId}`) || '[]'));
@@ -117,7 +126,7 @@ export default function StoreAdminPortal() {
     { id: 'staff', label: 'Staff', icon: UserSquare2 },
     { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'alerts', label: 'Alerts', icon: Bell, badge: unreadCount },
-    { id: 'support', label: 'Support', icon: LifeBuoy, badge: tickets.filter(t => t.status === 'Open').length },
+    { id: 'support', label: 'Support', icon: LifeBuoy, badge: myTickets.filter(t => t.status === 'Open').length },
   ].filter(item => allowedPages.has(item.id));
 
   useEffect(() => {
@@ -186,10 +195,14 @@ export default function StoreAdminPortal() {
     setAuthView('login');
   };
 
-  const updateStatus = (id: string, status: string) => setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: status as any } : o)));
+  const updateStatus = (id: string, status: string) => {
+    if (!myOrderIds.has(id)) return;
+    setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: status as any } : o)));
+  };
 
   // Store admin accepts a pending customer order → dispatch to the first available driver
   const acceptOrder = (id: string) => {
+    if (!myOrderIds.has(id)) return;
     const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
     setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
       ...o,
@@ -206,6 +219,7 @@ export default function StoreAdminPortal() {
   };
 
   const approveTopUp = (tx: any, ok: boolean) => {
+    if (!myTxns.some(t => t.id === tx.id)) return;
     const next = txns.map(t => (t.id === tx.id ? { ...t, status: ok ? 'Completed' : 'Rejected' } : t));
     setTxns(next);
     if (ok) setWalletBal(walletBal + tx.amount);
@@ -217,7 +231,10 @@ export default function StoreAdminPortal() {
     setStf({ name: '', role: '', phone: '' });
   };
 
-  const replyTicket = (id: string, ok: boolean) => setTickets(prev => prev.map(t => (t.id === id ? { ...t, status: ok ? 'Closed' : 'In Progress' } : t)));
+  const replyTicket = (id: string, ok: boolean) => {
+    if (!myTickets.some(t => t.id === id)) return;
+    setTickets(prev => prev.map(t => (t.id === id ? { ...t, status: ok ? 'Closed' : 'In Progress' } : t)));
+  };
 
   const addProduct = () => {
     if (!newProd.name || !newProd.price) return;
@@ -253,6 +270,7 @@ export default function StoreAdminPortal() {
   const toggleCoupon = (id: string) => setAllCoupons(prev => prev.map((c: any) => c.id === id ? { ...c, status: c.status === 'Active' ? 'Paused' : 'Active' } : c));
 
   const setStock = (id: string, delta: number) => {
+    if (!myProducts.some(p => p.id === id)) return;
     setProducts(prev => prev.map(p => {
       if (p.id !== id) return p;
       const stock = Math.max(0, (p.stock || 0) + delta);
@@ -407,7 +425,7 @@ export default function StoreAdminPortal() {
             {[
               { label: 'Orders', value: myOrders.length.toString(), sub: `${myOrders.filter(o => o.status === 'Pending').length} pending`, color: 'text-white' },
               { label: 'Revenue', value: bdt(revenue), sub: 'completed', color: 'text-teal-400' },
-              { label: 'Wallet Balance', value: bdt(walletBal), sub: 'customer funds', color: 'text-brand-orange' },
+              { label: 'Wallet Balance', value: bdt(myWalletBal), sub: 'store ledger only', color: 'text-brand-orange' },
               { label: 'Products', value: myProducts.length.toString(), sub: 'catalog live', color: 'text-sky-400' },
             ].map(k => (
               <div key={k.label} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
@@ -736,7 +754,7 @@ export default function StoreAdminPortal() {
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-[10px] font-black text-white uppercase tracking-widest">Pending Top-Ups ({pending.length})</p>
-              <span className="text-[10px] text-emerald-400 font-black">Wallet: {bdt(walletBal)}</span>
+              <span className="text-[10px] text-emerald-400 font-black">Wallet: {bdt(myWalletBal)}</span>
             </div>
             {pending.length === 0 ? <p className="text-[10px] text-gray-500 py-4 text-center">No pending top-ups ✓</p> : (
               <div className="space-y-2">
@@ -758,9 +776,9 @@ export default function StoreAdminPortal() {
           </div>
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
             <p className="text-[10px] font-black text-white uppercase tracking-widest mb-3">Wallet Ledger</p>
-            {txns.length === 0 ? <p className="text-[10px] text-gray-500 py-4 text-center">No wallet activity.</p> : (
+            {myTxns.length === 0 ? <p className="text-[10px] text-gray-500 py-4 text-center">No wallet activity.</p> : (
               <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                {txns.map(t => (
+                {myTxns.map(t => (
                   <div key={t.id} className="flex items-center justify-between gap-2 bg-[#0a1322] border border-[#1e3050] rounded-lg px-3 py-2 text-[10px]">
                     <p className="text-gray-300 truncate">{t.type} <span className="font-mono text-gray-500">{t.id}</span></p>
                     <span className={`font-mono font-black ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{t.amount >= 0 ? '+' : ''}{bdt(t.amount)}</span>
@@ -769,11 +787,11 @@ export default function StoreAdminPortal() {
               </div>
             )}
           </div>
-          {refunds.length > 0 && (
+          {myRefunds.length > 0 && (
             <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
-              <p className="text-[10px] font-black text-white uppercase tracking-widest mb-3">Refunds ({refunds.length})</p>
+              <p className="text-[10px] font-black text-white uppercase tracking-widest mb-3">Refunds ({myRefunds.length})</p>
               <div className="space-y-1.5">
-                {refunds.map((r: any) => (
+                {myRefunds.map((r: any) => (
                   <div key={r.id} className="flex items-center justify-between bg-[#0a1322] border border-[#1e3050] rounded-lg px-3 py-2 text-[10px]">
                     <p className="text-gray-300 truncate">{r.orderId} · {r.method} {r.number}</p>
                     <span className="font-mono font-black text-red-400">{bdt(r.amount)}</span>
@@ -865,7 +883,7 @@ export default function StoreAdminPortal() {
               <h3 className="text-sm font-black text-white flex items-center space-x-2"><Bell className="w-4 h-4 text-brand-orange" /><span>Alerts & Notifications</span></h3>
               <p className="text-[10px] text-gray-400">Admin announcements and platform updates addressed to stores appear here.</p>
             </div>
-            <button onClick={() => setNotifications(prev => prev.map(n => (n.audience === 'all' || n.audience === 'store' || n.audience === 'store-admin' || n.storeId) ? { ...n, read: true } : n))} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">Mark all read</button>
+            <button onClick={() => setNotifications(prev => prev.map(n => myNotifs.some(m => m.id === n.id) ? { ...n, read: true } : n))} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline">Mark all read</button>
           </div>
           {myNotifs.length === 0 ? (
             <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 flex items-start space-x-3">
@@ -904,9 +922,9 @@ export default function StoreAdminPortal() {
             <h3 className="text-sm font-black text-white flex items-center space-x-2"><LifeBuoy className="w-4 h-4 text-brand-orange" /><span>Support Tickets</span></h3>
             <p className="text-[10px] text-gray-400">Customer tickets from the shared support queue.</p>
           </div>
-          {tickets.length === 0 ? <p className="text-center text-[10px] text-gray-500 py-10">No tickets.</p> : (
+          {myTickets.length === 0 ? <p className="text-center text-[10px] text-gray-500 py-10">No tickets.</p> : (
             <div className="space-y-2">
-              {tickets.map(t => (
+              {myTickets.map(t => (
                 <div key={t.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="min-w-0">
