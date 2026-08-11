@@ -6,14 +6,26 @@
  * tools (top-ups/wallet/refunds), staff, payments and support. Reads the same
  * localStorage keys as the admin panel.
  */
-import React, { useState } from 'react';
-import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, useDrivers, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, useDrivers, useStores, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet } from './portalUtils';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
 }
+
+const storeDocMeta = [
+  { key: 'tradeLicense', label: 'Trade License', required: true },
+  { key: 'binTin', label: 'BIN/TIN Certificate', required: true },
+  { key: 'ownerNid', label: 'Owner NID Front & Back', required: true },
+  { key: 'storePhoto', label: 'Store Front Photo', required: true },
+  { key: 'bankMfs', label: 'Bank/MFS Settlement Proof', required: true },
+  { key: 'foodSafety', label: 'BSTI/Food Safety Certificate (if food)', required: false },
+];
+
+const makeStoreId = () => `STR-${String(Date.now()).slice(-7)}`;
+const makeStoreAdminId = () => `SA-${String(Date.now()).slice(-8)}`;
 
 export default function StoreAdminPortal() {
   useCloudSync();
@@ -25,36 +37,54 @@ export default function StoreAdminPortal() {
   const [txns, setTxns] = useWalletTxns();
   const [products, setProducts] = useProducts();
   const [notifications, setNotifications] = useNotifications();
+  const [stores, setStores] = useStores();
+  const [storeAdminApps, setStoreAdminApps] = useStoreAdminApps();
+  const [storeAdminCreds] = useStoreAdminCreds();
   const [tab, setTab] = useState('dashboard');
+  const [authView, setAuthView] = useState<'login' | 'signup' | 'track'>('login');
+  const [sessionAdminId, setSessionAdminId] = useState(() => localStorage.getItem('sd_store_admin_session') || '');
+  const [loginId, setLoginId] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [trackId, setTrackId] = useState('');
+  const [signup, setSignup] = useState({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
+  const [submittedAppId, setSubmittedAppId] = useState('');
+  const activeApplication = storeAdminApps.find((a: any) => a.adminId === sessionAdminId && a.status === 'Verified');
+  const activeStoreId = activeApplication?.storeId || '';
+  const activeStoreName = activeApplication?.storeName || 'Approved Store';
+  const myOrders = orders.filter(o => (activeStoreId && (o as any).storeId === activeStoreId) || o.storeName === activeStoreName);
+  const myOrderIds = new Set(myOrders.map(o => o.id));
+  const myProducts = products.filter((p: any) => p.storeId === activeStoreId);
+  const myPayments = payments.filter(p => myOrderIds.has(p.orderId));
   const [coupons, setCoupons] = useState<{ id: string; code: string; discount: number; used: number }[]>(
-    JSON.parse(localStorage.getItem('sd_coupons') || '[]').length ? JSON.parse(localStorage.getItem('sd_coupons') || '[]') : [
-      { id: 'C-1', code: 'WELCOME10', discount: 10, used: 342 },
-      { id: 'C-2', code: 'FRIDAY15', discount: 15, used: 128 },
-      { id: 'C-3', code: 'FREESHIP', discount: 0, used: 95 },
-    ]
+    []
   );
-  const saveCoupons = (next: typeof coupons) => { setCoupons(next); localStorage.setItem('sd_coupons', JSON.stringify(next)); };
+  const saveCoupons = (next: typeof coupons) => { setCoupons(next); if (activeStoreId) lsSet(`sd_coupons_${activeStoreId}`, next); };
   const [search, setSearch] = useState('');
   const [newProd, setNewProd] = useState({ name: '', price: '', stock: '' });
-  const [staff, setStaff] = useState<Staff[]>([
-    { id: 'STF-01', name: 'Asif Rahman', role: 'Inventory Manager', shift: 'Day Shift', status: 'Active', phone: '01812345678' },
-    { id: 'STF-02', name: 'Nusrat Jahan', role: 'Support Supervisor', shift: 'Night Shift', status: 'Active', phone: '01712345679' },
-    { id: 'STF-03', name: 'Monirul Islam', role: 'Delivery Lead', shift: 'Day Shift', status: 'Active', phone: '01612345670' },
-  ]);
+  const [staff, setStaff] = useState<Staff[]>([]);
   const [stf, setStf] = useState({ name: '', role: '', phone: '' });
 
   const pending = txns.filter(t => t.status === 'Pending');
   const refunds = JSON.parse(localStorage.getItem('ss_refunds') || '[]');
-  const revenue = orders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.amount || 0), 0);
-  const lowStock = products.filter(p => p.stock > 0 && p.stock <= 10);
-  const outStock = products.filter(p => p.stock <= 0);
+  useEffect(() => {
+    if (!activeStoreId) return;
+    setCoupons(JSON.parse(localStorage.getItem(`sd_coupons_${activeStoreId}`) || '[]'));
+    setStaff(JSON.parse(localStorage.getItem(`sd_store_staff_${activeStoreId}`) || '[]'));
+  }, [activeStoreId]);
 
-  const myNotifs = notifications.filter(n => n.audience === 'all' || n.audience === 'store' || n.audience === 'store-admin' || n.storeId);
+  useEffect(() => { if (activeStoreId) lsSet(`sd_store_staff_${activeStoreId}`, staff); }, [activeStoreId, staff]);
+
+  const revenue = myOrders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.amount || 0), 0);
+  const lowStock = myProducts.filter(p => p.stock > 0 && p.stock <= 10);
+  const outStock = myProducts.filter(p => p.stock <= 0);
+
+  const myNotifs = notifications.filter(n => n.audience === 'all' || n.storeId === activeStoreId || (!n.storeId && (n.audience === 'store' || n.audience === 'store-admin')));
   const unreadCount = myNotifs.filter(n => !n.read).length;
 
   const nav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'orders', label: 'Orders', icon: ClipboardList, badge: orders.filter(o => o.status === 'Pending').length },
+    { id: 'orders', label: 'Orders', icon: ClipboardList, badge: myOrders.filter(o => o.status === 'Pending').length },
     { id: 'products', label: 'Products', icon: Box, badge: outStock.length },
     { id: 'inventory', label: 'Inventory', icon: Package, badge: lowStock.length },
     { id: 'coupons', label: 'Coupons', icon: Ticket },
@@ -66,6 +96,58 @@ export default function StoreAdminPortal() {
   ];
 
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
+
+  const handleDocUpload = (key: string, file?: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setUploadedDocs(prev => ({ ...prev, [key]: String(reader.result || '') }));
+    reader.readAsDataURL(file);
+  };
+
+  const submitSignup = () => {
+    const missing = storeDocMeta.find(d => d.required && !uploadedDocs[d.key]);
+    if (!signup.ownerName || !signup.phone || !signup.email || !signup.storeName || !signup.storeAddress || !signup.tradeLicenseNo || !signup.tinBin) return;
+    if (missing) return;
+    const storeId = makeStoreId();
+    const adminId = makeStoreAdminId();
+    const app = {
+      id: `SAPP-${Date.now()}`,
+      adminId,
+      storeId,
+      status: 'Pending Audit',
+      submittedAt: new Date().toLocaleString('en-GB'),
+      ...signup,
+      documents: storeDocMeta.map(d => ({
+        type: d.label,
+        required: d.required,
+        status: uploadedDocs[d.key] ? 'Pending' : 'Not Submitted',
+        dataUrl: uploadedDocs[d.key] || '',
+      })),
+    };
+    setStoreAdminApps(prev => [app, ...prev]);
+    setSubmittedAppId(adminId);
+    setTrackId(adminId);
+    setAuthView('track');
+    setSignup({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
+    setUploadedDocs({});
+  };
+
+  const login = () => {
+    const id = loginId.trim();
+    const cred = storeAdminCreds[id];
+    const app = storeAdminApps.find((a: any) => a.adminId === id && a.status === 'Verified');
+    if (!cred || !app || cred.password !== loginPassword) return;
+    localStorage.setItem('sd_store_admin_session', id);
+    setSessionAdminId(id);
+    setTab('dashboard');
+  };
+
+  const logout = () => {
+    localStorage.removeItem('sd_store_admin_session');
+    setSessionAdminId('');
+    setLoginPassword('');
+    setAuthView('login');
+  };
 
   const updateStatus = (id: string, status: string) => setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: status as any } : o)));
 
@@ -110,6 +192,7 @@ export default function StoreAdminPortal() {
       stock: Number(newProd.stock) || 0,
       status: Number(newProd.stock) <= 0 ? 'Out of Stock' : Number(newProd.stock) <= 10 ? 'Low Stock' : 'In Stock',
       image: '',
+      storeId: activeStoreId,
     };
     setProducts(prev => [p, ...prev]);
     setNewProd({ name: '', price: '', stock: '' });
@@ -123,7 +206,106 @@ export default function StoreAdminPortal() {
     }));
   };
 
-  const filtered = products.filter(p => !search.trim() || p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
+  const filtered = myProducts.filter(p => !search.trim() || p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
+
+  if (!activeApplication) {
+    const tracked = storeAdminApps.find((a: any) => a.adminId === trackId.trim() || a.adminId === submittedAppId);
+    const approvedCred = tracked ? storeAdminCreds[tracked.adminId] : null;
+    return (
+      <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-[#060d17] via-[#0a1322] to-[#0a1322] p-3 text-gray-100 sm:p-6">
+        <div className="mx-auto max-w-5xl space-y-4">
+          <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-brand-orange">NexaGo Store Admin</p>
+                <h1 className="mt-1 text-xl font-black text-white">Real Store Admin Account</h1>
+                <p className="mt-1 text-[11px] text-gray-400">No demo data. Submit Bangladesh business documents, track approval, then login with permanent ID.</p>
+              </div>
+              <div className="flex rounded-xl border border-[#1e3050] bg-[#0a1322] p-1">
+                {(['login', 'signup', 'track'] as const).map(v => (
+                  <button key={v} onClick={() => setAuthView(v)} className={`px-3 py-2 text-[10px] font-black uppercase ${authView === v ? 'rounded-lg bg-brand-orange text-white' : 'text-gray-400'}`}>{v}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {authView === 'login' && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+                <h2 className="flex items-center gap-2 text-sm font-black text-white"><LogIn className="h-4 w-4 text-brand-orange" /> Login</h2>
+                <div className="mt-4 space-y-3">
+                  <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="Permanent Store Admin ID (SA-...)" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+                  <input value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Password from approval tracking page" type="password" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+                  <button onClick={login} className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-2.5 text-[10px] font-black uppercase text-white"><Lock className="h-3.5 w-3.5" /> Login to Store Admin</button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+                <h2 className="flex items-center gap-2 text-sm font-black text-white"><ShieldCheck className="h-4 w-4 text-emerald-400" /> Approval Required</h2>
+                <p className="mt-3 text-[11px] leading-relaxed text-gray-400">Store Admin account opens only after Super Admin verifies documents. Each approved account gets one permanent Store ID and one permanent Store Admin ID. Data is separated by Store ID.</p>
+              </div>
+            </div>
+          )}
+
+          {authView === 'signup' && (
+            <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+              <h2 className="flex items-center gap-2 text-sm font-black text-white"><Store className="h-4 w-4 text-brand-orange" /> Store Admin Signup</h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  ['ownerName', 'Owner full name'], ['phone', 'Mobile number'], ['email', 'Email address'], ['storeName', 'Store / business name'], ['storeAddress', 'Store full address'], ['tradeLicenseNo', 'Trade license number'], ['tinBin', 'TIN/BIN number'], ['settlementNumber', 'Bank/MFS settlement number'],
+                ].map(([key, label]) => (
+                  <input key={key} value={(signup as any)[key]} onChange={e => setSignup(prev => ({ ...prev, [key]: e.target.value }))} placeholder={label} className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+                ))}
+                <select value={signup.businessType} onChange={e => setSignup(prev => ({ ...prev, businessType: e.target.value }))} className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange">
+                  <option>Grocery / Super Shop</option>
+                  <option>Restaurant / Food</option>
+                  <option>Pharmacy</option>
+                  <option>Electronics / Retail</option>
+                </select>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {storeDocMeta.map(d => (
+                  <label key={d.key} className="rounded-2xl border border-[#1e3050] bg-[#0a1322] p-3">
+                    <span className="flex items-center gap-2 text-[10px] font-black uppercase text-white"><FileText className="h-3.5 w-3.5 text-brand-orange" /> {d.label}</span>
+                    <span className="mt-1 block text-[8px] text-gray-500">{d.required ? 'Required' : 'Optional'}</span>
+                    <input type="file" accept="image/*,.pdf" onChange={e => handleDocUpload(d.key, e.target.files?.[0])} className="mt-3 w-full text-[9px] text-gray-400" />
+                    {uploadedDocs[d.key] && <span className="mt-2 block text-[9px] font-bold text-emerald-400">Submitted</span>}
+                  </label>
+                ))}
+              </div>
+              <button onClick={submitSignup} className="mt-5 w-full rounded-xl bg-brand-orange px-4 py-3 text-[10px] font-black uppercase text-white">Submit for Super Admin Verification</button>
+            </div>
+          )}
+
+          {authView === 'track' && (
+            <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+              <h2 className="flex items-center gap-2 text-sm font-black text-white"><Search className="h-4 w-4 text-brand-orange" /> Track Application</h2>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <input value={trackId} onChange={e => setTrackId(e.target.value)} placeholder="Enter Store Admin ID (SA-...)" className="min-w-0 flex-1 rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+                <button className="rounded-xl bg-[#132238] px-4 py-2 text-[10px] font-black uppercase text-gray-200">Check</button>
+              </div>
+              {tracked && (
+                <div className="mt-4 rounded-2xl border border-[#1e3050] bg-[#0a1322] p-4 text-xs">
+                  <p className="font-mono text-brand-orange">{tracked.adminId}</p>
+                  <p className="mt-1 font-black text-white">{tracked.storeName}</p>
+                  <p className="mt-1 text-gray-400">Store ID: <b className="text-white">{tracked.storeId}</b></p>
+                  <p className="mt-2 text-[10px] font-black uppercase text-amber-300">Status: {tracked.status}</p>
+                  {approvedCred && (
+                    <div className="mt-4 grid gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                      <p className="text-[10px] font-black uppercase text-emerald-300">Approved Login Credential</p>
+                      <p>Admin ID: <b>{tracked.adminId}</b></p>
+                      <p>Password: <b>{approvedCred.password}</b></p>
+                      <p>Store Site: <a className="text-brand-orange underline" href={`/store?key=${tracked.storeId}`}>{window.location.origin}/store?key={tracked.storeId}</a></p>
+                      <p>Store Admin: <a className="text-brand-orange underline" href={`/store-admin?key=${tracked.storeId}`}>{window.location.origin}/store-admin?key={tracked.storeId}</a></p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <PortalShell role="Store Admin" tagline="Store Operations" nav={nav} active={tab} onNav={setTab} onBack={goBack}>
@@ -134,20 +316,31 @@ export default function StoreAdminPortal() {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center font-black text-white text-xl">SA</div>
               <div>
                 <p className="text-[9px] text-gray-400 uppercase tracking-widest">Store Admin Console</p>
-                <p className="text-lg font-black text-white">Smart Shop Admin</p>
-                <p className="text-[10px] text-gray-400">Dhanmondi Hub · 5 staff online</p>
+                <p className="text-lg font-black text-white">{activeStoreName}</p>
+                <p className="text-[10px] text-gray-400">Store ID {activeStoreId} · {staff.length} staff online</p>
               </div>
             </div>
             <button onClick={() => setTab('tools')} className="flex items-center space-x-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors">
               <Wrench className="w-3.5 h-3.5" /><span>Review Top-Ups {pending.length > 0 && `(${pending.length})`}</span>
             </button>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: 'Store Site', url: `${window.location.origin}/store?key=${activeStoreId}` },
+                { label: 'Store Admin', url: `${window.location.origin}/store-admin?key=${activeStoreId}` },
+              ].map(link => (
+                <button key={link.label} onClick={() => navigator.clipboard.writeText(link.url)} className="flex items-center gap-1.5 rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-[9px] font-black uppercase text-gray-300">
+                  <Copy className="h-3 w-3" /> {link.label}
+                </button>
+              ))}
+              <button onClick={logout} className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[9px] font-black uppercase text-red-300">Logout</button>
+            </div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: 'Orders', value: orders.length.toString(), sub: `${orders.filter(o => o.status === 'Pending').length} pending`, color: 'text-white' },
+              { label: 'Orders', value: myOrders.length.toString(), sub: `${myOrders.filter(o => o.status === 'Pending').length} pending`, color: 'text-white' },
               { label: 'Revenue', value: bdt(revenue), sub: 'completed', color: 'text-teal-400' },
               { label: 'Wallet Balance', value: bdt(walletBal), sub: 'customer funds', color: 'text-brand-orange' },
-              { label: 'Products', value: products.length.toString(), sub: 'catalog live', color: 'text-sky-400' },
+              { label: 'Products', value: myProducts.length.toString(), sub: 'catalog live', color: 'text-sky-400' },
             ].map(k => (
               <div key={k.label} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{k.label}</p>
@@ -159,9 +352,9 @@ export default function StoreAdminPortal() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
               <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center space-x-2 mb-3"><TrendingUp className="w-3.5 h-3.5 text-brand-orange" /><span>Recent Orders</span></p>
-              {orders.length === 0 ? <p className="text-[10px] text-gray-500 py-6 text-center">No orders yet.</p> : (
+              {myOrders.length === 0 ? <p className="text-[10px] text-gray-500 py-6 text-center">No orders yet.</p> : (
                 <div className="space-y-2">
-                  {orders.slice(0, 4).map(o => (
+                  {myOrders.slice(0, 4).map(o => (
                     <div key={o.id} className="flex items-center justify-between gap-2 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2.5">
                       <div className="min-w-0">
                         <p className="text-[10px] font-mono text-brand-orange font-bold">#{o.id}</p>
@@ -197,9 +390,9 @@ export default function StoreAdminPortal() {
             <h3 className="text-sm font-black text-white flex items-center space-x-2"><ClipboardList className="w-4 h-4 text-brand-orange" /><span>Orders</span></h3>
             <p className="text-[10px] text-gray-400">Manage order status — changes reflect on the admin panel.</p>
           </div>
-          {orders.length === 0 ? <p className="text-center text-[10px] text-gray-500 py-10">No orders found.</p> : (
+          {myOrders.length === 0 ? <p className="text-center text-[10px] text-gray-500 py-10">No orders found.</p> : (
             <div className="space-y-2">
-              {orders.map(o => (
+              {myOrders.map(o => (
                 <div key={o.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center space-x-2">
@@ -303,7 +496,7 @@ export default function StoreAdminPortal() {
               <table className="w-full min-w-[620px] text-left text-[10px]">
               <thead><tr className="bg-[#0a1322] text-gray-400 text-[9px] uppercase tracking-wider"><th className="px-3 py-2.5">Product</th><th className="px-3 py-2.5">Category</th><th className="px-3 py-2.5">Price</th><th className="px-3 py-2.5">Stock</th><th className="px-3 py-2.5 text-right">Action</th></tr></thead>
               <tbody className="divide-y divide-[#1e3050]">
-                {products.map(p => (
+                {myProducts.map(p => (
                   <tr key={p.id} className="hover:bg-[#132238] transition-colors">
                     <td className="px-3 py-2.5 font-bold text-gray-200 truncate max-w-[160px]">{p.name}</td>
                     <td className="px-3 py-2.5 text-gray-400">{p.category}</td>
@@ -446,9 +639,9 @@ export default function StoreAdminPortal() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
-              { label: 'Total Payments', value: payments.length.toString(), color: 'text-white' },
-              { label: 'Paid', value: payments.filter(p => p.status === 'Paid').length.toString(), color: 'text-emerald-400' },
-              { label: 'Pending', value: payments.filter(p => p.status !== 'Paid').length.toString(), color: 'text-amber-400' },
+              { label: 'Total Payments', value: myPayments.length.toString(), color: 'text-white' },
+              { label: 'Paid', value: myPayments.filter(p => p.status === 'Paid').length.toString(), color: 'text-emerald-400' },
+              { label: 'Pending', value: myPayments.filter(p => p.status !== 'Paid').length.toString(), color: 'text-amber-400' },
             ].map(k => (
               <div key={k.label} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{k.label}</p>
@@ -461,7 +654,7 @@ export default function StoreAdminPortal() {
               <table className="w-full min-w-[420px] text-left text-[10px]">
               <thead><tr className="bg-[#0a1322] text-gray-400 text-[9px] uppercase tracking-wider"><th className="px-3 py-2.5">Ref</th><th className="px-3 py-2.5">Method</th><th className="px-3 py-2.5">Amount</th><th className="px-3 py-2.5">Status</th></tr></thead>
               <tbody className="divide-y divide-[#1e3050]">
-                {payments.map(p => (
+                {myPayments.map(p => (
                   <tr key={p.id} className="hover:bg-[#132238] transition-colors">
                     <td className="px-3 py-2.5 font-mono text-brand-orange font-bold">#{p.id}</td>
                     <td className="px-3 py-2.5 text-gray-300">{p.method || '—'}</td>
@@ -469,7 +662,7 @@ export default function StoreAdminPortal() {
                     <td className="px-3 py-2.5"><span className={`px-2 py-0.5 rounded-lg border text-[8px] font-black ${p.status === 'Paid' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'}`}>{p.status}</span></td>
                   </tr>
                 ))}
-                {payments.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-gray-500">No payments.</td></tr>}
+                {myPayments.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-gray-500">No payments.</td></tr>}
               </tbody>
               </table>
             </div>

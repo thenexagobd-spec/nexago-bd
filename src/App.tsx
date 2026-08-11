@@ -119,20 +119,20 @@ export default function App() {
 
   // Collections Persistent State
   const [orders, setOrders] = useState<Order[]>(() => {
-    const stored = getStoredData<Order[]>('sd_orders_v2', defaultOrders);
+    const stored = getStoredData<Order[]>('sd_orders_v2', []);
     return stored.filter(o => !/^ORD-001\d+/.test(o.id || ''));
   });
   const [driverDispatchOrder, setDriverDispatchOrder] = useState<Order | null>(null);
   const [adminDispatchOrder, setAdminDispatchOrder] = useState<Order | null>(null);
   const [customerDispatchOrder, setCustomerDispatchOrder] = useState<Order | null>(null);
-  const [drivers, setDrivers] = useState<Driver[]>(() => getStoredData('sd_drivers', defaultDrivers));
+  const [drivers, setDrivers] = useState<Driver[]>(() => getStoredData('sd_drivers', []));
   const [zones, setZones] = useState<Zone[]>(() => getZonesWithDefaults());
-  const [users, setUsers] = useState<User[]>(() => getStoredData('sd_users', defaultUsers));
-  const [payments, setPayments] = useState<Payment[]>(() => getStoredData('sd_payments', defaultPayments));
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => getStoredData('sd_vehicles', defaultVehicles));
-  const [banners, setBanners] = useState<PromotionBanner[]>(() => getStoredData('sd_banners', defaultBanners));
-  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => getStoredData('sd_tickets', defaultSupportTickets));
-  const [notifications, setNotifications] = useState<SystemNotification[]>(() => getStoredData('sd_notifications', defaultNotifications));
+  const [users, setUsers] = useState<User[]>(() => getStoredData('sd_users', []));
+  const [payments, setPayments] = useState<Payment[]>(() => getStoredData('sd_payments', []));
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() => getStoredData('sd_vehicles', []));
+  const [banners, setBanners] = useState<PromotionBanner[]>(() => getStoredData('sd_banners', []));
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => getStoredData('sd_tickets', []));
+  const [notifications, setNotifications] = useState<SystemNotification[]>(() => getStoredData('sd_notifications', []));
   const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
   const [orderReports, setOrderReports] = useState<OrderReportEntry[]>([]);
   const unreadNotifCount = notifications.filter(n => !n.read).length;
@@ -140,43 +140,15 @@ export default function App() {
   const { liveDrivers, locSim, setLocSim, simTick } = useLiveDrivers(drivers);
 
   // Additional Interactive Mock States for the rich new sidebar panels
-  const [products, setProducts] = useState([
-    { id: 'PROD-101', name: 'Fresh Apples (Premium)', category: 'Fruits & Vegetables', stock: 45, price: 180, status: 'In Stock', image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&q=80&w=600' },
-    { id: 'PROD-102', name: 'Organic Bananas', category: 'Fruits & Vegetables', stock: 120, price: 90, status: 'In Stock', image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&q=80&w=600' },
-    { id: 'PROD-103', name: 'Miniket Rice 5kg', category: 'Rice & Grains', stock: 35, price: 380, status: 'In Stock', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600' },
-    { id: 'PROD-104', name: 'Jasmine Rice 1kg', category: 'Rice & Grains', stock: 8, price: 150, status: 'Low Stock', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600' },
-    { id: 'PROD-105', name: 'Whole Milk 1L', category: 'Dairy & Eggs', stock: 0, price: 95, status: 'Out of Stock', image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&q=80&w=600' },
-    { id: 'PROD-106', name: 'Fresh Farm Eggs (Dozen)', category: 'Dairy & Eggs', stock: 80, price: 145, status: 'In Stock', image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&q=80&w=600' },
-    { id: 'PROD-107', name: 'Brown Bread 400g', category: 'Bakery', stock: 15, price: 65, status: 'In Stock', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=600' },
-  ]);
+  const [products, setProducts] = useState<any[]>(() => getStoredData<any[]>('sd_products', []).filter(p => !/^PROD-10\d$/.test(p.id || '')));
 
-  const [categories, setCategories] = useState([
-    { id: 'CAT-01', name: 'Fruits & Vegetables', itemsCount: 48, status: 'Active' },
-    { id: 'CAT-02', name: 'Dairy & Eggs', itemsCount: 32, status: 'Active' },
-    { id: 'CAT-03', name: 'Rice & Grains', itemsCount: 15, status: 'Active' },
-    { id: 'CAT-04', name: 'Bakery & Bread', itemsCount: 22, status: 'Active' },
-    { id: 'CAT-05', name: 'Beverages', itemsCount: 64, status: 'Active' },
-    { id: 'CAT-06', name: 'Snacks & Confectionery', itemsCount: 110, status: 'Active' },
-  ]);
+  const [categories, setCategories] = useState<any[]>(() => getStoredData('sd_categories', []));
 
-  const [stores, setStores] = useState<any[]>(() => {
-    const storesSeed = [
-      { id: 'STR-01', name: 'Fresh Mart', address: 'Dhanmondi, Dhaka', rating: 4.8, orders: 1240, status: 'Active', category: 'Grocery', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600', description: 'Fresh groceries & produce delivered fast', deliveryFee: 60, offer: '10% OFF first order' },
-      { id: 'STR-02', name: 'Daily Grocery', address: 'Gulshan, Dhaka', rating: 4.6, orders: 980, status: 'Active', category: 'Grocery', image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=600', description: 'Daily essentials at the best prices', deliveryFee: 50, offer: 'Free delivery over Tk 500' },
-      { id: 'STR-03', name: 'Green Basket', address: 'Uttara, Dhaka', rating: 4.7, orders: 840, status: 'Active', category: 'Fruits & Veg', image: 'https://images.unsplash.com/photo-1543168256-418811576931?auto=format&fit=crop&q=80&w=600', description: 'Organic fruits & vegetables, farm to door', deliveryFee: 70, offer: 'Buy 2 Get 1 Free' },
-      { id: 'STR-04', name: 'Super Shop', address: 'Mirpur, Dhaka', rating: 4.5, orders: 720, status: 'Active', category: 'Department Store', image: 'https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&q=80&w=600', description: 'One-stop shop for household needs', deliveryFee: 55, offer: 'Flat 5% OFF' },
-      { id: 'STR-05', name: 'Save Mart', address: 'Banani, Dhaka', rating: 4.4, orders: 530, status: 'Active', category: 'Grocery', image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=600', description: 'Savings on everything you need', deliveryFee: 45, offer: 'Tk 40 OFF first order' },
-    ];
-    const loaded = getStoredData('sd_stores', storesSeed);
-    return storesSeed.map(seed => ({ ...seed, ...(loaded.find((l: any) => l.id === seed.id) || {}) }));
-  });
+  const [stores, setStores] = useState<any[]>(() => getStoredData<any[]>('sd_stores', []).filter(s => !/^STR-0[1-5]$/.test(s.id || '') || s.adminId));
+  const [storeAdminApps, setStoreAdminApps] = useState<any[]>(() => getStoredData('sd_store_admin_apps', []));
+  const [storeAdminCreds, setStoreAdminCreds] = useState<Record<string, { password: string; storeId: string }>>(() => getStoredData('sd_store_admin_creds', {}));
 
-  const [inventory, setInventory] = useState([
-    { id: 'INV-301', name: 'Whole Milk 1L', store: 'Fresh Mart', stock: 0, reorderPoint: 10, status: 'Reorder Needed' },
-    { id: 'INV-302', name: 'Jasmine Rice 1kg', store: 'Daily Grocery', stock: 8, reorderPoint: 15, status: 'Low Stock' },
-    { id: 'INV-303', name: 'Fresh Farm Eggs', store: 'Green Basket', stock: 80, reorderPoint: 20, status: 'Healthy' },
-    { id: 'INV-304', name: 'Jasmine Rice 5kg', store: 'Super Shop', stock: 35, reorderPoint: 10, status: 'Healthy' },
-  ]);
+  const [inventory, setInventory] = useState<any[]>(() => getStoredData<any[]>('sd_inventory', []).filter(i => !/^INV-30[1-4]$/.test(i.id || '')));
 
   const [coupons, setCoupons] = useState([
     { id: 'CPN-01', code: 'EID20', discount: '20% Off', minOrder: 1000, usages: 420, status: 'Active' },
@@ -184,23 +156,15 @@ export default function App() {
     { id: 'CPN-03', code: 'GROCERY5', discount: '৳50 Flat Off', minOrder: 400, usages: 150, status: 'Active' },
   ]);
 
-  const [staff, setStaff] = useState([
-    { id: 'STF-01', name: 'Asif Rahman', role: 'Inventory Manager', shift: 'Day Shift', status: 'Active' },
-    { id: 'STF-02', name: 'Nusrat Jahan', role: 'Support Supervisor', shift: 'Night Shift', status: 'Active' },
-    { id: 'STF-03', name: 'Monirul Islam', role: 'Delivery Lead', shift: 'Day Shift', status: 'Active' },
-  ]);
+  const [staff, setStaff] = useState<any[]>(() => getStoredData('sd_staff', []));
 
-  const [reviews, setReviews] = useState([
-    { id: 'REV-01', customer: 'John Doe', item: 'Fresh Mart (Dhanmondi)', rating: 5, comment: 'Extremely fresh apples, delivery was fast!', date: 'May 26, 2024' },
-    { id: 'REV-02', customer: 'Sarah Khan', item: 'Daily Grocery (Gulshan)', rating: 4, comment: 'Great quality but the delivery was slightly delayed.', date: 'May 26, 2024' },
-    { id: 'REV-03', customer: 'Rafiq Hasan', item: 'Green Basket (Uttara)', rating: 5, comment: 'Highly recommended! The eggs were safely packed.', date: 'May 25, 2024' },
-  ]);
+  const [reviews, setReviews] = useState<any[]>(() => getStoredData('sd_reviews', []));
 
-  const [marketing, setMarketing] = useState([
-    { id: 'MKT-01', title: 'bKash Eid 20% Off Splash', channel: 'In-app Banner', budget: 15000, clicks: 1420, status: 'Running' },
-    { id: 'MKT-02', title: 'Friday Free Delivery Rush', channel: 'Push Notification', budget: 5000, clicks: 980, status: 'Running' },
-    { id: 'MKT-03', title: 'Daily Mart Launch', channel: 'Sms Broadcast', budget: 8000, clicks: 0, status: 'Scheduled' },
-  ]);
+  const [marketing, setMarketing] = useState<any[]>(() => getStoredData('sd_marketing', []));
+
+  useEffect(() => {
+    setCoupons(prev => prev.filter((c: any) => !/^CPN-0[1-3]$/.test(c.id || '')));
+  }, []);
 
   // UI Control states
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
@@ -248,6 +212,8 @@ export default function App() {
   useEffect(() => { setStoredData('sd_tickets', supportTickets); }, [supportTickets]);
   useEffect(() => { setStoredData('sd_notifications', notifications); }, [notifications]);
   useEffect(() => { setStoredData('sd_stores', stores); }, [stores]);
+  useEffect(() => { setStoredData('sd_store_admin_apps', storeAdminApps); }, [storeAdminApps]);
+  useEffect(() => { setStoredData('sd_store_admin_creds', storeAdminCreds); }, [storeAdminCreds]);
 
   // Toast System trigger helper
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
@@ -1082,6 +1048,42 @@ export default function App() {
         );
 
       case 'Stores': {
+        const approveStoreAdmin = (app: any, approve: boolean) => {
+          const nextStatus = approve ? 'Verified' : 'Rejected';
+          const nextApps = storeAdminApps.map(a => a.adminId === app.adminId ? {
+            ...a,
+            status: nextStatus,
+            reviewedAt: new Date().toLocaleString('en-GB'),
+            documents: (a.documents || []).map((d: any) => ({ ...d, status: d.dataUrl ? nextStatus : d.status })),
+          } : a);
+          setStoreAdminApps(nextApps);
+          if (approve) {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+            let password = '';
+            for (let i = 0; i < 10; i++) password += chars[Math.floor(Math.random() * chars.length)];
+            setStoreAdminCreds({ ...storeAdminCreds, [app.adminId]: { password, storeId: app.storeId } });
+            const storeRecord = {
+              id: app.storeId,
+              name: app.storeName,
+              address: app.storeAddress,
+              rating: 0,
+              orders: 0,
+              status: 'Active',
+              category: app.businessType,
+              ownerName: app.ownerName,
+              phone: app.phone,
+              email: app.email,
+              adminId: app.adminId,
+              siteUrl: `${window.location.origin}/store?key=${encodeURIComponent(app.storeId)}`,
+              adminUrl: `${window.location.origin}/store-admin?key=${encodeURIComponent(app.storeId)}`,
+            };
+            setStores(prev => prev.some(s => s.id === app.storeId) ? prev.map(s => s.id === app.storeId ? { ...s, ...storeRecord } : s) : [storeRecord, ...prev]);
+            showToast(`Store admin approved. ID: ${app.adminId} · Password: ${password}`, 'success');
+          } else {
+            showToast(`Store admin application ${app.adminId} rejected.`, 'info');
+          }
+        };
+
         const handleCreateStore = (e: React.FormEvent) => {
           e.preventDefault();
           if (!newStoreName || !newStoreAddress) {
@@ -1131,6 +1133,48 @@ export default function App() {
                   <span>{isAddingStore ? "Cancel Registration" : "Register New Store"}</span>
                 </button>
               </div>
+            </div>
+
+            <div className="bg-brand-card border border-brand-border rounded-xl p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">Store Admin Document Verification</h4>
+                  <p className="text-[10px] text-gray-400">Signup submissions from Store Admin site. Approve to generate permanent Store ID, Store Admin ID and password.</p>
+                </div>
+                <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[9px] font-black uppercase text-amber-300">
+                  {storeAdminApps.filter(a => a.status === 'Pending Audit').length} Pending
+                </span>
+              </div>
+              {storeAdminApps.length === 0 ? (
+                <p className="py-4 text-center text-[10px] text-gray-500">No real store admin application submitted yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {storeAdminApps.map(app => (
+                    <div key={app.id} className="rounded-xl border border-brand-border/70 bg-[#080e17] p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-mono text-[10px] font-black text-brand-orange">{app.adminId} · {app.storeId}</p>
+                          <p className="mt-1 truncate text-sm font-black text-white">{app.storeName}</p>
+                          <p className="text-[10px] text-gray-400">{app.ownerName} · {app.phone}</p>
+                          <p className="text-[10px] text-gray-500">{app.storeAddress}</p>
+                        </div>
+                        <span className={`rounded-lg border px-2 py-1 text-[8px] font-black uppercase ${app.status === 'Verified' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : app.status === 'Rejected' ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{app.status}</span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {(app.documents || []).map((doc: any) => (
+                          <a key={doc.type} href={doc.dataUrl || '#'} target="_blank" rel="noreferrer" className={`rounded-lg border px-2 py-2 text-[9px] font-bold ${doc.dataUrl ? 'border-sky-500/30 bg-sky-500/10 text-sky-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>
+                            <FileText className="mr-1 inline h-3 w-3" /> {doc.type}
+                          </a>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex flex-wrap justify-end gap-2">
+                        <button onClick={() => approveStoreAdmin(app, false)} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-red-300">Reject</button>
+                        <button onClick={() => approveStoreAdmin(app, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[9px] font-black uppercase text-white">Approve & Generate Password</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Register New Store Form */}

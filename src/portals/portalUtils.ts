@@ -8,7 +8,6 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Order, Driver, Product, Payment, SupportTicket, SystemNotification, User } from '../types';
-import { defaultDrivers, defaultUsers, defaultPayments, defaultSupportTickets, defaultNotifications } from '../data';
 
 export const lsGet = <T,>(key: string, d: T): T => {
   try {
@@ -52,6 +51,8 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_store_profile: 'profile',
   sd_notifications: 'notifications',
   sd_driver_creds: 'driverCreds',
+  sd_store_admin_apps: 'storeAdminApps',
+  sd_store_admin_creds: 'storeAdminCreds',
 };
 
 // The product catalog is owned by the super admin panel (it pushes products as
@@ -230,16 +231,18 @@ function useShared<T>(key: string, fallback: T) {
 }
 
 export const useOrders = () => useShared<Order[]>('sd_orders_v2', []);
-export const useDrivers = () => useShared<Driver[]>('sd_drivers', defaultDrivers);
-export const useProducts = () => useShared<Product[]>('sd_products', SEED_PRODUCTS);
-export const usePayments = () => useShared<Payment[]>('sd_payments', defaultPayments);
-export const useTickets = () => useShared<SupportTicket[]>('sd_tickets', defaultSupportTickets);
-export const useNotifications = () => useShared<SystemNotification[]>('sd_notifications', defaultNotifications);
-export const useUsers = () => useShared<User[]>('sd_users', defaultUsers);
+export const useDrivers = () => useShared<Driver[]>('sd_drivers', []);
+export const useProducts = () => useShared<Product[]>('sd_products', []);
+export const usePayments = () => useShared<Payment[]>('sd_payments', []);
+export const useTickets = () => useShared<SupportTicket[]>('sd_tickets', []);
+export const useNotifications = () => useShared<SystemNotification[]>('sd_notifications', []);
+export const useUsers = () => useShared<User[]>('sd_users', []);
 export const useStores = () => useShared<any[]>('sd_stores', []);
 export const useWalletBal = () => useShared<number>('ss_wallet_v2', 0);
 export const useWalletTxns = () => useShared<any[]>('ss_wtxn_v3', []);
-export const useStoreProfile = () => useShared<{ storeName: string; storeSub: string; whatsapp: string }>('sd_store_profile', { storeName: 'Smart Shop', storeSub: 'NexaGo BD Delivery', whatsapp: '8801712345678' });
+export const useStoreProfile = () => useShared<{ storeName: string; storeSub: string; whatsapp: string }>('sd_store_profile', { storeName: '', storeSub: '', whatsapp: '' });
+export const useStoreAdminApps = () => useShared<any[]>('sd_store_admin_apps', []);
+export const useStoreAdminCreds = () => useShared<Record<string, { password: string; storeId: string }>>('sd_store_admin_creds', {});
 
 export const SEED_PRODUCTS: Product[] = [
   { id: 'PROD-101', name: 'Fresh Apples (Premium)', category: 'Fruits & Vegetables', stock: 45, price: 180, status: 'In Stock', image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&q=80&w=600' },

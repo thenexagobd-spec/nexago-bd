@@ -19,13 +19,14 @@ import {
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useStoreProfile, useNotifications, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync } from './portalUtils';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync } from './portalUtils';
 
 export default function StorePortal() {
   useCloudSync();
   const [orders, setOrders] = useOrders();
   const [drivers, setDrivers] = useDrivers();
   const [profile] = useStoreProfile();
+  const [stores] = useStores();
   const [notifications, setNotifications] = useNotifications();
   const [tab, setTab] = useState('receive');
   const [storeOnline, setStoreOnline] = useState<boolean>(lsGet('sd_store_online', true));
@@ -49,8 +50,10 @@ export default function StorePortal() {
     return () => clearInterval(t);
   }, []);
 
-  const storeName = profile.storeName || 'Smart Shop';
-  const mine = useMemo(() => orders.filter(o => o.storeName === storeName || o.source === 'customer-app' || o.customerName), [orders, storeName]);
+  const storeId = new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || '';
+  const currentStore = stores.find((s: any) => s.id === storeId);
+  const storeName = currentStore?.name || profile.storeName || 'Store';
+  const mine = useMemo(() => orders.filter(o => ((o as any).storeId && (o as any).storeId === storeId) || o.storeName === storeName), [orders, storeId, storeName]);
 
   const incoming = mine.filter(o => o.status === 'Pending');
   const live = mine.find(o => o.status === 'Processing' || o.status === 'Ongoing' || (o.status === 'Confirmed' && o.driverId));
@@ -68,10 +71,10 @@ export default function StorePortal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, incoming.length]);
 
-  const storeNotifs = notifications.filter(n => n.audience === 'all' || n.audience === 'store' || n.audience === 'store-admin' || n.storeId);
+  const storeNotifs = notifications.filter(n => n.audience === 'all' || n.storeId === storeId || (!n.storeId && (n.audience === 'store' || n.audience === 'store-admin')));
   const storeUnread = storeNotifs.filter(n => !n.read).length;
 
-  const myReturns = returns.filter(r => !r.storeName || r.storeName === storeName || r.storeName === 'Smart Shop');
+  const myReturns = returns.filter(r => (r.storeId && r.storeId === storeId) || r.storeName === storeName);
   const pendingReturns = myReturns.filter(r => r.status === 'Requested');
 
   const nav = [
