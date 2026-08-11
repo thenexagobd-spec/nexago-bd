@@ -10,6 +10,8 @@ const HOST = process.env.RELAY_HOST || '0.0.0.0';
 const PUBLIC_URL = (process.env.RELAY_PUBLIC_URL || '').replace(/\/$/, '');
 const AGENT_TOKEN = process.env.NEXAGO_AGENT_TOKEN || '';
 const MAX_JSON_BYTES = Number(process.env.NEXAGO_MAX_JSON_BYTES || 8_000_000);
+const STRICT_SECURITY = process.env.NEXAGO_STRICT_SECURITY === '1';
+const STATE_WRITE_TOKEN = process.env.NEXAGO_STATE_WRITE_TOKEN || '';
 
 import os from 'node:os';
 
@@ -50,6 +52,7 @@ const securityHeaders = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self)',
   'Cross-Origin-Resource-Policy': 'same-site',
+  'Content-Security-Policy': "default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; connect-src 'self' https: wss: ws:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
 };
 const corsHeaders = {
   ...securityHeaders,
@@ -85,6 +88,14 @@ function isTrustedAutomation(req) {
   const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.');
   const tokenOk = AGENT_TOKEN && req.headers['x-nexago-agent'] === AGENT_TOKEN;
   return isLocal || tokenOk;
+}
+
+function hasStateWriteAccess(req, key) {
+  if (!STRICT_SECURITY) return true;
+  if (isTrustedAutomation(req)) return true;
+  const session = requireSession(req, key);
+  if (session && ['super-admin', 'store-admin', 'branch-admin', 'driver', 'customer', 'staff'].includes(session.role)) return true;
+  return !!(STATE_WRITE_TOKEN && req.headers['x-nexago-agent'] === STATE_WRITE_TOKEN);
 }
 
 function rateLimit(req, bucket = 'default', limit = 60, windowMs = 60_000) {
@@ -154,6 +165,11 @@ function storeFile(key) {
 
 function safeKey(key) {
   return String(key || 'default').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'default';
+}
+
+function keyLooksSafe(key) {
+  const raw = String(key || '');
+  return /^[a-zA-Z0-9_-]{1,64}$/.test(raw);
 }
 
 function backupFile(key, stamp = new Date().toISOString().replace(/[:.]/g, '-')) {
@@ -308,6 +324,11 @@ function serveDistFile(res, reqPath) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  const allowedMethods = new Set(['GET', 'POST', 'OPTIONS']);
+  if (!allowedMethods.has(req.method || '')) {
+    sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' });
+    return;
+  }
   const suspicious = /\.\.|%2e%2e|<script|union\s+select|\/wp-admin|\/phpmyadmin|\.env|\.git/i.test(req.url || '');
   if (suspicious) {
     try { appendAudit('nexago-main', { actor: 'system', action: 'suspicious-request-blocked', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: req.url }); } catch { /* ignore */ }
@@ -381,6 +402,11 @@ const server = http.createServer((req, res) => {
 
   // ---- Live store REST API ----
   const key = (url.searchParams.get('key') || '').trim() || 'default';
+  if (url.pathname.startsWith('/api/') && !keyLooksSafe(key)) {
+    appendAudit('nexago-main', { actor: 'system', action: 'unsafe-key-blocked', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: key });
+    sendJson(res, 400, { ok: false, error: 'INVALID_KEY' });
+    return;
+  }
 
   if (req.method === 'OPTIONS') { res.writeHead(204, corsHeaders); res.end(); return; }
 
@@ -547,6 +573,11 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && (url.pathname === '/api/state' || url.pathname === '/api/push')) {
+    if (!hasStateWriteAccess(req, key)) {
+      appendAudit(key, { actor: 'system', action: 'state-write-blocked', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'strict security requires trusted session/token' });
+      sendJson(res, 401, { ok: false, error: 'STATE_WRITE_LOCKED' });
+      return;
+    }
     readBody(req).then((body) => {
       const store = loadStore(key);
       const merged = mergeState(store, body || {});
@@ -561,6 +592,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/recover') {
+    if (!hasStateWriteAccess(req, key)) { sendJson(res, 401, { ok: false, error: 'RECOVER_LOCKED' }); return; }
     readBody(req).then((body) => {
       const dir = path.join(BACKUP_DIR, safeKey(key));
       if (!fs.existsSync(dir)) { sendJson(res, 404, { ok: false, error: 'No backups found' }); return; }
@@ -579,6 +611,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/events') {
+    if (!rateLimit(req, 'events', 120, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {
       const store = loadStore(key);
       const banners = Array.isArray(store.state && store.state.banners) ? store.state.banners : [];
@@ -599,6 +632,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/order') {
+    if (!rateLimit(req, 'orders', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {
       const store = loadStore(key);
       const order = body && body.order;
@@ -638,7 +672,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/reset') {
-    if (!isTrustedAutomation(req) && url.searchParams.get('confirm') !== 'RESET') {
+    if (!hasStateWriteAccess(req, key) || (!isTrustedAutomation(req) && url.searchParams.get('confirm') !== 'RESET')) {
       appendAudit(key, { actor: 'system', action: 'reset-blocked', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'missing confirm token' });
       sendJson(res, 403, { ok: false, error: 'RESET_CONFIRM_REQUIRED' });
       return;
@@ -665,6 +699,7 @@ const server = http.createServer((req, res) => {
 
 const { WebSocketServer } = await import('ws');
 const wss = new WebSocketServer({ server, path: '/ws' });
+const wsIpCounts = new Map();
 
 function roomFor(roomId) {
   if (!rooms.has(roomId)) rooms.set(roomId, { share: null, admin: null });
@@ -672,6 +707,13 @@ function roomFor(roomId) {
 }
 
 wss.on('connection', (ws, req) => {
+  const ip = clientIp(req);
+  const current = wsIpCounts.get(ip) || 0;
+  if (!isTrustedAutomation(req) && current >= 12) {
+    try { ws.close(4008, 'too many connections'); } catch { /* ignore */ }
+    return;
+  }
+  wsIpCounts.set(ip, current + 1);
   let roomId = null;
   let role = null;
 
@@ -717,6 +759,7 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    wsIpCounts.set(ip, Math.max(0, (wsIpCounts.get(ip) || 1) - 1));
     if (!roomId || !rooms.has(roomId)) return;
     const room = rooms.get(roomId);
     if (role === 'share' && room.share === ws) room.share = null;
