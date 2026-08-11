@@ -107,6 +107,7 @@ export interface Driver {
   email?: string;
   nidNumber?: string;
   licenseNumber?: string;
+  licenseExpiry?: string;
   documents?: DriverDocument[];
   statusHistory?: DriverStatusLog[];
   locationCoords?: { lat: number; lng: number };

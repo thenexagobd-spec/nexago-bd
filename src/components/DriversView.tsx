@@ -588,7 +588,7 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">BRTA Driving License:</span>
-                    <span className="font-mono font-bold text-white">{auditingDriver.licenseNumber || '—'}</span>
+                    <span className="font-mono font-bold text-white">{auditingDriver.licenseNumber || '—'} {auditingDriver.licenseExpiry ? `· expires ${auditingDriver.licenseExpiry}` : ''}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Vehicle Specification:</span>

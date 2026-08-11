@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Package, Wallet, User, MessageSquare, BarChart3, Phone, Navigation,
   CheckCircle2, Star, LogIn, Power, Send, RefreshCw, MapPin, FileText, AlertCircle,
     History, Inbox, Headphones, Settings, ShieldCheck, LogOut, ChevronRight, Copy, Eye, Truck,
-    X, Bell, Clock, RotateCcw, Search, Lock
+    X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays
   } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync } from './portalUtils';
@@ -61,6 +61,7 @@ export default function DriverPortal() {
   const [signupGmail, setSignupGmail] = useState('');
   const [signupNid, setSignupNid] = useState('');
   const [signupLicense, setSignupLicense] = useState('');
+  const [signupLicenseExpiry, setSignupLicenseExpiry] = useState('');
   const [signupVehicle, setSignupVehicle] = useState('Motorcycle (150cc)');
   const [termsChecked, setTermsChecked] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
@@ -180,6 +181,8 @@ export default function DriverPortal() {
       showToast('Enter a valid driving license number');
       return;
     }
+    if (!signupLicenseExpiry) { showToast('Enter your driving license expiry date'); return; }
+    if (new Date(signupLicenseExpiry) <= new Date()) { showToast('Your driving license has expired — upload a valid one'); return; }
     if (!termsChecked) { showToast('Accept the Terms & Safety Guidelines first'); return; }
     if (missing) { showToast(`Upload required document: ${missing}`); return; }
     const normPhone = signupPhone.replace(/[^0-9]/g, '');
@@ -203,6 +206,7 @@ export default function DriverPortal() {
       email: signupGmail.trim().toLowerCase(),
       nidNumber: signupNid.trim(),
       licenseNumber: signupLicense.trim().toUpperCase(),
+      licenseExpiry: signupLicenseExpiry,
       vehicleType: signupVehicle,
       status: 'Offline',
       completedOrders: 0,
@@ -223,7 +227,7 @@ export default function DriverPortal() {
     setPendingId(newId);
     lsSet('sd_driver_pending_id', newId);
     setAuthView('pending');
-    setSignupName(''); setSignupPhone(''); setSignupGmail(''); setSignupNid(''); setSignupLicense('');
+    setSignupName(''); setSignupPhone(''); setSignupGmail(''); setSignupNid(''); setSignupLicense(''); setSignupLicenseExpiry('');
     setUploadedDocs({}); setTermsChecked(false);
   };
 
@@ -620,39 +624,99 @@ export default function DriverPortal() {
           {/* ---- SIGNUP (Step 1) ---- */}
           {authView === 'signup' && (
             <>
-              <div className="flex items-center justify-between border-b border-[#1e3050] pb-2">
-                <button onClick={() => setAuthView('login')} className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
-                <h4 className="text-xs font-bold text-white">Driver Registration</h4>
-                <span className="text-[9px] text-brand-orange font-bold">Step 1 of 2</span>
-              </div>
-              <div className="space-y-2.5">
-                {[
-                  { label: 'Full Name (Bangla/English)', val: signupName, set: setSignupName, type: 'text' },
-                  { label: 'Mobile Phone (+880)', val: signupPhone, set: setSignupPhone, type: 'tel' },
-                  { label: 'Gmail Address', val: signupGmail, set: setSignupGmail, type: 'email' },
-                  { label: 'NID Number', val: signupNid, set: setSignupNid, type: 'text' },
-                  { label: 'Driving License Number', val: signupLicense, set: setSignupLicense, type: 'text' },
-                ].map(f => (
-                  <div key={f.label} className="glass-soft rounded-xl p-3">
-                    <label className="text-[7.5px] text-gray-400 uppercase block font-bold">{f.label}</label>
-                    <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full mt-1" />
+              <div className="relative">
+                <div className="flex items-center justify-between">
+                  <button onClick={() => setAuthView('login')} className="text-gray-400 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
+                  <div className="text-center flex-1">
+                    <h4 className="text-sm font-black text-white tracking-wide">Driver Registration</h4>
+                    <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">Join the NexaGo Delivery Network</p>
                   </div>
-                ))}
-                <div className="glass-soft rounded-xl p-3">
-                  <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Vehicle Type</label>
-                  <select value={signupVehicle} onChange={e => setSignupVehicle(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full mt-1 cursor-pointer">
-                    {['Motorcycle (150cc)', 'Electric Scooter / EV', 'Bicycle Courier', 'Covered Van / Car'].map(v => (
-                      <option key={v} value={v} className="glass-soft">{v}</option>
-                    ))}
-                  </select>
+                  <span className="w-4" />
                 </div>
-                <div className="glass-soft rounded-xl p-3">
-                  <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Your Permanent Driver ID</label>
-                  <p className="text-[10px] text-emerald-400 mt-1">Auto-generated after approval — e.g. 3667463854. You will also receive a random password.</p>
+                <div className="mt-3 h-1.5 rounded-full bg-[#132238] border border-[#1e3050] overflow-hidden">
+                  <div className="h-full w-1/2 bg-gradient-to-r from-brand-orange to-orange-500 rounded-full" />
                 </div>
-                <label className="flex items-center space-x-1.5 text-[9px] text-gray-300 cursor-pointer">
-                  <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)} className="rounded border-white/20 text-brand-orange" />
-                  <span>I agree to the <button onClick={() => setAuthView('terms')} className="text-brand-orange underline">Terms & Safety Guidelines</button></span>
+                <div className="mt-1.5 flex items-center justify-between text-[8px] font-bold uppercase tracking-widest">
+                  <span className="text-brand-orange">Step 1 · Personal Details</span>
+                  <span className="text-gray-500">Step 2 · Documents</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5 flex items-center space-x-1.5">
+                    <User className="w-3 h-3 text-brand-orange" /><span>Personal Information</span>
+                  </p>
+                  {[
+                    { label: 'Full Name (Bangla/English)', val: signupName, set: setSignupName, type: 'text', icon: User, ph: 'e.g. Rahim Khan' },
+                    { label: 'Mobile Phone', val: signupPhone, set: setSignupPhone, type: 'tel', icon: Phone, ph: 'e.g. 01712345678' },
+                    { label: 'Gmail Address', val: signupGmail, set: setSignupGmail, type: 'email', icon: Mail, ph: 'name@gmail.com' },
+                  ].map(f => (
+                    <div key={f.label} className="glass-soft rounded-xl p-3 mb-2 last:mb-0 border-[#24395c]">
+                      <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">{f.label} <span className="text-brand-orange">*</span></label>
+                      <div className="flex items-center space-x-2 mt-1.5">
+                        <f.icon className="w-3.5 h-3.5 text-brand-orange/70 shrink-0" />
+                        <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} className="bg-transparent text-xs text-white outline-none w-full placeholder:text-gray-600" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5 flex items-center space-x-1.5">
+                    <ShieldCheck className="w-3 h-3 text-brand-orange" /><span>Verification Documents</span>
+                  </p>
+                  {[
+                    { label: 'NID Number', val: signupNid, set: setSignupNid, type: 'text', icon: FileText, ph: '10+ digit national ID' },
+                    { label: 'Driving License Number', val: signupLicense, set: setSignupLicense, type: 'text', icon: Truck, ph: 'e.g. DK-DL-2024-XXXXX' },
+                  ].map(f => (
+                    <div key={f.label} className="glass-soft rounded-xl p-3 mb-2 last:mb-0 border-[#24395c]">
+                      <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">{f.label} <span className="text-brand-orange">*</span></label>
+                      <div className="flex items-center space-x-2 mt-1.5">
+                        <f.icon className="w-3.5 h-3.5 text-brand-orange/70 shrink-0" />
+                        <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} className="bg-transparent text-xs text-white outline-none w-full placeholder:text-gray-600" />
+                      </div>
+                    </div>
+                  ))}
+                  <div className="glass-soft rounded-xl p-3 border-[#24395c]">
+                    <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">Driving License Expiry Date <span className="text-brand-orange">*</span></label>
+                    <div className="flex items-center space-x-2 mt-1.5">
+                      <CalendarDays className="w-3.5 h-3.5 text-brand-orange/70 shrink-0" />
+                      <input type="date" value={signupLicenseExpiry} onChange={e => setSignupLicenseExpiry(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full [color-scheme:dark]" />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5 flex items-center space-x-1.5">
+                    <Navigation className="w-3 h-3 text-brand-orange" /><span>Vehicle</span>
+                  </p>
+                  <div className="glass-soft rounded-xl p-3 border-[#24395c]">
+                    <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">Vehicle Type <span className="text-brand-orange">*</span></label>
+                    <div className="flex items-center space-x-2 mt-1.5">
+                      <Truck className="w-3.5 h-3.5 text-brand-orange/70 shrink-0" />
+                      <select value={signupVehicle} onChange={e => setSignupVehicle(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full cursor-pointer">
+                        {['Motorcycle (150cc)', 'Electric Scooter / EV', 'Bicycle Courier', 'Covered Van / Car'].map(v => (
+                          <option key={v} value={v} className="glass-soft text-white">{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl p-3 border border-emerald-500/25 bg-gradient-to-r from-emerald-500/10 to-transparent">
+                  <div className="flex items-start space-x-2">
+                    <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[9px] font-black text-emerald-300 uppercase tracking-widest">Your Permanent Driver ID</p>
+                      <p className="text-[9px] text-gray-400 mt-1 leading-relaxed">Auto-generated after admin approval (e.g. 3667463854). You will also receive a <b className="text-white">random secure password</b> to log in.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <label className="flex items-start space-x-2.5 text-[9px] text-gray-300 cursor-pointer glass-soft rounded-xl p-3 border-[#24395c]">
+                  <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)} className="mt-0.5 rounded border-white/20 text-brand-orange accent-brand-orange" />
+                  <span className="leading-relaxed">I agree to the <button onClick={() => setAuthView('terms')} className="text-brand-orange underline hover:opacity-80">Terms & Safety Guidelines</button> and confirm the above information is accurate.</span>
                 </label>
               </div>
               <button onClick={() => {
@@ -664,9 +728,11 @@ export default function DriverPortal() {
                 if (!/^[\w.+-]+@gmail\.com$/i.test(signupGmail.trim())) { showToast('Enter a valid Gmail address (name@gmail.com)'); return; }
                 if (signupNid.replace(/[^0-9]/g, '').length < 10) { showToast('Enter a valid NID number (10+ digits)'); return; }
                 if (signupLicense.trim().length < 5) { showToast('Enter a valid driving license number'); return; }
+                if (!signupLicenseExpiry) { showToast('Enter your driving license expiry date'); return; }
+                if (new Date(signupLicenseExpiry) <= new Date()) { showToast('Your driving license has expired — upload a valid one'); return; }
                 if (!termsChecked) { showToast('Accept the Terms & Safety Guidelines first'); return; }
                 setAuthView('docs');
-              }} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg mt-3">
+              }} className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-black uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99]">
                 Continue to Document Upload →
               </button>
             </>
@@ -802,6 +868,7 @@ export default function DriverPortal() {
                 <div className="flex justify-between"><span className="text-gray-400">Gmail:</span><span className="text-white truncate max-w-[150px]">{pendingDriver?.email || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">NID:</span><span className="text-white font-mono">{pendingDriver?.nidNumber || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Driving License:</span><span className="text-white font-mono">{pendingDriver?.licenseNumber || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">License Expiry:</span><span className="text-white font-mono">{pendingDriver?.licenseExpiry || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Verification:</span>
                   <span className={approved ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>{approved ? 'Verified' : 'Pending Review'}</span>
                 </div>
