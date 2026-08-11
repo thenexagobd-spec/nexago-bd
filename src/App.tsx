@@ -99,10 +99,14 @@ export default function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const isSuperAdminRoute = window.location.pathname.includes('super-admin') || window.location.pathname.endsWith('/admin') || window.location.pathname.endsWith('/index.html');
   const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(() => localStorage.getItem('sd_super_admin_login') === 'verified');
-  const [superAdminLogin, setSuperAdminLogin] = useState({ user: '', password: '' });
+  const [superAdminLogin, setSuperAdminLogin] = useState({ user: '', password: '', secretCode: '' });
   const [superAdminLoginError, setSuperAdminLoginError] = useState('');
+  const [superAdminLoginStep, setSuperAdminLoginStep] = useState<'credentials' | 'secret'>('credentials');
   const [superAdminPasswordForm, setSuperAdminPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '', secretCode: '' });
   const [superAdminPasswordError, setSuperAdminPasswordError] = useState('');
+  const [superAdminSessions, setSuperAdminSessions] = useState<any[]>([]);
+  const [superAdminSessionsError, setSuperAdminSessionsError] = useState('');
+  const [selectedDeviceSession, setSelectedDeviceSession] = useState<any | null>(null);
 
   // Standalone Store Portal state
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(() => {
@@ -4198,18 +4202,54 @@ export default function App() {
   const handleSuperAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const userId = superAdminLogin.user.trim();
-    securityApi('/login', { userId, password: superAdminLogin.password }).then((data) => {
+    const confirmBiometric = async () => {
+      const pk = window.PublicKeyCredential;
+      if (!pk || !navigator.credentials) return true;
+      const available = await pk.isUserVerifyingPlatformAuthenticatorAvailable().catch(() => false);
+      if (!available) return true;
+      const challenge = new Uint8Array(32);
+      crypto.getRandomValues(challenge);
+      await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: 'The NexaGo BD' },
+          user: { id: challenge, name: userId || 'super-admin', displayName: 'Super Admin' },
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+          timeout: 60_000,
+        },
+      });
+      return true;
+    };
+    const runLogin = () => {
+    securityApi('/login', { userId, password: superAdminLogin.password, secretCode: superAdminLoginStep === 'secret' ? superAdminLogin.secretCode : '' }).then((data) => {
+      if (data.requiresSecret) {
+        setSuperAdminLoginStep('secret');
+        setSuperAdminLoginError('');
+        showToast('Password verified. Enter secret code.', 'info');
+        return;
+      }
       if (data.user?.role !== 'super-admin') throw new Error('not super admin');
       localStorage.setItem('sd_security_session', data.token);
       localStorage.setItem('sd_super_admin_login', 'verified');
       setIsSuperAdminLoggedIn(true);
+      setSuperAdminLoginStep('credentials');
       setSuperAdminLoginError('');
       securityAudit('super-admin-login-success', { actor: userId, reason: 'server verified super admin login' });
       showToast('Super Admin login successful.', 'success');
     }).catch(() => {
-      setSuperAdminLoginError('Invalid Super Admin username/email or password.');
+      setSuperAdminLoginError(superAdminLoginStep === 'secret' ? 'Invalid secret code.' : 'Invalid Super Admin username/email or password.');
       securityAudit('super-admin-login-failed', { actor: userId || 'unknown', reason: 'server rejected super admin login' });
     });
+    };
+    if (superAdminLoginStep === 'secret') {
+      confirmBiometric().then(runLogin).catch(() => {
+        setSuperAdminLoginError('Phone fingerprint / device lock verification failed.');
+        securityAudit('super-admin-biometric-failed', { actor: userId || 'unknown', reason: 'browser rejected device verification' });
+      });
+      return;
+    }
+    runLogin();
   };
 
   const handleSuperAdminPasswordChange = (e: React.FormEvent) => {
@@ -4233,6 +4273,41 @@ export default function App() {
       securityAudit('super-admin-password-change-ui-failed', { actor: 'super-admin', reason: 'server rejected password change' });
     });
   };
+
+  const refreshSuperAdminSessions = () => {
+    securityApi('/sessions').then((data) => {
+      setSuperAdminSessions(Array.isArray(data.sessions) ? data.sessions : []);
+      setSuperAdminSessionsError('');
+    }).catch(() => setSuperAdminSessionsError('Device sessions could not load.'));
+  };
+
+  const updateSuperAdminSession = (tokenId: string, action: 'inactive' | 'block') => {
+    securityApi('/session-action', { tokenId, action }).then(() => {
+      refreshSuperAdminSessions();
+      showToast(action === 'block' ? 'Device blocked.' : 'Device set inactive.', 'success');
+    }).catch(() => showToast('Device action failed.', 'info'));
+  };
+
+  useEffect(() => {
+    if (!isSuperAdminLoggedIn) return;
+    refreshSuperAdminSessions();
+    const timer = window.setInterval(refreshSuperAdminSessions, 10_000);
+    return () => window.clearInterval(timer);
+  }, [isSuperAdminLoggedIn]);
+
+  useEffect(() => {
+    if (!isSuperAdminLoggedIn || !navigator.geolocation) return;
+    const sendLocation = (pos: GeolocationPosition) => {
+      securityApi('/session-location', {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      }).catch(() => {});
+    };
+    navigator.geolocation.getCurrentPosition(sendLocation, () => {}, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 });
+    const watchId = navigator.geolocation.watchPosition(sendLocation, () => {}, { enableHighAccuracy: true, timeout: 20_000, maximumAge: 15_000 });
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [isSuperAdminLoggedIn]);
 
   if (isSuperAdminRoute && !isSuperAdminLoggedIn) {
     return (
@@ -4265,21 +4340,35 @@ export default function App() {
               <div className="mb-6">
                 <p className="text-[10px] font-black uppercase tracking-widest text-brand-orange">Login Required</p>
                 <h2 className="mt-2 text-xl font-black text-white">Super Admin Dashboard</h2>
-                <p className="mt-1 text-[11px] text-gray-400">Enter authorized username/email and password.</p>
+                <p className="mt-1 text-[11px] text-gray-400">{superAdminLoginStep === 'secret' ? 'Password accepted. Enter the Super Admin secret code.' : 'Enter authorized username/email and password.'}</p>
               </div>
               <div className="space-y-3">
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Username / Email</span>
-                  <input value={superAdminLogin.user} onChange={e => setSuperAdminLogin(prev => ({ ...prev, user: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Username or email" autoComplete="username" />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Password</span>
-                  <input value={superAdminLogin.password} onChange={e => setSuperAdminLogin(prev => ({ ...prev, password: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Password" type="password" autoComplete="current-password" />
-                </label>
+                {superAdminLoginStep === 'credentials' ? (
+                  <>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Username / Email</span>
+                      <input value={superAdminLogin.user} onChange={e => setSuperAdminLogin(prev => ({ ...prev, user: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Username or email" autoComplete="username" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Password</span>
+                      <input value={superAdminLogin.password} onChange={e => setSuperAdminLogin(prev => ({ ...prev, password: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Password" type="password" autoComplete="current-password" />
+                    </label>
+                  </>
+                ) : (
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Secret Code</span>
+                    <input value={superAdminLogin.secretCode} onChange={e => setSuperAdminLogin(prev => ({ ...prev, secretCode: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Secret code" type="password" inputMode="numeric" autoComplete="one-time-code" autoFocus />
+                  </label>
+                )}
                 {superAdminLoginError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">{superAdminLoginError}</p>}
                 <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white shadow-lg transition-colors hover:bg-brand-orange-hover">
-                  <ShieldCheck className="h-4 w-4" /> Open Super Admin
+                  <ShieldCheck className="h-4 w-4" /> {superAdminLoginStep === 'secret' ? 'Verify Secret Code' : 'Next'}
                 </button>
+                {superAdminLoginStep === 'secret' && (
+                  <button type="button" onClick={() => { setSuperAdminLoginStep('credentials'); setSuperAdminLogin(prev => ({ ...prev, secretCode: '' })); setSuperAdminLoginError(''); }} className="w-full rounded-xl border border-brand-border px-4 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-brand-orange">
+                    Back
+                  </button>
+                )}
               </div>
               <p className="mt-5 text-center text-[10px] text-gray-500">All login attempts are audited by the security system.</p>
             </form>
@@ -4310,6 +4399,66 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-dark flex overflow-x-hidden font-sans antialiased text-gray-200">
+      {selectedDeviceSession && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-brand-border bg-[#0c1624] shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-brand-border p-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-brand-orange">Live Phone Device</p>
+                <h3 className="mt-1 text-sm font-black text-white">{selectedDeviceSession.userId || 'Unknown device'}</h3>
+              </div>
+              <button onClick={() => setSelectedDeviceSession(null)} className="rounded-lg border border-brand-border px-3 py-1.5 text-[10px] font-black uppercase text-gray-300 hover:border-brand-orange">Close</button>
+            </div>
+            <div className="space-y-3 p-4 text-[10px]">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-xl border border-brand-border bg-[#070e17] p-3">
+                  <p className="text-gray-500">IP Address</p>
+                  <p className="mt-1 font-mono font-bold text-white">{selectedDeviceSession.ip || 'Not available'}</p>
+                </div>
+                <div className="rounded-xl border border-brand-border bg-[#070e17] p-3">
+                  <p className="text-gray-500">Status</p>
+                  <p className="mt-1 font-bold text-white">{selectedDeviceSession.status || (selectedDeviceSession.active ? 'Active' : 'Inactive')}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-brand-border bg-[#070e17] p-3">
+                <p className="text-gray-500">Phone / Browser Detail</p>
+                <p className="mt-1 break-words font-mono text-[9px] text-gray-200">{selectedDeviceSession.device || 'Unknown device'}</p>
+              </div>
+              {selectedDeviceSession.location ? (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-xl border border-brand-border bg-[#070e17] p-3">
+                      <p className="text-gray-500">Latitude</p>
+                      <p className="mt-1 font-mono font-bold text-white">{Number(selectedDeviceSession.location.lat).toFixed(6)}</p>
+                    </div>
+                    <div className="rounded-xl border border-brand-border bg-[#070e17] p-3">
+                      <p className="text-gray-500">Longitude</p>
+                      <p className="mt-1 font-mono font-bold text-white">{Number(selectedDeviceSession.location.lng).toFixed(6)}</p>
+                    </div>
+                    <div className="rounded-xl border border-brand-border bg-[#070e17] p-3">
+                      <p className="text-gray-500">Accuracy</p>
+                      <p className="mt-1 font-mono font-bold text-white">±{Math.round(Number(selectedDeviceSession.location.accuracy || 0))}m</p>
+                    </div>
+                  </div>
+                  <div className="overflow-hidden rounded-xl border border-brand-border bg-[#070e17]">
+                    <iframe
+                      title="Live device location"
+                      src={`https://maps.google.com/maps?q=${selectedDeviceSession.location.lat},${selectedDeviceSession.location.lng}&z=16&output=embed`}
+                      className="h-64 w-full border-0"
+                      loading="lazy"
+                    />
+                  </div>
+                  <button onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedDeviceSession.location.lat},${selectedDeviceSession.location.lng}`, '_blank')} className="w-full rounded-xl bg-brand-orange px-4 py-3 text-[10px] font-black uppercase tracking-wider text-white">
+                    Start Route To This Phone
+                  </button>
+                </>
+              ) : (
+                <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 font-bold text-amber-300">Location not available. Phone browser must allow location permission.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* SIDEBAR - Left panel */}
       {/* Desktop static Sidebar */}
@@ -4420,7 +4569,8 @@ export default function App() {
             onClick={() => {
               localStorage.removeItem('sd_super_admin_login');
               setIsSuperAdminLoggedIn(false);
-              setSuperAdminLogin({ user: '', password: '' });
+              setSuperAdminLogin({ user: '', password: '', secretCode: '' });
+              setSuperAdminLoginStep('credentials');
               showToast("Session reset. Welcome to The NexaGo BD Admin Panel!", "info");
               setActiveTab('Dashboard');
             }}
@@ -4470,6 +4620,47 @@ export default function App() {
                 Change Password
               </button>
             </form>
+          )}
+
+          {activePanelMode === 'super_admin' && (
+            <div className="mt-3 rounded-xl border border-brand-border bg-[#070e17] p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-brand-orange">Live Devices</p>
+                  <p className="mt-0.5 text-[8px] text-gray-500">{superAdminSessions.filter(s => s.active).length} active / {superAdminSessions.length} total</p>
+                </div>
+                <button type="button" onClick={refreshSuperAdminSessions} className="rounded-lg border border-brand-border px-2 py-1 text-[8px] font-black uppercase text-gray-300 hover:border-brand-orange">Refresh</button>
+              </div>
+              {superAdminSessionsError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[8px] font-bold text-red-300">{superAdminSessionsError}</p>}
+              <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                {superAdminSessions.slice(0, 8).map((session) => (
+                  <div key={session.tokenId} className="rounded-lg border border-brand-border/70 bg-[#0c1624] p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-[9px] font-black text-white">{session.userId || 'Unknown'}</p>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[7px] font-black uppercase ${session.active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-300'}`}>{session.status || (session.active ? 'Active' : 'Inactive')}</span>
+                    </div>
+                    <p className="mt-1 truncate text-[8px] text-gray-500">{session.ip || 'No IP'} · {String(session.device || 'Unknown device').slice(0, 52)}</p>
+                    <p className="mt-0.5 text-[8px] text-gray-600">{session.createdAt ? new Date(Number(session.createdAt)).toLocaleString() : 'No time'}</p>
+                    {session.location ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDeviceSession(session)}
+                        className="mt-1 w-full rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-left text-[8px] font-bold text-sky-300 hover:bg-sky-500/15"
+                      >
+                        Open live location popup
+                      </button>
+                    ) : (
+                      <p className="mt-1 text-[8px] text-gray-600">Location waiting for phone permission.</p>
+                    )}
+                    <div className="mt-2 grid grid-cols-2 gap-1">
+                      <button type="button" onClick={() => updateSuperAdminSession(session.tokenId, 'inactive')} className="rounded-md border border-amber-500/30 px-2 py-1 text-[8px] font-black uppercase text-amber-300 hover:bg-amber-500/10">Inactive</button>
+                      <button type="button" onClick={() => updateSuperAdminSession(session.tokenId, 'block')} className="rounded-md border border-red-500/30 px-2 py-1 text-[8px] font-black uppercase text-red-300 hover:bg-red-500/10">Block</button>
+                    </div>
+                  </div>
+                ))}
+                {!superAdminSessions.length && <p className="rounded-lg border border-brand-border/60 px-2 py-3 text-center text-[8px] text-gray-500">No device session found.</p>}
+              </div>
+            </div>
           )}
         </nav>
 
@@ -4556,7 +4747,8 @@ export default function App() {
                 onClick={() => {
                   localStorage.removeItem('sd_super_admin_login');
                   setIsSuperAdminLoggedIn(false);
-                  setSuperAdminLogin({ user: '', password: '' });
+                  setSuperAdminLogin({ user: '', password: '', secretCode: '' });
+                  setSuperAdminLoginStep('credentials');
                   showToast("Session reset. Welcome to The NexaGo BD Admin Panel!", "info");
                   setActiveTab('Dashboard');
                   setIsMobileSidebarOpen(false);

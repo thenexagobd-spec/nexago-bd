@@ -19,6 +19,7 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || process.env.NEXAGO_TELE
 const SUPER_ADMIN_USERS = (process.env.NEXAGO_SUPER_ADMIN_USERS || '').split(',').map((x) => x.trim()).filter(Boolean);
 const SUPER_ADMIN_PASSWORD = process.env.NEXAGO_SUPER_ADMIN_PASSWORD || '';
 const SUPER_ADMIN_PASSWORD_CHANGE_CODE = process.env.NEXAGO_SUPER_ADMIN_PASSWORD_CHANGE_CODE || '';
+const SUPER_ADMIN_LOGIN_SECRET_CODE = process.env.NEXAGO_SUPER_ADMIN_LOGIN_SECRET_CODE || SUPER_ADMIN_PASSWORD_CHANGE_CODE;
 
 import os from 'node:os';
 
@@ -560,6 +561,7 @@ const server = http.createServer((req, res) => {
     readBody(req).then((body) => {
       const userId = String(body.userId || '').trim();
       const password = String(body.password || '');
+      const secretCode = String(body.secretCode || '');
       ensureEnvSuperAdmins(key);
       const users = readSecurity(`users-${safeKey(key)}`, {});
       const found = findSecurityUser(users, userId);
@@ -569,6 +571,24 @@ const server = http.createServer((req, res) => {
         sendSecurityAlert('login-failed', { actor: userId || 'unknown', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'invalid credentials or inactive user' });
         sendJson(res, 401, { ok: false, error: 'INVALID_LOGIN' });
         return;
+      }
+      if (user.role === 'super-admin') {
+        if (!SUPER_ADMIN_LOGIN_SECRET_CODE) {
+          appendAudit(key, { actor: found.userId, role: user.role, action: 'super-admin-login-denied', ip: clientIp(req), reason: 'login secret env missing' });
+          sendJson(res, 503, { ok: false, error: 'LOGIN_SECRET_NOT_CONFIGURED' });
+          return;
+        }
+        if (!secretCode) {
+          appendAudit(key, { actor: found.userId, role: user.role, action: 'super-admin-login-secret-required', ip: clientIp(req), reason: 'password accepted; waiting for secret code' });
+          sendJson(res, 200, { ok: true, requiresSecret: true, user: { userId: found.userId, role: user.role } });
+          return;
+        }
+        if (secretCode !== SUPER_ADMIN_LOGIN_SECRET_CODE) {
+          appendAudit(key, { actor: found.userId, role: user.role, action: 'super-admin-login-denied', ip: clientIp(req), reason: 'invalid login secret code' });
+          sendSecurityAlert('super-admin-login-secret-failed', { actor: found.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'invalid login secret code' });
+          sendJson(res, 401, { ok: false, error: 'INVALID_SECRET_CODE' });
+          return;
+        }
       }
       const canonicalUserId = found.userId;
       const token = crypto.randomBytes(32).toString('hex');
@@ -594,6 +614,69 @@ const server = http.createServer((req, res) => {
     const session = requireSession(req, key);
     if (!session) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
     sendJson(res, 200, { ok: true, session });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/security/sessions') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+    const list = Object.entries(sessions).map(([token, item]) => ({
+      token: `${token.slice(0, 10)}...${token.slice(-6)}`,
+      tokenId: token,
+      active: Date.now() <= Number(item.expiresAt || 0),
+      ...item,
+    })).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    sendJson(res, 200, { ok: true, sessions: list });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/session-action') {
+    if (!rateLimit(req, 'session-action', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const session = requireSession(req, key);
+      if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+      const targetToken = String(body.tokenId || '');
+      const action = String(body.action || '').toLowerCase();
+      const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+      const target = sessions[targetToken];
+      if (!target) { sendJson(res, 404, { ok: false, error: 'SESSION_NOT_FOUND' }); return; }
+      if (action === 'inactive' || action === 'block') {
+        sessions[targetToken] = {
+          ...target,
+          expiresAt: 0,
+          status: action === 'block' ? 'Blocked' : 'Inactive',
+          changedBy: session.userId,
+          changedAt: Date.now(),
+        };
+        writeSecurity(`sessions-${safeKey(key)}`, sessions);
+        appendAudit(key, { actor: session.userId, role: session.role, action: `session-${action}`, ip: clientIp(req), newValue: { targetUser: target.userId, targetIp: target.ip, targetDevice: target.device } });
+        sendJson(res, 200, { ok: true, session: sessions[targetToken] });
+        return;
+      }
+      sendJson(res, 400, { ok: false, error: 'INVALID_ACTION' });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/session-location') {
+    if (!rateLimit(req, 'session-location', 60, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const session = requireSession(req, key);
+      if (!session) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
+      const lat = Number(body.lat);
+      const lng = Number(body.lng);
+      const accuracy = Number(body.accuracy || 0);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) { sendJson(res, 400, { ok: false, error: 'INVALID_LOCATION' }); return; }
+      const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+      if (!sessions[session.token]) { sendJson(res, 404, { ok: false, error: 'SESSION_NOT_FOUND' }); return; }
+      sessions[session.token] = {
+        ...sessions[session.token],
+        location: { lat, lng, accuracy, updatedAt: Date.now() },
+      };
+      writeSecurity(`sessions-${safeKey(key)}`, sessions);
+      sendJson(res, 200, { ok: true, location: sessions[session.token].location });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
 
