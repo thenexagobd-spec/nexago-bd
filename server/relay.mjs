@@ -42,7 +42,7 @@ function publicBase(req) {
   return `http://localhost:${PORT}`;
 }
 
-const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token' };
 
 const rooms = new Map(); // room -> { share?: ws, admin?: ws }
 
@@ -56,6 +56,74 @@ const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const BACKUP_DIR = path.join(DATA_DIR, '_backups');
 if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+const SECURITY_DIR = path.join(DATA_DIR, '_security');
+const FILES_DIR = path.join(DATA_DIR, '_files');
+for (const dir of [SECURITY_DIR, FILES_DIR]) if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+const rateBuckets = new Map();
+
+function clientIp(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+}
+
+function rateLimit(req, bucket = 'default', limit = 60, windowMs = 60_000) {
+  const key = `${bucket}:${clientIp(req)}`;
+  const now = Date.now();
+  const entry = rateBuckets.get(key) || { count: 0, resetAt: now + windowMs };
+  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + windowMs; }
+  entry.count += 1;
+  rateBuckets.set(key, entry);
+  return entry.count <= limit;
+}
+
+function securityFile(name) {
+  return path.join(SECURITY_DIR, name.replace(/[^a-zA-Z0-9_.-]/g, '') + '.json');
+}
+
+function readSecurity(name, fallback) {
+  try { return JSON.parse(fs.readFileSync(securityFile(name), 'utf8')); } catch { return fallback; }
+}
+
+function writeSecurity(name, value) {
+  fs.writeFileSync(securityFile(name), JSON.stringify(value), 'utf8');
+  return value;
+}
+
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.pbkdf2Sync(String(password || ''), salt, 210000, 32, 'sha256').toString('hex');
+  return { salt, hash, algo: 'pbkdf2-sha256', iterations: 210000 };
+}
+
+function verifyPassword(password, record) {
+  if (!record || !record.salt || !record.hash) return false;
+  const next = hashPassword(password, record.salt);
+  return crypto.timingSafeEqual(Buffer.from(next.hash), Buffer.from(record.hash));
+}
+
+function appendAudit(key, entry) {
+  const audit = readSecurity(`audit-${safeKey(key)}`, []);
+  const item = {
+    id: `AUD-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+    time: new Date().toISOString(),
+    ...entry,
+  };
+  audit.push(item);
+  writeSecurity(`audit-${safeKey(key)}`, audit.slice(-5000));
+  return item;
+}
+
+function sessionFromReq(req) {
+  return String(req.headers['x-session-token'] || (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || '').trim();
+}
+
+function requireSession(req, key) {
+  const token = sessionFromReq(req);
+  if (!token) return null;
+  const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+  const session = sessions[token];
+  if (!session || Date.now() > Number(session.expiresAt || 0)) return null;
+  return { token, ...session };
+}
 
 function storeFile(key) {
   const safe = String(key || 'default').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'default';
@@ -293,6 +361,141 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/state') {
     const store = loadStore(key);
     sendJson(res, 200, { ok: true, key, version: store.version, updatedAt: store.updatedAt, state: store.state });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/register') {
+    if (!rateLimit(req, 'security-register', 10, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const role = String(body.role || '').trim();
+      const userId = String(body.userId || '').trim();
+      const password = String(body.password || '');
+      const storeId = String(body.storeId || '').trim();
+      const branchId = String(body.branchId || '').trim();
+      if (!role || !userId || password.length < 8) { sendJson(res, 400, { ok: false, error: 'role, userId and 8+ char password required' }); return; }
+      const users = readSecurity(`users-${safeKey(key)}`, {});
+      if (users[userId]) { sendJson(res, 409, { ok: false, error: 'USER_EXISTS' }); return; }
+      users[userId] = {
+        userId,
+        role,
+        storeId,
+        branchId,
+        status: 'Active',
+        password: hashPassword(password),
+        createdAt: new Date().toISOString(),
+        lastPasswordChangeAt: new Date().toISOString(),
+      };
+      writeSecurity(`users-${safeKey(key)}`, users);
+      appendAudit(key, { actor: userId, role, action: 'security-user-registered', storeId, branchId, ip: clientIp(req), reason: body.reason || 'initial registration' });
+      sendJson(res, 200, { ok: true, userId, role, storeId, branchId });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/login') {
+    if (!rateLimit(req, 'security-login', 12, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const userId = String(body.userId || '').trim();
+      const password = String(body.password || '');
+      const users = readSecurity(`users-${safeKey(key)}`, {});
+      const user = users[userId];
+      if (!user || user.status !== 'Active' || !verifyPassword(password, user.password)) {
+        appendAudit(key, { actor: userId || 'unknown', action: 'login-failed', ip: clientIp(req), device: req.headers['user-agent'] || '' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_LOGIN' });
+        return;
+      }
+      const token = crypto.randomBytes(32).toString('hex');
+      const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+      sessions[token] = {
+        userId,
+        role: user.role,
+        storeId: user.storeId || '',
+        branchId: user.branchId || '',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 1000 * 60 * 60 * 12,
+        ip: clientIp(req),
+        device: req.headers['user-agent'] || '',
+      };
+      writeSecurity(`sessions-${safeKey(key)}`, sessions);
+      appendAudit(key, { actor: userId, role: user.role, action: 'login-success', storeId: user.storeId, branchId: user.branchId, ip: clientIp(req), device: req.headers['user-agent'] || '' });
+      sendJson(res, 200, { ok: true, token, expiresAt: sessions[token].expiresAt, user: { userId, role: user.role, storeId: user.storeId || '', branchId: user.branchId || '' } });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/security/session') {
+    const session = requireSession(req, key);
+    if (!session) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
+    sendJson(res, 200, { ok: true, session });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/audit') {
+    if (!rateLimit(req, 'security-audit', 120, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const session = requireSession(req, key);
+      const actor = session?.userId || String(body.actor || 'anonymous');
+      const item = appendAudit(key, {
+        actor,
+        role: session?.role || body.role || '',
+        action: String(body.action || 'event'),
+        oldValue: body.oldValue ?? null,
+        newValue: body.newValue ?? null,
+        reason: body.reason || '',
+        ip: clientIp(req),
+        device: req.headers['user-agent'] || '',
+        storeId: body.storeId || session?.storeId || '',
+        branchId: body.branchId || session?.branchId || '',
+      });
+      sendJson(res, 200, { ok: true, audit: item });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/security/audit') {
+    const audit = readSecurity(`audit-${safeKey(key)}`, []);
+    sendJson(res, 200, { ok: true, key, audit: audit.slice().reverse().slice(0, 500) });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/file') {
+    if (!rateLimit(req, 'security-file', 20, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const session = requireSession(req, key);
+      const name = String(body.name || 'upload.bin').replace(/[^\w .()-]/g, '').slice(0, 120);
+      const dataUrl = String(body.dataUrl || '');
+      if (!dataUrl.startsWith('data:') || dataUrl.length > 8_000_000) { sendJson(res, 400, { ok: false, error: 'invalid or too large file' }); return; }
+      const id = `FILE-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      const meta = {
+        id,
+        name,
+        type: String(body.type || dataUrl.slice(5, dataUrl.indexOf(';')) || 'application/octet-stream'),
+        sha256: crypto.createHash('sha256').update(dataUrl).digest('hex'),
+        owner: session?.userId || body.owner || 'anonymous',
+        role: session?.role || body.role || '',
+        storeId: body.storeId || session?.storeId || '',
+        branchId: body.branchId || session?.branchId || '',
+        uploadedAt: new Date().toISOString(),
+        status: 'Stored',
+      };
+      const dir = path.join(FILES_DIR, safeKey(key));
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ ...meta, dataUrl }), 'utf8');
+      appendAudit(key, { actor: meta.owner, role: meta.role, action: 'secure-file-uploaded', storeId: meta.storeId, branchId: meta.branchId, ip: clientIp(req), newValue: { id, name, type: meta.type, sha256: meta.sha256 } });
+      sendJson(res, 200, { ok: true, file: meta, privateUrl: `/api/security/file/${id}?key=${encodeURIComponent(key)}` });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname.startsWith('/api/security/file/')) {
+    const id = url.pathname.split('/').pop().replace(/[^a-zA-Z0-9_-]/g, '');
+    const file = path.join(FILES_DIR, safeKey(key), `${id}.json`);
+    try {
+      const obj = JSON.parse(fs.readFileSync(file, 'utf8'));
+      sendJson(res, 200, { ok: true, file: { ...obj, dataUrl: undefined }, dataUrl: obj.dataUrl });
+    } catch {
+      sendJson(res, 404, { ok: false, error: 'file not found' });
+    }
     return;
   }
 
