@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { Driver, DriverStatusLog, DriverDocument } from '../types';
+import { Driver, DriverStatusLog, DriverDocument, Order } from '../types';
 import { 
   Search, UserPlus, Phone, Star, Award, MapPin, Edit3, Trash2, X, AlertCircle, 
   Eye, UserCheck, Download, GitCompare, Lock, Unlock, ShieldCheck, DollarSign, 
@@ -17,6 +17,7 @@ interface VehicleInfo { id:string; regNo:string; type:string; brand:string; mode
 
 interface DriversViewProps {
   drivers: Driver[];
+  orders: Order[];
   onAddDriver: (driver: Omit<Driver, 'id' | 'completedOrders' | 'earnings'>) => void;
   onUpdateDriver: (driver: Driver) => void;
   onDeleteDriver: (id: string) => void;
@@ -24,7 +25,7 @@ interface DriversViewProps {
   vehicles?: VehicleInfo[];
 }
 
-export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDeleteDriver, showToast, vehicles = [] }: DriversViewProps) {
+export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriver, onDeleteDriver, showToast, vehicles = [] }: DriversViewProps) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Online' | 'On-Delivery' | 'Offline' | 'Audit Pending' | 'Dispatch Locked'>('All');
@@ -66,6 +67,7 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
     return (
       <DriverProfileView
         driver={selectedDriver}
+        orders={orders}
         allDrivers={drivers}
         onBack={() => setSelectedDriverId(null)}
         onUpdateDriver={onUpdateDriver}

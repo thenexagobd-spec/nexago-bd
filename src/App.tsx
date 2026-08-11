@@ -4172,6 +4172,7 @@ export default function App() {
           {(activeTab === 'Drivers Management' || activeTab === 'Suppliers') && (
             <DriversView 
               drivers={drivers}
+              orders={orders}
               onAddDriver={handleAddDriver}
               onUpdateDriver={handleUpdateDriver}
               onDeleteDriver={handleDeleteDriver}
