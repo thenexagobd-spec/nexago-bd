@@ -641,6 +641,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/security/config-status') {
+    sendJson(res, 200, {
+      ok: true,
+      key,
+      superAdminUsersConfigured: SUPER_ADMIN_USERS.length > 0,
+      superAdminUserCount: SUPER_ADMIN_USERS.length,
+      superAdminPasswordConfigured: Boolean(SUPER_ADMIN_PASSWORD),
+      superAdminLoginSecretConfigured: Boolean(SUPER_ADMIN_LOGIN_SECRET_CODE),
+      superAdminPasswordChangeSecretConfigured: Boolean(SUPER_ADMIN_PASSWORD_CHANGE_CODE),
+      encryptionConfigured: Boolean(DATA_ENCRYPTION_KEY),
+      strictSecurity: STRICT_SECURITY,
+      checkedAt: new Date().toISOString(),
+    });
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/security/sessions') {
     const session = requireSession(req, key);
     if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
