@@ -54,10 +54,36 @@ function sendJson(res, code, obj) {
 // ---- Live store data (JSON file store per store key) ----
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+const BACKUP_DIR = path.join(DATA_DIR, '_backups');
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
 function storeFile(key) {
   const safe = String(key || 'default').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'default';
   return path.join(DATA_DIR, safe + '.json');
+}
+
+function safeKey(key) {
+  return String(key || 'default').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'default';
+}
+
+function backupFile(key, stamp = new Date().toISOString().replace(/[:.]/g, '-')) {
+  const dir = path.join(BACKUP_DIR, safeKey(key));
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, `${stamp}.json`);
+}
+
+function backupStore(key, obj, reason = 'autosave') {
+  try {
+    if (!obj || !obj.state) return;
+    const payload = { ...obj, backupReason: reason, backedUpAt: new Date().toISOString() };
+    fs.writeFileSync(backupFile(key), JSON.stringify(payload), 'utf8');
+    const dir = path.dirname(backupFile(key, 'x'));
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
+    while (files.length > 100) {
+      const old = files.shift();
+      if (old) fs.unlinkSync(path.join(dir, old));
+    }
+  } catch { /* ignore backup errors */ }
 }
 
 function loadStore(key) {
@@ -72,7 +98,9 @@ function loadStore(key) {
 }
 
 function saveStore(key, obj) {
+  backupStore(key, loadStore(key), 'before-save');
   fs.writeFileSync(storeFile(key), JSON.stringify(obj), 'utf8');
+  backupStore(key, obj, 'after-save');
   return obj;
 }
 
@@ -91,7 +119,7 @@ function unionById(existing, incomingArr) {
 
 function mergeState(stored, incoming) {
   const merged = { ...(stored.state || {}) };
-  const arrayUnion = new Set(['orders', 'notifications', 'drivers', 'payments', 'tickets', 'users', 'stores', 'returns', 'refunds', 'walletTxns', 'ratings', 'coupons']);
+  const arrayUnion = new Set(['orders', 'notifications', 'drivers', 'payments', 'tickets', 'users', 'stores', 'products', 'categories', 'inventory', 'staff', 'reviews', 'marketing', 'returns', 'refunds', 'walletTxns', 'ratings', 'coupons']);
   for (const [k, v] of Object.entries(incoming || {})) {
     if (k === 'banners') {
       if (Array.isArray(v)) {
@@ -120,7 +148,7 @@ function mergeState(stored, incoming) {
 function storefrontView(state) {
   const now = new Date().toISOString().slice(0, 10);
   const profile = Object.assign(
-    { storeName: 'Smart Shop', storeSub: 'NexaGo BD Delivery', whatsapp: '' },
+    { storeName: '', storeSub: '', whatsapp: '' },
     (state.profile && typeof state.profile === 'object') ? state.profile : {}
   );
   const banners = (Array.isArray(state.banners) ? state.banners : [])
@@ -268,12 +296,47 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/backups') {
+    try {
+      const dir = path.join(BACKUP_DIR, safeKey(key));
+      const backups = fs.existsSync(dir)
+        ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort().reverse().slice(0, 50).map((file) => ({ id: file.replace(/\.json$/, ''), file }))
+        : [];
+      sendJson(res, 200, { ok: true, key, backups });
+    } catch (e) {
+      sendJson(res, 500, { ok: false, error: String(e && e.message || e) });
+    }
+    return;
+  }
+
   if (req.method === 'POST' && (url.pathname === '/api/state' || url.pathname === '/api/push')) {
     readBody(req).then((body) => {
       const store = loadStore(key);
       const merged = mergeState(store, body || {});
       saveStore(key, merged);
+      if (safeKey(key) !== 'nexago-main') {
+        const central = loadStore('nexago-main');
+        saveStore('nexago-main', mergeState(central, body || {}));
+      }
       sendJson(res, 200, { ok: true, key, updatedAt: merged.updatedAt });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/recover') {
+    readBody(req).then((body) => {
+      const dir = path.join(BACKUP_DIR, safeKey(key));
+      if (!fs.existsSync(dir)) { sendJson(res, 404, { ok: false, error: 'No backups found' }); return; }
+      const requested = body && body.backupId ? String(body.backupId).replace(/[^a-zA-Z0-9_-]/g, '') + '.json' : '';
+      const files = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
+      const file = requested && files.includes(requested) ? requested : files[files.length - 1];
+      if (!file) { sendJson(res, 404, { ok: false, error: 'No backups found' }); return; }
+      const recovered = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      const current = loadStore(key);
+      backupStore(key, current, 'before-recover');
+      const merged = mergeState(current, recovered.state || {});
+      saveStore(key, merged);
+      sendJson(res, 200, { ok: true, key, recoveredFrom: file, updatedAt: merged.updatedAt });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
@@ -328,13 +391,21 @@ const server = http.createServer((req, res) => {
       store.state.notifications = notifs.slice(0, 100);
       store.updatedAt = new Date().toISOString();
       saveStore(key, store);
+      if (safeKey(key) !== 'nexago-main') {
+        const central = loadStore('nexago-main');
+        saveStore('nexago-main', mergeState(central, { orders: [order], notifications: store.state.notifications }));
+      }
       sendJson(res, 200, { ok: true, orderId: order.id });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String((e && e.message) || e) }));
     return;
   }
 
   if (req.method === 'POST' && url.pathname === '/api/reset') {
-    try { if (fs.existsSync(storeFile(key))) fs.unlinkSync(storeFile(key)); } catch { /* ignore */ }
+    try {
+      const store = loadStore(key);
+      backupStore(key, store, 'before-reset');
+      if (fs.existsSync(storeFile(key))) fs.unlinkSync(storeFile(key));
+    } catch { /* ignore */ }
     sendJson(res, 200, { ok: true, reset: key });
     return;
   }

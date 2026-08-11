@@ -55,9 +55,10 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_store_admin_creds: 'storeAdminCreds',
 };
 
-// The product catalog is owned by the super admin panel (it pushes products as
-// a full replace). Role sites only read it, so it is never pushed back up.
-const CLOUD_PUSH_EXCLUDE = new Set(['sd_products']);
+// Every approved role writes its own store-scoped records. Server-side merge is
+// union-by-id, so Store Admin product/stock changes sync live without dropping
+// another store's data.
+const CLOUD_PUSH_EXCLUDE = new Set<string>();
 
 const API_BASE = ((import.meta.env.VITE_RELAY_BASE as string) || window.location.origin).replace(/\/+$/, '');
 
