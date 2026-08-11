@@ -8,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || process.env.RELAY_PORT || 3100;
 const HOST = process.env.RELAY_HOST || '0.0.0.0';
 const PUBLIC_URL = (process.env.RELAY_PUBLIC_URL || '').replace(/\/$/, '');
+const AGENT_TOKEN = process.env.NEXAGO_AGENT_TOKEN || '';
+const MAX_JSON_BYTES = Number(process.env.NEXAGO_MAX_JSON_BYTES || 8_000_000);
 
 import os from 'node:os';
 
@@ -42,7 +44,19 @@ function publicBase(req) {
   return `http://localhost:${PORT}`;
 }
 
-const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token' };
+const securityHeaders = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self)',
+  'Cross-Origin-Resource-Policy': 'same-site',
+};
+const corsHeaders = {
+  ...securityHeaders,
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token, X-Nexago-Agent',
+};
 
 const rooms = new Map(); // room -> { share?: ws, admin?: ws }
 
@@ -66,7 +80,15 @@ function clientIp(req) {
   return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
 }
 
+function isTrustedAutomation(req) {
+  const ip = clientIp(req);
+  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.');
+  const tokenOk = AGENT_TOKEN && req.headers['x-nexago-agent'] === AGENT_TOKEN;
+  return isLocal || tokenOk;
+}
+
 function rateLimit(req, bucket = 'default', limit = 60, windowMs = 60_000) {
+  if (isTrustedAutomation(req)) return true;
   const key = `${bucket}:${clientIp(req)}`;
   const now = Date.now();
   const entry = rateBuckets.get(key) || { count: 0, resetAt: now + windowMs };
@@ -257,7 +279,7 @@ function storefrontView(state) {
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
-    req.on('data', (c) => { data += c; if (data.length > 5e6) { req.destroy(); reject(new Error('payload too large')); } });
+    req.on('data', (c) => { data += c; if (data.length > MAX_JSON_BYTES) { req.destroy(); reject(new Error('payload too large')); } });
     req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); } });
     req.on('error', reject);
   });
@@ -286,6 +308,16 @@ function serveDistFile(res, reqPath) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  const suspicious = /\.\.|%2e%2e|<script|union\s+select|\/wp-admin|\/phpmyadmin|\.env|\.git/i.test(req.url || '');
+  if (suspicious) {
+    try { appendAudit('nexago-main', { actor: 'system', action: 'suspicious-request-blocked', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: req.url }); } catch { /* ignore */ }
+    sendJson(res, 403, { ok: false, error: 'blocked' });
+    return;
+  }
+  if (url.pathname.startsWith('/api/') && !rateLimit(req, 'api-global', 240, 60_000)) {
+    sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' });
+    return;
+  }
   if (url.pathname === '/' || url.pathname === '/share') {
     const file = path.join(__dirname, 'share.html');
     fs.readFile(file, (err, data) => {
@@ -453,6 +485,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/security/audit') {
+    if (!requireSession(req, key) && !isTrustedAutomation(req)) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
     const audit = readSecurity(`audit-${safeKey(key)}`, []);
     sendJson(res, 200, { ok: true, key, audit: audit.slice().reverse().slice(0, 500) });
     return;
@@ -488,6 +521,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname.startsWith('/api/security/file/')) {
+    if (!requireSession(req, key) && !isTrustedAutomation(req)) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
     const id = url.pathname.split('/').pop().replace(/[^a-zA-Z0-9_-]/g, '');
     const file = path.join(FILES_DIR, safeKey(key), `${id}.json`);
     try {
@@ -604,6 +638,11 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/reset') {
+    if (!isTrustedAutomation(req) && url.searchParams.get('confirm') !== 'RESET') {
+      appendAudit(key, { actor: 'system', action: 'reset-blocked', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'missing confirm token' });
+      sendJson(res, 403, { ok: false, error: 'RESET_CONFIRM_REQUIRED' });
+      return;
+    }
     try {
       const store = loadStore(key);
       backupStore(key, store, 'before-reset');
