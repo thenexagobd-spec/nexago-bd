@@ -12,6 +12,10 @@ const AGENT_TOKEN = process.env.NEXAGO_AGENT_TOKEN || '';
 const MAX_JSON_BYTES = Number(process.env.NEXAGO_MAX_JSON_BYTES || 8_000_000);
 const STRICT_SECURITY = process.env.NEXAGO_STRICT_SECURITY === '1';
 const STATE_WRITE_TOKEN = process.env.NEXAGO_STATE_WRITE_TOKEN || '';
+const DATA_ENCRYPTION_KEY = process.env.NEXAGO_DATA_ENCRYPTION_KEY || '';
+const SECURITY_ALERT_WEBHOOK = process.env.NEXAGO_SECURITY_ALERT_WEBHOOK || '';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXAGO_TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || process.env.NEXAGO_TELEGRAM_CHAT_ID || '';
 
 import os from 'node:os';
 
@@ -78,6 +82,7 @@ const FILES_DIR = path.join(DATA_DIR, '_files');
 for (const dir of [SECURITY_DIR, FILES_DIR]) if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
 const rateBuckets = new Map();
+const alertBuckets = new Map();
 
 function clientIp(req) {
   return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
@@ -113,12 +118,43 @@ function securityFile(name) {
   return path.join(SECURITY_DIR, name.replace(/[^a-zA-Z0-9_.-]/g, '') + '.json');
 }
 
+function encryptionKey() {
+  if (!DATA_ENCRYPTION_KEY) return null;
+  return crypto.createHash('sha256').update(DATA_ENCRYPTION_KEY).digest();
+}
+
+function encryptJson(value) {
+  const key = encryptionKey();
+  if (!key) return value;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const plaintext = JSON.stringify(value);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    __encrypted: 'aes-256-gcm',
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    data: ciphertext.toString('base64'),
+  };
+}
+
+function decryptJson(value) {
+  if (!value || value.__encrypted !== 'aes-256-gcm') return value;
+  const key = encryptionKey();
+  if (!key) throw new Error('encrypted data requires NEXAGO_DATA_ENCRYPTION_KEY');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(value.iv, 'base64'));
+  decipher.setAuthTag(Buffer.from(value.tag, 'base64'));
+  const plaintext = Buffer.concat([decipher.update(Buffer.from(value.data, 'base64')), decipher.final()]).toString('utf8');
+  return JSON.parse(plaintext);
+}
+
 function readSecurity(name, fallback) {
-  try { return JSON.parse(fs.readFileSync(securityFile(name), 'utf8')); } catch { return fallback; }
+  try { return decryptJson(JSON.parse(fs.readFileSync(securityFile(name), 'utf8'))); } catch { return fallback; }
 }
 
 function writeSecurity(name, value) {
-  fs.writeFileSync(securityFile(name), JSON.stringify(value), 'utf8');
+  fs.writeFileSync(securityFile(name), JSON.stringify(encryptJson(value)), 'utf8');
   return value;
 }
 
@@ -143,6 +179,32 @@ function appendAudit(key, entry) {
   audit.push(item);
   writeSecurity(`audit-${safeKey(key)}`, audit.slice(-5000));
   return item;
+}
+
+async function sendSecurityAlert(kind, detail = {}) {
+  const now = Date.now();
+  const bucketKey = `${kind}:${detail.ip || ''}:${detail.actor || ''}`;
+  const prev = alertBuckets.get(bucketKey) || 0;
+  if (now - prev < 60_000) return;
+  alertBuckets.set(bucketKey, now);
+  const text = [
+    `NexaGo Security Alert: ${kind}`,
+    `Time: ${new Date().toISOString()}`,
+    detail.actor ? `Actor: ${detail.actor}` : '',
+    detail.ip ? `IP: ${detail.ip}` : '',
+    detail.storeId ? `Store: ${detail.storeId}` : '',
+    detail.reason ? `Reason: ${detail.reason}` : '',
+    detail.device ? `Device: ${String(detail.device).slice(0, 160)}` : '',
+  ].filter(Boolean).join('\n');
+  const tasks = [];
+  if (SECURITY_ALERT_WEBHOOK) {
+    tasks.push(fetch(SECURITY_ALERT_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, text, detail }) }).catch(() => {}));
+  }
+  if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+    const tgUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    tasks.push(fetch(tgUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }) }).catch(() => {}));
+  }
+  await Promise.all(tasks);
 }
 
 function sessionFromReq(req) {
@@ -332,10 +394,12 @@ const server = http.createServer((req, res) => {
   const suspicious = /\.\.|%2e%2e|<script|union\s+select|\/wp-admin|\/phpmyadmin|\.env|\.git/i.test(req.url || '');
   if (suspicious) {
     try { appendAudit('nexago-main', { actor: 'system', action: 'suspicious-request-blocked', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: req.url }); } catch { /* ignore */ }
+    sendSecurityAlert('suspicious-request-blocked', { ip: clientIp(req), device: req.headers['user-agent'] || '', reason: req.url });
     sendJson(res, 403, { ok: false, error: 'blocked' });
     return;
   }
   if (url.pathname.startsWith('/api/') && !rateLimit(req, 'api-global', 240, 60_000)) {
+    sendSecurityAlert('api-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '', reason: req.url });
     sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' });
     return;
   }
@@ -404,6 +468,7 @@ const server = http.createServer((req, res) => {
   const key = (url.searchParams.get('key') || '').trim() || 'default';
   if (url.pathname.startsWith('/api/') && !keyLooksSafe(key)) {
     appendAudit('nexago-main', { actor: 'system', action: 'unsafe-key-blocked', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: key });
+    sendSecurityAlert('unsafe-key-blocked', { ip: clientIp(req), device: req.headers['user-agent'] || '', reason: key });
     sendJson(res, 400, { ok: false, error: 'INVALID_KEY' });
     return;
   }
@@ -423,7 +488,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/security/register') {
-    if (!rateLimit(req, 'security-register', 10, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    if (!rateLimit(req, 'security-register', 10, 60_000)) { sendSecurityAlert('register-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '' }); sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {
       const role = String(body.role || '').trim();
       const userId = String(body.userId || '').trim();
@@ -451,7 +516,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/security/login') {
-    if (!rateLimit(req, 'security-login', 12, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    if (!rateLimit(req, 'security-login', 12, 60_000)) { sendSecurityAlert('login-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '' }); sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {
       const userId = String(body.userId || '').trim();
       const password = String(body.password || '');
@@ -459,6 +524,7 @@ const server = http.createServer((req, res) => {
       const user = users[userId];
       if (!user || user.status !== 'Active' || !verifyPassword(password, user.password)) {
         appendAudit(key, { actor: userId || 'unknown', action: 'login-failed', ip: clientIp(req), device: req.headers['user-agent'] || '' });
+        sendSecurityAlert('login-failed', { actor: userId || 'unknown', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'invalid credentials or inactive user' });
         sendJson(res, 401, { ok: false, error: 'INVALID_LOGIN' });
         return;
       }
@@ -539,7 +605,7 @@ const server = http.createServer((req, res) => {
       };
       const dir = path.join(FILES_DIR, safeKey(key));
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ ...meta, dataUrl }), 'utf8');
+      fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(encryptJson({ ...meta, dataUrl })), 'utf8');
       appendAudit(key, { actor: meta.owner, role: meta.role, action: 'secure-file-uploaded', storeId: meta.storeId, branchId: meta.branchId, ip: clientIp(req), newValue: { id, name, type: meta.type, sha256: meta.sha256 } });
       sendJson(res, 200, { ok: true, file: meta, privateUrl: `/api/security/file/${id}?key=${encodeURIComponent(key)}` });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
@@ -551,7 +617,7 @@ const server = http.createServer((req, res) => {
     const id = url.pathname.split('/').pop().replace(/[^a-zA-Z0-9_-]/g, '');
     const file = path.join(FILES_DIR, safeKey(key), `${id}.json`);
     try {
-      const obj = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const obj = decryptJson(JSON.parse(fs.readFileSync(file, 'utf8')));
       sendJson(res, 200, { ok: true, file: { ...obj, dataUrl: undefined }, dataUrl: obj.dataUrl });
     } catch {
       sendJson(res, 404, { ok: false, error: 'file not found' });
