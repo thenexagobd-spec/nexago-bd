@@ -197,6 +197,7 @@ export default function App() {
     settlementNumber: '',
   });
   const [newStoreDocs, setNewStoreDocs] = useState<Record<string, string>>({});
+  const [newStoreReview, setNewStoreReview] = useState(false);
 
   // Merchant specific interactive states
   const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
@@ -1144,11 +1145,35 @@ export default function App() {
           }
         };
 
+        const modifyStoreAdminApp = (app: any) => {
+          const field = window.prompt('Field to modify: ownerName, phone, email, storeName, storeAddress, tradeLicenseNo, tinBin, settlementNumber, businessType');
+          if (!field || !(field in app)) return;
+          const value = window.prompt(`New value for ${field}`, app[field] || '');
+          if (value === null) return;
+          const reason = window.prompt('Required reason for modification');
+          if (!reason?.trim()) { showToast('Modification reason is required and must be saved.', 'info'); return; }
+          setStoreAdminApps(prev => prev.map((a: any) => a.id === app.id ? {
+            ...a,
+            [field]: value,
+            modifiedAt: new Date().toLocaleString('en-GB'),
+            modificationLog: [
+              ...(a.modificationLog || []),
+              { field, oldValue: app[field] || '', newValue: value, reason: reason.trim(), time: new Date().toISOString(), actor: 'super-admin' }
+            ],
+          } : a));
+          showToast(`${field} modified with permanent reason.`, 'success');
+        };
+
         const handleCreateStore = (e: React.FormEvent) => {
           e.preventDefault();
           const missingDoc = storeDocMeta.find(d => d.required && !newStoreDocs[d.key]);
           if (!newStoreName || !newStoreAddress || !newStoreAdminDraft.ownerName || !newStoreAdminDraft.phone || !newStoreAdminDraft.email || !newStoreAdminDraft.tradeLicenseNo || !newStoreAdminDraft.tinBin || missingDoc) {
             showToast("Please fill in all fields and required documents", "info");
+            return;
+          }
+          if (!newStoreReview) {
+            setNewStoreReview(true);
+            showToast('Review all details, then final submit.', 'info');
             return;
           }
           const usedFingerprints = new Set(storeAdminApps.flatMap((app: any) => (app.documents || []).map((d: any) => d.fingerprint).filter(Boolean)));
@@ -1190,6 +1215,7 @@ export default function App() {
           setNewStoreAddress('');
           setNewStoreAdminDraft({ ownerName: '', phone: '', email: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
           setNewStoreDocs({});
+          setNewStoreReview(false);
           setIsAddingStore(false);
           showToast(`Store admin application ${adminId} submitted. Verify documents to generate password.`, "success");
         };
@@ -1262,6 +1288,14 @@ export default function App() {
                           </a>
                         ))}
                       </div>
+                      {(app.modificationLog || []).length > 0 && (
+                        <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/10 p-2">
+                          <p className="text-[9px] font-black uppercase text-purple-300">Modification History</p>
+                          {(app.modificationLog || []).slice(-3).map((m: any, i: number) => (
+                            <p key={i} className="mt-1 text-[9px] text-gray-300">{m.field}: {m.oldValue || '-'} → {m.newValue || '-'} · Reason: {m.reason}</p>
+                          ))}
+                        </div>
+                      )}
                       {app.status === 'Verified' && (
                         <div className="mt-3 grid gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2 text-[9px] text-emerald-100">
                           <p className="font-black uppercase text-emerald-300">Permanent Access</p>
@@ -1272,6 +1306,7 @@ export default function App() {
                         </div>
                       )}
                       <div className="mt-3 flex flex-wrap justify-end gap-2">
+                        <button onClick={() => modifyStoreAdminApp(app)} className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-purple-300">Modify With Reason</button>
                         <button onClick={() => approveStoreAdmin(app, false)} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-red-300">Reject</button>
                         <button onClick={() => approveStoreAdmin(app, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[9px] font-black uppercase text-white">Approve & Generate Password</button>
                       </div>
@@ -1335,10 +1370,22 @@ export default function App() {
                     </label>
                   ))}
                 </div>
+                {newStoreReview && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-50">
+                    <p className="text-[10px] font-black uppercase text-amber-300">Confirm Before Final Submit</p>
+                    <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-3">
+                      {Object.entries(newStoreAdminDraft).map(([k, v]) => <p key={k}><b>{k}:</b> {v || '-'}</p>)}
+                      <p><b>storeName:</b> {newStoreName || '-'}</p>
+                      <p><b>storeAddress:</b> {newStoreAddress || '-'}</p>
+                      {storeDocMeta.map(d => <p key={d.key}><b>{d.label}:</b> {newStoreDocs[d.key] ? 'Attached' : 'Not submitted'}</p>)}
+                    </div>
+                    <p className="mt-3 text-[11px] leading-relaxed">Notice: Verify that all store, owner and document information is true. False, reused, edited or borrowed documents can cause permanent rejection or account block. Super Admin modifications must include a permanent reason.</p>
+                  </div>
+                )}
                 <div className="flex justify-end space-x-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setIsAddingStore(false)}
+                    onClick={() => { setIsAddingStore(false); setNewStoreReview(false); }}
                     className="px-3 py-2 bg-brand-dark border border-brand-border hover:bg-brand-border/30 text-gray-300 rounded-lg text-xs font-semibold cursor-pointer"
                   >
                     Cancel
@@ -1347,7 +1394,7 @@ export default function App() {
                     type="submit"
                     className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
                   >
-                    Submit For Verification
+                    {newStoreReview ? 'Final Submit For Verification' : 'Review & Confirm'}
                   </button>
                 </div>
               </form>

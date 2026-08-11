@@ -57,6 +57,7 @@ export default function StoreAdminPortal() {
   const [trackId, setTrackId] = useState('');
   const [signup, setSignup] = useState({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
+  const [signupReview, setSignupReview] = useState(false);
   const [submittedAppId, setSubmittedAppId] = useState('');
   const branchSession = branches.find((b: any) => b.branchAdminId === sessionAdminId && b.status === 'Active');
   const activeApplication = storeAdminApps.find((a: any) => ((a.adminId === sessionAdminId) || (branchSession && a.storeId === branchSession.storeId)) && a.status === 'Verified');
@@ -128,6 +129,7 @@ export default function StoreAdminPortal() {
     const missing = storeDocMeta.find(d => d.required && !uploadedDocs[d.key]);
     if (!signup.ownerName || !signup.phone || !signup.email || !signup.storeName || !signup.storeAddress || !signup.tradeLicenseNo || !signup.tinBin) return;
     if (missing) return;
+    if (!signupReview) { setSignupReview(true); return; }
     const usedFingerprints = new Set(storeAdminApps.flatMap((app: any) => (app.documents || []).map((d: any) => d.fingerprint).filter(Boolean)));
     const duplicate = storeDocMeta.find(d => uploadedDocs[d.key] && usedFingerprints.has(fingerprintOf(uploadedDocs[d.key])));
     if (duplicate) return;
@@ -155,6 +157,7 @@ export default function StoreAdminPortal() {
     setAuthView('track');
     setSignup({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
     setUploadedDocs({});
+    setSignupReview(false);
   };
 
   const login = () => {
@@ -315,7 +318,20 @@ export default function StoreAdminPortal() {
                   </label>
                 ))}
               </div>
-              <button onClick={submitSignup} className="mt-5 w-full rounded-xl bg-brand-orange px-4 py-3 text-[10px] font-black uppercase text-white">Submit for Super Admin Verification</button>
+              {signupReview && (
+                <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-50">
+                  <p className="text-[10px] font-black uppercase text-amber-300">Confirm Before Submit</p>
+                  <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                    {Object.entries(signup).map(([k, v]) => <p key={k}><b>{k}:</b> {v || '-'}</p>)}
+                    {storeDocMeta.map(d => <p key={d.key}><b>{d.label}:</b> {uploadedDocs[d.key] ? 'Attached' : 'Not submitted'}</p>)}
+                  </div>
+                  <p className="mt-3 text-[11px] leading-relaxed">Notice: Submit only true owner, store and document information. False, edited, borrowed or reused documents can permanently reject or block the Store Admin account. After final submit, Super Admin will verify every document.</p>
+                </div>
+              )}
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                {signupReview && <button onClick={() => setSignupReview(false)} className="rounded-xl border border-[#1e3050] bg-[#0a1322] px-4 py-3 text-[10px] font-black uppercase text-gray-300 sm:w-40">Edit Again</button>}
+                <button onClick={submitSignup} className="w-full rounded-xl bg-brand-orange px-4 py-3 text-[10px] font-black uppercase text-white">{signupReview ? 'Final Submit for Verification' : 'Review & Confirm'}</button>
+              </div>
             </div>
           )}
 
