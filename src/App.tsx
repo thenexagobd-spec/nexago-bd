@@ -40,7 +40,7 @@ import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
-import { appendTimeline } from './portals/portalUtils';
+import { appendTimeline, useCloudSync } from './portals/portalUtils';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
@@ -55,6 +55,11 @@ import {
 // Role-based portal sites — each HTML entry (driver.html, store.html, ...) opens
 // the full NexaGo admin panel (super admin access).
 export default function App() {
+  // Live cloud sync: admin changes (driver approvals, orders, notifications...)
+  // are pushed to the relay so every role site (driver, store, customer) sees
+  // them instantly — and incoming changes from those sites are pulled in live.
+  useCloudSync();
+
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('Dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);

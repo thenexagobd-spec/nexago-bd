@@ -22,6 +22,9 @@ export const lsGet = <T,>(key: string, d: T): T => {
 export const lsSet = <T,>(key: string, v: T) => {
   try {
     localStorage.setItem(key, JSON.stringify(v));
+    // Notify sibling tabs (driver/admin/store...) that shared state changed so
+    // their cloud sync pulls right away instead of waiting for the poll timer.
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('nexago-local-write'));
   } catch {
     /* ignore */
   }
@@ -48,6 +51,7 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_store_online: 'storeOnline',
   sd_store_profile: 'profile',
   sd_notifications: 'notifications',
+  sd_driver_creds: 'driverCreds',
 };
 
 // The product catalog is owned by the super admin panel (it pushes products as
@@ -129,18 +133,39 @@ export function useCloudSync() {
     const onStorage = () => { push(); };
     window.addEventListener('storage', onStorage);
 
+    // Instant cross-tab delivery for the same browser: any tab that writes shared
+    // state tells every other open tab to pull from the cloud right away instead
+    // of waiting for the poll timer. This makes admin approvals appear on the
+    // driver site immediately.
+    const bc: BroadcastChannel | undefined =
+      typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('nexago-cloud-sync') : undefined;
+    if (bc) {
+      bc.onmessage = (e: MessageEvent) => {
+        if (e && e.data && e.data.nexago === 'sync') { pull(); }
+      };
+    }
+
     (async () => {
       const ok = await pull();
       if (!cancelled) setSyncState(ok ? 'online' : 'offline');
       await push();
       if (!cancelled) setSyncState('online');
     })();
-    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 5000);
-    const pushTimer = setInterval(() => { push(); }, 3000);
+    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 2000);
+    const pushTimer = setInterval(() => { push(); }, 1500);
+
+    // Broadcast changes made in THIS tab so sibling tabs (driver site, admin, ...)
+    // trigger an immediate pull instead of waiting for the poll timer.
+    const onBroadcast = () => {
+      if (bc) bc.postMessage({ nexago: 'sync' });
+    };
+    window.addEventListener('nexago-local-write', onBroadcast);
 
     return () => {
       cancelled = true;
       window.removeEventListener('storage', onStorage);
+      window.removeEventListener('nexago-local-write', onBroadcast);
+      if (bc) bc.close();
       clearInterval(pullTimer);
       clearInterval(pushTimer);
     };

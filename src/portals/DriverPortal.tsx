@@ -110,9 +110,10 @@ export default function DriverPortal() {
     { key: 'photo', label: 'Profile Photo / Selfie with Vehicle', docType: 'Profile Photo', required: true },
   ];
 
-  // ---- Real driver credentials (no demo bypass) ----
-  // sd_driver_creds: { [driverId]: { phone, password } } — created during signup.
-  // No account can be entered without matching credentials.
+  // Credentials come only from the admin panel: admin-created fleet drivers get a
+  // password at creation, and approved pending registrations get a password in
+  // App.tsx handleUpdateDriver. They are synced to the driver site via cloud
+  // (sd_driver_creds) so the driver receives their ID + password instantly.
   const CREDS_KEY = 'sd_driver_creds';
   const getCreds = (): Record<string, { phone: string; password: string }> => {
     try {
@@ -123,23 +124,6 @@ export default function DriverPortal() {
   const saveCreds = (c: Record<string, { phone: string; password: string }>) => {
     try { localStorage.setItem(CREDS_KEY, JSON.stringify(c)); } catch { /* ignore */ }
   };
-
-  // Seed credentials for fleet drivers created from the admin panel (which has no
-  // password field) so they can log in too. Default password = the driver's phone
-  // number. Drivers awaiting audit (new registrations) are skipped — they only get
-  // a password when the admin approves them.
-  useEffect(() => {
-    const creds = getCreds();
-    let changed = false;
-    for (const d of drivers) {
-      if (d.id && d.verificationStatus !== 'Pending Audit' && !creds[d.id]) {
-        creds[d.id] = { phone: d.phone || '', password: (d.phone || '').replace(/[^0-9]/g, '') };
-        changed = true;
-      }
-    }
-    if (changed) saveCreds(creds);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drivers]);
 
   // Authenticate the driver against the shared fleet (id / phone / name) AND a
   // stored password. Without a matching account + password there is no way in.
