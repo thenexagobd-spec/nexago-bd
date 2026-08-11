@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet, secureFileUpload, securityApi, securityAudit } from './portalUtils';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
@@ -58,7 +58,7 @@ export default function StoreAdminPortal() {
   const [loginPassword, setLoginPassword] = useState('');
   const [trackId, setTrackId] = useState('');
   const [signup, setSignup] = useState({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
-  const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, any>>({});
   const [signupReview, setSignupReview] = useState(false);
   const [submittedAppId, setSubmittedAppId] = useState('');
   const branchSession = branches.find((b: any) => b.branchAdminId === sessionAdminId && b.status === 'Active');
@@ -143,7 +143,11 @@ export default function StoreAdminPortal() {
   const handleDocUpload = (key: string, file?: File | null) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setUploadedDocs(prev => ({ ...prev, [key]: String(reader.result || '') }));
+    reader.onload = async () => {
+      const dataUrl = String(reader.result || '');
+      const stored = await secureFileUpload({ name: file.name, type: file.type, dataUrl }, { role: 'store-admin-signup', owner: signup.email || signup.phone || signup.ownerName, storeId: signup.storeName });
+      setUploadedDocs(prev => ({ ...prev, [key]: stored }));
+    };
     reader.readAsDataURL(file);
   };
 
@@ -152,8 +156,9 @@ export default function StoreAdminPortal() {
     if (!signup.ownerName || !signup.phone || !signup.email || !signup.storeName || !signup.storeAddress || !signup.tradeLicenseNo || !signup.tinBin) return;
     if (missing) return;
     if (!signupReview) { setSignupReview(true); return; }
+    const docData = (key: string) => typeof uploadedDocs[key] === 'string' ? uploadedDocs[key] : uploadedDocs[key]?.dataUrl || '';
     const usedFingerprints = new Set(storeAdminApps.flatMap((app: any) => (app.documents || []).map((d: any) => d.fingerprint).filter(Boolean)));
-    const duplicate = storeDocMeta.find(d => uploadedDocs[d.key] && usedFingerprints.has(fingerprintOf(uploadedDocs[d.key])));
+    const duplicate = storeDocMeta.find(d => docData(d.key) && usedFingerprints.has(fingerprintOf(docData(d.key))));
     if (duplicate) return;
     const storeId = makeStoreId();
     const adminId = makeStoreAdminId();
@@ -168,12 +173,15 @@ export default function StoreAdminPortal() {
         key: d.key,
         type: d.label,
         required: d.required,
-        status: uploadedDocs[d.key] ? 'Pending' : 'Not Submitted',
-        dataUrl: uploadedDocs[d.key] || '',
-        fingerprint: uploadedDocs[d.key] ? fingerprintOf(uploadedDocs[d.key]) : '',
+        status: docData(d.key) ? 'Pending' : 'Not Submitted',
+        dataUrl: docData(d.key),
+        secureFile: uploadedDocs[d.key]?.secureFile || null,
+        privateUrl: uploadedDocs[d.key]?.privateUrl || '',
+        fingerprint: docData(d.key) ? fingerprintOf(docData(d.key)) : '',
       })),
     };
     setStoreAdminApps(prev => [app, ...prev]);
+    securityAudit('store-admin-signup-submitted', { actor: adminId, storeId, reason: 'new store admin application' });
     setSubmittedAppId(adminId);
     setTrackId(adminId);
     setAuthView('track');
@@ -190,6 +198,9 @@ export default function StoreAdminPortal() {
     const loginStore = stores.find((s: any) => s.id === (app?.storeId || branch?.storeId));
     if (['Suspended', 'Blacklisted'].includes(loginStore?.status || '') || ['suspend', 'blacklist'].includes(loginStore?.adminRiskStatus || '')) return;
     if ((!cred || !app || cred.password !== loginPassword) && !branch) return;
+    securityApi('/login', { userId: id, password: loginPassword }).then((data) => {
+      if (data.token) localStorage.setItem('sd_security_session', data.token);
+    }).catch(() => {});
     localStorage.setItem('sd_store_admin_session', id);
     setSessionAdminId(id);
     setTab('dashboard');
@@ -278,7 +289,11 @@ export default function StoreAdminPortal() {
   const uploadTicketFile = (ticketId: string, file?: File | null) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setTicketFiles(prev => ({ ...prev, [ticketId]: { name: file.name, type: file.type, dataUrl: String(reader.result || '') } }));
+    reader.onload = async () => {
+      const dataUrl = String(reader.result || '');
+      const stored = await secureFileUpload({ name: file.name, type: file.type, dataUrl }, { role: 'store-admin-support', actor: sessionAdminId, storeId: activeStoreId, branchId: activeBranchId });
+      setTicketFiles(prev => ({ ...prev, [ticketId]: { name: file.name, type: file.type, dataUrl, secureFile: (stored as any).secureFile, privateUrl: (stored as any).privateUrl } as any }));
+    };
     reader.readAsDataURL(file);
   };
 
@@ -298,10 +313,13 @@ export default function StoreAdminPortal() {
         attachmentName: file?.name || '',
         attachmentType: file?.type || '',
         attachmentUrl: file?.dataUrl || '',
+        secureFile: file?.secureFile || null,
+        privateUrl: file?.privateUrl || '',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }],
       auditLog: [...(t.auditLog || []), { actor: sessionAdminId, action: 'store-admin-message', time: new Date().toISOString(), note: text || link || file?.name || '' }],
     } : t));
+    securityAudit('store-admin-support-message', { actor: sessionAdminId, storeId: activeStoreId, branchId: activeBranchId, reason: ticket.id });
     setTicketReplies(prev => ({ ...prev, [ticket.id]: '' }));
     setTicketLinks(prev => ({ ...prev, [ticket.id]: '' }));
     setTicketFiles(prev => {

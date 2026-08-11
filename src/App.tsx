@@ -40,7 +40,7 @@ import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
-import { appendTimeline, useCloudSync } from './portals/portalUtils';
+import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit } from './portals/portalUtils';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
@@ -213,7 +213,7 @@ export default function App() {
     tinBin: '',
     settlementNumber: '',
   });
-  const [newStoreDocs, setNewStoreDocs] = useState<Record<string, string>>({});
+  const [newStoreDocs, setNewStoreDocs] = useState<Record<string, any>>({});
   const [newStoreReview, setNewStoreReview] = useState(false);
 
   // Merchant specific interactive states
@@ -1126,6 +1126,14 @@ export default function App() {
             let password = '';
             for (let i = 0; i < 10; i++) password += chars[Math.floor(Math.random() * chars.length)];
             setStoreAdminCreds({ ...storeAdminCreds, [app.adminId]: { password, storeId: app.storeId } });
+            securityApi('/register', {
+              role: 'store-admin',
+              userId: app.adminId,
+              password,
+              storeId: app.storeId,
+              reason: 'Super Admin approved Store Admin documents',
+            }).catch(() => {});
+            securityAudit('store-admin-approved', { actor: 'super-admin', storeId: app.storeId, newValue: { adminId: app.adminId }, reason: 'document verified and permanent password generated' });
             const storeRecord = {
               id: app.storeId,
               name: app.storeName,
@@ -1267,13 +1275,16 @@ export default function App() {
             return;
           }
           const usedFingerprints = new Set(storeAdminApps.flatMap((app: any) => (app.documents || []).map((d: any) => d.fingerprint).filter(Boolean)));
+          const docData = (docKey: string) => typeof newStoreDocs[docKey] === 'string' ? newStoreDocs[docKey] : newStoreDocs[docKey]?.dataUrl || '';
           const docs = storeDocMeta.map(d => ({
             key: d.key,
             type: d.label,
             required: d.required,
-            dataUrl: newStoreDocs[d.key] || '',
-            fingerprint: newStoreDocs[d.key] ? fingerprintOf(newStoreDocs[d.key]) : '',
-            status: newStoreDocs[d.key] ? 'Pending' : 'Not Submitted',
+            dataUrl: docData(d.key),
+            secureFile: newStoreDocs[d.key]?.secureFile || null,
+            privateUrl: newStoreDocs[d.key]?.privateUrl || '',
+            fingerprint: docData(d.key) ? fingerprintOf(docData(d.key)) : '',
+            status: docData(d.key) ? 'Pending' : 'Not Submitted',
           }));
           const duplicate = docs.find(d => d.fingerprint && usedFingerprints.has(d.fingerprint));
           if (duplicate) {
@@ -1313,7 +1324,11 @@ export default function App() {
         const handleRegisterDocUpload = (key: string, file?: File | null) => {
           if (!file) return;
           const reader = new FileReader();
-          reader.onload = () => setNewStoreDocs(prev => ({ ...prev, [key]: String(reader.result || '') }));
+          reader.onload = async () => {
+            const dataUrl = String(reader.result || '');
+            const stored = await secureFileUpload({ name: file.name, type: file.type, dataUrl }, { role: 'super-admin-register-store', actor: 'super-admin', storeId: newStoreName || key });
+            setNewStoreDocs(prev => ({ ...prev, [key]: stored }));
+          };
           reader.readAsDataURL(file);
         };
 

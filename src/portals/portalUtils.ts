@@ -66,6 +66,36 @@ const API_BASE = ((import.meta.env.VITE_RELAY_BASE as string) || window.location
 const cloudKeyOf = () =>
   new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main';
 
+export const currentCloudKey = cloudKeyOf;
+
+export async function securityApi(path: string, body?: Record<string, any>, token?: string) {
+  const key = currentCloudKey();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const sessionToken = token || localStorage.getItem('sd_security_session') || '';
+  if (sessionToken) headers['X-Session-Token'] = sessionToken;
+  const res = await fetch(`${API_BASE}/api/security${path}?key=${encodeURIComponent(key)}`, {
+    method: body ? 'POST' : 'GET',
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.ok === false) throw new Error(data.error || `Security API failed: ${path}`);
+  return data;
+}
+
+export async function securityAudit(action: string, detail: Record<string, any> = {}) {
+  try { await securityApi('/audit', { action, ...detail }); } catch { /* old flow stays working if security API is offline */ }
+}
+
+export async function secureFileUpload(file: { name: string; type?: string; dataUrl: string }, detail: Record<string, any> = {}) {
+  try {
+    const data = await securityApi('/file', { name: file.name, type: file.type, dataUrl: file.dataUrl, ...detail });
+    return data.file ? { ...file, secureFile: data.file, privateUrl: data.privateUrl } : file;
+  } catch {
+    return file;
+  }
+}
+
 const unionByIdArr = <T extends { id?: any }>(a: T[], b: T[]) => {
   const byId = new Map<string, T>();
   (a || []).forEach(x => { if (x && x.id) byId.set(String(x.id), x); });
