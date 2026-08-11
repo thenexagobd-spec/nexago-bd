@@ -267,10 +267,11 @@ function ensureEnvSuperAdmins(key) {
         status: 'Active',
         source: existing.source || 'env-seed',
       };
-      if (!existing.passwordChangedBy && SUPER_ADMIN_PASSWORD && !verifyPassword(SUPER_ADMIN_PASSWORD, existing.password)) {
+      if (SUPER_ADMIN_PASSWORD && !verifyPassword(SUPER_ADMIN_PASSWORD, existing.password)) {
         next.password = hashPassword(SUPER_ADMIN_PASSWORD);
         next.lastPasswordChangeAt = new Date().toISOString();
         next.source = 'env-seed';
+        next.passwordChangedBy = 'render-env';
       }
       users[userId] = next;
       changed = true;
