@@ -26,6 +26,11 @@ const storeDocMeta = [
 
 const makeStoreId = () => `STR-${String(Date.now()).slice(-7)}`;
 const makeStoreAdminId = () => `SA-${String(Date.now()).slice(-8)}`;
+const fingerprintOf = (value: string) => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
+  return `DOC-${Math.abs(hash).toString(36)}-${value.length}`;
+};
 
 export default function StoreAdminPortal() {
   useCloudSync();
@@ -116,6 +121,9 @@ export default function StoreAdminPortal() {
     const missing = storeDocMeta.find(d => d.required && !uploadedDocs[d.key]);
     if (!signup.ownerName || !signup.phone || !signup.email || !signup.storeName || !signup.storeAddress || !signup.tradeLicenseNo || !signup.tinBin) return;
     if (missing) return;
+    const usedFingerprints = new Set(storeAdminApps.flatMap((app: any) => (app.documents || []).map((d: any) => d.fingerprint).filter(Boolean)));
+    const duplicate = storeDocMeta.find(d => uploadedDocs[d.key] && usedFingerprints.has(fingerprintOf(uploadedDocs[d.key])));
+    if (duplicate) return;
     const storeId = makeStoreId();
     const adminId = makeStoreAdminId();
     const app = {
@@ -126,10 +134,12 @@ export default function StoreAdminPortal() {
       submittedAt: new Date().toLocaleString('en-GB'),
       ...signup,
       documents: storeDocMeta.map(d => ({
+        key: d.key,
         type: d.label,
         required: d.required,
         status: uploadedDocs[d.key] ? 'Pending' : 'Not Submitted',
         dataUrl: uploadedDocs[d.key] || '',
+        fingerprint: uploadedDocs[d.key] ? fingerprintOf(uploadedDocs[d.key]) : '',
       })),
     };
     setStoreAdminApps(prev => [app, ...prev]);

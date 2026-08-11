@@ -52,6 +52,23 @@ import {
   Wrench
 } from 'lucide-react';
 
+const storeDocMeta = [
+  { key: 'tradeLicense', label: 'Trade License', required: true },
+  { key: 'binTin', label: 'BIN/TIN Certificate', required: true },
+  { key: 'ownerNid', label: 'Owner NID Front & Back', required: true },
+  { key: 'storePhoto', label: 'Store Front Photo', required: true },
+  { key: 'bankMfs', label: 'Bank/MFS Settlement Proof', required: true },
+  { key: 'foodSafety', label: 'BSTI/Food Safety Certificate (if food)', required: false },
+];
+
+const makeStoreId = () => `STR-${Date.now().toString().slice(-7)}`;
+const makeStoreAdminId = () => `SA-${Date.now().toString().slice(-8)}`;
+const fingerprintOf = (value: string) => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
+  return `DOC-${Math.abs(hash).toString(36)}-${value.length}`;
+};
+
 // Role-based portal sites — each HTML entry (driver.html, store.html, ...) opens
 // the full NexaGo admin panel (super admin access).
 export default function App() {
@@ -169,6 +186,16 @@ export default function App() {
   const [isAddingStore, setIsAddingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
   const [newStoreAddress, setNewStoreAddress] = useState('');
+  const [newStoreAdminDraft, setNewStoreAdminDraft] = useState({
+    ownerName: '',
+    phone: '',
+    email: '',
+    businessType: 'Grocery / Super Shop',
+    tradeLicenseNo: '',
+    tinBin: '',
+    settlementNumber: '',
+  });
+  const [newStoreDocs, setNewStoreDocs] = useState<Record<string, string>>({});
 
   // Merchant specific interactive states
   const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
@@ -1100,28 +1127,59 @@ export default function App() {
 
         const handleCreateStore = (e: React.FormEvent) => {
           e.preventDefault();
-          if (!newStoreName || !newStoreAddress) {
-            showToast("Please fill in all fields", "info");
+          const missingDoc = storeDocMeta.find(d => d.required && !newStoreDocs[d.key]);
+          if (!newStoreName || !newStoreAddress || !newStoreAdminDraft.ownerName || !newStoreAdminDraft.phone || !newStoreAdminDraft.email || !newStoreAdminDraft.tradeLicenseNo || !newStoreAdminDraft.tinBin || missingDoc) {
+            showToast("Please fill in all fields and required documents", "info");
             return;
           }
-          
-          const newId = `STR-0${stores.length + 1}`;
-          const newStore = {
-            id: newId,
-            name: newStoreName,
-            address: newStoreAddress,
-            rating: 5.0,
-            orders: 0,
-            status: 'Active',
-            siteUrl: `${window.location.origin}/store-site?key=${encodeURIComponent(newId)}`,
-            adminUrl: `${window.location.origin}/store-admin?key=${encodeURIComponent(newId)}`,
+          const usedFingerprints = new Set(storeAdminApps.flatMap((app: any) => (app.documents || []).map((d: any) => d.fingerprint).filter(Boolean)));
+          const docs = storeDocMeta.map(d => ({
+            key: d.key,
+            type: d.label,
+            required: d.required,
+            dataUrl: newStoreDocs[d.key] || '',
+            fingerprint: newStoreDocs[d.key] ? fingerprintOf(newStoreDocs[d.key]) : '',
+            status: newStoreDocs[d.key] ? 'Pending' : 'Not Submitted',
+          }));
+          const duplicate = docs.find(d => d.fingerprint && usedFingerprints.has(d.fingerprint));
+          if (duplicate) {
+            showToast(`${duplicate.type} already used by another store admin. Same document cannot be registered twice.`, 'info');
+            return;
+          }
+          const storeId = makeStoreId();
+          const adminId = makeStoreAdminId();
+          const app = {
+            id: `SAPP-${Date.now()}`,
+            adminId,
+            storeId,
+            status: 'Pending Audit',
+            submittedAt: new Date().toLocaleString('en-GB'),
+            source: 'super-admin-register',
+            ownerName: newStoreAdminDraft.ownerName,
+            phone: newStoreAdminDraft.phone,
+            email: newStoreAdminDraft.email,
+            storeName: newStoreName,
+            storeAddress: newStoreAddress,
+            businessType: newStoreAdminDraft.businessType,
+            tradeLicenseNo: newStoreAdminDraft.tradeLicenseNo,
+            tinBin: newStoreAdminDraft.tinBin,
+            settlementNumber: newStoreAdminDraft.settlementNumber,
+            documents: docs,
           };
-          
-          setStores([...stores, newStore]);
+          setStoreAdminApps(prev => [app, ...prev]);
           setNewStoreName('');
           setNewStoreAddress('');
+          setNewStoreAdminDraft({ ownerName: '', phone: '', email: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
+          setNewStoreDocs({});
           setIsAddingStore(false);
-          showToast(`Store "${newStore.name}" registered — store site + admin links generated!`, "success");
+          showToast(`Store admin application ${adminId} submitted. Verify documents to generate password.`, "success");
+        };
+
+        const handleRegisterDocUpload = (key: string, file?: File | null) => {
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => setNewStoreDocs(prev => ({ ...prev, [key]: String(reader.result || '') }));
+          reader.readAsDataURL(file);
         };
 
         return (
@@ -1163,7 +1221,11 @@ export default function App() {
                 <p className="py-4 text-center text-[10px] text-gray-500">No real store admin application submitted yet.</p>
               ) : (
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  {storeAdminApps.map(app => (
+                  {storeAdminApps.map(app => {
+                    const cred = storeAdminCreds[app.adminId];
+                    const storeLink = `${window.location.origin}/store?key=${encodeURIComponent(app.storeId)}`;
+                    const adminLink = `${window.location.origin}/store-admin?key=${encodeURIComponent(app.storeId)}`;
+                    return (
                     <div key={app.id} className="rounded-xl border border-brand-border/70 bg-[#080e17] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -1181,43 +1243,78 @@ export default function App() {
                           </a>
                         ))}
                       </div>
+                      {app.status === 'Verified' && (
+                        <div className="mt-3 grid gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2 text-[9px] text-emerald-100">
+                          <p className="font-black uppercase text-emerald-300">Permanent Access</p>
+                          <p>Admin ID: <b>{app.adminId}</b></p>
+                          <p>Password: <b>{cred?.password || 'Generated'}</b></p>
+                          <a className="text-brand-orange underline" href={storeLink} target="_blank" rel="noreferrer">Store Site Link</a>
+                          <a className="text-brand-orange underline" href={adminLink} target="_blank" rel="noreferrer">Store Admin Link</a>
+                        </div>
+                      )}
                       <div className="mt-3 flex flex-wrap justify-end gap-2">
                         <button onClick={() => approveStoreAdmin(app, false)} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-red-300">Reject</button>
                         <button onClick={() => approveStoreAdmin(app, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[9px] font-black uppercase text-white">Approve & Generate Password</button>
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
             </div>
 
             {/* Register New Store Form */}
             {isAddingStore && (
-              <form onSubmit={handleCreateStore} className="bg-brand-card border border-brand-border/85 rounded-xl p-5 space-y-4 max-w-xl animate-in slide-in-from-top-4 duration-200">
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider border-b border-brand-border/40 pb-2">Register Partner Outlet</h4>
-                <div className="grid grid-cols-1 gap-4">
+              <form onSubmit={handleCreateStore} className="bg-brand-card border border-brand-border/85 rounded-xl p-4 sm:p-5 space-y-4 animate-in slide-in-from-top-4 duration-200">
+                <div className="border-b border-brand-border/40 pb-3">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Register Store Admin Application</h4>
+                  <p className="mt-1 text-[10px] text-gray-400">Same process as Store Admin signup. Documents are permanently saved and cannot be reused for another account.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {[
+                    ['ownerName', 'Owner full name', newStoreAdminDraft.ownerName],
+                    ['phone', 'Mobile number', newStoreAdminDraft.phone],
+                    ['email', 'Email address', newStoreAdminDraft.email],
+                    ['tradeLicenseNo', 'Trade license number', newStoreAdminDraft.tradeLicenseNo],
+                    ['tinBin', 'TIN/BIN number', newStoreAdminDraft.tinBin],
+                    ['settlementNumber', 'Bank/MFS settlement number', newStoreAdminDraft.settlementNumber],
+                  ].map(([key, label, value]) => (
+                    <div key={key}>
+                      <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">{label}</label>
+                      <input
+                        required={key !== 'settlementNumber'}
+                        value={value}
+                        onChange={(e) => setNewStoreAdminDraft(prev => ({ ...prev, [key]: e.target.value }))}
+                        className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange/50"
+                      />
+                    </div>
+                  ))}
                   <div>
                     <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Store Outlet Name</label>
-                    <input 
-                      type="text"
-                      required
-                      value={newStoreName}
-                      onChange={(e) => setNewStoreName(e.target.value)}
-                      className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange/50" 
-                      placeholder="e.g. Agora Superstore, Shwapno Dhanmondi" 
-                    />
+                    <input required value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange/50" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Store Address / Area Location</label>
-                    <input 
-                      type="text"
-                      required
-                      value={newStoreAddress}
-                      onChange={(e) => setNewStoreAddress(e.target.value)}
-                      className="w-full px-3 py-2 bg-[#080e17] text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange/50" 
-                      placeholder="e.g. Road 12, Banani, Dhaka" 
-                    />
+                    <input required value={newStoreAddress} onChange={(e) => setNewStoreAddress(e.target.value)} className="w-full px-3 py-2 bg-[#080e17] text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange/50" />
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Business Type</label>
+                    <select value={newStoreAdminDraft.businessType} onChange={(e) => setNewStoreAdminDraft(prev => ({ ...prev, businessType: e.target.value }))} className="w-full px-3 py-2 bg-[#080e17] text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange/50">
+                      <option>Grocery / Super Shop</option>
+                      <option>Restaurant / Food</option>
+                      <option>Pharmacy</option>
+                      <option>Electronics / Retail</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {storeDocMeta.map(d => (
+                    <label key={d.key} className="rounded-xl border border-brand-border bg-[#080e17] p-3">
+                      <span className="flex items-center gap-2 text-[10px] font-black uppercase text-white"><FileText className="h-3.5 w-3.5 text-brand-orange" /> {d.label}</span>
+                      <span className="mt-1 block text-[8px] text-gray-500">{d.required ? 'Required' : 'Optional'} · Permanent record</span>
+                      <input type="file" accept="image/*,.pdf" onChange={e => handleRegisterDocUpload(d.key, e.target.files?.[0])} className="mt-3 w-full text-[9px] text-gray-400" />
+                      {newStoreDocs[d.key] && <span className="mt-2 block text-[9px] font-bold text-emerald-400">Ready to submit</span>}
+                    </label>
+                  ))}
                 </div>
                 <div className="flex justify-end space-x-2 pt-2">
                   <button
@@ -1231,7 +1328,7 @@ export default function App() {
                     type="submit"
                     className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
                   >
-                    Register & Generate Link
+                    Submit For Verification
                   </button>
                 </div>
               </form>
