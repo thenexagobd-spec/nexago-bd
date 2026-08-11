@@ -4,14 +4,14 @@
  */
 
 import React, { useState } from 'react';
-import { Driver, Vehicle, DriverStatusLog, DriverDutyStatus } from '../types';
+import { Driver, Vehicle, DriverStatusLog, DriverDutyStatus, DriverDocument } from '../types';
 import { 
   ArrowLeft, Star, Phone, MapPin, Award, CheckCircle2, ShieldCheck, 
   Clock, TrendingUp, TrendingDown, AlertTriangle, Calendar, Truck, Fuel, Wrench, 
   BarChart2, ThumbsUp, MessageSquare, Download, Edit3, UserCheck, 
   Activity, Zap, ChevronRight, RefreshCw, Filter, Layers, Gauge,
   Flame, Map, Compass, Navigation, Crosshair, Target, Globe, Sliders, Eye,
-  Plus, Search, Trash2, FileText, User, Tag, History, Check, Power, XCircle, Lock, Unlock, Package, X
+  Plus, Search, Trash2, FileText, User, Tag, History, Check, Power, XCircle, Lock, Unlock, Package, X, Camera, Upload
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, 
@@ -107,6 +107,13 @@ export default function DriverProfileView({
   const [heatmapTimeframe, setHeatmapTimeframe] = useState<'7d' | '30d' | 'all'>('30d');
   const [heatmapSort, setHeatmapSort] = useState<'orders' | 'earnings' | 'speed'>('orders');
   const [trendMetricMode, setTrendMetricMode] = useState<'ratings' | 'earnings'>('ratings');
+
+  // Add Document Modal State
+  const [isAddDocOpen, setIsAddDocOpen] = useState(false);
+  const [newDocType, setNewDocType] = useState<DriverDocument['type']>('Other');
+  const [newDocDataUrl, setNewDocDataUrl] = useState<string>('');
+  const docInputRef = React.useRef<HTMLInputElement>(null);
+  const docCaptureRef = React.useRef<HTMLInputElement>(null);
 
   // Interactive Status History Timeline State
   const [timelineFilterStatus, setTimelineFilterStatus] = useState<'All' | 'Online' | 'On-Delivery' | 'Offline'>('All');
@@ -224,6 +231,42 @@ export default function DriverProfileView({
     if (showToast) {
       showToast(`Exported ${history.length} timeline logs to CSV.`, 'success');
     }
+  };
+
+  // Add Document Helpers
+  const openDocFilePicker = (capture: boolean) => {
+    if (capture) {
+      docCaptureRef.current?.click();
+    } else {
+      docInputRef.current?.click();
+    }
+  };
+
+  const handleDocFile = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setNewDocDataUrl(String(reader.result));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveNewDocument = () => {
+    if (!newDocDataUrl) {
+      if (showToast) showToast('Capture or select a document image first.', 'error');
+      return;
+    }
+    const doc: DriverDocument = {
+      type: newDocType,
+      fileName: `${newDocType.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}`,
+      submittedAt: new Date().toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+      status: 'Pending',
+      dataUrl: newDocDataUrl
+    };
+    onUpdateDriver({ ...driver, documents: [...(driver.documents || []), doc] });
+    setIsAddDocOpen(false);
+    setNewDocDataUrl('');
+    if (showToast) showToast(`${newDocType} uploaded to ${driver.name}'s profile.`, 'success');
   };
 
   // Generate deterministic/consistent mock data based on driver.id
@@ -568,6 +611,14 @@ export default function DriverProfileView({
             <span>{driver.status}</span>
           </button>
 
+          <button
+            onClick={() => setIsAddDocOpen(true)}
+            className="px-3 py-1.5 bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 text-xs font-black uppercase tracking-wider rounded-lg cursor-pointer transition-all flex items-center space-x-1.5"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Add Document</span>
+          </button>
+
           <a
             href={`tel:${driver.phone}`}
             onClick={(e) => {
@@ -581,6 +632,23 @@ export default function DriverProfileView({
           </a>
         </div>
       </div>
+
+      {/* Hidden file inputs for Add Document */}
+      <input
+        ref={docInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => { handleDocFile(e.target.files?.[0]); e.target.value = ''; }}
+      />
+      <input
+        ref={docCaptureRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => { handleDocFile(e.target.files?.[0]); e.target.value = ''; }}
+      />
 
       {/* Driver Header Hero Banner Card */}
       <div className="bg-gradient-to-r from-[#0d1b2a] via-brand-card to-[#0e1e30] border border-brand-border/80 rounded-2xl p-6 shadow-xl relative overflow-hidden">
@@ -2188,6 +2256,86 @@ export default function DriverProfileView({
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* ADD DOCUMENT MODAL */}
+      {isAddDocOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-brand-card border border-brand-border/60 rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+            <button
+              onClick={() => setIsAddDocOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white cursor-pointer transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 mb-5">
+              <div className="w-11 h-11 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center justify-center">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-white text-sm">Add Profile Document</h3>
+                <p className="text-[10px] text-gray-400">Attach to {driver.name} ({driver.id})</p>
+              </div>
+            </div>
+
+            <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1.5">Document Type</label>
+            <select
+              value={newDocType}
+              onChange={(e) => setNewDocType(e.target.value as DriverDocument['type'])}
+              className="w-full bg-brand-dark border border-brand-border/60 rounded-lg px-3 py-2.5 text-xs text-white outline-none focus:border-sky-500/50 mb-4"
+            >
+              <option value="NID Card">NID Card</option>
+              <option value="Driving License">Driving License</option>
+              <option value="Vehicle Registration">Vehicle Registration</option>
+              <option value="Profile Photo">Profile Photo</option>
+              <option value="Other">Other (Insurance / Tax Token / Fitness)</option>
+            </select>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button
+                onClick={() => openDocFilePicker(true)}
+                className="py-3 rounded-lg bg-gradient-to-br from-brand-orange to-amber-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center space-x-1.5 cursor-pointer transition-all hover:opacity-90"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Camera</span>
+              </button>
+              <button
+                onClick={() => openDocFilePicker(false)}
+                className="py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Gallery</span>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              {newDocDataUrl ? (
+                <div className="relative rounded-xl overflow-hidden border border-brand-border/60">
+                  <img src={newDocDataUrl} alt="Preview" className="w-full h-44 object-cover" />
+                  <button
+                    onClick={() => setNewDocDataUrl('')}
+                    className="absolute top-2 right-2 bg-black/70 text-red-400 p-1.5 rounded-lg cursor-pointer hover:bg-black/90 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-brand-border/60 bg-brand-dark/40 p-6 text-center text-[10px] text-gray-500">
+                  No image captured yet — use Camera or Gallery above.
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={saveNewDocument}
+              disabled={!newDocDataUrl}
+              className="w-full py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-wider cursor-pointer transition-all"
+            >
+              Save Document
+            </button>
           </div>
         </div>
       )}
