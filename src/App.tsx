@@ -4246,9 +4246,11 @@ export default function App() {
     });
     };
     if (superAdminLoginStep === 'secret') {
-      confirmBiometric().then(runLogin).catch(() => {
-        setSuperAdminLoginError('Phone fingerprint / device lock verification failed.');
-        securityAudit('super-admin-biometric-failed', { actor: userId || 'unknown', reason: 'browser rejected device verification' });
+      confirmBiometric().catch(() => {
+        securityAudit('super-admin-biometric-skipped', { actor: userId || 'unknown', reason: 'device verification unavailable or rejected; secret code fallback used' });
+        return true;
+      }).then(runLogin).catch(() => {
+        setSuperAdminLoginError('Secret code verification failed.');
       });
       return;
     }
