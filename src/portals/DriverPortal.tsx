@@ -1362,7 +1362,7 @@ export default function DriverPortal() {
                         <p className="text-gray-400 sm:col-span-2 truncate"><span className="text-gray-500">Address:</span> {o.address || o.pickupLocation || '—'}</p>
                       </div>
                       {(o.status === 'Processing' || o.status === 'Ongoing') && (
-                        <div className="flex items-center justify-end space-x-2 mt-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2 mt-3">
                           <button onClick={() => setReportOpen(o.id)} className="flex items-center space-x-1.5 px-3 py-2 bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl text-[10px] font-black hover:bg-red-500/20 transition-colors">
                             <AlertCircle className="w-3 h-3" /><span>Report</span>
                           </button>
@@ -1372,7 +1372,7 @@ export default function DriverPortal() {
                         </div>
                       )}
                       {o.status === 'Completed' && (
-                        <div className="flex items-center space-x-2 mt-3">
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
                           <span className="flex items-center space-x-1 text-[9px] text-gray-500"><Star className="w-3 h-3 text-amber-400" /><span>Rate Customer (Optional)</span></span>
                           <div className="flex space-x-1">
                             {[1, 2, 3, 4, 5].map(st => (
@@ -1651,7 +1651,7 @@ export default function DriverPortal() {
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center space-x-2 mt-3">
+                <div className="flex flex-wrap items-center gap-2 mt-3">
                   <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Type a message…" className="flex-1 glass-input rounded-xl px-3 py-2.5 text-[10px] outline-none focus:border-brand-orange" />
                   <button onClick={sendChat} className="p-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl transition-colors"><Send className="w-4 h-4" /></button>
                 </div>

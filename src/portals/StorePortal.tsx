@@ -292,7 +292,7 @@ export default function StorePortal() {
                         <Package className="w-3 h-3" /><span>{o.items.length} item{o.items.length === 1 ? '' : 's'}</span>
                       </div>
                     )}
-                    <div className="flex items-center justify-end space-x-2 mt-3">
+                    <div className="flex flex-wrap items-center justify-end gap-2 mt-3">
                       <button onClick={() => rejectOrder(o.id)} className="px-3 py-2 bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl text-[10px] font-black hover:bg-red-500/20 transition-colors">Reject</button>
                       <button onClick={() => acceptOrder(o.id)} className="flex items-center space-x-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-[10px] font-black transition-colors">
                         <CheckCircle2 className="w-3 h-3" /><span>Accept & Dispatch</span>

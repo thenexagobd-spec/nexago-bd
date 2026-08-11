@@ -100,8 +100,8 @@ export default function StaffPortal() {
               <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center space-x-2 mb-3"><TrendingUp className="w-3.5 h-3.5 text-brand-orange" /><span>Orders by Status</span></p>
               <div className="space-y-2">
                 {byStatus.map(s => (
-                  <div key={s.st} className="flex items-center space-x-2 text-[10px]">
-                    <span className="w-24 text-gray-400">{s.st}</span>
+                  <div key={s.st} className="flex min-w-0 items-center gap-2 text-[10px]">
+                    <span className="w-20 shrink-0 text-gray-400 sm:w-24">{s.st}</span>
                     <div className="flex-1 h-2.5 bg-[#0a1322] rounded-full overflow-hidden">
                       <div className={`h-full ${s.st === 'Completed' ? 'bg-emerald-500' : s.st === 'Cancelled' ? 'bg-red-500' : 'bg-brand-orange'}`} style={{ width: `${orders.length ? (s.n / orders.length) * 100 : 0}%` }} />
                     </div>
@@ -125,7 +125,7 @@ export default function StaffPortal() {
               {orders.map(o => (
                 <div key={o.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="text-[11px] font-mono text-brand-orange font-black">#{o.id}</p>
                       <span className={`px-2 py-0.5 rounded-lg border text-[8px] font-black ${statusBadge(o.status)}`}>{o.status}</span>
                     </div>
@@ -136,7 +136,7 @@ export default function StaffPortal() {
                     <p className="text-gray-400 truncate">{o.storeName} · {o.paymentMethod}</p>
                     <p className="text-gray-500">{o.date}</p>
                   </div>
-                  <div className="flex items-center justify-end space-x-2 mt-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2 mt-3">
                     {o.status !== 'Completed' && o.status !== 'Cancelled' && (
                       <>
                         <button onClick={() => updateStatus(o.id, 'Ongoing')} className="px-3 py-1.5 bg-sky-500/15 border border-sky-500/40 text-sky-300 rounded-lg text-[9px] font-black hover:bg-sky-500/25 transition-colors">Dispatch</button>
@@ -171,7 +171,7 @@ export default function StaffPortal() {
                       <p className="text-[9px] text-gray-400">{tx.sender} · {tx.method} · {tx.date}</p>
                     </div>
                     <span className="text-[12px] font-black text-emerald-400">+{bdt(tx.amount)}</span>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button onClick={() => approveTopUp(tx, true)} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[9px] font-black transition-colors">✓ Verify</button>
                       <button onClick={() => approveTopUp(tx, false)} className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg text-[9px] font-black transition-colors">✗ Reject</button>
                     </div>
@@ -293,8 +293,8 @@ export default function StaffPortal() {
             <p className="text-[10px] font-black text-white uppercase tracking-widest mb-3">Order Mix</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {byStatus.map(s => (
-                <div key={s.st} className="flex items-center space-x-2 text-[10px]">
-                  <span className="w-24 text-gray-400">{s.st}</span>
+                <div key={s.st} className="flex min-w-0 items-center gap-2 text-[10px]">
+                  <span className="w-20 shrink-0 text-gray-400 sm:w-24">{s.st}</span>
                   <div className="flex-1 h-2 bg-[#0a1322] rounded-full overflow-hidden"><div className={`h-full ${s.st === 'Completed' ? 'bg-emerald-500' : s.st === 'Cancelled' ? 'bg-red-500' : 'bg-brand-orange'}`} style={{ width: `${orders.length ? (s.n / orders.length) * 100 : 0}%` }} /></div>
                   <span className="text-gray-400 w-6 text-right font-mono">{s.n}</span>
                 </div>

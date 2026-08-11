@@ -3125,7 +3125,7 @@ export default function App() {
     };
 
     return (
-      <div className="min-h-screen bg-brand-dark flex font-sans antialiased text-gray-200">
+      <div className="min-h-screen bg-brand-dark flex overflow-x-hidden font-sans antialiased text-gray-200">
         
         {/* MERCHANT SIDEBAR - Static left panel */}
         <aside className="hidden lg:flex flex-col w-64 bg-[#0c1624] border-r border-brand-border/60 shrink-0 select-none">
@@ -3203,7 +3203,7 @@ export default function App() {
         {/* MOBILE SIDEBAR FOR MERCHANT */}
         {isMerchantMobileSidebarOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-            <aside className="w-64 bg-[#0c1624] flex flex-col h-full animate-in slide-in-from-left duration-200">
+            <aside className="w-[88vw] max-w-72 bg-[#0c1624] flex flex-col h-full animate-in slide-in-from-left duration-200">
               <div className="p-5 border-b border-brand-border/40 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 rounded-lg bg-brand-orange/20 flex items-center justify-center text-brand-orange font-bold text-sm">B</div>
@@ -3249,32 +3249,32 @@ export default function App() {
         )}
 
         {/* MERCHANT BODY PANEL */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex min-w-0 flex-col overflow-hidden">
           
           {/* HEADER - top navbar matching layout exactly */}
-          <header className="h-16 bg-[#0c1624] border-b border-brand-border/60 flex items-center justify-between px-6 shrink-0 shadow-md">
+          <header className="min-h-16 bg-[#0c1624] border-b border-brand-border/60 flex flex-wrap items-start justify-between gap-3 px-3 py-3 sm:px-4 lg:px-6 shrink-0 shadow-md">
             {/* Left: Breadcrumbs welcome */}
-            <div className="flex items-center space-x-3">
+            <div className="flex min-w-0 items-start space-x-3">
               <button 
                 onClick={() => setIsMerchantMobileSidebarOpen(true)}
                 className="lg:hidden p-1.5 bg-brand-dark/80 hover:bg-brand-border border border-brand-border rounded-md text-gray-300"
               >
                 <Menu className="w-4 h-4" />
               </button>
-              <div>
-                <div className="flex items-center space-x-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-black text-brand-orange uppercase tracking-wider">{activeMerchantTab}</span>
                   <span className="text-[9px] text-gray-500 font-bold uppercase">/</span>
                   <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-black uppercase px-1.5 py-0.5 rounded tracking-widest animate-pulse">
                     Outlet Panel Live
                   </span>
                 </div>
-                <h1 className="text-xs font-black text-white uppercase tracking-wider mt-0.5">Welcome back, {activeStore.name}!</h1>
+                <h1 className="mt-0.5 truncate text-xs font-black text-white uppercase tracking-wider">Welcome back, {activeStore.name}!</h1>
               </div>
             </div>
 
             {/* Middle: Universal Search Bar with hotkey */}
-            <div className="hidden md:flex items-center space-x-2 bg-brand-dark/80 border border-brand-border px-3 py-1.5 rounded-lg w-72 group focus-within:border-brand-orange transition-all">
+            <div className="order-3 hidden w-full items-center space-x-2 bg-brand-dark/80 border border-brand-border px-3 py-1.5 rounded-lg transition-all group focus-within:border-brand-orange md:order-none md:flex md:w-72 lg:w-80">
               <Search className="w-3.5 h-3.5 text-gray-500 group-focus-within:text-brand-orange" />
               <input 
                 type="text" 
@@ -3287,7 +3287,7 @@ export default function App() {
             </div>
 
             {/* Right: Badge notifications, profile avatar dropdown */}
-            <div className="flex items-center space-x-3">
+            <div className="flex w-full items-center justify-end gap-2 sm:gap-3 md:w-auto">
               {/* Inbox notifications */}
               <div className="relative">
                 <button 
@@ -3303,7 +3303,7 @@ export default function App() {
                 </button>
                 {/* Notification Dropdown list */}
                 {isMerchantNotifDropdownOpen && (
-                  <div className="absolute right-0 mt-2.5 w-72 bg-[#0c1624] border border-brand-border rounded-xl p-4 shadow-2xl z-50 text-xs space-y-3 animate-in fade-in duration-200">
+                  <div className="absolute right-0 mt-2.5 w-[min(18rem,calc(100vw-1.5rem))] bg-[#0c1624] border border-brand-border rounded-xl p-4 shadow-2xl z-50 text-xs space-y-3 animate-in fade-in duration-200">
                     <div className="flex justify-between items-center border-b border-brand-border/40 pb-2">
                       <span className="font-black text-white uppercase tracking-wider text-[10px]">Active Orders Alert</span>
                       <button 
@@ -3399,7 +3399,7 @@ export default function App() {
           </header>
 
           {/* MAIN CONTAINER PAGE BODY */}
-          <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full scrollbar-thin">
+          <main className="mx-auto flex-1 w-full max-w-7xl space-y-4 overflow-x-hidden overflow-y-auto p-3 scrollbar-thin sm:p-4 md:space-y-6 md:p-6 xl:p-8">
             {renderMerchantTabContent()}
           </main>
 
@@ -3684,7 +3684,7 @@ export default function App() {
           })()}
 
           {/* FOOTER */}
-          <footer className="py-4 border-t border-brand-border/40 text-center text-[10px] text-gray-500 bg-[#0c1624]/20 select-none flex items-center justify-between px-6 shrink-0">
+          <footer className="py-4 border-t border-brand-border/40 text-center text-[10px] text-gray-500 bg-[#0c1624]/20 select-none flex flex-col items-center justify-between gap-2 px-4 shrink-0 sm:flex-row sm:px-6">
             <p>© 2026 {activeStore.name}. All rights reserved. The NexaGo BD</p>
             <p className="font-mono text-gray-600">Version 1.0.0</p>
           </footer>
@@ -3713,7 +3713,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark flex font-sans antialiased text-gray-200">
+    <div className="min-h-screen bg-brand-dark flex overflow-x-hidden font-sans antialiased text-gray-200">
       
       {/* SIDEBAR - Left panel */}
       {/* Desktop static Sidebar */}
@@ -3854,7 +3854,7 @@ export default function App() {
       {/* Mobile Sidebar overlay Drawer */}
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden bg-brand-dark/80 backdrop-blur-xs">
-          <div className="w-64 bg-[#0c1624] border-r border-brand-border flex flex-col h-full animate-in slide-in-from-left duration-200">
+          <div className="w-[88vw] max-w-72 bg-[#0c1624] border-r border-brand-border flex flex-col h-full animate-in slide-in-from-left duration-200">
             <div className="p-4 border-b border-brand-border flex items-center justify-between bg-brand-dark/30">
               <div className="flex items-center space-x-2.5">
                 <div className="w-9 h-9 rounded-xl bg-brand-orange text-white flex items-center justify-center font-black text-xs shadow-md">
@@ -3942,11 +3942,11 @@ export default function App() {
       )}
 
       {/* MAIN VIEWPORT WRAPPER */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
         
         {/* HEADER BAR */}
         {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && (
-        <header className="h-16 border-b border-brand-border/60 bg-[#0c1624]/65 backdrop-blur-md flex items-center justify-between px-5 select-none shrink-0 sticky top-0 z-40">
+        <header className="min-h-16 border-b border-brand-border/60 bg-[#0c1624]/65 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-5 select-none shrink-0 sticky top-0 z-40">
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
@@ -3960,7 +3960,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4">
             {/* Tight Mode Toggle Switch */}
             <button
               onClick={toggleTightMode}
@@ -4002,7 +4002,7 @@ export default function App() {
 
               {/* Notification Dropdown Drawer */}
               {isNotifDropdownOpen && (
-                <div className="absolute right-0 mt-2.5 w-80 bg-[#0e1b2c] border border-brand-border rounded-xl shadow-2xl overflow-hidden z-50 fade-in">
+                <div className="absolute right-0 mt-2.5 w-[min(20rem,calc(100vw-1.5rem))] bg-[#0e1b2c] border border-brand-border rounded-xl shadow-2xl overflow-hidden z-50 fade-in">
                   <div className="p-3 border-b border-brand-border bg-brand-dark/30 flex items-center justify-between">
                     <span className="text-xs font-bold text-white">System Alerts</span>
                     {unreadNotifCount > 0 && (
@@ -4069,7 +4069,7 @@ export default function App() {
         )}
 
         {/* CORE CONTENT SWITCH CONTAINER */}
-        <main className={`flex-1 overflow-y-auto ${activeTab === 'Mobile App Simulator' || activeTab === 'POS System' ? 'p-0' : 'p-4 md:p-6'}`}>
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto ${activeTab === 'Mobile App Simulator' || activeTab === 'POS System' ? 'p-0' : 'p-3 sm:p-4 md:p-6'}`}>
           {activeTab === 'Dashboard' && activePanelMode === 'super_admin' && (
             <DashboardView 
               orders={orders} 
