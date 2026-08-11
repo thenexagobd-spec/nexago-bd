@@ -7,9 +7,9 @@
  * localStorage keys as the admin panel.
  */
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2 } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useNotifications, useDrivers, useStores, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet } from './portalUtils';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
@@ -36,6 +36,9 @@ export default function StoreAdminPortal() {
   const [walletBal, setWalletBal] = useWalletBal();
   const [txns, setTxns] = useWalletTxns();
   const [products, setProducts] = useProducts();
+  const [categories, setCategories] = useCategories();
+  const [allCoupons, setAllCoupons] = useCoupons();
+  const [reviews, setReviews] = useReviews();
   const [notifications, setNotifications] = useNotifications();
   const [stores, setStores] = useStores();
   const [storeAdminApps, setStoreAdminApps] = useStoreAdminApps();
@@ -56,12 +59,14 @@ export default function StoreAdminPortal() {
   const myOrderIds = new Set(myOrders.map(o => o.id));
   const myProducts = products.filter((p: any) => p.storeId === activeStoreId);
   const myPayments = payments.filter(p => myOrderIds.has(p.orderId));
-  const [coupons, setCoupons] = useState<{ id: string; code: string; discount: number; used: number }[]>(
-    []
-  );
-  const saveCoupons = (next: typeof coupons) => { setCoupons(next); if (activeStoreId) lsSet(`sd_coupons_${activeStoreId}`, next); };
+  const myCategories = categories.filter((c: any) => c.storeId === activeStoreId);
+  const coupons = allCoupons.filter((c: any) => c.storeId === activeStoreId);
+  const myReviews = reviews.filter((r: any) => r.storeId === activeStoreId || r.storeName === activeStoreName || myProducts.some((p: any) => p.id === r.productId));
   const [search, setSearch] = useState('');
-  const [newProd, setNewProd] = useState({ name: '', price: '', stock: '' });
+  const [newProd, setNewProd] = useState({ name: '', price: '', stock: '', category: '' });
+  const [newCategory, setNewCategory] = useState('');
+  const [newCoupon, setNewCoupon] = useState({ code: '', discount: '', minOrder: '' });
+  const [reviewReplies, setReviewReplies] = useState<Record<string, string>>({});
   const [staff, setStaff] = useState<Staff[]>([]);
   const [stf, setStf] = useState({ name: '', role: '', phone: '' });
 
@@ -69,11 +74,12 @@ export default function StoreAdminPortal() {
   const refunds = JSON.parse(localStorage.getItem('ss_refunds') || '[]');
   useEffect(() => {
     if (!activeStoreId) return;
-    setCoupons(JSON.parse(localStorage.getItem(`sd_coupons_${activeStoreId}`) || '[]'));
     setStaff(JSON.parse(localStorage.getItem(`sd_store_staff_${activeStoreId}`) || '[]'));
+    setReviewReplies(JSON.parse(localStorage.getItem(`sd_review_replies_${activeStoreId}`) || '{}'));
   }, [activeStoreId]);
 
   useEffect(() => { if (activeStoreId) lsSet(`sd_store_staff_${activeStoreId}`, staff); }, [activeStoreId, staff]);
+  useEffect(() => { if (activeStoreId) lsSet(`sd_review_replies_${activeStoreId}`, reviewReplies); }, [activeStoreId, reviewReplies]);
 
   const revenue = myOrders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.amount || 0), 0);
   const lowStock = myProducts.filter(p => p.stock > 0 && p.stock <= 10);
@@ -86,7 +92,9 @@ export default function StoreAdminPortal() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Orders', icon: ClipboardList, badge: myOrders.filter(o => o.status === 'Pending').length },
     { id: 'products', label: 'Products', icon: Box, badge: outStock.length },
+    { id: 'categories', label: 'Categories', icon: FolderOpen },
     { id: 'inventory', label: 'Inventory', icon: Package, badge: lowStock.length },
+    { id: 'reviews', label: 'Reviews', icon: Star },
     { id: 'coupons', label: 'Coupons', icon: Ticket },
     { id: 'tools', label: 'Order Tools', icon: Wrench, badge: pending.length },
     { id: 'staff', label: 'Staff', icon: UserSquare2 },
@@ -187,7 +195,7 @@ export default function StoreAdminPortal() {
     const p = {
       id: `PROD-${Date.now().toString().slice(-4)}`,
       name: newProd.name,
-      category: 'General',
+      category: newProd.category || myCategories[0]?.name || 'General',
       price: Number(newProd.price) || 0,
       stock: Number(newProd.stock) || 0,
       status: Number(newProd.stock) <= 0 ? 'Out of Stock' : Number(newProd.stock) <= 10 ? 'Low Stock' : 'In Stock',
@@ -195,8 +203,23 @@ export default function StoreAdminPortal() {
       storeId: activeStoreId,
     };
     setProducts(prev => [p, ...prev]);
-    setNewProd({ name: '', price: '', stock: '' });
+    setNewProd({ name: '', price: '', stock: '', category: '' });
   };
+
+  const addCategory = () => {
+    if (!newCategory.trim() || !activeStoreId) return;
+    setCategories(prev => [{ id: `CAT-${Date.now().toString().slice(-5)}`, name: newCategory.trim(), itemsCount: 0, status: 'Active', storeId: activeStoreId, storeName: activeStoreName }, ...prev]);
+    setNewCategory('');
+  };
+
+  const addCoupon = () => {
+    if (!newCoupon.code.trim() || !newCoupon.discount.trim() || !activeStoreId) return;
+    setAllCoupons(prev => [{ id: `CPN-${Date.now().toString().slice(-5)}`, code: newCoupon.code.trim().toUpperCase(), discount: newCoupon.discount.trim(), minOrder: Number(newCoupon.minOrder) || 0, usages: 0, status: 'Active', storeId: activeStoreId, storeName: activeStoreName }, ...prev]);
+    setNewCoupon({ code: '', discount: '', minOrder: '' });
+  };
+
+  const deleteCoupon = (id: string) => setAllCoupons(prev => prev.filter((c: any) => c.id !== id));
+  const toggleCoupon = (id: string) => setAllCoupons(prev => prev.map((c: any) => c.id === id ? { ...c, status: c.status === 'Active' ? 'Paused' : 'Active' } : c));
 
   const setStock = (id: string, delta: number) => {
     setProducts(prev => prev.map(p => {
@@ -449,6 +472,11 @@ export default function StoreAdminPortal() {
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <input value={newProd.name} onChange={e => setNewProd(prev => ({ ...prev, name: e.target.value }))} placeholder="Product name" className="min-w-0 flex-1 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+              <select value={newProd.category} onChange={e => setNewProd(prev => ({ ...prev, category: e.target.value }))} className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange sm:w-40">
+                <option value="">Category</option>
+                {myCategories.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                <option value="General">General</option>
+              </select>
               <input value={newProd.price} onChange={e => setNewProd(prev => ({ ...prev, price: e.target.value }))} placeholder="Price ৳" type="number" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange sm:w-24" />
               <input value={newProd.stock} onChange={e => setNewProd(prev => ({ ...prev, stock: e.target.value }))} placeholder="Stock" type="number" className="w-full bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange sm:w-20" />
               <button onClick={addProduct} className="flex items-center justify-center space-x-1.5 px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl text-[10px] font-black transition-colors sm:self-stretch"><Plus className="w-3.5 h-3.5" /><span>Add</span></button>
@@ -481,6 +509,36 @@ export default function StoreAdminPortal() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'categories' && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="space-y-3 lg:col-span-2">
+            <div>
+              <h3 className="flex items-center space-x-2 text-sm font-black text-white"><FolderOpen className="h-4 w-4 text-brand-orange" /><span>Product Categories</span></h3>
+              <p className="text-[10px] text-gray-400">Real category departments for this Store ID only.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {myCategories.map((c: any) => {
+                const count = myProducts.filter((p: any) => p.category === c.name).length;
+                return (
+                  <div key={c.id} className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+                    <p className="text-sm font-black text-white">{c.name}</p>
+                    <p className="mt-1 font-mono text-[9px] font-bold text-gray-500">{c.id}</p>
+                    <p className="mt-3 text-lg font-black text-brand-orange">{count}</p>
+                    <p className="text-[9px] font-black uppercase text-gray-500">Items Active</p>
+                  </div>
+                );
+              })}
+              {myCategories.length === 0 && <p className="rounded-2xl border border-[#1e3050] bg-[#101d30] py-10 text-center text-[10px] text-gray-500 sm:col-span-2">No real category added yet.</p>}
+            </div>
+          </div>
+          <div className="h-fit rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+            <h4 className="flex items-center gap-2 border-b border-[#1e3050] pb-3 text-xs font-black uppercase text-white"><Plus className="h-4 w-4 text-brand-orange" /> Create Category</h4>
+            <input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="e.g. Frozen Foods" className="mt-4 w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+            <button onClick={addCategory} className="mt-3 w-full rounded-xl bg-brand-orange px-4 py-2.5 text-[10px] font-black uppercase text-white">Launch Category</button>
           </div>
         </div>
       )}
@@ -520,21 +578,71 @@ export default function StoreAdminPortal() {
       )}
 
       {tab === 'coupons' && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="space-y-3 lg:col-span-2">
+            <div>
+              <h3 className="text-sm font-black text-white flex items-center space-x-2"><Ticket className="w-4 h-4 text-brand-orange" /><span>Coupons & Offers</span></h3>
+              <p className="text-[10px] text-gray-400">Real coupons for this store only. Super Admin sees the same records.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {coupons.map((c: any) => (
+                <div key={c.id} className="bg-[#101d30] border border-dashed border-brand-orange/40 rounded-2xl p-4 relative overflow-hidden">
+                  <div className="absolute -right-3 top-0 bottom-0 w-6 border-l-2 border-dashed border-[#1e3050]" />
+                  <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{c.id}</p>
+                  <p className="text-lg font-black font-mono text-brand-orange mt-1">{c.code}</p>
+                  <p className="text-[10px] text-gray-300 mt-1">{c.discount}</p>
+                  <p className="text-[8px] text-gray-500 mt-1">Min order {bdt(c.minOrder || 0)} · {c.usages || 0} uses</p>
+                  <div className="mt-3 flex items-center justify-between border-t border-[#1e3050] pt-3">
+                    <button onClick={() => toggleCoupon(c.id)} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[8px] font-black uppercase text-emerald-300">{c.status || 'Active'}</button>
+                    <button onClick={() => deleteCoupon(c.id)} className="flex items-center gap-1 text-[9px] font-bold text-red-400"><Trash2 className="h-3 w-3" /> Delete</button>
+                  </div>
+                </div>
+              ))}
+              {coupons.length === 0 && <p className="rounded-2xl border border-[#1e3050] bg-[#101d30] py-10 text-center text-[10px] text-gray-500 sm:col-span-2">No real coupon added yet.</p>}
+            </div>
+          </div>
+          <div className="h-fit rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+            <h4 className="flex items-center gap-2 border-b border-[#1e3050] pb-3 text-xs font-black uppercase text-white"><Ticket className="h-4 w-4 text-brand-orange" /> Configure Promo Code</h4>
+            <div className="mt-4 space-y-3">
+              <input value={newCoupon.code} onChange={e => setNewCoupon(prev => ({ ...prev, code: e.target.value }))} placeholder="Coupon code" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs uppercase outline-none focus:border-brand-orange" />
+              <input value={newCoupon.discount} onChange={e => setNewCoupon(prev => ({ ...prev, discount: e.target.value }))} placeholder="Discount display e.g. 20% Off" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+              <input value={newCoupon.minOrder} onChange={e => setNewCoupon(prev => ({ ...prev, minOrder: e.target.value }))} placeholder="Minimum order" type="number" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+              <button onClick={addCoupon} className="w-full rounded-xl bg-brand-orange px-4 py-2.5 text-[10px] font-black uppercase text-white">Publish Coupon Code</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'reviews' && (
         <div className="space-y-3">
           <div>
-            <h3 className="text-sm font-black text-white flex items-center space-x-2"><Ticket className="w-4 h-4 text-brand-orange" /><span>Coupons & Offers</span></h3>
-            <p className="text-[10px] text-gray-400">Create discount codes customers can use on the storefront.</p>
+            <h3 className="flex items-center space-x-2 text-sm font-black text-white"><Star className="h-4 w-4 text-brand-orange" /><span>Customer Reviews</span></h3>
+            <p className="text-[10px] text-gray-400">Real customer feedback for this Store ID. Replies stay saved.</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {coupons.map(c => (
-              <div key={c.id} className="bg-[#101d30] border border-dashed border-brand-orange/40 rounded-2xl p-4 relative overflow-hidden">
-                <div className="absolute -right-3 top-0 bottom-0 w-6 border-l-2 border-dashed border-[#1e3050]" />
-                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{c.id}</p>
-                <p className="text-lg font-black font-mono text-brand-orange mt-1">{c.code}</p>
-                <p className="text-[10px] text-gray-300 mt-1">{c.discount > 0 ? `${c.discount}% off` : 'Free delivery'}</p>
-                <p className="text-[8px] text-gray-500 mt-1">{c.used} uses</p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {myReviews.map((r: any) => (
+              <div key={r.id} className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-white">{r.customer || r.customerName || 'Customer'}</p>
+                    <p className="text-[9px] text-gray-500">{r.date || 'Recent'} · {r.item || r.productName || activeStoreName}</p>
+                  </div>
+                  <span className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-2 py-1 text-[10px] font-black text-brand-orange">{r.rating || 5}.0</span>
+                </div>
+                <p className="mt-3 text-xs italic text-gray-300">"{r.comment || r.text || 'No comment'}"</p>
+                {reviewReplies[r.id] && <p className="mt-3 rounded-xl border-l-2 border-brand-orange bg-[#0a1322] p-3 text-[11px] text-gray-300">{reviewReplies[r.id]}</p>}
+                <div className="mt-3 flex gap-2">
+                  <input id={`reply-${r.id}`} placeholder="Reply to customer..." className="min-w-0 flex-1 rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+                  <button onClick={() => {
+                    const input = document.getElementById(`reply-${r.id}`) as HTMLInputElement | null;
+                    if (!input?.value) return;
+                    setReviewReplies(prev => ({ ...prev, [r.id]: input.value }));
+                    input.value = '';
+                  }} className="rounded-xl bg-brand-orange px-3 py-2 text-[10px] font-black uppercase text-white">Reply</button>
+                </div>
               </div>
             ))}
+            {myReviews.length === 0 && <p className="rounded-2xl border border-[#1e3050] bg-[#101d30] py-10 text-center text-[10px] text-gray-500 md:col-span-2">No real customer review yet.</p>}
           </div>
         </div>
       )}

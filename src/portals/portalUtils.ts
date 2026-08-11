@@ -233,6 +233,9 @@ function useShared<T>(key: string, fallback: T) {
 export const useOrders = () => useShared<Order[]>('sd_orders_v2', []);
 export const useDrivers = () => useShared<Driver[]>('sd_drivers', []);
 export const useProducts = () => useShared<Product[]>('sd_products', []);
+export const useCategories = () => useShared<any[]>('sd_categories', []);
+export const useCoupons = () => useShared<any[]>('sd_coupons', []);
+export const useReviews = () => useShared<any[]>('sd_reviews', []);
 export const usePayments = () => useShared<Payment[]>('sd_payments', []);
 export const useTickets = () => useShared<SupportTicket[]>('sd_tickets', []);
 export const useNotifications = () => useShared<SystemNotification[]>('sd_notifications', []);

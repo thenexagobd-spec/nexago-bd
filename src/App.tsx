@@ -1721,7 +1721,7 @@ export default function App() {
 
   if (selectedStoreId) {
     const activeStore = stores.find(s => s.id === selectedStoreId) || stores[0];
-    const storeOrders = orders.filter(o => o.storeName.toLowerCase() === activeStore.name.toLowerCase());
+    const storeOrders = orders.filter(o => ((o as any).storeId && (o as any).storeId === activeStore.id) || o.storeName.toLowerCase() === activeStore.name.toLowerCase());
     
     // Merchant Side Navigation Options
     const merchantSidebarItems = [
@@ -1744,11 +1744,11 @@ export default function App() {
     ];
 
     // Derived statistics and values for current merchant context
-    const currentProducts = products.filter(p => p.id !== ''); // Allow full list for demo or mock
-    const storeCategories = categories;
-    const storeStaff = staff;
-    const storeCoupons = coupons;
-    const storeReviews = reviews.filter(r => r.item.toLowerCase().includes(activeStore.name.toLowerCase()) || r.item.toLowerCase().includes('fresh mart'));
+    const currentProducts = products.filter((p: any) => p.storeId === activeStore.id);
+    const storeCategories = categories.filter((c: any) => c.storeId === activeStore.id);
+    const storeStaff = staff.filter((s: any) => !s.storeId || s.storeId === activeStore.id);
+    const storeCoupons = coupons.filter((c: any) => c.storeId === activeStore.id);
+    const storeReviews = reviews.filter((r: any) => r.storeId === activeStore.id || r.storeName === activeStore.name || currentProducts.some((p: any) => p.id === r.productId));
 
     // Handle Order status transition from within Merchant Panel
     const updateMerchantOrderStatus = (orderId: string, newStatus: 'Completed' | 'Ongoing' | 'Cancelled') => {
@@ -1766,12 +1766,14 @@ export default function App() {
         return;
       }
       const newProd = {
-        id: `PROD-${100 + products.length + 1}`,
+        id: `PROD-${Date.now().toString().slice(-5)}`,
         name: mProdName,
         category: mProdCat,
         stock: parseInt(mProdStock) || 0,
         price: parseFloat(mProdPrice) || 0,
-        status: parseInt(mProdStock) > 10 ? 'In Stock' : (parseInt(mProdStock) > 0 ? 'Low Stock' : 'Out of Stock')
+        status: parseInt(mProdStock) > 10 ? 'In Stock' : (parseInt(mProdStock) > 0 ? 'Low Stock' : 'Out of Stock'),
+        storeId: activeStore.id,
+        storeName: activeStore.name
       };
       setProducts([...products, newProd]);
       setMProdName('');
@@ -1785,10 +1787,12 @@ export default function App() {
       e.preventDefault();
       if (!mCatName) return;
       const newCat = {
-        id: `CAT-0${categories.length + 1}`,
+        id: `CAT-${Date.now().toString().slice(-5)}`,
         name: mCatName,
         itemsCount: 0,
-        status: 'Active'
+        status: 'Active',
+        storeId: activeStore.id,
+        storeName: activeStore.name
       };
       setCategories([...categories, newCat]);
       setMCatName('');
@@ -1800,12 +1804,14 @@ export default function App() {
       e.preventDefault();
       if (!mCouponCode || !mCouponDiscount) return;
       const newCpn = {
-        id: `CPN-0${coupons.length + 1}`,
+        id: `CPN-${Date.now().toString().slice(-5)}`,
         code: mCouponCode.toUpperCase(),
         discount: mCouponDiscount,
         minOrder: parseInt(mCouponMinOrder) || 0,
         usages: 0,
-        status: 'Active'
+        status: 'Active',
+        storeId: activeStore.id,
+        storeName: activeStore.name
       };
       setCoupons([...coupons, newCpn]);
       setMCouponCode('');
@@ -1819,11 +1825,13 @@ export default function App() {
       e.preventDefault();
       if (!mStaffName) return;
       const newStf = {
-        id: `STF-0${staff.length + 1}`,
+        id: `STF-${Date.now().toString().slice(-5)}`,
         name: mStaffName,
         role: mStaffRole,
         shift: mStaffShift,
-        status: 'Active'
+        status: 'Active',
+        storeId: activeStore.id,
+        storeName: activeStore.name
       };
       setStaff([...staff, newStf]);
       setMStaffName('');
@@ -2211,9 +2219,10 @@ export default function App() {
                       onChange={(e) => setMProdCat(e.target.value)}
                       className="w-full bg-brand-dark/60 border border-brand-border rounded-lg p-2.5 text-white outline-none focus:border-brand-orange"
                     >
-                      {categories.map(c => (
+                      {storeCategories.map(c => (
                         <option key={c.id} value={c.name}>{c.name}</option>
                       ))}
+                      <option value="General">General</option>
                     </select>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -2262,7 +2271,7 @@ export default function App() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {storeCategories.map(c => {
-                    const mappedCount = products.filter(p => p.category === c.name).length;
+                    const mappedCount = currentProducts.filter(p => p.category === c.name).length;
                     return (
                       <div key={c.id} className="bg-[#0c1624]/60 border border-brand-border/60 rounded-xl p-5 flex items-center justify-between shadow-md">
                         <div>
@@ -2570,7 +2579,7 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-border/30 text-xs">
-                    {products.map(p => {
+                    {currentProducts.map(p => {
                       const percentage = Math.min(100, (p.stock / 120) * 100);
                       const barColor = p.stock > 20 ? 'bg-emerald-500' : (p.stock > 0 ? 'bg-orange-500' : 'bg-red-500');
                       return (
