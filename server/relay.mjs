@@ -172,6 +172,20 @@ function verifyPassword(password, record) {
   return crypto.timingSafeEqual(Buffer.from(next.hash), Buffer.from(record.hash));
 }
 
+function normalizeLoginId(value) {
+  return String(value || '').trim().toLowerCase().replace(/[\s._-]+/g, '');
+}
+
+function findSecurityUser(users, loginId) {
+  const exact = users[loginId];
+  if (exact) return { userId: loginId, user: exact };
+  const target = normalizeLoginId(loginId);
+  for (const [userId, user] of Object.entries(users)) {
+    if (normalizeLoginId(userId) === target) return { userId, user };
+  }
+  return { userId: loginId, user: null };
+}
+
 function appendAudit(key, entry) {
   const audit = readSecurity(`audit-${safeKey(key)}`, []);
   const item = {
@@ -548,17 +562,19 @@ const server = http.createServer((req, res) => {
       const password = String(body.password || '');
       ensureEnvSuperAdmins(key);
       const users = readSecurity(`users-${safeKey(key)}`, {});
-      const user = users[userId];
+      const found = findSecurityUser(users, userId);
+      const user = found.user;
       if (!user || user.status !== 'Active' || !verifyPassword(password, user.password)) {
         appendAudit(key, { actor: userId || 'unknown', action: 'login-failed', ip: clientIp(req), device: req.headers['user-agent'] || '' });
         sendSecurityAlert('login-failed', { actor: userId || 'unknown', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'invalid credentials or inactive user' });
         sendJson(res, 401, { ok: false, error: 'INVALID_LOGIN' });
         return;
       }
+      const canonicalUserId = found.userId;
       const token = crypto.randomBytes(32).toString('hex');
       const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
       sessions[token] = {
-        userId,
+        userId: canonicalUserId,
         role: user.role,
         storeId: user.storeId || '',
         branchId: user.branchId || '',
@@ -568,8 +584,8 @@ const server = http.createServer((req, res) => {
         device: req.headers['user-agent'] || '',
       };
       writeSecurity(`sessions-${safeKey(key)}`, sessions);
-      appendAudit(key, { actor: userId, role: user.role, action: 'login-success', storeId: user.storeId, branchId: user.branchId, ip: clientIp(req), device: req.headers['user-agent'] || '' });
-      sendJson(res, 200, { ok: true, token, expiresAt: sessions[token].expiresAt, user: { userId, role: user.role, storeId: user.storeId || '', branchId: user.branchId || '' } });
+      appendAudit(key, { actor: canonicalUserId, role: user.role, action: 'login-success', storeId: user.storeId, branchId: user.branchId, ip: clientIp(req), device: req.headers['user-agent'] || '' });
+      sendJson(res, 200, { ok: true, token, expiresAt: sessions[token].expiresAt, user: { userId: canonicalUserId, role: user.role, storeId: user.storeId || '', branchId: user.branchId || '' } });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
