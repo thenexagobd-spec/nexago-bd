@@ -256,6 +256,24 @@ function ensureEnvSuperAdmins(key) {
         source: 'env-seed',
       };
       changed = true;
+    } else {
+      const existing = users[userId];
+      const next = {
+        ...existing,
+        userId,
+        role: 'super-admin',
+        storeId: existing.storeId || '',
+        branchId: existing.branchId || '',
+        status: 'Active',
+        source: existing.source || 'env-seed',
+      };
+      if (!existing.passwordChangedBy && SUPER_ADMIN_PASSWORD && !verifyPassword(SUPER_ADMIN_PASSWORD, existing.password)) {
+        next.password = hashPassword(SUPER_ADMIN_PASSWORD);
+        next.lastPasswordChangeAt = new Date().toISOString();
+        next.source = 'env-seed';
+      }
+      users[userId] = next;
+      changed = true;
     }
   }
   if (changed) writeSecurity(`users-${safeKey(key)}`, users);
