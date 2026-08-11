@@ -33,19 +33,19 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#060d17] via-[#0a1322] to-[#0a1322] text-gray-100 flex flex-col">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-[#060d17] via-[#0a1322] to-[#0a1322] text-gray-100 flex flex-col">
       {/* Top header */}
-      <header className="h-14 shrink-0 border-b border-[#1e3050]/60 bg-gradient-to-r from-[#0d1829]/90 via-[#0f1c30]/90 to-[#0d1829]/90 backdrop-blur-xl flex items-center justify-between px-4 sticky top-0 z-40">
-        <div className="w-full max-w-7xl mx-auto flex items-center justify-between px-1">
-          <div className="flex items-center space-x-3">
+      <header className="shrink-0 border-b border-[#1e3050]/60 bg-gradient-to-r from-[#0d1829]/90 via-[#0f1c30]/90 to-[#0d1829]/90 backdrop-blur-xl sticky top-0 z-40">
+        <div className="w-full max-w-7xl mx-auto flex min-h-14 flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-4">
+          <div className="flex min-w-0 items-center space-x-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-sm shadow-lg">N</div>
-            <div>
-              <p className="font-black tracking-widest leading-none text-sm">NEXAGO</p>
-              <p className="text-[8px] text-gray-400 uppercase tracking-widest mt-0.5">Smart Delivery Network</p>
+            <div className="min-w-0">
+              <p className="truncate font-black tracking-widest leading-none text-sm">NEXAGO</p>
+              <p className="mt-0.5 truncate text-[8px] text-gray-400 uppercase tracking-widest">Smart Delivery Network</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:space-x-3">
             <span className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#132238] border border-[#1e3050] text-[10px] font-bold text-gray-300">
               <Clock className="w-3 h-3 text-brand-orange" />
               <span className="font-mono">{clock.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
@@ -98,8 +98,8 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
         </div>
 
         {/* Content */}
-        <main className="flex-1 min-w-0 p-3 sm:p-6 overflow-y-auto pb-20 md:pb-6 md:pl-20">
-          <div className="max-w-5xl mx-auto space-y-5 fade-in">{children}</div>
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto p-3 pb-20 sm:p-4 md:pb-6 md:pl-20 lg:p-6">
+          <div className="mx-auto max-w-5xl space-y-5 fade-in">{children}</div>
         </main>
       </div>
 

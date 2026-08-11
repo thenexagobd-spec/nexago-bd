@@ -254,8 +254,8 @@ export default function StoreAdminPortal() {
             <p className="text-[10px] text-gray-400">Add & manage products — they appear on the live storefront.</p>
           </div>
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4 space-y-3">
-            <div className="flex items-center space-x-2">
-              <input value={newProd.name} onChange={e => setNewProd(prev => ({ ...prev, name: e.target.value }))} placeholder="Product name" className="flex-1 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input value={newProd.name} onChange={e => setNewProd(prev => ({ ...prev, name: e.target.value }))} placeholder="Product name" className="min-w-0 flex-1 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
               <input value={newProd.price} onChange={e => setNewProd(prev => ({ ...prev, price: e.target.value }))} placeholder="Price ৳" type="number" className="w-24 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
               <input value={newProd.stock} onChange={e => setNewProd(prev => ({ ...prev, stock: e.target.value }))} placeholder="Stock" type="number" className="w-20 bg-[#0a1322] border border-[#1e3050] rounded-xl px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
               <button onClick={addProduct} className="flex items-center space-x-1.5 px-3 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-xl text-[10px] font-black transition-colors"><Plus className="w-3.5 h-3.5" /><span>Add</span></button>
@@ -299,7 +299,8 @@ export default function StoreAdminPortal() {
             <p className="text-[10px] text-gray-400">Stock levels — low stock highlighted, adjust on the fly.</p>
           </div>
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl overflow-hidden">
-            <table className="w-full text-left text-[10px]">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left text-[10px]">
               <thead><tr className="bg-[#0a1322] text-gray-400 text-[9px] uppercase tracking-wider"><th className="px-3 py-2.5">Product</th><th className="px-3 py-2.5">Category</th><th className="px-3 py-2.5">Price</th><th className="px-3 py-2.5">Stock</th><th className="px-3 py-2.5 text-right">Action</th></tr></thead>
               <tbody className="divide-y divide-[#1e3050]">
                 {products.map(p => (
@@ -319,7 +320,8 @@ export default function StoreAdminPortal() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -455,7 +457,8 @@ export default function StoreAdminPortal() {
             ))}
           </div>
           <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl overflow-hidden">
-            <table className="w-full text-left text-[10px]">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-left text-[10px]">
               <thead><tr className="bg-[#0a1322] text-gray-400 text-[9px] uppercase tracking-wider"><th className="px-3 py-2.5">Ref</th><th className="px-3 py-2.5">Method</th><th className="px-3 py-2.5">Amount</th><th className="px-3 py-2.5">Status</th></tr></thead>
               <tbody className="divide-y divide-[#1e3050]">
                 {payments.map(p => (
@@ -468,7 +471,8 @@ export default function StoreAdminPortal() {
                 ))}
                 {payments.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-gray-500">No payments.</td></tr>}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       )}
