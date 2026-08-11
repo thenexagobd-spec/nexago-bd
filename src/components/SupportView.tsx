@@ -7216,10 +7216,17 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                 <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-brand-dark/10">
                   {activeTicket.messages.map((msg, idx) => {
                     const isAdmin = msg.sender === 'admin';
+                    const richMsg = msg as any;
                     return (
                       <div key={idx} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[75%] rounded-2xl p-3.5 ${isAdmin ? 'bg-brand-orange text-white rounded-br-none' : 'bg-brand-dark border border-brand-border text-gray-100 rounded-bl-none'}`}>
                           <p className="text-xs leading-relaxed">{msg.text}</p>
+                          {richMsg.linkUrl && <a href={richMsg.linkUrl} target="_blank" rel="noreferrer" className={`mt-2 block break-all text-[10px] underline ${isAdmin ? 'text-orange-100' : 'text-brand-orange'}`}>{richMsg.linkUrl}</a>}
+                          {richMsg.attachmentUrl && (
+                            <a href={richMsg.attachmentUrl} target="_blank" rel="noreferrer" className={`mt-2 inline-flex items-center rounded-lg px-2 py-1 text-[10px] font-bold ${isAdmin ? 'bg-white/15 text-white' : 'bg-sky-500/10 text-sky-300 border border-sky-500/30'}`}>
+                              {richMsg.attachmentName || 'Open attachment'}
+                            </a>
+                          )}
                           <p className={`text-[9px] mt-1.5 text-right ${isAdmin ? 'text-orange-100' : 'text-gray-500 font-mono'}`}>
                             {msg.time} {isAdmin ? '(You)' : ''}
                           </p>

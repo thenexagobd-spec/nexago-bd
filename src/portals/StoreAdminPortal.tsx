@@ -7,7 +7,7 @@
  * localStorage keys as the admin panel.
  */
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2 } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet } from './portalUtils';
 
@@ -90,6 +90,9 @@ export default function StoreAdminPortal() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [stf, setStf] = useState({ name: '', role: '', phone: '' });
   const [supportDraft, setSupportDraft] = useState({ subject: '', message: '', priority: 'Medium' });
+  const [ticketReplies, setTicketReplies] = useState<Record<string, string>>({});
+  const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({});
+  const [ticketFiles, setTicketFiles] = useState<Record<string, { name: string; type: string; dataUrl: string }>>({});
 
   const myTxns = txns.filter(t => t.storeId === activeStoreId || myOrderIds.has(t.orderId));
   const pending = myTxns.filter(t => t.status === 'Pending');
@@ -269,6 +272,42 @@ export default function StoreAdminPortal() {
     } : t));
   };
 
+  const uploadTicketFile = (ticketId: string, file?: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setTicketFiles(prev => ({ ...prev, [ticketId]: { name: file.name, type: file.type, dataUrl: String(reader.result || '') } }));
+    reader.readAsDataURL(file);
+  };
+
+  const sendTicketMessage = (ticket: any) => {
+    if (!myTickets.some(t => t.id === ticket.id) || ticket.status === 'Resolved' || ticket.status === 'Closed') return;
+    const text = (ticketReplies[ticket.id] || '').trim();
+    const link = (ticketLinks[ticket.id] || '').trim();
+    const file = ticketFiles[ticket.id];
+    if (!text && !link && !file) return;
+    setTickets(prev => prev.map((t: any) => t.id === ticket.id ? {
+      ...t,
+      status: t.status === 'Open' ? 'In Progress' : t.status,
+      messages: [...(t.messages || []), {
+        sender: 'user',
+        text: text || (file ? `Attached ${file.name}` : link),
+        linkUrl: link,
+        attachmentName: file?.name || '',
+        attachmentType: file?.type || '',
+        attachmentUrl: file?.dataUrl || '',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }],
+      auditLog: [...(t.auditLog || []), { actor: sessionAdminId, action: 'store-admin-message', time: new Date().toISOString(), note: text || link || file?.name || '' }],
+    } : t));
+    setTicketReplies(prev => ({ ...prev, [ticket.id]: '' }));
+    setTicketLinks(prev => ({ ...prev, [ticket.id]: '' }));
+    setTicketFiles(prev => {
+      const next = { ...prev };
+      delete next[ticket.id];
+      return next;
+    });
+  };
+
   const addProduct = () => {
     if (!newProd.name || !newProd.price) return;
     const p = {
@@ -372,7 +411,7 @@ export default function StoreAdminPortal() {
                   <label key={d.key} className="rounded-2xl border border-[#1e3050] bg-[#0a1322] p-3">
                     <span className="flex items-center gap-2 text-[10px] font-black uppercase text-white"><FileText className="h-3.5 w-3.5 text-brand-orange" /> {d.label}</span>
                     <span className="mt-1 block text-[8px] text-gray-500">{d.required ? 'Required' : 'Optional'}</span>
-                    <input type="file" accept="image/*,.pdf" onChange={e => handleDocUpload(d.key, e.target.files?.[0])} className="mt-3 w-full text-[9px] text-gray-400" />
+                    <input type="file" onChange={e => handleDocUpload(d.key, e.target.files?.[0])} className="mt-3 w-full text-[9px] text-gray-400" />
                     {uploadedDocs[d.key] && <span className="mt-2 block text-[9px] font-bold text-emerald-400">Submitted</span>}
                   </label>
                 ))}
@@ -996,8 +1035,31 @@ export default function StoreAdminPortal() {
                   {(t.messages || []).length > 0 && (
                     <div className="mt-3 space-y-1 rounded-xl border border-[#1e3050] bg-[#0a1322] p-2">
                       {(t.messages || []).slice(-3).map((m: any, i: number) => (
-                        <p key={i} className="text-[9px] text-gray-300"><b className={m.sender === 'admin' ? 'text-brand-orange' : 'text-cyan-300'}>{m.sender}:</b> {m.text}</p>
+                        <div key={i} className="text-[9px] text-gray-300">
+                          <p><b className={m.sender === 'admin' ? 'text-brand-orange' : 'text-cyan-300'}>{m.sender}:</b> {m.text}</p>
+                          {m.linkUrl && <a href={m.linkUrl} target="_blank" rel="noreferrer" className="mt-1 block text-brand-orange underline">{m.linkUrl}</a>}
+                          {m.attachmentUrl && (
+                            <a href={m.attachmentUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-sky-300">
+                              <Paperclip className="h-3 w-3" /> {m.attachmentName || 'Attachment'}
+                            </a>
+                          )}
+                        </div>
                       ))}
+                    </div>
+                  )}
+                  {t.status !== 'Resolved' && t.status !== 'Closed' && (
+                    <div className="mt-3 rounded-xl border border-[#1e3050] bg-[#0a1322] p-2">
+                      <textarea value={ticketReplies[t.id] || ''} onChange={e => setTicketReplies(prev => ({ ...prev, [t.id]: e.target.value }))} placeholder="Chat message to Super Admin / Support staff" className="min-h-16 w-full rounded-lg border border-[#1e3050] bg-[#101d30] px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+                      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_170px_auto]">
+                        <input value={ticketLinks[t.id] || ''} onChange={e => setTicketLinks(prev => ({ ...prev, [t.id]: e.target.value }))} placeholder="Any link / URL" className="rounded-lg border border-[#1e3050] bg-[#101d30] px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+                        <label className="flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-[#1e3050] bg-[#101d30] px-3 py-2 text-[9px] font-black uppercase text-gray-300">
+                          <Paperclip className="h-3 w-3" /> {ticketFiles[t.id]?.name ? 'Attached' : 'Photo/Video'}
+                          <input type="file" onChange={e => uploadTicketFile(t.id, e.target.files?.[0])} className="hidden" />
+                        </label>
+                        <button onClick={() => sendTicketMessage(t)} className="flex items-center justify-center gap-1 rounded-lg bg-brand-orange px-3 py-2 text-[9px] font-black uppercase text-white">
+                          <Send className="h-3 w-3" /> Send
+                        </button>
+                      </div>
                     </div>
                   )}
                   <div className="flex flex-wrap items-center justify-end gap-2 mt-3">

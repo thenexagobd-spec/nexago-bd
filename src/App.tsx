@@ -1406,7 +1406,7 @@ export default function App() {
                     <label key={d.key} className="rounded-xl border border-brand-border bg-[#080e17] p-3">
                       <span className="flex items-center gap-2 text-[10px] font-black uppercase text-white"><FileText className="h-3.5 w-3.5 text-brand-orange" /> {d.label}</span>
                       <span className="mt-1 block text-[8px] text-gray-500">{d.required ? 'Required' : 'Optional'} · Permanent record</span>
-                      <input type="file" accept="image/*,.pdf" onChange={e => handleRegisterDocUpload(d.key, e.target.files?.[0])} className="mt-3 w-full text-[9px] text-gray-400" />
+                      <input type="file" onChange={e => handleRegisterDocUpload(d.key, e.target.files?.[0])} className="mt-3 w-full text-[9px] text-gray-400" />
                       {newStoreDocs[d.key] && <span className="mt-2 block text-[9px] font-bold text-emerald-400">Ready to submit</span>}
                     </label>
                   ))}
