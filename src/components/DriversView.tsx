@@ -8,7 +8,7 @@ import { Driver, DriverStatusLog, DriverDocument } from '../types';
 import { 
   Search, UserPlus, Phone, Star, Award, MapPin, Edit3, Trash2, X, AlertCircle, 
   Eye, UserCheck, Download, GitCompare, Lock, Unlock, ShieldCheck, DollarSign, 
-  MessageSquare, Send, CheckCircle2, XCircle, Zap, Truck, Gauge, Fuel, Wrench
+  MessageSquare, Send, CheckCircle2, XCircle, Zap, Truck, Gauge, Fuel, Wrench, Clock
 } from 'lucide-react';
 import DriverProfileView from './DriverProfileView';
 import CompareDriversModal from './CompareDriversModal';
@@ -36,6 +36,8 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
   const [auditingDriver, setAuditingDriver] = useState<Driver | null>(null);
   const [messagingDriver, setMessagingDriver] = useState<Driver | null>(null);
   const [broadcastText, setBroadcastText] = useState('');
+  const [docViewDriver, setDocViewDriver] = useState<Driver | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -206,6 +208,66 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
     if (showToast) {
       showToast(`Collected ৳${amount.toLocaleString()} COD cash handover from ${driver.name}.`, 'success');
     }
+  };
+
+  const docList = (driver: Driver | null): DriverDocument[] => (driver?.documents || []);
+
+  const printDriverDocs = () => {
+    if (!docViewDriver || !printRef.current) return;
+    const w = window.open('', '_blank', 'width=800,height=600');
+    if (!w) return;
+    const docs = docList(docViewDriver);
+    w.document.write(`<!DOCTYPE html><html><head><title>Documents - ${docViewDriver.name}</title>
+      <style>body{font-family:Arial,sans-serif;margin:24px;color:#111}
+      h2{margin:0 0 4px} p.meta{margin:0 0 18px;font-size:13px;color:#555}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+      .doc{border:1px solid #ddd;border-radius:8px;padding:10px}
+      .doc p{font-size:12px;margin:6px 0 0;color:#333}
+      img{width:100%;height:auto;border-radius:4px;background:#f3f3f3}
+      @media print{.doc{break-inside:avoid}}</style></head><body>
+      <h2>${docViewDriver.name}</h2>
+      <p class="meta">Driver ID: ${docViewDriver.id || '—'} · ${docViewDriver.vehicleType || ''} · Verification: ${docViewDriver.verificationStatus || 'Verified'}</p>
+      <div class="grid">${docs.map((d, i) => `<div class="doc">${d.dataUrl ? `<img src="${d.dataUrl}" alt="${d.type}"/>` : '<p>No image</p>'}<p><b>${d.type}</b> — submitted ${d.submittedAt}</p></div>`).join('') || '<p>No documents attached.</p>'}</div>
+      <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
+      </body></html>`);
+    w.document.close();
+  };
+
+  const downloadDoc = (doc: DriverDocument) => {
+    if (!doc.dataUrl) { if (showToast) showToast('No image data available to download.', 'info'); return; }
+    const a = document.createElement('a');
+    a.href = doc.dataUrl;
+    a.download = `${doc.type.replace(/\s+/g, '_')}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const downloadAllDocs = () => {
+    const docs = docList(docViewDriver);
+    if (!docs.length) { if (showToast) showToast('No documents to download.', 'info'); return; }
+    docs.forEach((d, i) => setTimeout(() => downloadDoc(d), i * 400));
+    if (showToast) showToast(`Downloading ${docs.length} document(s)...`, 'success');
+  };
+
+  const shareDocsWhatsApp = () => {
+    if (!docViewDriver) return;
+    const docs = docList(docViewDriver);
+    const msg = encodeURIComponent(
+      `NexaGo Driver Documents — ${docViewDriver.name} (${docViewDriver.id})\n` +
+      `Vehicle: ${docViewDriver.vehicleType || '—'}\n` +
+      `NID: ${docViewDriver.nidNumber || '—'}\n` +
+      `License: ${docViewDriver.licenseNumber || '—'}${docViewDriver.licenseExpiry ? ` (expires ${docViewDriver.licenseExpiry})` : ''}\n` +
+      `Verification: ${docViewDriver.verificationStatus || 'Verified'}\n` +
+      `Documents attached (${docs.length}): ${docs.map(d => d.type).join(', ') || 'None'}`
+    );
+    const phone = (docViewDriver.phone || '').replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/${phone ? '88' + phone : ''}?text=${msg}`, '_blank');
+  };
+
+  const setVerification = (driver: Driver, v: Driver['verificationStatus']) => {
+    onUpdateDriver({ ...driver, verificationStatus: v });
+    if (showToast) showToast(`Driver ${driver.name} marked as ${v}.`, v === 'Verified' ? 'success' : 'info');
   };
 
   const resetForm = () => {
@@ -521,6 +583,15 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
                   <span>View Profile</span>
                 </button>
 
+                <button
+                  onClick={() => setDocViewDriver(driver)}
+                  className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border border-emerald-500/30 rounded text-[11px] font-bold transition-all flex items-center space-x-1 cursor-pointer"
+                  title="View all submitted documents, print, download, share & approve"
+                >
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Document Show</span>
+                </button>
+
                 {/* Dispatch Lock Toggle */}
                 <button
                   onClick={() => toggleDispatchLock(driver)}
@@ -649,6 +720,120 @@ export default function DriversView({ drivers, onAddDriver, onUpdateDriver, onDe
                   >
                     <XCircle className="w-4 h-4" />
                     <span>Reject Credentials</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DOCUMENT VIEW MODAL — all documents in one popup with print / download /
+          WhatsApp share + Approve / Reject / Under Review / Block / Inactive */}
+      {docViewDriver && (
+        <div className="fixed inset-0 z-[60] bg-brand-dark/90 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+          <div className="bg-brand-card border border-brand-border rounded-xl max-w-3xl w-full max-h-[92vh] overflow-hidden shadow-2xl fade-in flex flex-col">
+            <div className="flex items-center justify-between border-b border-brand-border px-5 py-3.5">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-black text-white text-sm truncate">{docViewDriver.name}</h3>
+                  <p className="text-[10px] text-gray-400 font-mono truncate">{docViewDriver.id || '—'} · {docViewDriver.vehicleType || '—'}</p>
+                </div>
+              </div>
+              <button onClick={() => setDocViewDriver(null)} className="text-gray-400 hover:text-white cursor-pointer ml-3">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div ref={printRef} className="p-5 space-y-4 overflow-y-auto">
+              {/* Identity summary */}
+              <div className="bg-brand-dark/60 p-3.5 rounded-lg border border-brand-border/40 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="flex justify-between gap-2"><span className="text-gray-400">NID Number:</span><span className="font-mono font-bold text-white text-right">{docViewDriver.nidNumber || '—'}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-gray-400">License:</span><span className="font-mono font-bold text-white text-right">{docViewDriver.licenseNumber || '—'}{docViewDriver.licenseExpiry ? ` · exp ${docViewDriver.licenseExpiry}` : ''}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-gray-400">Phone:</span><span className="font-mono font-bold text-white text-right">{docViewDriver.phone || '—'}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-gray-400">Email:</span><span className="font-mono font-bold text-white text-right truncate">{docViewDriver.email || '—'}</span></div>
+                <div className="flex justify-between gap-2 sm:col-span-2"><span className="text-gray-400">Status:</span>
+                  <span className={`font-bold ${docViewDriver.verificationStatus === 'Verified' ? 'text-emerald-400' : docViewDriver.verificationStatus === 'Rejected' ? 'text-red-400' : 'text-amber-400'}`}>
+                    {docViewDriver.verificationStatus || 'Verified'} {docViewDriver.dispatchLocked ? ' · <Locked>' : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Documents grid */}
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">All Submitted Documents ({docList(docViewDriver).length})</p>
+                {docList(docViewDriver).length === 0 ? (
+                  <div className="bg-brand-dark/60 p-4 rounded-lg border border-brand-border/40 text-[10px] text-gray-500 text-center">No scanned documents attached to this driver profile.</div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {docList(docViewDriver).map((doc, i) => (
+                      <div key={i} className="bg-brand-dark/60 p-2 rounded-lg border border-brand-border/40 flex flex-col">
+                        {doc.dataUrl ? (
+                          <img src={doc.dataUrl} alt={doc.type} className="w-full h-28 object-cover rounded-md border border-brand-border/40" />
+                        ) : (
+                          <div className="w-full h-28 flex items-center justify-center text-[9px] text-gray-500">No image</div>
+                        )}
+                        <p className="text-[9px] text-gray-300 font-bold mt-1.5">{doc.type}</p>
+                        <p className="text-[8px] text-gray-500">{doc.submittedAt}</p>
+                        <div className="flex items-center justify-between mt-1.5">
+                          <span className={`text-[8px] font-bold ${doc.status === 'Verified' ? 'text-emerald-400' : doc.status === 'Rejected' ? 'text-red-400' : 'text-amber-400'}`}>{doc.status}</span>
+                          <button onClick={() => downloadDoc(doc)} className="text-[8px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-0.5 cursor-pointer">
+                            <Download className="w-2.5 h-2.5" />Save
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Print / Download / WhatsApp share */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button onClick={printDriverDocs} className="py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1.5 cursor-pointer transition-all">
+                  <Download className="w-3.5 h-3.5" /><span>Print All</span>
+                </button>
+                <button onClick={downloadAllDocs} className="py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1.5 cursor-pointer transition-all">
+                  <Download className="w-3.5 h-3.5" /><span>Download All</span>
+                </button>
+                <button onClick={shareDocsWhatsApp} className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1.5 cursor-pointer transition-all">
+                  <Send className="w-3.5 h-3.5" /><span>WhatsApp Share</span>
+                </button>
+              </div>
+
+              {/* Verification + block controls */}
+              <div className="border-t border-brand-border/40 pt-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Verification & Fleet Control</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    onClick={() => setVerification(docViewDriver, 'Verified')}
+                    className="py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-bold flex items-center justify-center space-x-1 cursor-pointer transition-all"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /><span>Approve</span>
+                  </button>
+                  <button
+                    onClick={() => setVerification(docViewDriver, 'Rejected')}
+                    className="py-2.5 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 rounded-lg text-[10px] font-bold flex items-center justify-center space-x-1 cursor-pointer transition-all"
+                  >
+                    <XCircle className="w-3.5 h-3.5" /><span>Reject</span>
+                  </button>
+                  <button
+                    onClick={() => setVerification(docViewDriver, 'Pending Audit')}
+                    className="py-2.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white border border-amber-500/30 rounded-lg text-[10px] font-bold flex items-center justify-center space-x-1 cursor-pointer transition-all"
+                  >
+                    <Clock className="w-3.5 h-3.5" /><span>Under Review</span>
+                  </button>
+                  <button
+                    onClick={() => toggleDispatchLock(docViewDriver)}
+                    className={`py-2.5 rounded-lg text-[10px] font-bold flex items-center justify-center space-x-1 cursor-pointer transition-all ${
+                      docViewDriver.dispatchLocked
+                        ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                        : 'bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30'
+                    }`}
+                  >
+                    {docViewDriver.dispatchLocked ? (<><Unlock className="w-3.5 h-3.5" /><span>Active</span></>) : (<><Lock className="w-3.5 h-3.5" /><span>Block</span></>)}
                   </button>
                 </div>
               </div>
