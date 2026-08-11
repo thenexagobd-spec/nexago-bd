@@ -61,6 +61,23 @@ const storeDocMeta = [
   { key: 'foodSafety', label: 'BSTI/Food Safety Certificate (if food)', required: false },
 ];
 
+const STORE_ADMIN_PAGE_OPTIONS = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'orders', label: 'Orders' },
+  { id: 'branches', label: 'Branches' },
+  { id: 'products', label: 'Products' },
+  { id: 'categories', label: 'Categories' },
+  { id: 'inventory', label: 'Inventory' },
+  { id: 'reviews', label: 'Reviews' },
+  { id: 'coupons', label: 'Coupons' },
+  { id: 'tools', label: 'Order Tools' },
+  { id: 'staff', label: 'Staff' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'alerts', label: 'Alerts' },
+  { id: 'support', label: 'Support' },
+];
+const DEFAULT_STORE_ADMIN_PAGES = STORE_ADMIN_PAGE_OPTIONS.map(p => p.id);
+
 const makeStoreId = () => `STR-${Date.now().toString().slice(-7)}`;
 const makeStoreAdminId = () => `SA-${Date.now().toString().slice(-8)}`;
 const fingerprintOf = (value: string) => {
@@ -1123,6 +1140,7 @@ export default function App() {
               adminId: app.adminId,
               siteUrl: `${window.location.origin}/store?key=${encodeURIComponent(app.storeId)}`,
               adminUrl: `${window.location.origin}/store-admin?key=${encodeURIComponent(app.storeId)}`,
+              adminPages: app.adminPages && app.adminPages.length ? app.adminPages : DEFAULT_STORE_ADMIN_PAGES,
             };
             setStores(prev => prev.some(s => s.id === app.storeId) ? prev.map(s => s.id === app.storeId ? { ...s, ...storeRecord } : s) : [storeRecord, ...prev]);
             const primaryBranchPassword = Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -1162,6 +1180,29 @@ export default function App() {
             ],
           } : a));
           showToast(`${field} modified with permanent reason.`, 'success');
+        };
+
+        const toggleStoreAdminPage = (storeId: string, pageId: string) => {
+          if (pageId === 'dashboard') {
+            showToast('Dashboard is required for Store Admin login.', 'info');
+            return;
+          }
+          setStores(prev => prev.map((store: any) => {
+            if (store.id !== storeId) return store;
+            const current = store.adminPages && store.adminPages.length ? store.adminPages : DEFAULT_STORE_ADMIN_PAGES;
+            const next = current.includes(pageId) ? current.filter((id: string) => id !== pageId) : [...current, pageId];
+            return {
+              ...store,
+              adminPages: next,
+              adminAccessUpdatedAt: new Date().toLocaleString('en-GB'),
+              adminAccessLog: [
+                ...(store.adminAccessLog || []),
+                { pageId, action: current.includes(pageId) ? 'cancelled' : 'added', time: new Date().toISOString(), actor: 'super-admin' },
+              ],
+            };
+          }));
+          const page = STORE_ADMIN_PAGE_OPTIONS.find(p => p.id === pageId)?.label || pageId;
+          showToast(`${page} Store Admin access updated.`, 'success');
         };
 
         const handleCreateStore = (e: React.FormEvent) => {
@@ -1492,6 +1533,39 @@ export default function App() {
                             </button>
                           </div>
                         ))}
+                      </div>
+                      <div className="bg-[#080e17] border border-brand-border/40 rounded-lg p-2.5 mb-4">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-wider text-cyan-300">Store Admin Page Access</p>
+                            <p className="text-[8px] text-gray-500">This store admin gets only the pages enabled here.</p>
+                          </div>
+                          <span className="text-[8px] font-bold uppercase text-gray-500">{(s.adminPages?.length || DEFAULT_STORE_ADMIN_PAGES.length)} Active</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                          {STORE_ADMIN_PAGE_OPTIONS.map(page => {
+                            const enabled = (s.adminPages && s.adminPages.length ? s.adminPages : DEFAULT_STORE_ADMIN_PAGES).includes(page.id);
+                            return (
+                              <button
+                                key={page.id}
+                                type="button"
+                                onClick={() => toggleStoreAdminPage(s.id, page.id)}
+                                className={`rounded-lg border px-2 py-1.5 text-[8px] font-black uppercase transition-all ${enabled ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}
+                                title={enabled ? `Cancel ${page.label}` : `Add ${page.label}`}
+                              >
+                                {enabled ? 'ON ' : 'OFF '} {page.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {(s.adminAccessLog || []).length > 0 && (
+                          <div className="mt-2 rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-2">
+                            <p className="text-[8px] font-black uppercase text-cyan-300">Access History</p>
+                            {(s.adminAccessLog || []).slice(-3).map((log: any, i: number) => (
+                              <p key={i} className="mt-1 text-[8px] text-gray-300">{log.pageId}: {log.action}</p>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 

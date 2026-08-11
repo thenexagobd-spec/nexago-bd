@@ -24,6 +24,8 @@ const storeDocMeta = [
   { key: 'foodSafety', label: 'BSTI/Food Safety Certificate (if food)', required: false },
 ];
 
+const DEFAULT_STORE_ADMIN_PAGES = ['dashboard', 'orders', 'branches', 'products', 'categories', 'inventory', 'reviews', 'coupons', 'tools', 'staff', 'payments', 'alerts', 'support'];
+
 const makeStoreId = () => `STR-${String(Date.now()).slice(-7)}`;
 const makeStoreAdminId = () => `SA-${String(Date.now()).slice(-8)}`;
 const fingerprintOf = (value: string) => {
@@ -62,6 +64,7 @@ export default function StoreAdminPortal() {
   const branchSession = branches.find((b: any) => b.branchAdminId === sessionAdminId && b.status === 'Active');
   const activeApplication = storeAdminApps.find((a: any) => ((a.adminId === sessionAdminId) || (branchSession && a.storeId === branchSession.storeId)) && a.status === 'Verified');
   const activeStoreId = branchSession?.storeId || activeApplication?.storeId || '';
+  const activeStore = stores.find((s: any) => s.id === activeStoreId);
   const activeStoreName = activeApplication?.storeName || 'Approved Store';
   const myBranches = branches.filter((b: any) => b.storeId === activeStoreId);
   const queryBranchId = new URLSearchParams(window.location.search).get('branch') || '';
@@ -100,6 +103,7 @@ export default function StoreAdminPortal() {
   const myNotifs = notifications.filter(n => n.audience === 'all' || n.storeId === activeStoreId || (!n.storeId && (n.audience === 'store' || n.audience === 'store-admin')));
   const unreadCount = myNotifs.filter(n => !n.read).length;
 
+  const allowedPages = new Set<string>((activeStore?.adminPages && activeStore.adminPages.length ? activeStore.adminPages : DEFAULT_STORE_ADMIN_PAGES));
   const nav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Orders', icon: ClipboardList, badge: myOrders.filter(o => o.status === 'Pending').length },
@@ -114,7 +118,11 @@ export default function StoreAdminPortal() {
     { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'alerts', label: 'Alerts', icon: Bell, badge: unreadCount },
     { id: 'support', label: 'Support', icon: LifeBuoy, badge: tickets.filter(t => t.status === 'Open').length },
-  ];
+  ].filter(item => allowedPages.has(item.id));
+
+  useEffect(() => {
+    if (activeApplication && nav.length > 0 && !allowedPages.has(tab)) setTab(nav[0].id);
+  }, [activeApplication, allowedPages, nav, tab]);
 
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
 
