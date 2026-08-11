@@ -1567,6 +1567,56 @@ export default function App() {
                           </div>
                         )}
                       </div>
+                      <div className="bg-[#080e17] border border-brand-border/40 rounded-lg p-2.5 mb-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-wider text-amber-300">Admin Fix Permission</p>
+                            <p className="text-[8px] text-gray-500">Send request to this Store Admin before changing their store data.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const subject = window.prompt('Fix request subject', `${s.name} store support fix`);
+                              if (!subject) return;
+                              const terms = window.prompt('Terms and condition / reason for access request', 'Super Admin needs temporary permission to review and fix this store issue. All actions will be recorded with admin/staff ID.');
+                              if (!terms?.trim()) {
+                                showToast('Terms/reason is required before sending request.', 'info');
+                                return;
+                              }
+                              const ticket: any = {
+                                id: `ADMREQ-${Date.now().toString().slice(-7)}`,
+                                user: s.name,
+                                subject,
+                                priority: 'High',
+                                status: 'Open',
+                                date: new Date().toLocaleString('en-GB'),
+                                storeId: s.id,
+                                storeName: s.name,
+                                requesterRole: 'super-admin',
+                                requestStatus: 'Waiting Store Admin Approval',
+                                terms: terms.trim(),
+                                messages: [{ sender: 'admin', text: terms.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }],
+                                auditLog: [{ actor: 'super-admin', action: 'fix-request-sent', time: new Date().toISOString(), note: terms.trim() }],
+                              };
+                              setSupportTickets(prev => [ticket, ...prev]);
+                              setNotifications(prev => [{
+                                id: `NOTIF-${Date.now().toString().slice(-8)}`,
+                                title: 'Super Admin Fix Request',
+                                message: `${subject} - approve from Store Admin Support page.`,
+                                type: 'system',
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                read: false,
+                                audience: 'store-admin',
+                                storeId: s.id,
+                              }, ...prev]);
+                              showToast(`Fix request sent to ${s.name} Store Admin.`, 'success');
+                            }}
+                            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-amber-300"
+                          >
+                            Send Request
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-center border-t border-brand-border/40 pt-3.5 text-xs">

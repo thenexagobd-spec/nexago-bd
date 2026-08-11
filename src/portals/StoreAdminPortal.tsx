@@ -89,6 +89,7 @@ export default function StoreAdminPortal() {
   const [reviewReplies, setReviewReplies] = useState<Record<string, string>>({});
   const [staff, setStaff] = useState<Staff[]>([]);
   const [stf, setStf] = useState({ name: '', role: '', phone: '' });
+  const [supportDraft, setSupportDraft] = useState({ subject: '', message: '', priority: 'Medium' });
 
   const myTxns = txns.filter(t => t.storeId === activeStoreId || myOrderIds.has(t.orderId));
   const pending = myTxns.filter(t => t.status === 'Pending');
@@ -234,6 +235,38 @@ export default function StoreAdminPortal() {
   const replyTicket = (id: string, ok: boolean) => {
     if (!myTickets.some(t => t.id === id)) return;
     setTickets(prev => prev.map(t => (t.id === id ? { ...t, status: ok ? 'Closed' : 'In Progress' } : t)));
+  };
+
+  const createSupportTicket = () => {
+    if (!supportDraft.subject.trim() || !supportDraft.message.trim() || !activeStoreId) return;
+    const ticket: any = {
+      id: `STK-${Date.now().toString().slice(-7)}`,
+      user: activeStoreName,
+      subject: supportDraft.subject.trim(),
+      priority: supportDraft.priority,
+      status: 'Open',
+      date: new Date().toLocaleString('en-GB'),
+      storeId: activeStoreId,
+      branchId: activeBranchId,
+      storeName: activeStoreName,
+      requesterRole: 'store-admin',
+      requestStatus: 'Store Admin Submitted',
+      messages: [{ sender: 'user', text: supportDraft.message.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }],
+      auditLog: [{ actor: sessionAdminId, action: 'ticket-created', time: new Date().toISOString(), note: supportDraft.message.trim() }],
+    };
+    setTickets(prev => [ticket, ...prev]);
+    setSupportDraft({ subject: '', message: '', priority: 'Medium' });
+  };
+
+  const decideAdminRequest = (ticket: any, approve: boolean) => {
+    if (!myTickets.some(t => t.id === ticket.id)) return;
+    setTickets(prev => prev.map((t: any) => t.id === ticket.id ? {
+      ...t,
+      status: approve ? 'In Progress' : 'Resolved',
+      requestStatus: approve ? 'Store Admin Approved Admin Fix' : 'Store Admin Rejected Admin Fix',
+      messages: [...(t.messages || []), { sender: 'user', text: approve ? 'Store Admin approved the Super Admin fix request after reading the terms.' : 'Store Admin rejected the Super Admin fix request.', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }],
+      auditLog: [...(t.auditLog || []), { actor: sessionAdminId, action: approve ? 'approved-admin-fix' : 'rejected-admin-fix', time: new Date().toISOString(), note: t.terms || '' }],
+    } : t));
   };
 
   const addProduct = () => {
@@ -920,20 +953,53 @@ export default function StoreAdminPortal() {
         <div className="space-y-3">
           <div>
             <h3 className="text-sm font-black text-white flex items-center space-x-2"><LifeBuoy className="w-4 h-4 text-brand-orange" /><span>Support Tickets</span></h3>
-            <p className="text-[10px] text-gray-400">Customer tickets from the shared support queue.</p>
+            <p className="text-[10px] text-gray-400">Create store support requests and approve Super Admin fix requests before any work starts.</p>
+          </div>
+          <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-white">New Support Request</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_140px]">
+              <input value={supportDraft.subject} onChange={e => setSupportDraft(prev => ({ ...prev, subject: e.target.value }))} placeholder="Problem subject" className="rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+              <select value={supportDraft.priority} onChange={e => setSupportDraft(prev => ({ ...prev, priority: e.target.value }))} className="rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-[10px] outline-none focus:border-brand-orange">
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+              </select>
+            </div>
+            <textarea value={supportDraft.message} onChange={e => setSupportDraft(prev => ({ ...prev, message: e.target.value }))} placeholder="Write the issue, order/product/payment reference, and what help you need" className="mt-2 min-h-20 w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-[10px] outline-none focus:border-brand-orange" />
+            <button onClick={createSupportTicket} className="mt-2 rounded-xl bg-brand-orange px-4 py-2 text-[10px] font-black uppercase text-white">Submit Ticket to Super Admin</button>
           </div>
           {myTickets.length === 0 ? <p className="text-center text-[10px] text-gray-500 py-10">No tickets.</p> : (
             <div className="space-y-2">
-              {myTickets.map(t => (
+              {myTickets.map((t: any) => (
                 <div key={t.id} className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="min-w-0">
                       <p className="text-[11px] font-mono text-brand-orange font-bold">{t.id}</p>
                       <p className="text-[11px] font-bold text-white truncate">{t.subject}</p>
                       <p className="text-[9px] text-gray-500">{t.category} · {t.date}</p>
+                      {t.requestStatus && <p className="mt-1 text-[9px] font-black uppercase text-cyan-300">{t.requestStatus}</p>}
                     </div>
                     <span className={`px-2 py-1 rounded-lg border text-[8px] font-black ${t.status === 'Open' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : t.status === 'Closed' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-sky-500/20 text-sky-300 border-sky-500/30'}`}>{t.status}</span>
                   </div>
+                  {t.terms && (
+                    <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                      <p className="text-[9px] font-black uppercase text-amber-300">Super Admin Fix Request Terms</p>
+                      <p className="mt-1 text-[10px] leading-relaxed text-amber-50">{t.terms}</p>
+                      {t.requestStatus === 'Waiting Store Admin Approval' && (
+                        <div className="mt-3 flex flex-wrap justify-end gap-2">
+                          <button onClick={() => decideAdminRequest(t, false)} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-red-300">Reject Request</button>
+                          <button onClick={() => decideAdminRequest(t, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[9px] font-black uppercase text-white">Approve Fix Request</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {(t.messages || []).length > 0 && (
+                    <div className="mt-3 space-y-1 rounded-xl border border-[#1e3050] bg-[#0a1322] p-2">
+                      {(t.messages || []).slice(-3).map((m: any, i: number) => (
+                        <p key={i} className="text-[9px] text-gray-300"><b className={m.sender === 'admin' ? 'text-brand-orange' : 'text-cyan-300'}>{m.sender}:</b> {m.text}</p>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center justify-end gap-2 mt-3">
                     <button onClick={() => replyTicket(t.id, false)} className="px-3 py-1.5 bg-sky-500/15 border border-sky-500/40 text-sky-300 rounded-lg text-[9px] font-black hover:bg-sky-500/25 transition-colors">In Progress</button>
                     <button onClick={() => replyTicket(t.id, true)} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-[9px] font-black transition-colors">✓ Close</button>
