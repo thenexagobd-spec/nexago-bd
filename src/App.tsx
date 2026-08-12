@@ -2119,17 +2119,17 @@ export default function App() {
 
       case 'Staff Management':
         return (
-          <div className="flex flex-col gap-6 fade-in">
-            <div>
-              <h3 className="text-lg font-bold text-white uppercase tracking-wider">Supermarket & Dispatch Staff</h3>
-              <p className="text-xs text-gray-400">Authorized personnel managing logistics and partner portals</p>
-            </div>
-            <div className="flex justify-end">
-              <button onClick={addSuperAdminStaff} className="rounded-xl bg-brand-orange px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white hover:bg-brand-orange-hover">
+          <div className="flex flex-col gap-4 fade-in">
+            <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/20 backdrop-blur md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Supermarket & Dispatch Staff</h3>
+                <p className="text-xs text-gray-400">Authorized personnel managing logistics and partner portals</p>
+              </div>
+              <button onClick={addSuperAdminStaff} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-brand-orange/20 hover:bg-brand-orange-hover">
                 Add Super Admin Staff
               </button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
               {[
                 ['All', staff.filter((s: any) => !s.archived && s.status !== 'Archived').length],
                 ['Pending Verification', staff.filter((s: any) => !s.archived && s.status === 'Pending Verification').length],
@@ -2138,28 +2138,32 @@ export default function App() {
                 ['Suspended', staff.filter((s: any) => !s.archived && s.status === 'Suspended').length],
                 ['Archived', staff.filter((s: any) => s.archived || s.status === 'Archived').length],
               ].map(([label, count]) => (
-                <button key={String(label)} onClick={() => setStaffKycFilter(label as any)} className={`rounded-xl border p-4 text-left transition-colors ${staffKycFilter === label ? 'border-brand-orange/50 bg-brand-orange/10' : 'border-brand-border bg-brand-card hover:bg-brand-dark/40'}`}>
+                <button key={String(label)} onClick={() => setStaffKycFilter(label as any)} className={`rounded-xl border p-3 text-left shadow-sm transition-colors ${staffKycFilter === label ? 'border-brand-orange/50 bg-brand-orange/10' : 'border-white/10 bg-white/[0.035] hover:bg-white/[0.06]'}`}>
                   <p className="text-[9px] font-black uppercase tracking-widest text-gray-500">{label}</p>
                   <p className="mt-1 text-2xl font-black text-white">{count}</p>
                 </button>
               ))}
             </div>
-            <div className="flex flex-col gap-3 rounded-2xl border border-brand-border bg-brand-card p-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-4 backdrop-blur md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-white">KYC Queue Control</p>
                 <p className="mt-1 text-[10px] font-semibold text-gray-500">Only real submitted staff records appear here. No demo records are created.</p>
               </div>
-              <input value={staffKycSearch} onChange={e => setStaffKycSearch(e.target.value)} className="w-full rounded-xl border border-brand-border bg-brand-dark px-4 py-3 text-xs font-bold text-white outline-none focus:border-brand-orange md:max-w-sm" placeholder="Search staff ID, name, phone, document..." />
+              <input value={staffKycSearch} onChange={e => setStaffKycSearch(e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-xs font-bold text-white outline-none focus:border-brand-orange md:max-w-sm" placeholder="Search staff ID, name, phone, document..." />
             </div>
             {staffKycOpen && (
-              <form onSubmit={submitSuperAdminStaffKyc} className="rounded-2xl border border-brand-border bg-brand-card p-5 shadow-xl">
-                <div className="mb-4 flex items-center justify-between gap-3">
+              <>
+              <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" onClick={() => setStaffKycOpen(false)} />
+              <form onSubmit={submitSuperAdminStaffKyc} className="fixed left-1/2 top-6 z-50 max-h-[calc(100vh-3rem)] w-[min(1120px,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-white/10 bg-[#0b1220]/95 p-6 shadow-2xl shadow-black/70 backdrop-blur-xl">
+                <div className="mb-4 flex items-center justify-between gap-3 border-b border-brand-border pb-4">
                   <div>
-                    <h4 className="text-sm font-black uppercase tracking-wider text-white">Staff KYC Submission</h4>
-                    <p className="text-[10px] font-semibold text-gray-500">All fields and files are required. Documents are saved in secure storage and linked to the staff audit record.</p>
+                    <h4 className="text-base font-black uppercase tracking-wider text-white">New Staff KYC Registration</h4>
+                    <p className="text-[10px] font-semibold text-gray-500">Submit verified staff identity, permissions and secure KYC files. No demo data is created.</p>
                   </div>
-                  <button type="button" onClick={() => setStaffKycOpen(false)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                  <button type="button" onClick={() => setStaffKycOpen(false)} className="rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-card">Close</button>
                 </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Identity Information</p>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   {[
                     ['name', 'Full Name', 'text'],
@@ -2172,17 +2176,18 @@ export default function App() {
                   ].map(([keyName, label, type]) => (
                     <label key={keyName} className="block">
                       <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span>
-                      <input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-brand-dark px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" />
+                      <input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" />
                     </label>
                   ))}
                 </div>
-                <div className="mt-4 rounded-xl border border-brand-border bg-brand-dark/40 p-3">
-                  <p className="mb-3 text-[9px] font-black uppercase tracking-wider text-gray-500">Permission Builder</p>
+                </div>
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Permission Builder</p>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     {['support', 'orders', 'tools', 'reports', 'notifications', 'payouts', 'kyc-review', 'security'].map(permission => {
                       const selected = staffKycForm.permissions.split(',').map(p => p.trim()).includes(permission);
                       return (
-                        <label key={permission} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase ${selected ? 'border-brand-orange/40 bg-brand-orange/10 text-brand-orange' : 'border-brand-border bg-brand-card text-gray-400'}`}>
+                        <label key={permission} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase ${selected ? 'border-brand-orange/40 bg-brand-orange/10 text-brand-orange' : 'border-brand-border bg-[#0d1726] text-gray-400'}`}>
                           <input
                             type="checkbox"
                             checked={selected}
@@ -2199,13 +2204,15 @@ export default function App() {
                     })}
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Secure KYC Documents</p>
+                <div className="grid gap-3 md:grid-cols-3">
                   {[
                     ['identity', 'Identity Document'],
                     ['photo', 'Staff Photo'],
                     ['police', 'Police / Reference Check'],
                   ].map(([keyName, label]) => (
-                    <div key={keyName} className="rounded-xl border border-dashed border-brand-border bg-brand-dark/40 p-3">
+                    <div key={keyName} className="rounded-xl border border-dashed border-brand-border bg-[#070d16] p-3">
                       <span className="block text-[9px] font-black uppercase text-gray-500">{label}</span>
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         <label className="flex cursor-pointer items-center justify-center rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20">
@@ -2221,12 +2228,14 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 flex justify-end">
-                  <button disabled={staffKycBusy} type="submit" className="rounded-xl bg-emerald-600 px-5 py-2.5 text-[10px] font-black uppercase tracking-wider text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+                </div>
+                <div className="mt-5 flex justify-end border-t border-brand-border pt-4">
+                  <button disabled={staffKycBusy} type="submit" className="rounded-xl bg-emerald-600 px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
                     {staffKycBusy ? 'Saving KYC...' : 'Submit KYC & Save Staff'}
                   </button>
                 </div>
               </form>
+              </>
             )}
             {staffKycViewing && (
               <div className="order-last rounded-2xl border border-sky-500/20 bg-[#07111f] p-5 shadow-xl">
