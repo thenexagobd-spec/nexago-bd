@@ -6,10 +6,10 @@
  * support, notifications and reports. Reads the same localStorage keys as the
  * admin panel.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, LifeBuoy, Bell, BarChart3, CheckCircle2, TrendingUp, Ticket, ShieldCheck, Lock, LogOut } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync, securityApi, securityAudit } from './portalUtils';
+import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync, securityApi, securityAudit, lsGet } from './portalUtils';
 
 export default function StaffPortal() {
   useCloudSync();
@@ -27,6 +27,14 @@ export default function StaffPortal() {
   const [custTickets, setCustTickets] = useState<any[]>(() => {
     try { const raw = localStorage.getItem('ss_tickets_v2'); return raw ? JSON.parse(raw) : []; } catch { return []; }
   });
+  const [staffRecords, setStaffRecords] = useState<any[]>(() => lsGet('sd_staff', []));
+  useEffect(() => {
+    const refresh = () => setStaffRecords(lsGet('sd_staff', []));
+    window.addEventListener('storage', refresh);
+    window.addEventListener('nexago-local-write', refresh);
+    const timer = setInterval(refresh, 2000);
+    return () => { window.removeEventListener('storage', refresh); window.removeEventListener('nexago-local-write', refresh); clearInterval(timer); };
+  }, []);
 
   const staffLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,6 +140,10 @@ export default function StaffPortal() {
   const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   const closeTicket = (id: string) => setTickets(prev => prev.map(t => (t.id === id ? { ...t, status: 'Closed' } : t)));
   const closeCustTicket = (id: string) => setCustTickets(prev => prev.map(t => (t.id === id ? { ...t, status: 'Resolved' } : t)));
+  const ownStaff = staffRecords.find((s: any) => s.id === session.user?.userId) || session.user || {};
+  const ownCardHtml = () => `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Arial}.card{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:5mm;padding:5mm;color:white;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316);position:relative;overflow:hidden}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{position:absolute;right:5mm;top:5mm;background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}.main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photo{width:18mm;height:24mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}@media print{body{background:white}@page{size:85.6mm 54mm;margin:0}}</style></head><body><div class="card"><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div><div class="logo">NXG</div><div class="main"><div class="photo">${String(ownStaff.name || 'S').slice(0,1).toUpperCase()}</div><div><div class="name">${ownStaff.name || ownStaff.userId || 'Staff'}</div><div class="meta">${ownStaff.role || 'Staff'} · ${ownStaff.shift || ''}</div><div class="id">${ownStaff.permanentNumber || ownStaff.id || ownStaff.userId}</div><div class="meta">Phone: ${ownStaff.phone || 'N/A'}</div></div></div><div class="foot"><span>THE NEXAGO BD</span><span>${ownStaff.status || 'Active'}</span><span>Official Staff ID</span></div></div></body></html>`;
+  const downloadOwnCard = () => { const url = URL.createObjectURL(new Blob([ownCardHtml()], { type: 'text/html' })); const a = document.createElement('a'); a.href = url; a.download = `${ownStaff.permanentNumber || ownStaff.id || 'staff'}-id-card.html`; a.click(); URL.revokeObjectURL(url); };
+  const printOwnCard = () => { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f); f.contentDocument?.open(); f.contentDocument?.write(ownCardHtml()); f.contentDocument?.close(); setTimeout(() => { f.contentWindow?.print(); setTimeout(() => f.remove(), 1000); }, 250); };
 
   return (
     <PortalShell role="Admin Staff" tagline={`Super Admin Support · ${session.user?.userId || 'Staff'}`} nav={[...nav, { id: 'logout', label: 'Logout', icon: LogOut }]} active={tab} onNav={(id) => id === 'logout' ? staffLogout() : setTab(id)} onBack={goBack}>
@@ -163,6 +175,18 @@ export default function StaffPortal() {
                 <p className="text-[9px] text-gray-500 mt-0.5">{k.sub}</p>
               </div>
             ))}
+          </div>
+          <div className="rounded-2xl border border-orange-500/20 bg-[#101d30] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white">My Smart Staff ID Card</p>
+                <p className="mt-1 font-mono text-[10px] font-bold text-brand-orange">{ownStaff.permanentNumber || ownStaff.id || session.user?.userId}</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={downloadOwnCard} className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-[10px] font-black uppercase text-emerald-300">Download</button>
+                <button onClick={printOwnCard} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-[10px] font-black uppercase text-sky-300">Print</button>
+              </div>
+            </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-4">
