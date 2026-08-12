@@ -1321,6 +1321,59 @@ export default function App() {
     showToast('Incomplete staff record archived. Recovery Archived filter-e thakbe.', 'success');
   };
 
+  const addOneTestStaff = () => {
+    if (staff.some((s: any) => s.id === 'STF-TEST-001')) {
+      showToast('One test staff already exists.', 'info');
+      return;
+    }
+    const now = new Date().toISOString();
+    const testStaff = {
+      id: 'STF-TEST-001',
+      permanentNumber: 'NXG202600000001',
+      name: 'Test Staff',
+      fatherName: 'Test Father',
+      motherName: 'Test Mother',
+      dob: '1995-01-01',
+      gender: 'Male',
+      nationality: 'Bangladeshi',
+      bloodGroup: 'B+',
+      phone: '01700000000',
+      email: 'test.staff@nexago.local',
+      emergencyContact: '01800000000',
+      nid: 'TEST-NID-0001',
+      address: 'Test present address',
+      permanentAddress: 'Test permanent address',
+      district: 'Dhaka',
+      upazila: 'Dhaka',
+      role: 'Support Staff',
+      shift: 'Full Time',
+      joiningDate: new Date().toISOString().slice(0, 10),
+      supervisor: 'Super Admin',
+      contractType: 'Test',
+      referenceOne: 'Test Reference 1',
+      referenceTwo: 'Test Reference 2',
+      deviceAccess: 'Allowed after approval',
+      permissions: ['support', 'orders', 'reports', 'notifications'],
+      status: 'Active',
+      scope: 'super-admin',
+      documentStatus: 'Verified',
+      documents: [
+        { type: 'Identity Document', ref: 'test-preview-only', submittedAt: now, status: 'Stored' },
+        { type: 'Staff Photo', ref: 'test-preview-only', submittedAt: now, status: 'Stored' },
+        { type: 'Police/Reference Check', ref: 'test-preview-only', submittedAt: now, status: 'Stored' },
+      ],
+      auditTrail: [
+        { action: 'test-staff-created', actor: 'super-admin', at: now, reason: 'single test staff requested for preview only' },
+      ],
+      createdAt: now,
+      verifiedAt: now,
+      testRecord: true,
+    };
+    setStaff(prev => [testStaff, ...prev]);
+    securityAudit('test-staff-created', { actor: 'super-admin', newValue: { staffId: testStaff.id }, reason: 'single test staff requested for preview only' });
+    showToast('One test staff created for preview.', 'success');
+  };
+
   // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
   const sidebarItems = React.useMemo(() => {
     const allItems: Array<{ name: string; icon: any; badgeCount?: number; section?: string; onClick?: () => void }> = [
@@ -2241,9 +2294,14 @@ export default function App() {
                 <h3 className="text-lg font-bold text-white uppercase tracking-wider">Supermarket & Dispatch Staff</h3>
                 <p className="text-xs text-gray-400">Authorized personnel managing logistics and partner portals</p>
               </div>
-              <button onClick={addSuperAdminStaff} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-brand-orange/20 hover:bg-brand-orange-hover">
-                Add Super Admin Staff
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={addOneTestStaff} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-sky-300 hover:bg-sky-500/20">
+                  Add 1 Test Staff
+                </button>
+                <button onClick={addSuperAdminStaff} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-brand-orange/20 hover:bg-brand-orange-hover">
+                  Add Super Admin Staff
+                </button>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.035] p-2">
               {[
