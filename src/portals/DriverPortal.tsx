@@ -26,7 +26,7 @@ export default function DriverPortal() {
   useCloudSync();
   const [orders, setOrders] = useOrders();
   const [drivers, setDrivers] = useDrivers();
-  const [txns] = useWalletTxns();
+  const [txns, setTxns] = useWalletTxns();
   const [tickets, setTickets] = useTickets();
   const [notifications, setNotifications] = useNotifications();
   const [sessionId, setSessionId] = useState<string>(() => lsGet('sd_driver_session', ''));
@@ -477,6 +477,33 @@ export default function DriverPortal() {
     setTicketOpen(false);
     setTicketSubject('');
     setTicketDesc('');
+  };
+
+  // Withdraw to bKash / Nagad / Bank — records a real payout request into the
+  // shared wallet transaction ledger (ss_wtxn_v3) so it shows in Payout History
+  // and is visible to the admin settlement dashboard.
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawMethod, setWithdrawMethod] = useState('bKash');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+
+  const submitWithdraw = () => {
+    const amt = parseFloat(withdrawAmount);
+    if (!amt || amt <= 0) { showToast('Enter a valid withdrawal amount'); return; }
+    if (amt > earned) { showToast(`You can withdraw up to ${bdt(earned)}`); return; }
+    const now = new Date();
+    const txn = {
+      id: `PAYOUT-${Date.now().toString().slice(-6)}`,
+      type: `Withdrawal (${withdrawMethod})`,
+      amount: -Math.round(amt),
+      date: `${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      status: 'Requested',
+      driverId: me?.id,
+      driverName: me?.name,
+    };
+    setTxns(prev => [txn, ...(prev || [])]);
+    setWithdrawOpen(false);
+    setWithdrawAmount('');
+    showToast(`Withdrawal of ${bdt(amt)} to ${withdrawMethod} requested — admin will settle shortly`);
   };
 
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
@@ -1376,8 +1403,11 @@ export default function DriverPortal() {
                           <span className="flex items-center space-x-1 text-[9px] text-gray-500"><Star className="w-3 h-3 text-amber-400" /><span>Rate Customer (Optional)</span></span>
                           <div className="flex space-x-1">
                             {[1, 2, 3, 4, 5].map(st => (
-                              <button key={st} onClick={() => setCustomerRating(prev => ({ ...prev, [o.id]: st }))}
-                                className={`text-sm cursor-pointer ${(customerRating[o.id] || 0) >= st ? 'text-amber-400' : 'text-gray-600 hover:text-amber-300'}`}>★</button>
+                              <button key={st} onClick={() => {
+                                setOrders(prev => prev.map(x => x.id === o.id ? { ...x, customerRating: st } : x));
+                                setCustomerRating(prev => ({ ...prev, [o.id]: st }));
+                              }}
+                                className={`text-sm cursor-pointer ${((o as any).customerRating || customerRating[o.id] || 0) >= st ? 'text-amber-400' : 'text-gray-600 hover:text-amber-300'}`}>★</button>
                             ))}
                           </div>
                         </div>
@@ -1427,7 +1457,7 @@ export default function DriverPortal() {
                 <div className="flex justify-between text-[8px] text-gray-500 mt-1.5"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
               </div>
 
-              <button onClick={() => { /* withdraw */ }} className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-black uppercase rounded-xl cursor-pointer shadow-lg">
+              <button onClick={() => { setWithdrawAmount(String(earned)); setWithdrawMethod('bKash'); setWithdrawOpen(true); }} className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-black uppercase rounded-xl cursor-pointer shadow-lg">
                 Withdraw to bKash / Bank
               </button>
 
@@ -1590,7 +1620,7 @@ export default function DriverPortal() {
                   <div className={`w-4 h-4 rounded-full bg-white transition-all shadow ${autoAccept ? 'ml-auto' : ''}`}></div>
                 </button>
               </div>
-              <button onClick={() => { /* version */ }} className="w-full glass-soft p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-[#132238]">
+              <button onClick={() => showToast('NexaGo Driver v1.4.2 — you are on the latest version')} className="w-full glass-soft p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-[#132238]">
                 <p className="text-[10px] text-gray-400">App Version</p>
                 <p className="text-white font-bold text-[11px]">v1.4.2 ✓</p>
               </button>
@@ -1793,6 +1823,39 @@ export default function DriverPortal() {
       )}
 
       {/* ============ REPORT MODAL ============ */}
+      {withdrawOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setWithdrawOpen(false)}>
+          <div className="w-full max-w-md glass-soft rounded-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h5 className="text-xs font-black text-white flex items-center gap-1.5"><Wallet className="w-4 h-4 text-cyan-400" />Withdraw Earnings</h5>
+              <button onClick={() => setWithdrawOpen(false)} className="w-6 h-6 rounded-full glass-input flex items-center justify-center cursor-pointer"><X className="w-3.5 h-3.5 text-white" /></button>
+            </div>
+            <div className="text-center glass-input rounded-xl py-3">
+              <p className="text-[8px] text-gray-400 uppercase font-black">Available Balance</p>
+              <p className="text-xl font-black text-emerald-400">{bdt(earned)}</p>
+            </div>
+            <div>
+              <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Withdraw To</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['bKash', 'Nagad', 'Bank'].map(m => (
+                  <button key={m} onClick={() => setWithdrawMethod(m)} className={`py-2.5 rounded-xl text-[10px] font-black uppercase cursor-pointer transition-all ${withdrawMethod === m ? 'bg-cyan-600 text-white shadow-lg' : 'glass-input text-gray-400 hover:text-white'}`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[8px] text-gray-400 uppercase block font-black mb-1">Amount (৳)</label>
+              <input type="number" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} min={1} max={earned} placeholder="0" className="w-full glass-input rounded-xl px-3 py-2.5 text-[11px] font-mono text-white outline-none focus:border-brand-orange" />
+              <button onClick={() => setWithdrawAmount(String(earned))} className="text-[9px] text-cyan-400 font-bold mt-1 hover:underline cursor-pointer">Withdraw all ({bdt(earned)})</button>
+            </div>
+            <button onClick={submitWithdraw} className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black uppercase rounded-xl cursor-pointer">
+              Request Withdrawal
+            </button>
+          </div>
+        </div>
+      )}
+
       {reportOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setReportOpen(null)}>
           <div className="w-full max-w-md glass-soft rounded-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
