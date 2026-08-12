@@ -244,7 +244,7 @@ export default function App() {
   const [staffLoginPassword, setStaffLoginPassword] = useState('');
   const [staffActionTarget, setStaffActionTarget] = useState<{ member: any; status: 'Active' | 'Rejected' | 'Suspended' } | null>(null);
   const [staffActionReason, setStaffActionReason] = useState('');
-  const [staffKycFilter, setStaffKycFilter] = useState<'All' | 'Pending Verification' | 'Active' | 'Rejected' | 'Suspended'>('All');
+  const [staffKycFilter, setStaffKycFilter] = useState<'All' | 'Pending Verification' | 'Active' | 'Rejected' | 'Suspended' | 'Archived'>('All');
   const [staffKycSearch, setStaffKycSearch] = useState('');
   const [staffProfile, setStaffProfile] = useState<any | null>(null);
 
@@ -1178,9 +1178,32 @@ export default function App() {
   const filteredStaff = staff.filter((s: any) => {
     const haystack = [s.id, s.name, s.phone, s.nid, s.role, s.status, s.documentStatus].join(' ').toLowerCase();
     const matchesSearch = !staffKycSearch.trim() || haystack.includes(staffKycSearch.trim().toLowerCase());
-    const matchesFilter = staffKycFilter === 'All' || s.status === staffKycFilter;
+    const archived = s.status === 'Archived' || s.archived;
+    const matchesFilter = staffKycFilter === 'Archived' ? archived : (staffKycFilter === 'All' ? !archived : s.status === staffKycFilter && !archived);
     return matchesSearch && matchesFilter;
   });
+
+  const archiveIncompleteStaff = (member: any) => {
+    const docs = Array.isArray(member.documents) ? member.documents : [];
+    if (docs.length >= 3) {
+      showToast('Complete KYC record archive korar age Suspend/Reject use korun.', 'info');
+      return;
+    }
+    const now = new Date().toISOString();
+    setStaff(prev => prev.map((s: any) => s.id === member.id ? {
+      ...s,
+      status: 'Archived',
+      archived: true,
+      archivedAt: now,
+      loginEnabled: false,
+      auditTrail: [
+        ...(s.auditTrail || []),
+        { action: 'staff-incomplete-archived', actor: 'super-admin', at: now, reason: 'incomplete/not-submitted KYC hidden from active queue' },
+      ],
+    } : s));
+    securityAudit('staff-incomplete-archived', { actor: 'super-admin', newValue: { staffId: member.id }, reason: 'incomplete KYC archived from main queue' });
+    showToast('Incomplete staff record archived. Recovery Archived filter-e thakbe.', 'success');
+  };
 
   // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
   const sidebarItems = React.useMemo(() => {
@@ -2108,11 +2131,12 @@ export default function App() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {[
-                ['All', staff.length],
-                ['Pending Verification', staff.filter((s: any) => s.status === 'Pending Verification').length],
-                ['Active', staff.filter((s: any) => s.status === 'Active').length],
-                ['Rejected', staff.filter((s: any) => s.status === 'Rejected').length],
-                ['Suspended', staff.filter((s: any) => s.status === 'Suspended').length],
+                ['All', staff.filter((s: any) => !s.archived && s.status !== 'Archived').length],
+                ['Pending Verification', staff.filter((s: any) => !s.archived && s.status === 'Pending Verification').length],
+                ['Active', staff.filter((s: any) => !s.archived && s.status === 'Active').length],
+                ['Rejected', staff.filter((s: any) => !s.archived && s.status === 'Rejected').length],
+                ['Suspended', staff.filter((s: any) => !s.archived && s.status === 'Suspended').length],
+                ['Archived', staff.filter((s: any) => s.archived || s.status === 'Archived').length],
               ].map(([label, count]) => (
                 <button key={String(label)} onClick={() => setStaffKycFilter(label as any)} className={`rounded-xl border p-4 text-left transition-colors ${staffKycFilter === label ? 'border-brand-orange/50 bg-brand-orange/10' : 'border-brand-border bg-brand-card hover:bg-brand-dark/40'}`}>
                   <p className="text-[9px] font-black uppercase tracking-widest text-gray-500">{label}</p>
@@ -2298,6 +2322,14 @@ export default function App() {
                   <div className="flex gap-2">
                     <button onClick={() => viewStaffDocuments(staffProfile)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase text-sky-300 hover:bg-sky-500/20">KYC Viewer</button>
                     <button onClick={() => updateStaffVerification(staffProfile, 'Suspended')} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase text-red-300 hover:bg-red-500/20">Emergency Freeze</button>
+                    {(staffProfile.archived || staffProfile.status === 'Archived') && (
+                      <button onClick={() => {
+                        const now = new Date().toISOString();
+                        setStaff(prev => prev.map((s: any) => s.id === staffProfile.id ? { ...s, archived: false, status: 'Pending Verification', auditTrail: [...(s.auditTrail || []), { action: 'staff-archive-restored', actor: 'super-admin', at: now, reason: 'restored from archive for KYC correction' }] } : s));
+                        setStaffProfile(null);
+                        showToast('Archived staff restored to Pending Verification.', 'success');
+                      }} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300 hover:bg-emerald-500/20">Restore</button>
+                    )}
                     <button onClick={() => setStaffProfile(null)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
                   </div>
                 </div>
@@ -2390,6 +2422,11 @@ export default function App() {
                           <button onClick={() => updateStaffVerification(s, 'Suspended')} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase text-amber-300 hover:bg-amber-500/20">
                             Freeze
                           </button>
+                          {(!(s.documents || []).length || s.documentStatus === 'Not Submitted') && (
+                            <button onClick={() => archiveIncompleteStaff(s)} className="rounded-lg border border-gray-500/30 bg-gray-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase text-gray-300 hover:bg-gray-500/20">
+                              Archive
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="py-3 px-4 text-right">
