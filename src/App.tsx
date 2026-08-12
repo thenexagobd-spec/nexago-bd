@@ -213,7 +213,19 @@ export default function App() {
 
   const [coupons, setCoupons] = useState<any[]>(() => getStoredData('sd_coupons', []));
 
-  const [staff, setStaff] = useState<any[]>(() => getStoredData('sd_staff', []));
+  const normalizeStaffKyc = (rows: any[]) => (rows || []).map((s: any) => {
+    const docs = Array.isArray(s.documents) ? s.documents : [];
+    const hasFullKyc = docs.length >= 3 && docs.every((d: any) => d && (d.fileId || d.ref));
+    if (hasFullKyc) return s;
+    return {
+      ...s,
+      status: s.status === 'Active' ? 'Pending Verification' : (s.status || 'Pending Verification'),
+      documentStatus: s.documentStatus && s.documentStatus !== 'Verified' ? s.documentStatus : 'Not Submitted',
+      loginEnabled: false,
+    };
+  });
+
+  const [staff, setStaff] = useState<any[]>(() => normalizeStaffKyc(getStoredData('sd_staff', [])));
   const [staffKycOpen, setStaffKycOpen] = useState(false);
   const [staffKycViewing, setStaffKycViewing] = useState<any | null>(null);
   const [staffKycForm, setStaffKycForm] = useState({
@@ -301,7 +313,7 @@ export default function App() {
   useEffect(() => { setStoredData('sd_categories', categories); }, [categories]);
   useEffect(() => { setStoredData('sd_inventory', inventory); }, [inventory]);
   useEffect(() => { setStoredData('sd_coupons', coupons); }, [coupons]);
-  useEffect(() => { setStoredData('sd_staff', staff); }, [staff]);
+  useEffect(() => { setStoredData('sd_staff', normalizeStaffKyc(staff)); }, [staff]);
   useEffect(() => { setStoredData('sd_reviews', reviews); }, [reviews]);
   useEffect(() => { setStoredData('sd_marketing', marketing); }, [marketing]);
   useEffect(() => { setStoredData('sd_banners', banners); }, [banners]);
@@ -974,6 +986,12 @@ export default function App() {
   };
 
   const createStaffLogin = (member: any, password = '') => {
+    const docs = Array.isArray(member.documents) ? member.documents : [];
+    const hasFullKyc = docs.length >= 3 && docs.every((d: any) => d && (d.fileId || d.ref));
+    if (!hasFullKyc || member.documentStatus !== 'Verified' || member.status !== 'Active') {
+      showToast('KYC verified na hole staff login create kora jabe na.', 'info');
+      return;
+    }
     if (!password) {
       setStaffLoginTarget(member);
       setStaffLoginPassword('');
@@ -1116,6 +1134,12 @@ export default function App() {
   };
 
   const updateStaffVerification = (member: any, nextStatus: 'Active' | 'Rejected' | 'Suspended', reason = '') => {
+    const docs = Array.isArray(member.documents) ? member.documents : [];
+    const hasFullKyc = docs.length >= 3 && docs.every((d: any) => d && (d.fileId || d.ref));
+    if (nextStatus === 'Active' && !hasFullKyc) {
+      showToast('3 ta KYC document submit na hole approve kora jabe na.', 'info');
+      return;
+    }
     if (!reason) {
       setStaffActionTarget({ member, status: nextStatus });
       setStaffActionReason('');
@@ -2072,7 +2096,7 @@ export default function App() {
 
       case 'Staff Management':
         return (
-          <div className="space-y-6 fade-in">
+          <div className="flex flex-col gap-6 fade-in">
             <div>
               <h3 className="text-lg font-bold text-white uppercase tracking-wider">Supermarket & Dispatch Staff</h3>
               <p className="text-xs text-gray-400">Authorized personnel managing logistics and partner portals</p>
@@ -2181,7 +2205,7 @@ export default function App() {
               </form>
             )}
             {staffKycViewing && (
-              <div className="rounded-2xl border border-sky-500/20 bg-[#07111f] p-5 shadow-xl">
+              <div className="order-last rounded-2xl border border-sky-500/20 bg-[#07111f] p-5 shadow-xl">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-black uppercase tracking-wider text-white">KYC Document Viewer</h4>
@@ -2235,7 +2259,7 @@ export default function App() {
               </div>
             )}
             {staffLoginTarget && (
-              <div className="rounded-2xl border border-brand-orange/20 bg-brand-card p-5 shadow-xl">
+              <div className="order-last rounded-2xl border border-brand-orange/20 bg-brand-card p-5 shadow-xl">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-black uppercase tracking-wider text-white">Create Staff Portal Login</h4>
@@ -2250,7 +2274,7 @@ export default function App() {
               </div>
             )}
             {staffActionTarget && (
-              <div className="rounded-2xl border border-amber-500/20 bg-brand-card p-5 shadow-xl">
+              <div className="order-last rounded-2xl border border-amber-500/20 bg-brand-card p-5 shadow-xl">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-black uppercase tracking-wider text-white">Save Verification Decision</h4>
@@ -2265,7 +2289,7 @@ export default function App() {
               </div>
             )}
             {staffProfile && (
-              <div className="rounded-2xl border border-violet-500/20 bg-[#0a1020] p-5 shadow-xl">
+              <div className="order-last rounded-2xl border border-violet-500/20 bg-[#0a1020] p-5 shadow-xl">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-black uppercase tracking-wider text-white">Staff 360 Profile</h4>
@@ -2324,8 +2348,10 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border/40">
-                  {filteredStaff.map(s => {
+                  {filteredStaff.map(raw => {
+                    const s = normalizeStaffKyc([raw])[0];
                     const risk = staffRiskOf(s);
+                    const canCreateLogin = s.status === 'Active' && s.documentStatus === 'Verified' && (s.documents || []).length >= 3;
                     return (
                     <tr key={s.id} className="hover:bg-brand-dark/10 transition-colors">
                       <td className="py-3 px-4">
@@ -2349,7 +2375,7 @@ export default function App() {
                         <p className="mt-1 text-[9px] font-bold uppercase text-gray-500">{s.documentStatus || 'Not Submitted'}</p>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${s.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : s.status === 'Suspended' || s.status === 'Rejected' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>
                           {s.status}
                         </span>
                       </td>
@@ -2367,7 +2393,7 @@ export default function App() {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <button disabled={s.status !== 'Active'} onClick={() => createStaffLogin(s)} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20 disabled:cursor-not-allowed disabled:opacity-40">
+                        <button disabled={!canCreateLogin} onClick={() => createStaffLogin(s)} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20 disabled:cursor-not-allowed disabled:opacity-40">
                           {s.loginEnabled ? 'Reset Login' : 'Create Login'}
                         </button>
                       </td>
