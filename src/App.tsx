@@ -91,7 +91,7 @@ const code39SvgDataUrlThick = (value: string) => {
   const bars = code39Bars(value);
   let x = 0;
   const rects = bars.map((bar) => {
-    const w = bar.wide ? 8 : 4;
+    const w = bar.wide ? 12 : 6;
     const rect = bar.on ? `<rect x="${x}" y="0" width="${w}" height="64" fill="#020617"/>` : '';
     x += w + 2;
     return rect;
@@ -1290,10 +1290,10 @@ export default function App() {
   const staffCardHtml = (card: any) => `<!doctype html><html><head><meta charset="utf-8"><title>${card.id} Staff ID</title><style>
     body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Arial,sans-serif}
     .card{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:5mm;padding:5mm;color:white;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316);position:relative;overflow:hidden}
-    .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}
+    .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px;background:linear-gradient(90deg,#ffffff,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent}.logo{background:linear-gradient(135deg,#ffffff,#fde68a 55%,#fb923c);color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px;border:1px solid rgba(251,146,60,.85);box-shadow:0 0 0 .6mm rgba(251,146,60,.35)}
     .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:grid;grid-template-columns:25mm 1fr 16mm;gap:3mm;align-items:end}.photoWrap{width:25mm;display:grid;justify-items:center}.photo{width:25mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}.info{min-width:0}
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
-    .qr{width:16mm;height:16mm;border:1px solid rgba(255,255,255,.32);border-radius:1mm;padding:.6mm;display:grid;place-items:center;align-self:center;justify-self:center}.qr svg{width:100%;height:100%}.photoBar{width:25mm;height:5mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill;display:block}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
+    .qr{width:16mm;height:16mm;border:1px solid rgba(255,255,255,.32);border-radius:1mm;padding:.6mm;display:grid;place-items:center;align-self:center;justify-self:center}.qr svg{width:100%;height:100%}.photoBar{width:25mm;height:6mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill;display:block}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
   </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="photoBar"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div></div><div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr">${staffCardQrSvg(card)}</div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
@@ -2794,7 +2794,7 @@ export default function App() {
                             <p className="text-[8px] font-black uppercase tracking-[0.2em] text-orange-100">The NexaGo BD</p>
                             <p className="mt-0.5 text-[7px] font-bold uppercase text-white/70">Super Admin Staff</p>
                           </div>
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[10px] font-black text-[#0b1220]">NXG</div>
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-white via-orange-100 to-orange-400 text-[10px] font-black text-[#0b1220] ring-1 ring-orange-400/60 shadow-lg shadow-orange-500/20">NXG</div>
                         </div>
                         <div className="grid grid-cols-[96px_minmax(0,1fr)_64px] items-end gap-3">
                           <div className="flex w-24 shrink-0 flex-col items-center">
@@ -2810,7 +2810,7 @@ export default function App() {
                                 }}
                               />
                             </div>
-                            <div className="mt-1 h-6 w-24 overflow-hidden">
+                            <div className="mt-1 h-8 w-24 overflow-hidden">
                               <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
                             </div>
                           </div>
