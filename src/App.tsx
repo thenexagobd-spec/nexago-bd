@@ -79,6 +79,17 @@ const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap(
   const bars = pattern.split('').map((bit, idx) => ({ on: idx % 2 === 0, wide: bit === '1' }));
   return charIndex < chars.length - 1 ? [...bars, { on: false, wide: false }] : bars;
 });
+const code39SvgDataUrl = (value: string) => {
+  const bars = code39Bars(value);
+  let x = 8;
+  const rects = bars.map((bar) => {
+    const w = bar.wide ? 4 : 2;
+    const rect = bar.on ? `<rect x="${x}" y="6" width="${w}" height="42" fill="#020617"/>` : '';
+    x += w + 1;
+    return rect;
+  }).join('');
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="220" height="58" viewBox="0 0 220 58"><rect width="220" height="58" fill="#fff"/><g transform="scale(${Math.min(1, 204 / Math.max(x, 1))} 1)">${rects}</g></svg>`)}`;
+};
 
 const STORE_ADMIN_PAGE_OPTIONS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -1252,9 +1263,9 @@ export default function App() {
     .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}
     .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photoWrap{width:22mm}.photo{width:20mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover}
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
-    .qr{margin-left:auto;width:14mm;height:14mm;background:white;border-radius:1mm;padding:1mm}.qr svg{width:100%;height:100%}.photoBar{background:white;border:1px solid #e5e7eb;border-radius:1mm;display:flex;align-items:end;gap:.18mm;padding:.7mm;width:20mm;height:5.5mm;margin-top:1mm;overflow:hidden}.photoBar i{background:#020617;width:.35mm}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
+    .qr{margin-left:auto;width:14mm;height:14mm;background:white;border-radius:1mm;padding:1mm}.qr svg{width:100%;height:100%}.photoBar{background:white;border:1px solid #e5e7eb;border-radius:1mm;width:20mm;height:5.5mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
-  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || demoStaffPhotoDataUrl}"></div><div class="photoBar">${code39Bars(staffCardCode(card)).map(b=>`<i style="height:${b.on ? '100' : '0'}%;width:${b.wide ? '.75' : '.35'}mm"></i>`).join('')}</div></div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
+  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || demoStaffPhotoDataUrl}"></div><div class="photoBar"><img src="${code39SvgDataUrl(staffCardCode(card))}"></div></div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
     const blob = new Blob([staffCardHtml(card)], { type: 'text/html' });
@@ -2714,18 +2725,14 @@ export default function App() {
                           </div>
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[10px] font-black text-[#0b1220]">NXG</div>
                         </div>
-                        <div className="flex items-end gap-3">
-                          <div className="w-20 shrink-0">
-                            <div className="h-[4.6rem] w-20 overflow-hidden rounded-xl border border-white/25 bg-white/10">
+                        <div className="grid grid-cols-[72px_minmax(0,1fr)_56px] items-end gap-3">
+                          <div className="w-[72px] shrink-0">
+                            <div className="h-[4.4rem] w-[72px] overflow-hidden rounded-xl border border-white/25 bg-white/10">
                               <img src={staffIdCard.photoDataUrl || demoStaffPhotoDataUrl} alt="Staff" className="h-full w-full object-cover" />
                             </div>
-                            <div className="mt-1 flex h-6 w-20 items-end gap-[1px] overflow-hidden rounded border border-gray-200 bg-white px-1 py-1">
-                              {code39Bars(staffCardCode(staffIdCard)).map((bar, idx) => <span key={idx} className="bg-[#020617]" style={{ height: bar.on ? '100%' : '0%', width: bar.wide ? '2px' : '1px' }} />)}
+                            <div className="mt-1 h-6 w-[72px] overflow-hidden rounded border border-gray-200 bg-white">
+                              <img src={code39SvgDataUrl(staffCardCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
                             </div>
-                            <label className="mt-2 flex cursor-pointer items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-1.5 text-[8px] font-black uppercase text-sky-200 hover:bg-sky-500/20">
-                              Change Photo
-                              <input type="file" accept="image/*" onChange={e => changeStaffCardPhoto(staffIdCard, e.target.files?.[0])} className="hidden" />
-                            </label>
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
@@ -2745,7 +2752,14 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                    <p className="mt-2 text-center text-[9px] font-semibold text-gray-500">Print size: 85.6mm x 54mm. Use PVC/ID-card print scale 100%.</p>
+                    <div className="mt-3 grid gap-2 rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-gray-500">Card Tools</p>
+                      <label className="flex cursor-pointer items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[9px] font-black uppercase text-sky-200 hover:bg-sky-500/20">
+                        Change Photo
+                        <input type="file" accept="image/*" onChange={e => changeStaffCardPhoto(staffIdCard, e.target.files?.[0])} className="hidden" />
+                      </label>
+                      <p className="text-center text-[9px] font-semibold text-gray-500">Print size: 85.6mm x 54mm. Use PVC/ID-card print scale 100%.</p>
+                    </div>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     {[
