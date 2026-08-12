@@ -431,26 +431,29 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
       </div>
 
       {/* Drivers List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredDrivers.map((driver) => (
           <div 
             key={driver.id} 
-            className={`bg-brand-card border rounded-xl p-5 transition-all flex flex-col justify-between shadow-sm relative group ${
-              driver.dispatchLocked ? 'border-red-500/40 bg-red-500/5' : 'border-brand-border hover:border-brand-orange/40'
+            className={`bg-gradient-to-b from-brand-card to-brand-dark rounded-xl p-4 transition-all flex flex-col justify-between shadow-md relative group overflow-hidden ${
+              driver.dispatchLocked ? 'border border-red-500/40 bg-red-500/5' : 'border border-brand-border/60 hover:border-brand-orange/40 hover:shadow-lg hover:shadow-brand-orange/5'
             }`}
           >
+            {/* Premium top accent */}
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-orange via-amber-400 to-brand-orange/10"></div>
+
             {/* Status indicator badges */}
-            <div className="absolute top-4 right-4 flex items-center space-x-1.5">
+            <div className="absolute top-3 right-3 flex items-center space-x-1.5">
               {driver.dispatchLocked && (
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
-                  <Lock className="w-2.5 h-2.5" />
+                <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
+                  <Lock className="w-2 h-2" />
                   Locked
                 </span>
               )}
 
               <button
                 onClick={() => toggleStatus(driver)}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase cursor-pointer border tracking-wider transition-colors ${
+                className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase cursor-pointer border tracking-wider transition-colors ${
                   driver.status === 'Online'
                     ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/20'
                     : driver.status === 'On-Delivery'
@@ -463,62 +466,62 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3.5 cursor-pointer group/card" onClick={() => setSelectedDriverId(driver.id)}>
-                <div className="w-12 h-12 rounded-xl bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-black text-brand-orange text-xs shrink-0 relative group-hover/card:scale-105 transition-transform">
-                  {driver.name.split(' ').map(n => n[0]).join('')}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3 cursor-pointer group/card" onClick={() => setSelectedDriverId(driver.id)}>
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-orange/20 to-amber-500/10 border border-brand-orange/30 flex items-center justify-center font-black text-brand-orange text-[11px] shrink-0 relative group-hover/card:scale-105 transition-transform shadow-inner">
+                  {driver.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-card ${
                     driver.status === 'Online' ? 'bg-emerald-500' : driver.status === 'On-Delivery' ? 'bg-purple-500' : 'bg-red-500'
                   }`}></span>
                 </div>
-                <div>
-                  <h4 className="font-bold text-sm text-white pr-28 group-hover/card:text-brand-orange transition-colors flex items-center gap-1.5">
+                <div className="min-w-0">
+                  <h4 className="font-bold text-[13px] text-white truncate group-hover/card:text-brand-orange transition-colors">
                     <span>{driver.name}</span>
                   </h4>
-                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">{driver.id}</p>
-                  <p className="text-[11px] text-gray-300 mt-1">{driver.vehicleType}</p>
+                  <p className="text-[9px] text-gray-400 font-mono mt-0.5">{driver.id}</p>
+                  <p className="text-[10px] text-gray-300 mt-0.5 truncate">{driver.vehicleType}</p>
                 </div>
               </div>
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-2 bg-brand-dark/40 p-2.5 border border-brand-border/40 rounded-lg text-center">
+              {/* Compact Stats Strip */}
+              <div className="grid grid-cols-3 gap-1.5 bg-brand-dark/40 p-2 border border-brand-border/40 rounded-lg text-center">
                 <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-medium">Orders</p>
-                  <p className="text-xs font-bold text-white mt-0.5">{driver.completedOrders}</p>
+                  <p className="text-[8px] text-gray-500 uppercase font-medium">Orders</p>
+                  <p className="text-[11px] font-bold text-white mt-0.5">{driver.completedOrders}</p>
+                </div>
+                <div className="border-x border-brand-border/30">
+                  <p className="text-[8px] text-gray-500 uppercase font-medium">Earnings</p>
+                  <p className="text-[11px] font-bold text-emerald-400 mt-0.5">৳{driver.earnings.toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-medium">Earnings</p>
-                  <p className="text-xs font-bold text-emerald-400 mt-0.5">৳{driver.earnings.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-medium">Rating</p>
-                  <div className="flex items-center justify-center space-x-0.5 mt-0.5 text-xs font-bold text-yellow-400">
-                    <Star className="w-3 h-3 fill-current" />
+                  <p className="text-[8px] text-gray-500 uppercase font-medium">Rating</p>
+                  <div className="flex items-center justify-center space-x-0.5 mt-0.5 text-[11px] font-bold text-yellow-400">
+                    <Star className="w-2.5 h-2.5 fill-current" />
                     <span>{driver.rating.toFixed(1)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Assigned Vehicle */}
-              {(()=>{const veh=vehicles.find(v=>v.driverName===driver.name)||vehicles[0];return(<div className="bg-gradient-to-r from-brand-dark/30 to-brand-dark/10 border border-brand-border/40 rounded-lg p-3 space-y-1.5">
-                <div className="flex items-center justify-between"><span className="text-[9px] text-gray-400 uppercase font-black flex items-center gap-1"><Truck className="w-3 h-3"/>Assigned Vehicle</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${veh?.status==='Active'?'bg-emerald-500/10 text-emerald-400':veh?.status==='Maintenance'?'bg-amber-500/10 text-amber-400':'bg-gray-500/10 text-gray-400'}`}>{veh?.status||'Active'}</span></div>
-                <p className="text-[11px] font-mono font-black text-white">{veh?.regNo||'DHAKA METRO-XX-00-0000'}</p>
-                <p className="text-[10px] text-gray-400">{veh?.brand||'Yamaha'} {veh?.model||'FZ-S'} · {veh?.year||2024} · {veh?.fuelType||'Octane'}</p>
-                <div className="flex items-center justify-between text-[10px]"><span className="text-gray-400"><Gauge className="w-2.5 h-2.5 inline"/> {(veh?.odoKm||28500).toLocaleString()} km</span><span className="text-gray-400"><Fuel className="w-2.5 h-2.5 inline"/> ৳{(veh?.fuelCost||12400).toLocaleString()}</span></div>
+              {/* Assigned Vehicle — only real assigned data, no demo fallbacks */}
+              {(()=>{const veh=vehicles.find(v=>v.driverName===driver.name);if(!veh)return null;return(<div className="bg-brand-dark/30 border border-brand-border/40 rounded-lg px-3 py-2 space-y-1">
+                <div className="flex items-center justify-between"><span className="text-[8px] text-gray-500 uppercase font-black flex items-center gap-1"><Truck className="w-2.5 h-2.5"/>Assigned Vehicle</span><span className={`px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase ${veh.status==='Active'?'bg-emerald-500/10 text-emerald-400':veh.status==='Maintenance'?'bg-amber-500/10 text-amber-400':'bg-gray-500/10 text-gray-400'}`}>{veh.status}</span></div>
+                <p className="text-[10px] font-mono font-black text-white truncate">{veh.regNo}</p>
+                <div className="flex items-center justify-between text-[9.5px]"><span className="text-gray-400 truncate">{veh.brand} {veh.model} · {veh.year} · {veh.fuelType}</span></div>
+                <div className="flex items-center justify-between text-[9px]"><span className="text-gray-500"><Gauge className="w-2 h-2 inline"/> {(veh.odoKm||0).toLocaleString()} km</span><span className="text-gray-500"><Fuel className="w-2 h-2 inline"/> ৳{(veh.fuelCost||0).toLocaleString()}</span></div>
               </div>)})()}
 
-              {/* COD Cash & Verification Ribbon */}
-              <div className="space-y-2 text-xs bg-brand-dark/20 p-2.5 rounded-lg border border-brand-border/30">
-                <div className="flex items-center justify-between text-[11px]">
+              {/* COD + Verification Ribbon */}
+              <div className="space-y-1.5 text-xs bg-brand-dark/20 p-2.5 rounded-lg border border-brand-border/30">
+                <div className="flex items-center justify-between text-[10.5px]">
                   <span className="text-gray-400 font-medium">COD Cash Collected:</span>
                   <div className="flex items-center space-x-2">
-                    <span className="font-mono font-bold text-brand-orange">
+                    <span className="font-mono font-bold text-brand-orange text-[11px]">
                       ৳{(driver.codCashCollected || 0).toLocaleString()}
                     </span>
                     {(driver.codCashCollected || 0) > 0 && (
                       <button
                         onClick={() => handleCollectCodCash(driver)}
-                        className="px-2 py-0.5 bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded text-[9.5px] font-bold transition-all cursor-pointer border border-emerald-500/30"
+                        className="px-1.5 py-0.5 bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded text-[8.5px] font-bold transition-all cursor-pointer border border-emerald-500/30"
                         title="Deposit COD cash into company vault"
                       >
                         Collect
@@ -527,11 +530,11 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] border-t border-brand-border/20 pt-2">
+                <div className="flex items-center justify-between text-[10.5px] border-t border-brand-border/20 pt-1.5">
                   <span className="text-gray-400 font-medium">Document Audit:</span>
                   <button
                     onClick={() => setAuditingDriver(driver)}
-                    className={`px-2 py-0.5 rounded text-[9.5px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                    className={`px-2 py-0.5 rounded text-[8.5px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
                       driver.verificationStatus === 'Pending Audit' 
                         ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/30'
                         : driver.verificationStatus === 'Rejected'
@@ -539,73 +542,65 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                         : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                     }`}
                   >
-                    <ShieldCheck className="w-3 h-3" />
+                    <ShieldCheck className="w-2.5 h-2.5" />
                     <span>{driver.verificationStatus || 'Verified'}</span>
                   </button>
                 </div>
               </div>
 
               {/* Personal Details */}
-              <div className="space-y-1.5 text-xs text-gray-300">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Phone className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{driver.phone}</span>
-                  </div>
-
-                  <button
-                    onClick={() => setMessagingDriver(driver)}
-                    className="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center space-x-1 cursor-pointer bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20"
-                    title="Send direct Push Alert to Driver Mobile App"
-                  >
-                    <MessageSquare className="w-3 h-3" />
-                    <span>Push Alert</span>
-                  </button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5 min-w-0">
+                  <Phone className="w-3 h-3 text-gray-500 shrink-0" />
+                  <span className="text-[10.5px] text-gray-300 truncate">{driver.phone}</span>
                 </div>
-                {driver.email && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 truncate">
-                      <span className="text-gray-500 font-mono text-[10px]">✉</span>
-                      <span className="font-mono text-[11px] truncate text-gray-300">{driver.email}</span>
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={() => setMessagingDriver(driver)}
+                  className="text-[9px] font-bold text-blue-400 hover:text-blue-300 flex items-center space-x-1 cursor-pointer bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20"
+                  title="Send direct Push Alert to Driver Mobile App"
+                >
+                  <MessageSquare className="w-2.5 h-2.5" />
+                  <span>Push Alert</span>
+                </button>
               </div>
+              {driver.email && (
+                <p className="text-[9.5px] font-mono text-gray-500 truncate">✉ {driver.email}</p>
+              )}
             </div>
 
             {/* Actions footer */}
-            <div className="mt-5 pt-3 border-t border-brand-border/40 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+            <div className="mt-3 pt-2.5 border-t border-brand-border/40 flex items-center justify-between">
+              <div className="flex items-center space-x-1.5">
                 <button
                   onClick={() => setSelectedDriverId(driver.id)}
-                  className="px-2.5 py-1 bg-brand-orange/10 hover:bg-brand-orange text-brand-orange hover:text-white border border-brand-orange/30 rounded text-[11px] font-bold transition-all flex items-center space-x-1 cursor-pointer"
+                  className="px-2 py-1 bg-brand-orange/10 hover:bg-brand-orange text-brand-orange hover:text-white border border-brand-orange/30 rounded text-[10px] font-bold transition-all flex items-center space-x-1 cursor-pointer"
                   title="Open Detailed Performance Profile"
                 >
-                  <Eye className="w-3 h-3" />
-                  <span>View Profile</span>
+                  <Eye className="w-2.5 h-2.5" />
+                  <span>View</span>
                 </button>
 
                 <button
                   onClick={() => setDocViewDriver(driver)}
-                  className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border border-emerald-500/30 rounded text-[11px] font-bold transition-all flex items-center space-x-1 cursor-pointer"
+                  className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border border-emerald-500/30 rounded text-[10px] font-bold transition-all flex items-center space-x-1 cursor-pointer"
                   title="View all submitted documents, print, download, share & approve"
                 >
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>Document Show</span>
+                  <ShieldCheck className="w-2.5 h-2.5" />
+                  <span>Docs</span>
                 </button>
 
                 {/* Dispatch Lock Toggle */}
                 <button
                   onClick={() => toggleDispatchLock(driver)}
-                  className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center space-x-1 cursor-pointer border ${
+                  className={`px-2 py-1 rounded text-[9px] font-bold transition-all flex items-center space-x-1 cursor-pointer border ${
                     driver.dispatchLocked 
                       ? 'bg-red-500 text-white border-red-600' 
                       : 'bg-gray-800 text-gray-300 hover:text-white border-brand-border'
                   }`}
                   title={driver.dispatchLocked ? "Unlock Rider Dispatch" : "Lock / Suspend Dispatch"}
                 >
-                  {driver.dispatchLocked ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                  <span>{driver.dispatchLocked ? 'Unlock' : 'Lock Dispatch'}</span>
+                  {driver.dispatchLocked ? <Unlock className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
+                  <span>{driver.dispatchLocked ? 'Unlock' : 'Lock'}</span>
                 </button>
               </div>
 
@@ -615,14 +610,14 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   className="p-1.5 bg-brand-dark/60 hover:bg-brand-orange/20 text-gray-300 hover:text-brand-orange border border-brand-border rounded cursor-pointer transition-colors"
                   title="Edit Driver"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
+                  <Edit3 className="w-3 h-3" />
                 </button>
                 <button
                   onClick={() => onDeleteDriver(driver.id)}
                   className="p-1.5 bg-brand-dark/60 hover:bg-red-500/20 text-gray-300 hover:text-red-400 border border-brand-border rounded cursor-pointer transition-colors"
                   title="Delete Driver"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3 h-3" />
                 </button>
               </div>
             </div>
