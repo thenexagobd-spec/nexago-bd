@@ -270,6 +270,7 @@ export default function App() {
   const [staffKycFilter, setStaffKycFilter] = useState<'All' | 'Pending Verification' | 'Active' | 'Rejected' | 'Suspended' | 'Archived'>('All');
   const [staffKycSearch, setStaffKycSearch] = useState('');
   const [staffProfile, setStaffProfile] = useState<any | null>(null);
+  const [staffIdCard, setStaffIdCard] = useState<any | null>(null);
 
   const [reviews, setReviews] = useState<any[]>(() => getStoredData('sd_reviews', []));
 
@@ -1187,6 +1188,23 @@ export default function App() {
     }
     setStaffKycViewing({ ...member, previewDataUrl, previewDoc: first });
     securityAudit('staff-kyc-files-opened', { actor: 'super-admin', newValue: { staffId: member.id, files: docs.map((d: any) => d.fileId || d.ref) }, reason: 'super admin opened staff KYC files' });
+  };
+
+  const openStaffIdCard = async (member: any) => {
+    const photoDoc = (member.documents || []).find((doc: any) => String(doc.type || '').toLowerCase().includes('photo'));
+    let photoDataUrl = '';
+    try {
+      if (photoDoc?.fileId) {
+        const fileData = await securityApi(`/file/${photoDoc.fileId}`);
+        photoDataUrl = fileData.dataUrl || '';
+      }
+    } catch {
+      /* card still opens with initials */
+    }
+    const issuedAt = member.verifiedAt || member.createdAt || new Date().toISOString();
+    const expiresAt = new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
+    setStaffIdCard({ ...member, photoDataUrl, issuedAt, expiresAt });
+    securityAudit('staff-id-card-opened', { actor: 'super-admin', newValue: { staffId: member.id }, reason: 'digital smart ID card preview opened' });
   };
 
   const updateStaffVerification = (member: any, nextStatus: 'Active' | 'Rejected' | 'Suspended', reason = '') => {
@@ -2433,6 +2451,7 @@ export default function App() {
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => viewStaffDocuments(staffProfile)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase text-sky-300 hover:bg-sky-500/20">KYC Viewer</button>
+                    <button onClick={() => openStaffIdCard(staffProfile)} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-2 text-[10px] font-black uppercase text-brand-orange hover:bg-brand-orange/20">Smart ID Card</button>
                     <button onClick={() => updateStaffVerification(staffProfile, 'Suspended')} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase text-red-300 hover:bg-red-500/20">Emergency Freeze</button>
                     {(staffProfile.archived || staffProfile.status === 'Archived') && (
                       <button onClick={() => {
@@ -2472,6 +2491,64 @@ export default function App() {
                       {(staffProfile.auditTrail || []).map((a: any, idx: number) => <p key={idx}>{a.at} · {a.action} · {a.reason || 'No reason'}</p>)}
                       {!(staffProfile.auditTrail || []).length && <p>No staff activity yet.</p>}
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {staffIdCard && (
+              <div className="order-last rounded-2xl border border-brand-orange/20 bg-[#07111f] p-5 shadow-xl">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-wider text-white">Digital Smart Staff ID Card</h4>
+                    <p className="text-[10px] font-semibold text-gray-500">Original card size preview for neck badge printing.</p>
+                  </div>
+                  <button onClick={() => setStaffIdCard(null)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                </div>
+                <div className="grid gap-5 lg:grid-cols-[390px_1fr]">
+                  <div className="mx-auto w-full max-w-[340px]">
+                    <div className="relative aspect-[85.6/54] overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-[#07111f] via-[#102138] to-[#f97316] p-4 shadow-2xl">
+                      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent_35%,rgba(255,255,255,0.08))]" />
+                      <div className="relative flex h-full flex-col justify-between">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-orange-100">The NexaGo BD</p>
+                            <p className="mt-0.5 text-[7px] font-bold uppercase text-white/70">Super Admin Staff</p>
+                          </div>
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[10px] font-black text-[#0b1220]">NXG</div>
+                        </div>
+                        <div className="flex items-end gap-3">
+                          <div className="h-20 w-16 overflow-hidden rounded-xl border border-white/25 bg-white/10">
+                            {staffIdCard.photoDataUrl ? <img src={staffIdCard.photoDataUrl} alt="Staff" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xl font-black text-white">{String(staffIdCard.name || 'S').slice(0, 1).toUpperCase()}</div>}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
+                            <p className="truncate text-[8px] font-bold uppercase text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.shift || 'Shift'}</p>
+                            <p className="mt-1 font-mono text-[8px] font-black text-white/90">{staffIdCard.id}</p>
+                            <p className="mt-0.5 truncate text-[7px] font-semibold text-white/70">Phone: {staffIdCard.phone || 'N/A'}</p>
+                          </div>
+                          <div className="grid h-14 w-14 grid-cols-4 gap-0.5 rounded bg-white p-1">
+                            {Array.from({ length: 16 }).map((_, idx) => <span key={idx} className={`${(idx + String(staffIdCard.id || '').length) % 3 ? 'bg-[#0b1220]' : 'bg-transparent'}`} />)}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-white/15 pt-1 text-[6.5px] font-bold uppercase text-white/70">
+                          <span>Issue: {new Date(staffIdCard.issuedAt).toLocaleDateString()}</span>
+                          <span>Expire: {new Date(staffIdCard.expiresAt).toLocaleDateString()}</span>
+                          <span>{staffIdCard.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-center text-[9px] font-semibold text-gray-500">Print size: 85.6mm x 54mm. Use PVC/ID-card print scale 100%.</p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {[
+                      ['Staff ID', staffIdCard.id], ['Full Name', staffIdCard.name], ['Role', staffIdCard.role], ['Department/Shift', staffIdCard.shift],
+                      ['NID', staffIdCard.nid], ['Blood Group', staffIdCard.bloodGroup || 'N/A'], ['Emergency Contact', staffIdCard.emergencyContact || 'N/A'], ['Device Access', staffIdCard.deviceAccess || 'After approval'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                        <p className="text-[9px] font-black uppercase text-gray-500">{label}</p>
+                        <p className="mt-1 break-words text-xs font-bold text-white">{value || 'Not submitted'}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
