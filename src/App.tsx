@@ -72,6 +72,7 @@ const CODE39_PATTERNS: Record<string, string> = {
 };
 
 const staffCardCode = (card: any) => String(card?.permanentNumber || card?.id || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
+const staffCardVerifyUrl = (card: any) => `${window.location.origin}/api/security/staff-card/verify?key=${encodeURIComponent(new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main')}&staffId=${encodeURIComponent(card?.id || '')}&permanentNo=${encodeURIComponent(staffCardCode(card))}`;
 const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap((char, charIndex, chars) => {
   const pattern = CODE39_PATTERNS[char] || CODE39_PATTERNS['-'];
   const bars = pattern.split('').map((bit, idx) => ({ on: idx % 2 === 0, wide: bit === '1' }));
@@ -2715,7 +2716,7 @@ export default function App() {
                           </div>
                           <div className="space-y-1">
                             <div className="flex h-14 w-14 items-center justify-center rounded bg-white p-1">
-                              <QRCodeSVG value={JSON.stringify({ type: 'nexago-staff-card', staffId: staffIdCard.id, permanentNo: staffCardCode(staffIdCard), status: staffIdCard.status })} size={48} level="M" marginSize={0} />
+                              <QRCodeSVG value={staffCardVerifyUrl(staffIdCard)} size={48} level="M" marginSize={0} />
                             </div>
                             <div className="flex h-5 w-14 items-end gap-0.5 rounded bg-white px-1 pb-1">
                               {code39Bars(staffCardCode(staffIdCard)).slice(0, 24).map((bar, idx) => <span key={idx} className="bg-[#0b1220]" style={{ height: bar.on ? '100%' : '0%', width: bar.wide ? '2px' : '1px' }} />)}

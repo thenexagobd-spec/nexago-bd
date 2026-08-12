@@ -92,6 +92,18 @@ for (const dir of [SECURITY_DIR, FILES_DIR]) if (!fs.existsSync(dir)) fs.mkdirSy
 
 const rateBuckets = new Map();
 const alertBuckets = new Map();
+const stateSubscribers = new Map();
+
+function notifyStateSubscribers(key, detail = {}) {
+  const safe = safeKey(key);
+  const payload = JSON.stringify({ type: 'state-updated', key: safe, updatedAt: new Date().toISOString(), ...detail });
+  const sockets = stateSubscribers.get(safe) || new Set();
+  for (const ws of sockets) {
+    try {
+      if (ws.readyState === 1) ws.send(payload);
+    } catch { /* ignore dead socket */ }
+  }
+}
 
 function clientIp(req) {
   return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
@@ -344,9 +356,20 @@ function saveStore(key, obj) {
 // the same shared keys (orders, drivers, notifications, products, payments,
 // tickets, returns, refunds, wallet txns, ratings, stores, users, coupons),
 // and array keys are merged union-by-id so no site's data is ever dropped.
+function latestRecord(existing, incoming) {
+  const a = Date.parse(existing && (existing.updatedAt || existing.verifiedAt || existing.loginCreatedAt || existing.createdAt) || '') || 0;
+  const b = Date.parse(incoming && (incoming.updatedAt || incoming.verifiedAt || incoming.loginCreatedAt || incoming.createdAt) || '') || 0;
+  if (b > a) return incoming;
+  if (a > b) return existing;
+  return JSON.stringify(incoming || {}).length >= JSON.stringify(existing || {}).length ? incoming : existing;
+}
+
 function unionById(existing, incomingArr) {
   const byId = new Map((Array.isArray(existing) ? existing : []).map((x) => [x && x.id, x]));
-  for (const item of incomingArr) if (item && item.id) byId.set(item.id, item);
+  for (const item of incomingArr) {
+    if (!item || !item.id) continue;
+    byId.set(item.id, byId.has(item.id) ? latestRecord(byId.get(item.id), item) : item);
+  }
   return Array.from(byId.values());
 }
 
@@ -826,6 +849,36 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/security/staff-card/verify') {
+    if (!rateLimit(req, 'staff-card-verify', 120, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    const staffId = String(url.searchParams.get('staffId') || '').trim();
+    const permanentNo = String(url.searchParams.get('permanentNo') || '').trim();
+    const store = loadStore(key);
+    const rows = Array.isArray(store.state.staff) ? store.state.staff : [];
+    const staff = rows.find((s) => s && (String(s.id || '') === staffId || String(s.permanentNumber || '') === permanentNo));
+    if (!staff) {
+      appendAudit(key, { actor: 'public-scan', action: 'staff-card-verify-failed', ip: clientIp(req), reason: 'staff card not found', newValue: { staffId, permanentNo } });
+      sendJson(res, 404, { ok: false, valid: false, error: 'STAFF_CARD_NOT_FOUND' });
+      return;
+    }
+    const expiresAt = staff.cardExpiresAt || staff.expiresAt || '';
+    const expired = expiresAt ? Date.now() > Date.parse(expiresAt) : false;
+    const active = staff.status === 'Active' && !staff.archived && !expired;
+    appendAudit(key, { actor: 'public-scan', action: 'staff-card-verified', ip: clientIp(req), reason: 'staff card barcode/qr scanned', newValue: { staffId: staff.id, permanentNo: staff.permanentNumber, active, expired } });
+    sendJson(res, 200, {
+      ok: true,
+      valid: active,
+      card: {
+        id: String(staff.id || '').replace(/^(.{3}).+(.{2})$/, '$1***$2'),
+        permanentNumber: String(staff.permanentNumber || '').replace(/^(.{4}).+(.{3})$/, '$1***$2'),
+        status: staff.status,
+        cardExpiresAt: expiresAt,
+        expired,
+      },
+    });
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/security/file') {
     if (!rateLimit(req, 'security-file', 20, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {
@@ -894,7 +947,9 @@ const server = http.createServer((req, res) => {
       if (safeKey(key) !== 'nexago-main') {
         const central = loadStore('nexago-main');
         saveStore('nexago-main', mergeState(central, body || {}));
+        notifyStateSubscribers('nexago-main', { sourceKey: safeKey(key), reason: 'state-push' });
       }
+      notifyStateSubscribers(key, { reason: 'state-push' });
       sendJson(res, 200, { ok: true, key, updatedAt: merged.updatedAt });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
@@ -914,6 +969,7 @@ const server = http.createServer((req, res) => {
       backupStore(key, current, 'before-recover');
       const merged = mergeState(current, recovered.state || {});
       saveStore(key, merged);
+      notifyStateSubscribers(key, { reason: 'state-recover' });
       sendJson(res, 200, { ok: true, key, recoveredFrom: file, updatedAt: merged.updatedAt });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
@@ -931,6 +987,7 @@ const server = http.createServer((req, res) => {
           if (ev.type === 'banner-impression') banners[idx].impressions = Number(banners[idx].impressions || 0) + 1;
           else banners[idx].clicks = Number(banners[idx].clicks || 0) + 1;
           saveStore(key, store);
+          notifyStateSubscribers(key, { reason: ev.type });
           sendJson(res, 200, { ok: true, counted: ev.type });
           return;
         }
@@ -974,7 +1031,9 @@ const server = http.createServer((req, res) => {
       if (safeKey(key) !== 'nexago-main') {
         const central = loadStore('nexago-main');
         saveStore('nexago-main', mergeState(central, { orders: [order], notifications: store.state.notifications }));
+        notifyStateSubscribers('nexago-main', { sourceKey: safeKey(key), reason: 'order' });
       }
+      notifyStateSubscribers(key, { reason: 'order' });
       sendJson(res, 200, { ok: true, orderId: order.id });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String((e && e.message) || e) }));
     return;
@@ -1025,6 +1084,7 @@ wss.on('connection', (ws, req) => {
   wsIpCounts.set(ip, current + 1);
   let roomId = null;
   let role = null;
+  let stateKey = null;
 
   ws.on('message', (raw) => {
     let msg;
@@ -1050,6 +1110,14 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
+    if (msg.type === 'state-subscribe') {
+      stateKey = safeKey(msg.key || 'nexago-main');
+      if (!stateSubscribers.has(stateKey)) stateSubscribers.set(stateKey, new Set());
+      stateSubscribers.get(stateKey).add(ws);
+      ws.send(JSON.stringify({ type: 'state-subscribed', key: stateKey }));
+      return;
+    }
+
     if (!roomId) return;
     const room = rooms.get(roomId);
     if (!room) return;
@@ -1069,6 +1137,10 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     wsIpCounts.set(ip, Math.max(0, (wsIpCounts.get(ip) || 1) - 1));
+    if (stateKey && stateSubscribers.has(stateKey)) {
+      stateSubscribers.get(stateKey).delete(ws);
+      if (!stateSubscribers.get(stateKey).size) stateSubscribers.delete(stateKey);
+    }
     if (!roomId || !rooms.has(roomId)) return;
     const room = rooms.get(roomId);
     if (role === 'share' && room.share === ws) room.share = null;

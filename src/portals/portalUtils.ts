@@ -203,6 +203,19 @@ export function useCloudSync() {
         if (e && e.data && e.data.nexago === 'sync') { pull(); }
       };
     }
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => ws?.send(JSON.stringify({ type: 'state-subscribe', key }));
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(String(event.data || '{}'));
+          if (msg.type === 'state-updated' && (!msg.key || msg.key === key)) pull();
+        } catch { /* ignore non-json ws messages */ }
+      };
+    } catch { /* websocket is optional; polling remains active */ }
 
     (async () => {
       const ok = await pull();
@@ -226,6 +239,7 @@ export function useCloudSync() {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('nexago-local-write', onBroadcast);
       if (bc) bc.close();
+      if (ws) ws.close();
       clearInterval(pullTimer);
       clearInterval(pushTimer);
     };
