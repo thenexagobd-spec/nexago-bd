@@ -57,6 +57,27 @@ const storeDocMeta = [
   { key: 'foodSafety', label: 'BSTI/Food Safety Certificate (if food)', required: false },
 ];
 
+const CODE39_PATTERNS: Record<string, string> = {
+  '0': '101001101101', '1': '110100101011', '2': '101100101011', '3': '110110010101',
+  '4': '101001101011', '5': '110100110101', '6': '101100110101', '7': '101001011011',
+  '8': '110100101101', '9': '101100101101', A: '110101001011', B: '101101001011',
+  C: '110110100101', D: '101011001011', E: '110101100101', F: '101101100101',
+  G: '101010011011', H: '110101001101', I: '101101001101', J: '101011001101',
+  K: '110101010011', L: '101101010011', M: '110110101001', N: '101011010011',
+  O: '110101101001', P: '101101101001', Q: '101010110011', R: '110101011001',
+  S: '101101011001', T: '101011011001', U: '110010101011', V: '100110101011',
+  W: '110011010101', X: '100101101011', Y: '110010110101', Z: '100110110101',
+  '-': '100101011011', '.': '110010101101', ' ': '100110101101', '$': '100100100101',
+  '/': '100100101001', '+': '100101001001', '%': '101001001001', '*': '100101101101',
+};
+
+const staffCardCode = (card: any) => String(card?.permanentNumber || card?.id || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
+const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap((char, charIndex, chars) => {
+  const pattern = CODE39_PATTERNS[char] || CODE39_PATTERNS['-'];
+  const bars = pattern.split('').map((bit, idx) => ({ on: idx % 2 === 0, wide: bit === '1' }));
+  return charIndex < chars.length - 1 ? [...bars, { on: false, wide: false }] : bars;
+});
+
 const STORE_ADMIN_PAGE_OPTIONS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'orders', label: 'Orders' },
@@ -271,6 +292,10 @@ export default function App() {
   const [staffKycSearch, setStaffKycSearch] = useState('');
   const [staffProfile, setStaffProfile] = useState<any | null>(null);
   const [staffIdCard, setStaffIdCard] = useState<any | null>(null);
+  const [staffRenewalOpen, setStaffRenewalOpen] = useState(false);
+  const [staffRenewalStep, setStaffRenewalStep] = useState(1);
+  const [staffRenewalForm, setStaffRenewalForm] = useState({ role: '', shift: '', joiningDate: '', phone: '', address: '', emergencyContact: '', reason: '' });
+  const [staffRenewalRef, setStaffRenewalRef] = useState('');
 
   const [reviews, setReviews] = useState<any[]>(() => getStoredData('sd_reviews', []));
 
@@ -1214,8 +1239,8 @@ export default function App() {
       const initial = String(member.name || 'S').slice(0, 1).toUpperCase();
       photoDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f97316"/><stop offset="1" stop-color="#0b1220"/></linearGradient></defs><rect width="240" height="320" fill="url(#g)"/><circle cx="120" cy="105" r="48" fill="rgba(255,255,255,.85)"/><path d="M42 278c12-58 43-88 78-88s66 30 78 88" fill="rgba(255,255,255,.85)"/><text x="120" y="286" text-anchor="middle" font-family="Arial" font-size="38" font-weight="900" fill="#fff">${initial}</text></svg>`)}`;
     }
-    const issuedAt = member.verifiedAt || member.createdAt || new Date().toISOString();
-    const expiresAt = new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
+    const issuedAt = member.cardIssuedAt || member.verifiedAt || member.createdAt || new Date().toISOString();
+    const expiresAt = member.cardExpiresAt || new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
     setStaffIdCard({ ...member, photoDataUrl, issuedAt, expiresAt });
     securityAudit('staff-id-card-opened', { actor: 'super-admin', newValue: { staffId: member.id }, reason: 'digital smart ID card preview opened' });
   };
@@ -1224,11 +1249,11 @@ export default function App() {
     body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Arial,sans-serif}
     .card{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:5mm;padding:5mm;color:white;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316);position:relative;overflow:hidden}
     .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}
-    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photo{width:18mm;height:24mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover}
+    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photoWrap{width:20mm}.photo{width:18mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover}
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
-    .qr{margin-left:auto;width:14mm;height:14mm;background:white;display:grid;grid-template-columns:repeat(4,1fr);gap:.5mm;padding:1mm;border-radius:1mm}.qr i{background:#0b1220}.bar{position:absolute;right:5mm;bottom:18mm;width:16mm;height:5mm;background:white;border-radius:1mm;display:flex;align-items:end;gap:.4mm;padding:1mm}.bar i{width:.5mm;background:#0b1220}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
+    .qr{margin-left:auto;width:14mm;height:14mm;background:white;border-radius:1mm;padding:1mm}.qr svg{width:100%;height:100%}.bar,.photoBar{background:white;border-radius:1mm;display:flex;align-items:end;gap:.25mm;padding:.8mm}.bar{position:absolute;right:5mm;bottom:18mm;width:16mm;height:5mm}.photoBar{width:18mm;height:4.5mm;margin-top:1mm}.bar i,.photoBar i{background:#0b1220}.bar i{width:.45mm}.photoBar i{width:.35mm}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
-  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photo">${card.photoDataUrl ? `<img src="${card.photoDataUrl}">` : String(card.name || 'S').slice(0,1).toUpperCase()}</div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${card.permanentNumber || card.id}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr">${Array.from({length:16}).map((_,i)=>`<i style="opacity:${(i + String(card.id || '').length) % 3 ? 1 : 0}"></i>`).join('')}</div></div><div class="bar">${Array.from({length:13}).map((_,i)=>`<i style="height:${35+((i*17)%55)}%"></i>`).join('')}</div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
+  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo">${card.photoDataUrl ? `<img src="${card.photoDataUrl}">` : String(card.name || 'S').slice(0,1).toUpperCase()}</div><div class="photoBar">${code39Bars(staffCardCode(card)).map(b=>`<i style="height:${b.on ? '100' : '0'}%;width:${b.wide ? '.75' : '.35'}mm"></i>`).join('')}</div></div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="bar">${code39Bars(staffCardCode(card)).map(b=>`<i style="height:${b.on ? '100' : '0'}%;width:${b.wide ? '.8' : '.4'}mm"></i>`).join('')}</div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
     const blob = new Blob([staffCardHtml(card)], { type: 'text/html' });
@@ -1253,6 +1278,47 @@ export default function App() {
     frame.contentDocument?.write(staffCardHtml(card));
     frame.contentDocument?.close();
     setTimeout(() => { frame.contentWindow?.focus(); frame.contentWindow?.print(); setTimeout(() => frame.remove(), 1000); }, 250);
+  };
+
+  const openStaffRenewal = (card: any) => {
+    setStaffRenewalForm({
+      role: card.role || '',
+      shift: card.shift || '',
+      joiningDate: card.joiningDate || '',
+      phone: card.phone || '',
+      address: card.address || '',
+      emergencyContact: card.emergencyContact || '',
+      reason: '',
+    });
+    setStaffRenewalStep(1);
+    setStaffRenewalRef('');
+    setStaffRenewalOpen(true);
+  };
+
+  const renewStaffIdCard = (card: any) => {
+    if (!staffRenewalForm.reason.trim()) {
+      showToast('Renew reason required. Eta permanent audit-e save hobe.', 'info');
+      setStaffRenewalStep(3);
+      return;
+    }
+    const now = new Date().toISOString();
+    const expiresAt = new Date(new Date(now).setFullYear(new Date(now).getFullYear() + 1)).toISOString();
+    const ref = `NXG-RENEW-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(card.permanentNumber || card.id || 'STAFF').replace(/[^A-Z0-9]/gi, '').toUpperCase()}-${Date.now().toString().slice(-8)}`;
+    const renewed = { ...card, ...staffRenewalForm, cardIssuedAt: now, cardExpiresAt: expiresAt, lastRenewalRef: ref, updatedAt: now };
+    setStaff(prev => prev.map((s: any) => s.id === card.id ? {
+      ...s,
+      ...staffRenewalForm,
+      cardIssuedAt: now,
+      cardExpiresAt: expiresAt,
+      lastRenewalRef: ref,
+      updatedAt: now,
+      auditTrail: [...(s.auditTrail || []), { action: 'staff-id-card-renewed', actor: 'super-admin', at: now, reason: staffRenewalForm.reason.trim(), ref }],
+    } : s));
+    setStaffIdCard({ ...renewed, issuedAt: now, expiresAt });
+    setStaffRenewalRef(ref);
+    setStaffRenewalStep(4);
+    securityAudit('staff-id-card-renewed', { actor: 'super-admin', newValue: { staffId: card.id, cardIssuedAt: now, cardExpiresAt: expiresAt, ref }, reason: staffRenewalForm.reason.trim() });
+    showToast('Staff ID card renewed and synced live.', 'success');
   };
 
   const updateStaffVerification = (member: any, nextStatus: 'Active' | 'Rejected' | 'Suspended', reason = '') => {
@@ -2612,6 +2678,7 @@ export default function App() {
                     <p className="text-[10px] font-semibold text-gray-500">Permanent No: {staffIdCard.permanentNumber || staffIdCard.id} · original card size preview for neck badge printing.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <button onClick={() => openStaffRenewal(staffIdCard)} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-[10px] font-black uppercase text-violet-300 hover:bg-violet-500/20">Renew Card</button>
                     <button onClick={() => downloadStaffIdCard(staffIdCard)} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300 hover:bg-emerald-500/20">Download</button>
                     <button onClick={() => printStaffIdCard(staffIdCard)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase text-sky-300 hover:bg-sky-500/20">Print</button>
                     <button onClick={() => setStaffIdCard(null)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
@@ -2631,8 +2698,13 @@ export default function App() {
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[10px] font-black text-[#0b1220]">NXG</div>
                         </div>
                         <div className="flex items-end gap-3">
-                          <div className="h-20 w-16 overflow-hidden rounded-xl border border-white/25 bg-white/10">
-                            {staffIdCard.photoDataUrl ? <img src={staffIdCard.photoDataUrl} alt="Staff" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xl font-black text-white">{String(staffIdCard.name || 'S').slice(0, 1).toUpperCase()}</div>}
+                          <div className="w-16 shrink-0">
+                            <div className="h-[4.6rem] w-16 overflow-hidden rounded-xl border border-white/25 bg-white/10">
+                              {staffIdCard.photoDataUrl ? <img src={staffIdCard.photoDataUrl} alt="Staff" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xl font-black text-white">{String(staffIdCard.name || 'S').slice(0, 1).toUpperCase()}</div>}
+                            </div>
+                            <div className="mt-1 flex h-4 w-16 items-end gap-px rounded bg-white px-1 py-0.5">
+                              {code39Bars(staffCardCode(staffIdCard)).map((bar, idx) => <span key={idx} className="bg-[#0b1220]" style={{ height: bar.on ? '100%' : '0%', width: bar.wide ? '2px' : '1px' }} />)}
+                            </div>
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
@@ -2642,11 +2714,11 @@ export default function App() {
                             <p className="mt-0.5 truncate text-[7px] font-semibold text-white/70">Phone: {staffIdCard.phone || 'N/A'}</p>
                           </div>
                           <div className="space-y-1">
-                            <div className="grid h-14 w-14 grid-cols-4 gap-0.5 rounded bg-white p-1">
-                              {Array.from({ length: 16 }).map((_, idx) => <span key={idx} className={`${(idx + String(staffIdCard.id || '').length) % 3 ? 'bg-[#0b1220]' : 'bg-transparent'}`} />)}
+                            <div className="flex h-14 w-14 items-center justify-center rounded bg-white p-1">
+                              <QRCodeSVG value={JSON.stringify({ type: 'nexago-staff-card', staffId: staffIdCard.id, permanentNo: staffCardCode(staffIdCard), status: staffIdCard.status })} size={48} level="M" marginSize={0} />
                             </div>
                             <div className="flex h-5 w-14 items-end gap-0.5 rounded bg-white px-1 pb-1">
-                              {Array.from({ length: 13 }).map((_, idx) => <span key={idx} className="bg-[#0b1220]" style={{ height: `${35 + ((idx * 17) % 55)}%`, width: '2px' }} />)}
+                              {code39Bars(staffCardCode(staffIdCard)).slice(0, 24).map((bar, idx) => <span key={idx} className="bg-[#0b1220]" style={{ height: bar.on ? '100%' : '0%', width: bar.wide ? '2px' : '1px' }} />)}
                             </div>
                           </div>
                         </div>
@@ -2673,6 +2745,82 @@ export default function App() {
                     ))}
                   </div>
                 </div>
+                {staffRenewalOpen && (
+                  <div className="mt-5 rounded-2xl border border-violet-500/20 bg-violet-500/[0.06] p-4">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h5 className="text-xs font-black uppercase tracking-wider text-white">ID Card Renewal System</h5>
+                        <p className="mt-1 text-[10px] font-semibold text-gray-500">Step by step review, update, audit reason and permanent renewal reference.</p>
+                      </div>
+                      <button onClick={() => setStaffRenewalOpen(false)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close Renewal</button>
+                    </div>
+                    <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+                      {['Review', 'Update Details', 'Confirm', 'Reference'].map((label, index) => (
+                        <button key={label} type="button" onClick={() => staffRenewalRef ? setStaffRenewalStep(index + 1) : setStaffRenewalStep(Math.min(index + 1, 3))} className={`shrink-0 rounded-lg border px-3 py-2 text-[9px] font-black uppercase ${staffRenewalStep === index + 1 ? 'border-violet-400/60 bg-violet-500/20 text-violet-200' : 'border-white/10 bg-white/[0.03] text-gray-400'}`}>
+                          {index + 1}. {label}
+                        </button>
+                      ))}
+                    </div>
+                    {staffRenewalStep === 1 && (
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {[
+                          ['Current Staff', staffIdCard.name],
+                          ['Current Card No', staffCardCode(staffIdCard)],
+                          ['Current Expiry', new Date(staffIdCard.expiresAt).toLocaleDateString()],
+                          ['Current Status', staffIdCard.status],
+                          ['Current Podobi', staffIdCard.role],
+                          ['Last Renewal Ref', staffIdCard.lastRenewalRef || 'Not renewed yet'],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                            <p className="text-[9px] font-black uppercase text-gray-500">{label}</p>
+                            <p className="mt-1 break-words text-xs font-bold text-white">{value || 'Not submitted'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {staffRenewalStep === 2 && (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[
+                          ['role', 'Podobi / Designation', 'text'], ['shift', 'Department / Shift', 'text'], ['joiningDate', 'Joining Date', 'date'],
+                          ['phone', 'Phone', 'tel'], ['emergencyContact', 'Emergency Contact', 'tel'], ['address', 'Present Address', 'text'],
+                        ].map(([keyName, label, type]) => (
+                          <label key={keyName} className="block">
+                            <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span>
+                            <input type={type} value={(staffRenewalForm as any)[keyName]} onChange={e => setStaffRenewalForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-violet-400" />
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {staffRenewalStep === 3 && (
+                      <div className="space-y-3">
+                        <label className="block">
+                          <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">Renewal Reason / Note</span>
+                          <textarea value={staffRenewalForm.reason} onChange={e => setStaffRenewalForm(prev => ({ ...prev, reason: e.target.value }))} className="min-h-[90px] w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-violet-400" placeholder="Example: yearly ID card renewal after staff document review." />
+                        </label>
+                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-[10px] font-bold text-amber-200">Renew korle new issue/expiry date, updated staff details, renewal reason and reference number permanent audit-e save hobe.</div>
+                      </div>
+                    )}
+                    {staffRenewalStep === 4 && (
+                      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300">Renewal Completed</p>
+                        <div className="mt-2 flex flex-col gap-2 rounded-xl border border-emerald-400/30 bg-[#062015] p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="break-all font-mono text-sm font-black text-emerald-200">{staffRenewalRef || staffIdCard.lastRenewalRef}</p>
+                          <button onClick={() => { navigator.clipboard.writeText(staffRenewalRef || staffIdCard.lastRenewalRef || ''); showToast('Renewal reference copied.', 'success'); }} className="shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-emerald-400">Copy</button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
+                      <button disabled={staffRenewalStep === 1} onClick={() => setStaffRenewalStep(step => Math.max(1, step - 1))} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-[10px] font-black uppercase text-gray-300 disabled:cursor-not-allowed disabled:opacity-40">Back</button>
+                      {staffRenewalStep < 3 ? (
+                        <button onClick={() => setStaffRenewalStep(step => Math.min(3, step + 1))} className="rounded-xl bg-violet-600 px-5 py-3 text-[10px] font-black uppercase text-white hover:bg-violet-500">Next Step</button>
+                      ) : staffRenewalStep === 3 ? (
+                        <button onClick={() => renewStaffIdCard(staffIdCard)} className="rounded-xl bg-emerald-600 px-5 py-3 text-[10px] font-black uppercase text-white hover:bg-emerald-500">Renew & Generate Reference</button>
+                      ) : (
+                        <button onClick={() => setStaffRenewalOpen(false)} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase text-white hover:bg-brand-orange-hover">Done</button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {!(staffKycViewing || staffProfile || staffIdCard || staffLoginTarget || staffActionTarget) && (
