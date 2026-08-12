@@ -8,11 +8,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { 
   Order, Driver, Zone, User, Payment, Vehicle, PromotionBanner, SupportTicket, SystemNotification, ChatLogEntry, OrderReportEntry, makeOrderId
 } from './types';
-import { 
-  defaultOrders, defaultDrivers, defaultZones, defaultUsers, 
-  defaultPayments, defaultVehicles, defaultBanners, defaultSupportTickets, 
-  defaultNotifications, getStoredData, setStoredData, getZonesWithDefaults, 
-} from './data';
+import { getStoredData, setStoredData, getZonesWithDefaults } from './data';
 
 import DashboardView from './components/DashboardView';
 import UsersView from './components/UsersView';
@@ -146,6 +142,26 @@ export default function App() {
   // Separate Workspace Panel State: 'super_admin' = Super Admin Control Center, 'store' = Grocery Admin, 'delivery' = Delivery Logistics
   const [activePanelMode, setActivePanelMode] = useState<'super_admin' | 'store' | 'delivery'>('super_admin');
 
+  const stripDemoData = <T extends Record<string, any>>(rows: T[] = [], kind: 'orders' | 'drivers' | 'zones' | 'users' | 'payments' | 'vehicles' | 'banners' | 'tickets' | 'notifications' | 'products' | 'stores' | 'inventory'): T[] => {
+    const demoNames = /rahim|shakib|arif hossain|chillox|sultan|madchef|takeout|gulshan|dhanmondi/i;
+    return rows.filter((row) => {
+      const id = String(row.id || row.orderId || row.plateNumber || '');
+      const text = JSON.stringify(row || {});
+      if (kind === 'orders' && /^ORD-001\d+/.test(id)) return false;
+      if (kind === 'drivers' && (/^DRV12345[6-9]$/.test(id) || demoNames.test(text))) return false;
+      if (kind === 'zones' && /^Z-[1-5]$/.test(id)) return false;
+      if (kind === 'payments' && (/^TXN-982\d+/.test(id) || /^ORD-001\d+/.test(String(row.orderId || '')))) return false;
+      if (kind === 'vehicles' && (/^VEH-00\d$/.test(id) || /^V00\d$/.test(id) || demoNames.test(text))) return false;
+      if (kind === 'banners' && /^BNR-/.test(id)) return false;
+      if (kind === 'tickets' && (/^TCK-/.test(id) || /^ORD-001\d+/.test(text))) return false;
+      if (kind === 'notifications' && (/^NTF-/.test(id) || /^ORD-001\d+/.test(text) || demoNames.test(text))) return false;
+      if (kind === 'products' && /^PROD-10\d$/.test(id)) return false;
+      if (kind === 'stores' && /^STR-0[1-5]$/.test(id) && !row.adminId) return false;
+      if (kind === 'inventory' && /^INV-30[1-4]$/.test(id)) return false;
+      return true;
+    });
+  };
+
   // Compact Layout / Tight Mode state
   const [isTightMode, setIsTightMode] = useState<boolean>(() => {
     const stored = localStorage.getItem('is_tight_mode');
@@ -164,19 +180,19 @@ export default function App() {
   // Collections Persistent State
   const [orders, setOrders] = useState<Order[]>(() => {
     const stored = getStoredData<Order[]>('sd_orders_v2', []);
-    return stored.filter(o => !/^ORD-001\d+/.test(o.id || ''));
+    return stripDemoData(stored, 'orders');
   });
   const [driverDispatchOrder, setDriverDispatchOrder] = useState<Order | null>(null);
   const [adminDispatchOrder, setAdminDispatchOrder] = useState<Order | null>(null);
   const [customerDispatchOrder, setCustomerDispatchOrder] = useState<Order | null>(null);
-  const [drivers, setDrivers] = useState<Driver[]>(() => getStoredData('sd_drivers', []));
-  const [zones, setZones] = useState<Zone[]>(() => getZonesWithDefaults());
-  const [users, setUsers] = useState<User[]>(() => getStoredData('sd_users', []));
-  const [payments, setPayments] = useState<Payment[]>(() => getStoredData('sd_payments', []));
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => getStoredData('sd_vehicles', []));
-  const [banners, setBanners] = useState<PromotionBanner[]>(() => getStoredData('sd_banners', []));
-  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => getStoredData('sd_tickets', []));
-  const [notifications, setNotifications] = useState<SystemNotification[]>(() => getStoredData('sd_notifications', []));
+  const [drivers, setDrivers] = useState<Driver[]>(() => stripDemoData(getStoredData('sd_drivers', []), 'drivers'));
+  const [zones, setZones] = useState<Zone[]>(() => stripDemoData(getZonesWithDefaults(), 'zones'));
+  const [users, setUsers] = useState<User[]>(() => stripDemoData(getStoredData('sd_users', []), 'users'));
+  const [payments, setPayments] = useState<Payment[]>(() => stripDemoData(getStoredData('sd_payments', []), 'payments'));
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() => stripDemoData(getStoredData('sd_vehicles', []), 'vehicles'));
+  const [banners, setBanners] = useState<PromotionBanner[]>(() => stripDemoData(getStoredData('sd_banners', []), 'banners'));
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => stripDemoData(getStoredData('sd_tickets', []), 'tickets'));
+  const [notifications, setNotifications] = useState<SystemNotification[]>(() => stripDemoData(getStoredData('sd_notifications', []), 'notifications'));
   const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
   const [orderReports, setOrderReports] = useState<OrderReportEntry[]>([]);
   const unreadNotifCount = notifications.filter(n => !n.read).length;
@@ -184,16 +200,16 @@ export default function App() {
   const { liveDrivers, locSim, setLocSim, simTick } = useLiveDrivers(drivers);
 
   // Additional Interactive Mock States for the rich new sidebar panels
-  const [products, setProducts] = useState<any[]>(() => getStoredData<any[]>('sd_products', []).filter(p => !/^PROD-10\d$/.test(p.id || '')));
+  const [products, setProducts] = useState<any[]>(() => stripDemoData(getStoredData<any[]>('sd_products', []), 'products'));
 
   const [categories, setCategories] = useState<any[]>(() => getStoredData('sd_categories', []));
 
-  const [stores, setStores] = useState<any[]>(() => getStoredData<any[]>('sd_stores', []).filter(s => !/^STR-0[1-5]$/.test(s.id || '') || s.adminId));
+  const [stores, setStores] = useState<any[]>(() => stripDemoData(getStoredData<any[]>('sd_stores', []), 'stores'));
   const [branches, setBranches] = useState<any[]>(() => getStoredData('sd_store_branches', []));
   const [storeAdminApps, setStoreAdminApps] = useState<any[]>(() => getStoredData('sd_store_admin_apps', []));
   const [storeAdminCreds, setStoreAdminCreds] = useState<Record<string, { password: string; storeId: string }>>(() => getStoredData('sd_store_admin_creds', {}));
 
-  const [inventory, setInventory] = useState<any[]>(() => getStoredData<any[]>('sd_inventory', []).filter(i => !/^INV-30[1-4]$/.test(i.id || '')));
+  const [inventory, setInventory] = useState<any[]>(() => stripDemoData(getStoredData<any[]>('sd_inventory', []), 'inventory'));
 
   const [coupons, setCoupons] = useState<any[]>(() => getStoredData('sd_coupons', []));
 
@@ -343,15 +359,15 @@ export default function App() {
       if (!res.ok) throw new Error('http ' + res.status);
       const data = await res.json();
       if (data && data.state && data.state.updatedAt && (data.state.products || data.state.banners || data.state.stores)) {
-        if (Array.isArray(data.state.products)) setProducts(data.state.products);
+        if (Array.isArray(data.state.products)) setProducts(stripDemoData(data.state.products, 'products'));
         if (Array.isArray(data.state.categories)) setCategories(data.state.categories);
-        if (Array.isArray(data.state.stores)) setStores(data.state.stores);
+        if (Array.isArray(data.state.stores)) setStores(stripDemoData(data.state.stores, 'stores'));
         if (Array.isArray(data.state.branches)) setBranches(data.state.branches);
         if (Array.isArray(data.state.coupons)) setCoupons(data.state.coupons);
         if (Array.isArray(data.state.reviews)) setReviews(data.state.reviews);
-        if (Array.isArray(data.state.banners)) setBanners(data.state.banners);
-        if (Array.isArray(data.state.orders)) setOrders(data.state.orders);
-        if (Array.isArray(data.state.notifications)) setNotifications(data.state.notifications);
+        if (Array.isArray(data.state.banners)) setBanners(stripDemoData(data.state.banners, 'banners'));
+        if (Array.isArray(data.state.orders)) setOrders(stripDemoData(data.state.orders, 'orders'));
+        if (Array.isArray(data.state.notifications)) setNotifications(stripDemoData(data.state.notifications, 'notifications'));
         setLastSyncAt(data.state.updatedAt);
         setSyncState('online');
         showToast('Pulled the latest cloud data for this store', 'success');
@@ -442,7 +458,7 @@ export default function App() {
       const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`);
       if (!res.ok) return;
       const data = await res.json();
-      if (data && data.state && Array.isArray(data.state.orders)) setOrders(data.state.orders);
+      if (data && data.state && Array.isArray(data.state.orders)) setOrders(stripDemoData(data.state.orders, 'orders'));
     } catch { /* ignore */ }
   };
   useEffect(() => {
@@ -546,7 +562,7 @@ export default function App() {
 
     // Create matching transaction log
     const newTxn: Payment = {
-      id: `TXN-982${40 + payments.length + 1}`,
+      id: `PAY-${Date.now().toString().slice(-10)}`,
       orderId: newId,
       amount: orderData.amount,
       method: orderData.paymentMethod,
@@ -604,7 +620,7 @@ export default function App() {
     }
 
     const newTxn: Payment = {
-      id: `TXN-982${40 + payments.length + 1}`,
+      id: `PAY-${Date.now().toString().slice(-10)}`,
       orderId: newId,
       amount: orderData.amount,
       method: orderData.paymentMethod,
@@ -3213,7 +3229,7 @@ export default function App() {
                     <tbody className="divide-y divide-brand-border/30 text-xs">
                       {storeOrders.map((o, idx) => (
                         <tr key={idx} className="hover:bg-brand-dark/10 transition-colors">
-                          <td className="py-3 px-4 font-mono font-bold text-gray-500">#TXN-982{40 + idx}</td>
+                          <td className="py-3 px-4 font-mono font-bold text-gray-500">#{o.id || `PAY-${idx + 1}`}</td>
                           <td className="py-3 px-4 font-mono font-semibold text-gray-300">#{o.id}</td>
                           <td className="py-3 px-4 font-mono text-white font-bold">৳ {(o.amount * 0.95).toFixed(2)}</td>
                           <td className="py-3 px-4 font-mono text-red-400 font-bold">৳ {(o.amount * 0.05).toFixed(2)}</td>
@@ -3324,7 +3340,7 @@ export default function App() {
                 <div className="flex items-center justify-between p-3 bg-brand-dark/30 rounded-lg border border-brand-border/25">
                   <div>
                     <h4 className="font-bold text-white">Daily Summary Invoices</h4>
-                    <p className="text-[11px] text-gray-500 font-semibold">Dispatch daily PDF transaction reports directly to Shakib Hasan</p>
+                    <p className="text-[11px] text-gray-500 font-semibold">Dispatch daily PDF transaction reports to the assigned store admin</p>
                   </div>
                   <input type="checkbox" className="accent-brand-orange w-4 h-4 cursor-pointer" />
                 </div>
@@ -3835,7 +3851,7 @@ export default function App() {
                           <span>🛒 New Grocery Request</span>
                           <span className="text-[9px] text-brand-orange">Just Now</span>
                         </div>
-                        <p className="text-gray-400">Order #ORD-001248 has been requested and assigned to prepare.</p>
+                        <p className="text-gray-400">A real customer order has been requested and assigned to prepare.</p>
                       </div>
                       <div className="p-2 bg-brand-dark/40 rounded border border-brand-border/20 space-y-0.5">
                         <div className="flex justify-between font-bold text-white text-[10px]">
@@ -3868,12 +3884,12 @@ export default function App() {
                 >
                   <img 
                     src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100" 
-                    alt="Shakib Hasan" 
+                    alt="Store Admin" 
                     referrerPolicy="no-referrer"
                     className="w-7.5 h-7.5 rounded-full object-cover border border-brand-orange/40 shadow" 
                   />
                   <div className="text-left hidden xl:block">
-                    <span className="block text-xs font-black text-white leading-none">Shakib Hasan</span>
+                    <span className="block text-xs font-black text-white leading-none">Store Admin</span>
                     <span className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Store Admin</span>
                   </div>
                 </button>
@@ -5059,7 +5075,7 @@ export default function App() {
               onAddDriver={handleAddDriver}
               onUpdateDriver={handleUpdateDriver}
               onDeleteDriver={handleDeleteDriver}
-              vehicles={[{id:'V001',regNo:'DHAKA METRO-HA-54-3210',type:'Motorcycle',brand:'Yamaha',model:'FZ-S FI V3',year:2023,driverName:'Rahim Khan',fuelType:'Octane',status:'Active',fuelCost:12400,maintenanceCost:5800,odoKm:28500,downtime:5},{id:'V002',regNo:'DHAKA METRO-LA-23-5678',type:'Motorcycle',brand:'Suzuki',model:'Gixxer 150 Fi',year:2024,driverName:'Shakib Hasan',fuelType:'Petrol',status:'Active',fuelCost:9800,maintenanceCost:3200,odoKm:19200,downtime:2}]}
+              vehicles={vehicles}
             />
           )}
 
@@ -5236,7 +5252,7 @@ export default function App() {
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Driver Name</label>
-                    <input name="name" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Shakib Hasan" />
+                    <input name="name" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Driver full name" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Phone Number</label>
@@ -5253,11 +5269,11 @@ export default function App() {
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">User Full Name</label>
-                    <input name="name" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Rahim Khan" />
+                    <input name="name" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="Customer full name" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Email Address</label>
-                    <input name="email" type="email" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="rahim@email.com" />
+                    <input name="email" type="email" required className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none" placeholder="customer@email.com" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Phone</label>
