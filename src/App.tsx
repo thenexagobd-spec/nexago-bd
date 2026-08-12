@@ -2129,7 +2129,7 @@ export default function App() {
                 Add Super Admin Staff
               </button>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+            <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.035] p-2">
               {[
                 ['All', staff.filter((s: any) => !s.archived && s.status !== 'Archived').length],
                 ['Pending Verification', staff.filter((s: any) => !s.archived && s.status === 'Pending Verification').length],
@@ -2138,9 +2138,9 @@ export default function App() {
                 ['Suspended', staff.filter((s: any) => !s.archived && s.status === 'Suspended').length],
                 ['Archived', staff.filter((s: any) => s.archived || s.status === 'Archived').length],
               ].map(([label, count]) => (
-                <button key={String(label)} onClick={() => setStaffKycFilter(label as any)} className={`rounded-xl border p-3 text-left shadow-sm transition-colors ${staffKycFilter === label ? 'border-brand-orange/50 bg-brand-orange/10' : 'border-white/10 bg-white/[0.035] hover:bg-white/[0.06]'}`}>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-gray-500">{label}</p>
-                  <p className="mt-1 text-2xl font-black text-white">{count}</p>
+                <button key={String(label)} onClick={() => setStaffKycFilter(label as any)} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase transition-colors ${staffKycFilter === label ? 'border-brand-orange/50 bg-brand-orange/15 text-brand-orange' : 'border-transparent bg-transparent text-gray-400 hover:bg-white/[0.06] hover:text-white'}`}>
+                  <span>{label}</span>
+                  <span className={`rounded-md px-1.5 py-0.5 text-[9px] ${staffKycFilter === label ? 'bg-brand-orange text-white' : 'bg-white/10 text-gray-300'}`}>{count}</span>
                 </button>
               ))}
             </div>
