@@ -102,8 +102,20 @@ export async function secureFileUpload(file: { name: string; type?: string; data
 
 const unionByIdArr = <T extends { id?: any }>(a: T[], b: T[]) => {
   const byId = new Map<string, T>();
-  (a || []).forEach(x => { if (x && x.id) byId.set(String(x.id), x); });
-  (b || []).forEach(x => { if (x && x.id) byId.set(String(x.id), x); });
+  // Keep the RICHER record when both sides have the same id — e.g. a driver
+  // that carries uploaded document images (dataUrl) must never be replaced by
+  // an older cloud snapshot that lost those images.
+  const pick = (x: T) => {
+    if (!x || !x.id) return;
+    const k = String(x.id);
+    const cur = byId.get(k);
+    if (!cur) { byId.set(k, x); return; }
+    const curLen = JSON.stringify(cur).length;
+    const newLen = JSON.stringify(x).length;
+    if (newLen > curLen) byId.set(k, x);
+  };
+  (a || []).forEach(pick);
+  (b || []).forEach(pick);
   return Array.from(byId.values());
 };
 
