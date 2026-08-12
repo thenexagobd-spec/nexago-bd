@@ -1263,7 +1263,7 @@ export default function App() {
     body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Arial,sans-serif}
     .card{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:5mm;padding:5mm;color:white;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316);position:relative;overflow:hidden}
     .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}
-    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:grid;grid-template-columns:25mm 1fr 16mm;gap:3mm;align-items:end}.photoWrap{width:25mm;display:grid;justify-items:center}.photo{width:25mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover;object-position:center}.info{min-width:0}
+    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:grid;grid-template-columns:25mm 1fr 16mm;gap:3mm;align-items:end}.photoWrap{width:25mm;display:grid;justify-items:center}.photo{width:25mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}.info{min-width:0}
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
     .qr{width:16mm;height:16mm;background:#fff;border-radius:1mm;padding:.6mm;display:grid;place-items:center;align-self:center;justify-self:center}.qr svg{width:100%;height:100%}.photoBar{width:25mm;height:5mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill;display:block}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
@@ -1307,6 +1307,18 @@ export default function App() {
     setStaffIdCard((prev: any) => prev && prev.id === card.id ? { ...prev, photoDataUrl: dataUrl, updatedAt: now } : prev);
     securityAudit('staff-card-photo-updated', { actor: 'super-admin', newValue: { staffId: card.id }, reason: 'smart staff ID card photo changed' });
     showToast('Staff card photo updated and saved permanently.', 'success');
+  };
+
+  const updateStaffCardPhotoSetting = (card: any, key: 'photoScale' | 'photoX' | 'photoY', value: number) => {
+    const now = new Date().toISOString();
+    const nextValue = key === 'photoScale' ? Math.max(1, Math.min(1.8, value)) : Math.max(0, Math.min(100, value));
+    setStaff(prev => prev.map((s: any) => s.id === card.id ? {
+      ...s,
+      [key]: nextValue,
+      updatedAt: now,
+      auditTrail: [...(s.auditTrail || []), { action: 'staff-card-photo-size-updated', actor: 'super-admin', at: now, reason: `smart staff ID card ${key} adjusted`, newValue: nextValue }],
+    } : s));
+    setStaffIdCard((prev: any) => prev && prev.id === card.id ? { ...prev, [key]: nextValue, updatedAt: now } : prev);
   };
 
   const openStaffRenewal = (card: any) => {
@@ -2730,7 +2742,16 @@ export default function App() {
                         <div className="grid grid-cols-[96px_minmax(0,1fr)_64px] items-end gap-3">
                           <div className="flex w-24 shrink-0 flex-col items-center">
                             <div className="h-[4.6rem] w-24 overflow-hidden rounded-xl border border-white/25 bg-white/10">
-                              <img src={staffIdCard.photoDataUrl || demoStaffPhotoDataUrl} alt="Staff" className="h-full w-full object-cover object-center" />
+                              <img
+                                src={staffIdCard.photoDataUrl || demoStaffPhotoDataUrl}
+                                alt="Staff"
+                                className="h-full w-full object-cover"
+                                style={{
+                                  objectPosition: `${staffIdCard.photoX || 50}% ${staffIdCard.photoY || 50}%`,
+                                  transform: `scale(${staffIdCard.photoScale || 1})`,
+                                  transformOrigin: `${staffIdCard.photoX || 50}% ${staffIdCard.photoY || 50}%`,
+                                }}
+                              />
                             </div>
                             <div className="mt-1 h-6 w-24 overflow-hidden">
                               <img src={code39SvgDataUrl(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
@@ -2760,6 +2781,23 @@ export default function App() {
                         Change Photo
                         <input type="file" accept="image/*" onChange={e => changeStaffCardPhoto(staffIdCard, e.target.files?.[0])} className="hidden" />
                       </label>
+                      <div className="grid gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[9px] font-black uppercase text-gray-400">Photo Zoom</span>
+                          <span className="font-mono text-[9px] font-bold text-white">{Math.round((staffIdCard.photoScale || 1) * 100)}%</span>
+                        </div>
+                        <input type="range" min="1" max="1.8" step="0.01" value={staffIdCard.photoScale || 1} onChange={e => updateStaffCardPhotoSetting(staffIdCard, 'photoScale', Number(e.target.value))} className="w-full accent-orange-500" />
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[9px] font-black uppercase text-gray-400">Left / Right</span>
+                          <span className="font-mono text-[9px] font-bold text-white">{staffIdCard.photoX || 50}%</span>
+                        </div>
+                        <input type="range" min="0" max="100" step="1" value={staffIdCard.photoX || 50} onChange={e => updateStaffCardPhotoSetting(staffIdCard, 'photoX', Number(e.target.value))} className="w-full accent-orange-500" />
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[9px] font-black uppercase text-gray-400">Up / Down</span>
+                          <span className="font-mono text-[9px] font-bold text-white">{staffIdCard.photoY || 50}%</span>
+                        </div>
+                        <input type="range" min="0" max="100" step="1" value={staffIdCard.photoY || 50} onChange={e => updateStaffCardPhotoSetting(staffIdCard, 'photoY', Number(e.target.value))} className="w-full accent-orange-500" />
+                      </div>
                       <p className="text-center text-[9px] font-semibold text-gray-500">Print size: 85.6mm x 54mm. Use PVC/ID-card print scale 100%.</p>
                     </div>
                   </div>
