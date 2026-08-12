@@ -2154,7 +2154,7 @@ export default function App() {
             {staffKycOpen && (
               <>
               <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" onClick={() => setStaffKycOpen(false)} />
-              <form onSubmit={submitSuperAdminStaffKyc} className="fixed left-1/2 top-6 z-50 max-h-[calc(100vh-3rem)] w-[min(1120px,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-white/10 bg-[#0b1220]/95 p-6 shadow-2xl shadow-black/70 backdrop-blur-xl">
+              <form onSubmit={submitSuperAdminStaffKyc} className="fixed left-1/2 top-6 z-50 max-h-[calc(100vh-4rem)] w-[min(860px,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-white/10 bg-[#0b1220]/95 p-5 shadow-2xl shadow-black/70 backdrop-blur-xl">
                 <div className="mb-4 flex items-center justify-between gap-3 border-b border-brand-border pb-4">
                   <div>
                     <h4 className="text-base font-black uppercase tracking-wider text-white">New Staff KYC Registration</h4>
@@ -2162,9 +2162,9 @@ export default function App() {
                   </div>
                   <button type="button" onClick={() => setStaffKycOpen(false)} className="rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-card">Close</button>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
                   <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Identity Information</p>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 md:grid-cols-2">
                   {[
                     ['name', 'Full Name', 'text'],
                     ['dob', 'Date of Birth', 'date'],
@@ -2181,7 +2181,7 @@ export default function App() {
                   ))}
                 </div>
                 </div>
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
                   <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Permission Builder</p>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     {['support', 'orders', 'tools', 'reports', 'notifications', 'payouts', 'kyc-review', 'security'].map(permission => {
@@ -2204,7 +2204,7 @@ export default function App() {
                     })}
                   </div>
                 </div>
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
                   <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Secure KYC Documents</p>
                 <div className="grid gap-3 md:grid-cols-3">
                   {[
