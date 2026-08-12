@@ -767,6 +767,35 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/security/admin-set-password') {
+    if (!rateLimit(req, 'admin-set-password', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const session = requireSession(req, key);
+      if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+      const userId = String(body.userId || '').trim();
+      const password = cleanEnvSecret(body.password);
+      const role = String(body.role || 'staff').trim();
+      if (!userId || password.length < 8) { sendJson(res, 400, { ok: false, error: 'userId and 8+ char password required' }); return; }
+      const users = readSecurity(`users-${safeKey(key)}`, {});
+      users[userId] = {
+        ...(users[userId] || {}),
+        userId,
+        role,
+        storeId: String(body.storeId || users[userId]?.storeId || ''),
+        branchId: String(body.branchId || users[userId]?.branchId || ''),
+        status: 'Active',
+        password: hashPassword(password),
+        createdAt: users[userId]?.createdAt || new Date().toISOString(),
+        lastPasswordChangeAt: new Date().toISOString(),
+        passwordChangedBy: session.userId,
+      };
+      writeSecurity(`users-${safeKey(key)}`, users);
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'admin-set-user-password', ip: clientIp(req), reason: body.reason || 'super admin staff password reset', newValue: { userId, role } });
+      sendJson(res, 200, { ok: true, userId, role });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/security/audit') {
     if (!rateLimit(req, 'security-audit', 120, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {

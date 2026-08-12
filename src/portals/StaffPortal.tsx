@@ -7,12 +7,17 @@
  * admin panel.
  */
 import React, { useState } from 'react';
-import { LayoutDashboard, ClipboardList, Wrench, LifeBuoy, Bell, BarChart3, CheckCircle2, TrendingUp, Ticket } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Wrench, LifeBuoy, Bell, BarChart3, CheckCircle2, TrendingUp, Ticket, ShieldCheck, Lock, LogOut } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync } from './portalUtils';
+import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync, securityApi, securityAudit } from './portalUtils';
 
 export default function StaffPortal() {
   useCloudSync();
+  const [session, setSession] = useState<any>(() => {
+    try { return JSON.parse(localStorage.getItem('sd_staff_security_session') || 'null'); } catch { return null; }
+  });
+  const [login, setLogin] = useState({ userId: '', password: '' });
+  const [loginError, setLoginError] = useState('');
   const [orders, setOrders] = useOrders();
   const [tickets, setTickets] = useTickets();
   const [notifications, setNotifications] = useNotifications();
@@ -22,6 +27,81 @@ export default function StaffPortal() {
   const [custTickets, setCustTickets] = useState<any[]>(() => {
     try { const raw = localStorage.getItem('ss_tickets_v2'); return raw ? JSON.parse(raw) : []; } catch { return []; }
   });
+
+  const staffLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const userId = login.userId.trim();
+    securityApi('/login', { userId, password: login.password }).then((data) => {
+      if (data.user?.role !== 'staff' && data.user?.role !== 'super-admin-staff' && data.user?.role !== 'super-admin') throw new Error('not staff');
+      const next = { token: data.token, user: data.user, loggedAt: Date.now() };
+      localStorage.setItem('sd_security_session', data.token);
+      localStorage.setItem('sd_staff_security_session', JSON.stringify(next));
+      setSession(next);
+      setLoginError('');
+      securityAudit('staff-login-success', { actor: userId, role: data.user?.role || 'staff', reason: 'staff portal login' });
+    }).catch(() => {
+      setLoginError('Invalid Staff ID/email or password.');
+      securityAudit('staff-login-failed', { actor: userId || 'unknown', reason: 'server rejected staff login' });
+    });
+  };
+
+  const staffLogout = () => {
+    localStorage.removeItem('sd_staff_security_session');
+    localStorage.removeItem('sd_security_session');
+    setSession(null);
+    setLogin({ userId: '', password: '' });
+  };
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-[#070d16] text-gray-100 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(249,115,22,0.14),transparent_28%)]" />
+        <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl border border-[#1e3050] bg-[#0c1624] shadow-2xl">
+          <div className="grid min-h-[560px] lg:grid-cols-[1fr_420px]">
+            <div className="flex flex-col justify-between p-6 sm:p-8">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-violet-300">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Staff Secure Access
+                </div>
+                <h1 className="mt-6 max-w-xl text-3xl font-black leading-tight text-white sm:text-4xl">Super Admin Staff Console</h1>
+                <p className="mt-3 max-w-lg text-sm leading-6 text-gray-400">Real staff login for support tickets, order tools, notifications, reports and approved operational actions. Every action is audited with Staff ID.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[['Role', 'Staff permission'], ['Audit', 'Permanent logs'], ['Sync', 'Live operations']].map(([title, sub]) => (
+                  <div key={title} className="rounded-xl border border-[#1e3050] bg-[#080e17] p-3">
+                    <p className="text-[10px] font-black uppercase text-white">{title}</p>
+                    <p className="mt-1 text-[9px] text-gray-500">{sub}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <form onSubmit={staffLogin} className="flex flex-col justify-center border-t border-[#1e3050] bg-[#101d30] p-6 sm:p-8 lg:border-l lg:border-t-0">
+              <div className="mb-6">
+                <p className="text-[10px] font-black uppercase tracking-widest text-violet-300">Login Required</p>
+                <h2 className="mt-2 text-xl font-black text-white">Staff Dashboard</h2>
+                <p className="mt-1 text-[11px] text-gray-400">Enter approved Staff ID/email and password.</p>
+              </div>
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Staff ID / Email</span>
+                  <input value={login.userId} onChange={e => setLogin(prev => ({ ...prev, userId: e.target.value }))} className="w-full rounded-xl border border-[#1e3050] bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-violet-400" placeholder="STF-... or email" autoComplete="username" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Password</span>
+                  <input value={login.password} onChange={e => setLogin(prev => ({ ...prev, password: e.target.value }))} className="w-full rounded-xl border border-[#1e3050] bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-violet-400" placeholder="Password" type="password" autoComplete="current-password" />
+                </label>
+                {loginError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">{loginError}</p>}
+                <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white shadow-lg transition-colors hover:bg-violet-500">
+                  <Lock className="h-4 w-4" /> Open Staff Console
+                </button>
+              </div>
+              <p className="mt-5 text-center text-[10px] text-gray-500">No demo access. Super Admin must create a real staff account first.</p>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const pending = txns.filter(t => t.status === 'Pending');
   const openTickets = tickets.filter(t => t.status === 'Open');
@@ -52,7 +132,7 @@ export default function StaffPortal() {
   const closeCustTicket = (id: string) => setCustTickets(prev => prev.map(t => (t.id === id ? { ...t, status: 'Resolved' } : t)));
 
   return (
-    <PortalShell role="Admin Staff" tagline="Super Admin Support" nav={nav} active={tab} onNav={setTab} onBack={goBack}>
+    <PortalShell role="Admin Staff" tagline={`Super Admin Support · ${session.user?.userId || 'Staff'}`} nav={[...nav, { id: 'logout', label: 'Logout', icon: LogOut }]} active={tab} onNav={(id) => id === 'logout' ? staffLogout() : setTab(id)} onBack={goBack}>
       {tab === 'dashboard' && (
         <div className="space-y-5">
           <div className="rounded-2xl p-5 bg-gradient-to-r from-violet-500/15 via-[#101d30] to-[#101d30] border border-violet-500/20 flex items-center justify-between flex-wrap gap-4">

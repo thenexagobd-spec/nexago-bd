@@ -952,6 +952,41 @@ export default function App() {
     showToast(`Payment for #${orderId} marked Refunded (Tk ${amount.toFixed(2)}) · ${reason}`, 'info');
   };
 
+  const createStaffLogin = (member: any) => {
+    const password = window.prompt(`Create/reset login password for ${member.name || member.id}. Minimum 8 characters.`);
+    if (!password || password.length < 8) {
+      showToast('Staff password must be at least 8 characters.', 'info');
+      return;
+    }
+    const userId = String(member.id || '').trim();
+    securityApi('/admin-set-password', {
+      userId,
+      password,
+      role: 'staff',
+      storeId: member.storeId || '',
+      branchId: member.branchId || '',
+      reason: 'Super Admin created staff portal login',
+    }).then(() => {
+      setStaff(prev => prev.map((s: any) => s.id === member.id ? { ...s, loginEnabled: true, loginCreatedAt: new Date().toISOString() } : s));
+      securityAudit('staff-login-created', { actor: 'super-admin', newValue: { staffId: userId, staffName: member.name }, reason: 'staff portal account created' });
+      showToast(`Staff login ready. ID: ${userId}`, 'success');
+    }).catch((err) => {
+      showToast(`Staff login could not be created: ${String(err?.message || 'Check server security config')}`, 'info');
+    });
+  };
+
+  const addSuperAdminStaff = () => {
+    const name = window.prompt('Staff full name');
+    if (!name?.trim()) return;
+    const role = window.prompt('Staff role / department', 'Support Staff') || 'Support Staff';
+    const shift = window.prompt('Shift profile', 'Full Time') || 'Full Time';
+    const id = `STF-${Date.now().toString().slice(-7)}`;
+    const member = { id, name: name.trim(), role: role.trim(), shift: shift.trim(), status: 'Active', scope: 'super-admin' };
+    setStaff(prev => [member, ...prev]);
+    securityAudit('staff-record-created', { actor: 'super-admin', newValue: { staffId: id, name: member.name, role: member.role }, reason: 'super admin staff record created' });
+    showToast(`Staff record created. ID: ${id}`, 'success');
+  };
+
   // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
   const sidebarItems = React.useMemo(() => {
     const allItems: Array<{ name: string; icon: any; badgeCount?: number; section?: string; onClick?: () => void }> = [
@@ -1871,6 +1906,11 @@ export default function App() {
               <h3 className="text-lg font-bold text-white uppercase tracking-wider">Supermarket & Dispatch Staff</h3>
               <p className="text-xs text-gray-400">Authorized personnel managing logistics and partner portals</p>
             </div>
+            <div className="flex justify-end">
+              <button onClick={addSuperAdminStaff} className="rounded-xl bg-brand-orange px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white hover:bg-brand-orange-hover">
+                Add Super Admin Staff
+              </button>
+            </div>
             <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -1880,6 +1920,7 @@ export default function App() {
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Assigned Role</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Shift Profile</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">System Status</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase text-right">Portal Login</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border/40">
@@ -1894,8 +1935,18 @@ export default function App() {
                           {s.status}
                         </span>
                       </td>
+                      <td className="py-3 px-4 text-right">
+                        <button onClick={() => createStaffLogin(s)} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20">
+                          {s.loginEnabled ? 'Reset Login' : 'Create Login'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
+                  {!staff.length && (
+                    <tr>
+                      <td colSpan={6} className="py-10 text-center text-xs font-semibold text-gray-500">No staff records yet. Add real Super Admin staff to create portal access.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
