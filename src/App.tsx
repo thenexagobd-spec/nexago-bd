@@ -1208,6 +1208,10 @@ export default function App() {
     } catch {
       /* card still opens with initials */
     }
+    if (!photoDataUrl) {
+      const initial = String(member.name || 'S').slice(0, 1).toUpperCase();
+      photoDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f97316"/><stop offset="1" stop-color="#0b1220"/></linearGradient></defs><rect width="240" height="320" fill="url(#g)"/><circle cx="120" cy="105" r="48" fill="rgba(255,255,255,.85)"/><path d="M42 278c12-58 43-88 78-88s66 30 78 88" fill="rgba(255,255,255,.85)"/><text x="120" y="286" text-anchor="middle" font-family="Arial" font-size="38" font-weight="900" fill="#fff">${initial}</text></svg>`)}`;
+    }
     const issuedAt = member.verifiedAt || member.createdAt || new Date().toISOString();
     const expiresAt = new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
     setStaffIdCard({ ...member, photoDataUrl, issuedAt, expiresAt });
@@ -1220,9 +1224,9 @@ export default function App() {
     .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}
     .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photo{width:18mm;height:24mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover}
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
-    .qr{margin-left:auto;width:14mm;height:14mm;background:white;display:grid;grid-template-columns:repeat(4,1fr);gap:.5mm;padding:1mm;border-radius:1mm}.qr i{background:#0b1220}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
+    .qr{margin-left:auto;width:14mm;height:14mm;background:white;display:grid;grid-template-columns:repeat(4,1fr);gap:.5mm;padding:1mm;border-radius:1mm}.qr i{background:#0b1220}.bar{position:absolute;right:5mm;bottom:18mm;width:16mm;height:5mm;background:white;border-radius:1mm;display:flex;align-items:end;gap:.4mm;padding:1mm}.bar i{width:.5mm;background:#0b1220}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
-  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photo">${card.photoDataUrl ? `<img src="${card.photoDataUrl}">` : String(card.name || 'S').slice(0,1).toUpperCase()}</div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.shift || 'Shift'}</div><div class="id">${card.permanentNumber || card.id}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr">${Array.from({length:16}).map((_,i)=>`<i style="opacity:${(i + String(card.id || '').length) % 3 ? 1 : 0}"></i>`).join('')}</div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
+  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photo">${card.photoDataUrl ? `<img src="${card.photoDataUrl}">` : String(card.name || 'S').slice(0,1).toUpperCase()}</div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${card.permanentNumber || card.id}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr">${Array.from({length:16}).map((_,i)=>`<i style="opacity:${(i + String(card.id || '').length) % 3 ? 1 : 0}"></i>`).join('')}</div></div><div class="bar">${Array.from({length:13}).map((_,i)=>`<i style="height:${35+((i*17)%55)}%"></i>`).join('')}</div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
     const blob = new Blob([staffCardHtml(card)], { type: 'text/html' });
@@ -2612,6 +2616,7 @@ export default function App() {
                   <div className="mx-auto w-full max-w-[340px]">
                     <div className="relative aspect-[85.6/54] overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-[#07111f] via-[#102138] to-[#f97316] p-4 shadow-2xl">
                       <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent_35%,rgba(255,255,255,0.08))]" />
+                      <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full border border-white/10 bg-white/5" />
                       <div className="relative flex h-full flex-col justify-between">
                         <div className="flex items-start justify-between">
                           <div>
@@ -2626,12 +2631,18 @@ export default function App() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
-                            <p className="truncate text-[8px] font-bold uppercase text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.shift || 'Shift'}</p>
+                            <p className="truncate text-[8px] font-bold uppercase text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.contractType || 'Official'}</p>
+                            <p className="truncate text-[7px] font-bold uppercase text-white/70">Join: {staffIdCard.joiningDate || new Date(staffIdCard.createdAt || Date.now()).toLocaleDateString()}</p>
                             <p className="mt-1 font-mono text-[8px] font-black text-white/90">{staffIdCard.permanentNumber || staffIdCard.id}</p>
                             <p className="mt-0.5 truncate text-[7px] font-semibold text-white/70">Phone: {staffIdCard.phone || 'N/A'}</p>
                           </div>
-                          <div className="grid h-14 w-14 grid-cols-4 gap-0.5 rounded bg-white p-1">
-                            {Array.from({ length: 16 }).map((_, idx) => <span key={idx} className={`${(idx + String(staffIdCard.id || '').length) % 3 ? 'bg-[#0b1220]' : 'bg-transparent'}`} />)}
+                          <div className="space-y-1">
+                            <div className="grid h-14 w-14 grid-cols-4 gap-0.5 rounded bg-white p-1">
+                              {Array.from({ length: 16 }).map((_, idx) => <span key={idx} className={`${(idx + String(staffIdCard.id || '').length) % 3 ? 'bg-[#0b1220]' : 'bg-transparent'}`} />)}
+                            </div>
+                            <div className="flex h-5 w-14 items-end gap-0.5 rounded bg-white px-1 pb-1">
+                              {Array.from({ length: 13 }).map((_, idx) => <span key={idx} className="bg-[#0b1220]" style={{ height: `${35 + ((idx * 17) % 55)}%`, width: '2px' }} />)}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center justify-between border-t border-white/15 pt-1 text-[6.5px] font-bold uppercase text-white/70">
@@ -2646,7 +2657,7 @@ export default function App() {
                   <div className="grid gap-3 md:grid-cols-2">
                     {[
                       ['Permanent ID No', staffIdCard.permanentNumber || staffIdCard.id], ['Staff Record ID', staffIdCard.id], ['Full Name', staffIdCard.name], ['Father Name', staffIdCard.fatherName], ['Mother Name', staffIdCard.motherName],
-                      ['Role', staffIdCard.role], ['Department/Shift', staffIdCard.shift], ['Phone', staffIdCard.phone], ['Email', staffIdCard.email], ['NID', staffIdCard.nid],
+                      ['Podobi / Designation', staffIdCard.role], ['Department/Shift', staffIdCard.shift], ['Joining Date', staffIdCard.joiningDate], ['Phone', staffIdCard.phone], ['Email', staffIdCard.email], ['NID', staffIdCard.nid],
                       ['Date of Birth', staffIdCard.dob], ['Blood Group', staffIdCard.bloodGroup || 'N/A'], ['Present Address', staffIdCard.address], ['Permanent Address', staffIdCard.permanentAddress], ['District/Upazila', `${staffIdCard.district || ''} ${staffIdCard.upazila || ''}`.trim()],
                       ['Emergency Contact', staffIdCard.emergencyContact || 'N/A'], ['Device Access', staffIdCard.deviceAccess || 'After approval'], ['Permissions', (staffIdCard.permissions || []).join(', ')],
                     ].map(([label, value]) => (
