@@ -82,14 +82,14 @@ const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap(
 });
 const code39SvgDataUrl = (value: string) => {
   const bars = code39Bars(value);
-  let x = 8;
+  let x = 3;
   const rects = bars.map((bar) => {
     const w = bar.wide ? 4 : 2;
-    const rect = bar.on ? `<rect x="${x}" y="6" width="${w}" height="42" fill="#020617"/>` : '';
+    const rect = bar.on ? `<rect x="${x}" y="2" width="${w}" height="60" fill="#020617"/>` : '';
     x += w + 1;
     return rect;
   }).join('');
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="260" height="64" viewBox="0 0 260 64"><rect width="260" height="64" rx="4" fill="#fff"/><g transform="translate(6 4) scale(${Math.min(1.25, 248 / Math.max(x, 1))} 1.16)">${rects}</g></svg>`)}`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="260" height="64" viewBox="0 0 260 64"><rect width="260" height="64" fill="#fff"/><g transform="scale(${Math.min(1.3, 254 / Math.max(x, 1))} 1)">${rects}</g></svg>`)}`;
 };
 
 const STORE_ADMIN_PAGE_OPTIONS = [
@@ -1266,7 +1266,7 @@ export default function App() {
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
     .qr{width:16mm;height:16mm;background:white;border-radius:1.5mm;padding:1.2mm;display:grid;place-items:center;align-self:center}.qr svg{width:100%;height:100%}.photoBar{background:white;border:1px solid #e5e7eb;border-radius:1mm;width:22mm;height:6mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
-  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || demoStaffPhotoDataUrl}"></div><div class="photoBar"><img src="${code39SvgDataUrl(staffCardBarcodeCode(card))}"></div></div><div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
+  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || demoStaffPhotoDataUrl}"></div><div class="photoBar"><img src="${code39SvgDataUrl(staffCardBarcodeCode(card))}"></div></div><div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
     const blob = new Blob([staffCardHtml(card)], { type: 'text/html' });
@@ -2739,7 +2739,7 @@ export default function App() {
                             <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
                             <p className="truncate text-[8px] font-bold uppercase text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.contractType || 'Official'}</p>
                             <p className="truncate text-[7px] font-bold uppercase text-white/70">Join: {staffIdCard.joiningDate || new Date(staffIdCard.createdAt || Date.now()).toLocaleDateString()}</p>
-                            <p className="mt-1 font-mono text-[8px] font-black text-white/90">{staffIdCard.permanentNumber || staffIdCard.id}</p>
+                            <p className="mt-1 font-mono text-[8px] font-black text-white/90">ID: {staffIdCard.permanentNumber || staffIdCard.id}</p>
                             <p className="mt-0.5 truncate text-[7px] font-semibold text-white/70">Phone: {staffIdCard.phone || 'N/A'}</p>
                           </div>
                           <div className="flex h-16 w-16 items-center justify-center self-center rounded-lg bg-white p-1.5">
