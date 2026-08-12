@@ -254,6 +254,15 @@ export default function DriverProfileView({
     const reader = new FileReader();
     reader.onload = () => {
       const src = String(reader.result);
+      // PDF support: store as-is (PDFs cannot be canvas-compressed).
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (isPdf) {
+        if (file.size > 3 * 1024 * 1024) { if (showToast) showToast('PDF is too large — keep it under 3MB (compress the scan first).', 'error'); return; }
+        if (!src.startsWith('data:application/pdf')) { if (showToast) showToast('Please choose a valid PDF file.', 'error'); return; }
+        setNewDocDataUrl(src);
+        return;
+      }
+      if (!src.startsWith('data:image')) { if (showToast) showToast('Please choose an image (JPG/PNG) or a PDF.', 'error'); return; }
       // Compress before saving so documents always fit in localStorage + cloud
       // sync (large camera photos would silently overflow the quota otherwise).
       const img = new Image();
@@ -313,17 +322,17 @@ export default function DriverProfileView({
       @media print{.doc{break-inside:avoid}}</style></head><body>
       <h2>${driver.name}</h2>
       <p class="meta">Driver ID: ${driver.id || '—'} · ${driver.vehicleType || ''} · Verification: ${driver.verificationStatus || 'Verified'}</p>
-      <div class="grid">${profileDocs.map((d, i) => `<div class="doc">${d.dataUrl ? `<img src="${d.dataUrl}" alt="${d.type}"/>` : '<p>No image</p>'}<p><b>${d.type}</b> — submitted ${d.submittedAt} (${d.status})</p></div>`).join('') || '<p>No documents attached.</p>'}</div>
+      <div class="grid">${profileDocs.map((d, i) => `<div class="doc">${d.dataUrl ? (d.dataUrl.startsWith('data:application/pdf') ? `<embed src="${d.dataUrl}" type="application/pdf" style="width:100%;height:250px;border-radius:4px;background:#f3f3f3"/>` : `<img src="${d.dataUrl}" alt="${d.type}"/>`) : '<p>No image</p>'}<p><b>${d.type}</b> — submitted ${d.submittedAt} (${d.status})</p></div>`).join('') || '<p>No documents attached.</p>'}</div>
       <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
       </body></html>`);
     w.document.close();
   };
 
   const downloadDoc = (doc: DriverDocument) => {
-    if (!doc.dataUrl) { if (showToast) showToast('No image data available to download.', 'info'); return; }
+    if (!doc.dataUrl) { if (showToast) showToast('No file data available to download.', 'info'); return; }
     const a = document.createElement('a');
     a.href = doc.dataUrl;
-    a.download = `${doc.type.replace(/\s+/g, '_')}.jpg`;
+    a.download = `${doc.type.replace(/\s+/g, '_')}.${doc.dataUrl.startsWith('data:application/pdf') ? 'pdf' : 'jpg'}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -649,7 +658,7 @@ export default function DriverProfileView({
       <input
         ref={docInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf,.pdf"
         className="hidden"
         onChange={(e) => { handleDocFile(e.target.files?.[0]); e.target.value = ''; }}
       />
@@ -2326,7 +2335,11 @@ export default function DriverProfileView({
             <div className="mb-4">
               {newDocDataUrl ? (
                 <div className="relative rounded-xl overflow-hidden border border-brand-border/60">
-                  <img src={newDocDataUrl} alt="Preview" className="w-full h-44 object-cover" />
+                  {newDocDataUrl.startsWith('data:application/pdf') ? (
+                    <iframe title="PDF Preview" src={newDocDataUrl} className="w-full h-44 bg-white rounded-lg" />
+                  ) : (
+                    <img src={newDocDataUrl} alt="Preview" className="w-full h-44 object-cover" />
+                  )}
                   <button
                     onClick={() => setNewDocDataUrl('')}
                     className="absolute top-2 right-2 bg-black/70 text-red-400 p-1.5 rounded-lg cursor-pointer hover:bg-black/90 transition-all"
@@ -2336,7 +2349,7 @@ export default function DriverProfileView({
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-brand-border/60 bg-brand-dark/40 p-6 text-center text-[10px] text-gray-500">
-                  No image captured yet — use Camera or Gallery above.
+                  No file captured yet — use Camera, Gallery or PDF above.
                 </div>
               )}
             </div>
@@ -2395,9 +2408,13 @@ export default function DriverProfileView({
                     {profileDocs.map((doc, i) => (
                       <div key={i} className="bg-brand-dark/60 p-2 rounded-lg border border-brand-border/40 flex flex-col">
                         {doc.dataUrl ? (
-                          <img src={doc.dataUrl} alt={doc.type} className="w-full h-28 object-cover rounded-md border border-brand-border/40" />
+                          doc.dataUrl.startsWith('data:application/pdf') ? (
+                            <iframe title={doc.type} src={doc.dataUrl} className="w-full h-28 rounded-md border border-brand-border/40 bg-white" />
+                          ) : (
+                            <img src={doc.dataUrl} alt={doc.type} className="w-full h-28 object-cover rounded-md border border-brand-border/40" />
+                          )
                         ) : (
-                          <div className="w-full h-28 flex items-center justify-center text-[9px] text-gray-500">No image</div>
+                          <div className="w-full h-28 flex items-center justify-center text-[9px] text-gray-500">No file</div>
                         )}
                         <p className="text-[9px] text-gray-300 font-bold mt-1.5">{doc.type}</p>
                         <p className="text-[8px] text-gray-500">{doc.submittedAt}</p>

@@ -88,11 +88,22 @@ export default function DriverPortal() {
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = String(reader.result || '');
-      if (!dataUrl.startsWith('data:image')) { showToast('Please choose an image file (JPG/PNG)'); return; }
+      // PDF support: store the file as-is (PDFs cannot be canvas-compressed).
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (isPdf) {
+        // localStorage + cloud quota is shared, so very large PDFs would silently
+        // overflow. 3MB (→ ~4MB base64) keeps the whole driver record safe.
+        if (file.size > 3 * 1024 * 1024) { showToast('PDF is too large — keep it under 3MB (compress the scan first)'); return; }
+        if (!dataUrl.startsWith('data:application/pdf')) { showToast('Please choose a valid PDF file'); return; }
+        setUploadedDocs(prev => ({ ...prev, [key]: dataUrl }));
+        return;
+      }
+      if (!dataUrl.startsWith('data:image')) { showToast('Please choose an image file (JPG/PNG) or a PDF'); return; }
       // Compress before storing so signup documents always fit in localStorage +
       // cloud sync (large camera photos would silently overflow the quota).
       const img = new Image();
       img.onload = () => {
+        // Any photo size is fine — it is always downscaled to a compact JPEG.
         const MAX = 900;
         const scale = Math.min(1, MAX / Math.max(img.width, img.height));
         const w = Math.max(1, Math.round(img.width * scale));
@@ -110,7 +121,7 @@ export default function DriverPortal() {
       img.onerror = () => setUploadedDocs(prev => ({ ...prev, [key]: dataUrl }));
       img.src = dataUrl;
     };
-    reader.onerror = () => showToast('Could not read that image — try again');
+    reader.onerror = () => showToast('Could not read that file — try again');
     reader.readAsDataURL(file);
   };
 
@@ -792,21 +803,25 @@ export default function DriverPortal() {
                 <h4 className="text-xs font-bold text-white">Document Verification</h4>
                 <span className="text-[9px] text-brand-orange font-bold">Step 2 of 2</span>
               </div>
-              <p className="text-[10px] text-gray-400">Upload clear photos of your official documents for dispatch approval.</p>
+              <p className="text-[10px] text-gray-400">Upload clear photos or PDFs of your official documents for dispatch approval. Any photo size works — it is auto-compressed.</p>
               <div className="space-y-2">
                 {docMeta.map(docItem => (
                   <div key={docItem.key} className="glass-soft rounded-xl p-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-[11px] text-white font-bold">{docItem.label}</p>
-                        <p className="text-[8px] text-gray-400">{uploadedDocs[docItem.key] ? 'Image saved & locked — replace to change' : (docItem.required ? 'Required — use Camera or Gallery' : 'Optional — use Camera or Gallery')}</p>
+                        <p className="text-[8px] text-gray-400">{uploadedDocs[docItem.key] ? 'File saved & locked — replace to change' : (docItem.required ? 'Required — Camera, Gallery or PDF' : 'Optional — Camera, Gallery or PDF')}</p>
                       </div>
                       {uploadedDocs[docItem.key] && (
                         <button onClick={() => setUploadedDocs(prev => { const n = { ...prev }; delete n[docItem.key]; return n; })} className="text-[8px] text-red-400 hover:underline font-bold">Remove</button>
                       )}
                     </div>
                     {uploadedDocs[docItem.key] ? (
-                      <img src={uploadedDocs[docItem.key]} alt={docItem.label} className="mt-2 w-full h-32 object-cover rounded-lg border border-emerald-500/40" />
+                      uploadedDocs[docItem.key].startsWith('data:application/pdf') ? (
+                        <iframe title={docItem.label} src={uploadedDocs[docItem.key]} className="mt-2 w-full h-32 rounded-lg border border-emerald-500/40 bg-white" />
+                      ) : (
+                        <img src={uploadedDocs[docItem.key]} alt={docItem.label} className="mt-2 w-full h-32 object-cover rounded-lg border border-emerald-500/40" />
+                      )
                     ) : null}
                     <div className="flex items-center space-x-2 mt-2">
                       <button onClick={() => triggerDocInput(docItem.key, 'camera')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-brand-orange/10 text-brand-orange border-brand-orange/30 hover:bg-brand-orange hover:text-white">
@@ -815,10 +830,13 @@ export default function DriverPortal() {
                       <button onClick={() => triggerDocInput(docItem.key, 'gallery')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-sky-500/10 text-sky-300 border-sky-500/30 hover:bg-sky-500 hover:text-white">
                         🖼️ Gallery
                       </button>
+                      <button onClick={() => triggerDocInput(docItem.key, 'gallery')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-red-500/10 text-red-300 border-red-500/30 hover:bg-red-500 hover:text-white">
+                        📄 PDF
+                      </button>
                       <input
                         ref={el => { docInputRefs.current[docItem.key] = el; }}
                         type="file"
-                        accept="image/*"
+                        accept="image/*,application/pdf,.pdf"
                         capture="environment"
                         className="hidden"
                         onChange={e => { handleDocFile(docItem.key, e.target.files?.[0]); e.target.value = ''; }}
