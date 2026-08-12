@@ -82,14 +82,15 @@ const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap(
 });
 const code39SvgDataUrl = (value: string) => {
   const bars = code39Bars(value);
-  let x = 3;
+  let x = 0;
   const rects = bars.map((bar) => {
     const w = bar.wide ? 4 : 2;
-    const rect = bar.on ? `<rect x="${x}" y="2" width="${w}" height="60" fill="#020617"/>` : '';
+    const rect = bar.on ? `<rect x="${x}" y="0" width="${w}" height="64" fill="#020617"/>` : '';
     x += w + 1;
     return rect;
   }).join('');
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="260" height="64" viewBox="0 0 260 64"><rect width="260" height="64" fill="#fff"/><g transform="scale(${Math.min(1.3, 254 / Math.max(x, 1))} 1)">${rects}</g></svg>`)}`;
+  const width = Math.max(x - 1, 1);
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64" viewBox="0 0 ${width} 64"><rect width="${width}" height="64" fill="#fff"/>${rects}</svg>`)}`;
 };
 
 const STORE_ADMIN_PAGE_OPTIONS = [
