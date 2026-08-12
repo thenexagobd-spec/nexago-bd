@@ -1104,6 +1104,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
         isOpen={isCompareOpen}
         onClose={() => setIsCompareOpen(false)}
         drivers={drivers}
+        orders={orders}
         onViewProfile={(id) => setSelectedDriverId(id)}
       />
     </div>
