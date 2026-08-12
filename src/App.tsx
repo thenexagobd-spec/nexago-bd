@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { flushSync } from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import { 
   Order, Driver, Zone, User, Payment, Vehicle, PromotionBanner, SupportTicket, SystemNotification, ChatLogEntry, OrderReportEntry, makeOrderId
 } from './types';
@@ -74,7 +76,34 @@ const CODE39_PATTERNS: Record<string, string> = {
 const staffCardCode = (card: any) => String(card?.permanentNumber || card?.id || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
 const staffCardBarcodeCode = (card: any) => String(card?.id || card?.permanentNumber || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
 const staffCardVerifyUrl = (card: any) => `${window.location.origin}/api/security/staff-card/verify?key=${encodeURIComponent(new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main')}&staffId=${encodeURIComponent(card?.id || '')}&permanentNo=${encodeURIComponent(staffCardCode(card))}`;
+
+// Renders the REAL scannable QR code to an SVG string (same QR the on-screen card shows).
+const staffCardQrSvg = (card: any): string => {
+  const holder = document.createElement('div');
+  const root = createRoot(holder);
+  flushSync(() => root.render(<QRCodeSVG value={staffCardVerifyUrl(card)} size={120} level="M" marginSize={0} />));
+  const svg = holder.innerHTML;
+  root.unmount();
+  return svg;
+};
+
+const code39SvgDataUrlThick = (value: string) => {
+  const bars = code39Bars(value);
+  let x = 0;
+  const rects = bars.map((bar) => {
+    const w = bar.wide ? 8 : 4;
+    const rect = bar.on ? `<rect x="${x}" y="0" width="${w}" height="64" fill="#020617"/>` : '';
+    x += w + 2;
+    return rect;
+  }).join('');
+  const width = Math.max(x - 2, 1);
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64" viewBox="0 0 ${width} 64"><rect width="${width}" height="64" fill="#fff"/>${rects}</svg>`)}`;
+};
 const demoStaffPhotoDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f8fafc"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient><linearGradient id="suit" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#334155"/></linearGradient></defs><rect width="240" height="320" fill="url(#bg)"/><circle cx="120" cy="92" r="46" fill="#b77955"/><path d="M70 170c18-22 82-22 100 0l24 115H46z" fill="url(#suit)"/><path d="M91 165h58l-18 47h-22z" fill="#fff"/><path d="M108 166h24l-6 33h-12z" fill="#f97316"/><path d="M76 84c7-45 82-52 95-3-21-16-57-18-95 3z" fill="#111827"/><rect x="0" y="292" width="240" height="28" fill="#f97316" opacity=".9"/></svg>`)}`;
+const staffInitialsAvatarDataUrl = (name?: string) => {
+  const initials = String(name || 'S').split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'S';
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><rect width="240" height="320" fill="#0f1a2e"/><rect x="20" y="20" width="200" height="280" rx="16" fill="#162a45"/><text x="120" y="178" font-family="Arial,sans-serif" font-size="96" font-weight="900" fill="#f97316" text-anchor="middle">${initials}</text><text x="120" y="252" font-family="Arial,sans-serif" font-size="20" font-weight="700" letter-spacing="4" fill="#94a3b8" text-anchor="middle">STAFF</text></svg>`)}`;
+};
 const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap((char, charIndex, chars) => {
   const pattern = CODE39_PATTERNS[char] || CODE39_PATTERNS['-'];
   const bars = pattern.split('').map((bit, idx) => ({ on: idx % 2 === 0, wide: bit === '1' }));
@@ -306,8 +335,7 @@ export default function App() {
   const [staffKycFilter, setStaffKycFilter] = useState<'All' | 'Pending Verification' | 'Active' | 'Rejected' | 'Suspended' | 'Archived'>('All');
   const [staffKycSearch, setStaffKycSearch] = useState('');
   const [staffProfile, setStaffProfile] = useState<any | null>(null);
-  const [staffIdCard, setStaffIdCard] = useState<any | null>(null);
-  const [staffRenewalOpen, setStaffRenewalOpen] = useState(false);
+  const [staffIdCard, setStaffIdCard] = useState<any | null>(null);  const staffCardPrintRef = useRef<HTMLDivElement | null>(null); const [staffRenewalOpen, setStaffRenewalOpen] = useState(false);
   const [staffRenewalStep, setStaffRenewalStep] = useState(1);
   const [staffRenewalForm, setStaffRenewalForm] = useState({ role: '', shift: '', joiningDate: '', phone: '', address: '', emergencyContact: '', reason: '' });
   const [staffRenewalRef, setStaffRenewalRef] = useState('');
@@ -1251,7 +1279,7 @@ export default function App() {
       /* card still opens with initials */
     }
     if (!photoDataUrl) {
-      photoDataUrl = member.photoDataUrl || demoStaffPhotoDataUrl;
+      photoDataUrl = member.photoDataUrl;
     }
     const issuedAt = member.cardIssuedAt || member.verifiedAt || member.createdAt || new Date().toISOString();
     const expiresAt = member.cardExpiresAt || new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
@@ -1267,7 +1295,7 @@ export default function App() {
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
     .qr{width:16mm;height:16mm;border:1px solid rgba(255,255,255,.32);border-radius:1mm;padding:.6mm;display:grid;place-items:center;align-self:center;justify-self:center}.qr svg{width:100%;height:100%}.photoBar{width:25mm;height:5mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill;display:block}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
-  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || demoStaffPhotoDataUrl}"></div><div class="photoBar"><img src="${code39SvgDataUrl(staffCardBarcodeCode(card))}"></div></div><div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#fff"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
+  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="photoBar"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div></div><div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr">${staffCardQrSvg(card)}</div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
     const blob = new Blob([staffCardHtml(card)], { type: 'text/html' });
@@ -1280,6 +1308,9 @@ export default function App() {
   };
 
   const printStaffIdCard = (card: any) => {
+    // Print the EXACT on-screen card (real photo, real Code39 barcode, real QR)
+    // cloned as-is, sized to the original 85.6mm x 54mm card.
+    const source = staffCardPrintRef.current;
     const frame = document.createElement('iframe');
     frame.style.position = 'fixed';
     frame.style.right = '0';
@@ -1288,10 +1319,36 @@ export default function App() {
     frame.style.height = '0';
     frame.style.border = '0';
     document.body.appendChild(frame);
-    frame.contentDocument?.open();
-    frame.contentDocument?.write(staffCardHtml(card));
-    frame.contentDocument?.close();
-    setTimeout(() => { frame.contentWindow?.focus(); frame.contentWindow?.print(); setTimeout(() => frame.remove(), 1000); }, 250);
+    const doc = frame.contentDocument;
+    if (!doc) { frame.remove(); return; }
+    let styles = '';
+    document.querySelectorAll('style, link[rel="stylesheet"]').forEach((el) => {
+      if (el.tagName === 'STYLE') styles += (el as HTMLStyleElement).outerHTML;
+      else styles += `<link rel="stylesheet" href="${(el as HTMLLinkElement).href}">`;
+    });
+    let bodyHtml = '';
+    if (source) {
+      const clone = source.cloneNode(true) as HTMLElement;
+      clone.style.width = '85.6mm';
+      clone.style.height = '54mm';
+      clone.style.maxWidth = '85.6mm';
+      clone.style.aspectRatio = 'auto';
+      clone.style.borderRadius = '4mm';
+      clone.style.margin = '0 auto';
+      bodyHtml = clone.outerHTML;
+    } else {
+      bodyHtml = staffCardHtml(card);
+    }
+    doc.open();
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${card.id} Staff ID</title>${styles}<style>
+      html,body{margin:0;padding:0;min-height:100vh;background:#fff}
+      body{display:grid;place-items:center}
+      .staff-print-card{box-sizing:border-box;overflow:hidden;box-shadow:none}
+      .staff-print-card img{max-width:none}
+      @media print{html,body{display:block;margin:0;padding:0;background:#fff}@page{size:85.6mm 54mm;margin:0}.staff-print-card{box-shadow:none}}
+    </style></head><body>${bodyHtml}</body></html>`);
+    doc.close();
+    setTimeout(() => { frame.contentWindow?.focus(); frame.contentWindow?.print(); setTimeout(() => frame.remove(), 1200); }, 350);
   };
 
   const changeStaffCardPhoto = async (card: any, file?: File | null) => {
@@ -2728,7 +2785,7 @@ export default function App() {
                 </div>
                 <div className="grid gap-5 lg:grid-cols-[390px_1fr]">
                   <div className="mx-auto w-full max-w-[340px]">
-                    <div className="relative aspect-[85.6/54] overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-[#07111f] via-[#102138] to-[#f97316] p-4 shadow-2xl">
+                    <div ref={staffCardPrintRef} className="staff-print-card relative aspect-[85.6/54] overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-[#07111f] via-[#102138] to-[#f97316] p-4 shadow-2xl">
                       <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent_35%,rgba(255,255,255,0.08))]" />
                       <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full border border-white/10 bg-white/5" />
                       <div className="relative flex h-full flex-col justify-between">
@@ -2743,7 +2800,7 @@ export default function App() {
                           <div className="flex w-24 shrink-0 flex-col items-center">
                             <div className="h-[4.6rem] w-24 overflow-hidden rounded-xl border border-white/25 bg-white/10">
                               <img
-                                src={staffIdCard.photoDataUrl || demoStaffPhotoDataUrl}
+                                src={staffIdCard.photoDataUrl || staffInitialsAvatarDataUrl(staffIdCard.name)}
                                 alt="Staff"
                                 className="h-full w-full object-cover"
                                 style={{
@@ -2754,7 +2811,7 @@ export default function App() {
                               />
                             </div>
                             <div className="mt-1 h-6 w-24 overflow-hidden">
-                              <img src={code39SvgDataUrl(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
+                              <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
                             </div>
                           </div>
                           <div className="min-w-0 flex-1">
