@@ -73,6 +73,7 @@ const CODE39_PATTERNS: Record<string, string> = {
 
 const staffCardCode = (card: any) => String(card?.permanentNumber || card?.id || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
 const staffCardVerifyUrl = (card: any) => `${window.location.origin}/api/security/staff-card/verify?key=${encodeURIComponent(new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main')}&staffId=${encodeURIComponent(card?.id || '')}&permanentNo=${encodeURIComponent(staffCardCode(card))}`;
+const demoStaffPhotoDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f8fafc"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient><linearGradient id="suit" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#334155"/></linearGradient></defs><rect width="240" height="320" fill="url(#bg)"/><circle cx="120" cy="92" r="46" fill="#b77955"/><path d="M70 170c18-22 82-22 100 0l24 115H46z" fill="url(#suit)"/><path d="M91 165h58l-18 47h-22z" fill="#fff"/><path d="M108 166h24l-6 33h-12z" fill="#f97316"/><path d="M76 84c7-45 82-52 95-3-21-16-57-18-95 3z" fill="#111827"/><rect x="0" y="292" width="240" height="28" fill="#f97316" opacity=".9"/></svg>`)}`;
 const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap((char, charIndex, chars) => {
   const pattern = CODE39_PATTERNS[char] || CODE39_PATTERNS['-'];
   const bars = pattern.split('').map((bit, idx) => ({ on: idx % 2 === 0, wide: bit === '1' }));
@@ -1237,7 +1238,7 @@ export default function App() {
       /* card still opens with initials */
     }
     if (!photoDataUrl) {
-      photoDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f8fafc"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient><linearGradient id="suit" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#334155"/></linearGradient></defs><rect width="240" height="320" fill="url(#bg)"/><circle cx="120" cy="92" r="46" fill="#b77955"/><path d="M70 170c18-22 82-22 100 0l24 115H46z" fill="url(#suit)"/><path d="M91 165h58l-18 47h-22z" fill="#fff"/><path d="M108 166h24l-6 33h-12z" fill="#f97316"/><path d="M76 84c7-45 82-52 95-3-21-16-57-18-95 3z" fill="#111827"/><rect x="0" y="292" width="240" height="28" fill="#f97316" opacity=".9"/></svg>`)}`;
+      photoDataUrl = member.photoDataUrl || demoStaffPhotoDataUrl;
     }
     const issuedAt = member.cardIssuedAt || member.verifiedAt || member.createdAt || new Date().toISOString();
     const expiresAt = member.cardExpiresAt || new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
@@ -1249,11 +1250,11 @@ export default function App() {
     body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Arial,sans-serif}
     .card{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:5mm;padding:5mm;color:white;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316);position:relative;overflow:hidden}
     .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}
-    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photoWrap{width:20mm}.photo{width:18mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover}
+    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photoWrap{width:22mm}.photo{width:20mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover}
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
-    .qr{margin-left:auto;width:14mm;height:14mm;background:white;border-radius:1mm;padding:1mm}.qr svg{width:100%;height:100%}.photoBar{background:white;border-radius:1mm;display:flex;align-items:end;gap:.25mm;padding:.8mm;width:18mm;height:4.5mm;margin-top:1mm}.photoBar i{background:#0b1220;width:.35mm}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
+    .qr{margin-left:auto;width:14mm;height:14mm;background:white;border-radius:1mm;padding:1mm}.qr svg{width:100%;height:100%}.photoBar{background:white;border:1px solid #e5e7eb;border-radius:1mm;display:flex;align-items:end;gap:.18mm;padding:.7mm;width:20mm;height:5.5mm;margin-top:1mm;overflow:hidden}.photoBar i{background:#020617;width:.35mm}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
-  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo">${card.photoDataUrl ? `<img src="${card.photoDataUrl}">` : ''}</div><div class="photoBar">${code39Bars(staffCardCode(card)).map(b=>`<i style="height:${b.on ? '100' : '0'}%;width:${b.wide ? '.75' : '.35'}mm"></i>`).join('')}</div></div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
+  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || demoStaffPhotoDataUrl}"></div><div class="photoBar">${code39Bars(staffCardCode(card)).map(b=>`<i style="height:${b.on ? '100' : '0'}%;width:${b.wide ? '.75' : '.35'}mm"></i>`).join('')}</div></div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
     const blob = new Blob([staffCardHtml(card)], { type: 'text/html' });
@@ -1278,6 +1279,21 @@ export default function App() {
     frame.contentDocument?.write(staffCardHtml(card));
     frame.contentDocument?.close();
     setTimeout(() => { frame.contentWindow?.focus(); frame.contentWindow?.print(); setTimeout(() => frame.remove(), 1000); }, 250);
+  };
+
+  const changeStaffCardPhoto = async (card: any, file?: File | null) => {
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    const now = new Date().toISOString();
+    setStaff(prev => prev.map((s: any) => s.id === card.id ? {
+      ...s,
+      photoDataUrl: dataUrl,
+      updatedAt: now,
+      auditTrail: [...(s.auditTrail || []), { action: 'staff-card-photo-updated', actor: 'super-admin', at: now, reason: 'smart staff ID card photo changed' }],
+    } : s));
+    setStaffIdCard((prev: any) => prev && prev.id === card.id ? { ...prev, photoDataUrl: dataUrl, updatedAt: now } : prev);
+    securityAudit('staff-card-photo-updated', { actor: 'super-admin', newValue: { staffId: card.id }, reason: 'smart staff ID card photo changed' });
+    showToast('Staff card photo updated and saved permanently.', 'success');
   };
 
   const openStaffRenewal = (card: any) => {
@@ -1442,6 +1458,7 @@ export default function App() {
       createdAt: now,
       verifiedAt: now,
       updatedAt: now,
+      photoDataUrl: demoStaffPhotoDataUrl,
       testRecord: true,
     };
     setStaff(prev => [testStaff, ...prev]);
@@ -2698,13 +2715,17 @@ export default function App() {
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[10px] font-black text-[#0b1220]">NXG</div>
                         </div>
                         <div className="flex items-end gap-3">
-                          <div className="w-16 shrink-0">
-                            <div className="h-[4.6rem] w-16 overflow-hidden rounded-xl border border-white/25 bg-white/10">
-                              {staffIdCard.photoDataUrl ? <img src={staffIdCard.photoDataUrl} alt="Staff" className="h-full w-full object-cover" /> : null}
+                          <div className="w-20 shrink-0">
+                            <div className="h-[4.6rem] w-20 overflow-hidden rounded-xl border border-white/25 bg-white/10">
+                              <img src={staffIdCard.photoDataUrl || demoStaffPhotoDataUrl} alt="Staff" className="h-full w-full object-cover" />
                             </div>
-                            <div className="mt-1 flex h-4 w-16 items-end gap-px rounded bg-white px-1 py-0.5">
-                              {code39Bars(staffCardCode(staffIdCard)).map((bar, idx) => <span key={idx} className="bg-[#0b1220]" style={{ height: bar.on ? '100%' : '0%', width: bar.wide ? '2px' : '1px' }} />)}
+                            <div className="mt-1 flex h-6 w-20 items-end gap-[1px] overflow-hidden rounded border border-gray-200 bg-white px-1 py-1">
+                              {code39Bars(staffCardCode(staffIdCard)).map((bar, idx) => <span key={idx} className="bg-[#020617]" style={{ height: bar.on ? '100%' : '0%', width: bar.wide ? '2px' : '1px' }} />)}
                             </div>
+                            <label className="mt-2 flex cursor-pointer items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-1.5 text-[8px] font-black uppercase text-sky-200 hover:bg-sky-500/20">
+                              Change Photo
+                              <input type="file" accept="image/*" onChange={e => changeStaffCardPhoto(staffIdCard, e.target.files?.[0])} className="hidden" />
+                            </label>
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
