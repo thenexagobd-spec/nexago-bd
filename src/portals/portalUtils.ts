@@ -37,6 +37,8 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_orders_v2: 'orders',
   sd_drivers: 'drivers',
   sd_products: 'products',
+  sd_categories: 'categories',
+  sd_inventory: 'inventory',
   sd_payments: 'payments',
   sd_tickets: 'tickets',
   sd_users: 'users',
@@ -55,6 +57,10 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_store_admin_apps: 'storeAdminApps',
   sd_store_admin_creds: 'storeAdminCreds',
   sd_staff: 'staff',
+  sd_reviews: 'reviews',
+  sd_marketing: 'marketing',
+  sd_banners: 'banners',
+  sd_stock_ledger: 'stockLedger',
 };
 
 // Every approved role writes its own store-scoped records. Server-side merge is
@@ -110,6 +116,10 @@ const unionByIdArr = <T extends { id?: any }>(a: T[], b: T[]) => {
     const k = String(x.id);
     const cur = byId.get(k);
     if (!cur) { byId.set(k, x); return; }
+    const curTime = Date.parse((cur as any).updatedAt || (cur as any).verifiedAt || (cur as any).loginCreatedAt || (cur as any).createdAt || '') || 0;
+    const newTime = Date.parse((x as any).updatedAt || (x as any).verifiedAt || (x as any).loginCreatedAt || (x as any).createdAt || '') || 0;
+    if (newTime > curTime) { byId.set(k, x); return; }
+    if (curTime > newTime) return;
     const curLen = JSON.stringify(cur).length;
     const newLen = JSON.stringify(x).length;
     if (newLen > curLen) byId.set(k, x);
@@ -200,12 +210,13 @@ export function useCloudSync() {
       await push();
       if (!cancelled) setSyncState('online');
     })();
-    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 2000);
-    const pushTimer = setInterval(() => { push(); }, 1500);
+    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 1000);
+    const pushTimer = setInterval(() => { push(); }, 1000);
 
     // Broadcast changes made in THIS tab so sibling tabs (driver site, admin, ...)
     // trigger an immediate pull instead of waiting for the poll timer.
     const onBroadcast = () => {
+      push();
       if (bc) bc.postMessage({ nexago: 'sync' });
     };
     window.addEventListener('nexago-local-write', onBroadcast);

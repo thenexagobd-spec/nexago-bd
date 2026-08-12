@@ -1040,7 +1040,8 @@ export default function App() {
       permissions: member.permissions || [],
       reason: 'Super Admin created staff portal login',
     }).then(() => {
-      setStaff(prev => prev.map((s: any) => s.id === member.id ? { ...s, loginEnabled: true, loginCreatedAt: new Date().toISOString() } : s));
+      const now = new Date().toISOString();
+      setStaff(prev => prev.map((s: any) => s.id === member.id ? { ...s, loginEnabled: true, loginCreatedAt: now, updatedAt: now } : s));
       setStaffLoginTarget(null);
       setStaffLoginPassword('');
       securityAudit('staff-login-created', { actor: 'super-admin', newValue: { staffId: userId, staffName: member.name }, reason: 'staff portal account created' });
@@ -1165,6 +1166,7 @@ export default function App() {
         { action: 'staff-document-submitted', actor: 'super-admin', at: now, reason: 'new staff onboarding documents submitted before confirmation' },
       ],
       createdAt: now,
+      updatedAt: now,
     };
     setStaff(prev => [member, ...prev]);
     setStaffKycBusy(false);
@@ -1275,6 +1277,7 @@ export default function App() {
       status: nextStatus,
       documentStatus: nextStatus === 'Active' ? 'Verified' : nextStatus,
       verifiedAt: nextStatus === 'Active' ? now : s.verifiedAt,
+      updatedAt: now,
       auditTrail: [
         ...(s.auditTrail || []),
         { action: `staff-${nextStatus.toLowerCase()}`, actor: 'super-admin', at: now, reason: reason.trim() },
@@ -1315,6 +1318,7 @@ export default function App() {
       status: 'Archived',
       archived: true,
       archivedAt: now,
+      updatedAt: now,
       loginEnabled: false,
       auditTrail: [
         ...(s.auditTrail || []),
@@ -1371,6 +1375,7 @@ export default function App() {
       ],
       createdAt: now,
       verifiedAt: now,
+      updatedAt: now,
       testRecord: true,
     };
     setStaff(prev => [testStaff, ...prev]);
@@ -1538,7 +1543,6 @@ export default function App() {
               <h3 className="text-lg font-bold text-white uppercase tracking-wider">Departmental Categories</h3>
               <p className="text-xs text-gray-400">Configure supermarket categories, grocery slots, and sub-sections</p>
             </div>
-            {!(staffKycViewing || staffProfile || staffIdCard || staffLoginTarget || staffActionTarget) && (
             <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -1565,7 +1569,6 @@ export default function App() {
                 </tbody>
               </table>
             </div>
-            )}
           </div>
         );
 
@@ -2672,6 +2675,7 @@ export default function App() {
                 </div>
               </div>
             )}
+            {!(staffKycViewing || staffProfile || staffIdCard || staffLoginTarget || staffActionTarget) && (
             <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -2755,6 +2759,7 @@ export default function App() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         );
 

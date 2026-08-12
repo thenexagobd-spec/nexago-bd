@@ -29,6 +29,7 @@ export const getStoredData = <T>(key: string, defaultValue: T): T => {
 export const setStoredData = <T>(key: string, value: T): void => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('nexago-local-write'));
   } catch (error) {
     console.error(`Error writing ${key} to localStorage:`, error);
   }
