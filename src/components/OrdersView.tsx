@@ -771,37 +771,41 @@ export default function OrdersView({
 
                   {/* Action buttons (Eye icon and dropdown for details) */}
                   <td className="py-3.5 px-4 text-center sticky right-0 bg-brand-card shadow-[-8px_0_12px_rgba(0,0,0,0.25)]">
-                    <div className="flex items-center justify-center space-x-1">
+                    <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => startEdit(order)}
-                        className="p-2 bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-white border border-sky-500/30 rounded-lg transition-all cursor-pointer"
+                        className="px-2 py-1.5 bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-white border border-sky-500/30 rounded-lg transition-all cursor-pointer flex items-center space-x-1"
                         title="View & Edit Details"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5" />
+                        <span className="text-[8px] font-black uppercase leading-none">View</span>
                       </button>
                       <button
                         onClick={() => onDeleteOrder(order.id)}
-                        className="p-2 bg-red-500/15 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 rounded-lg transition-all cursor-pointer"
+                        className="px-2 py-1.5 bg-red-500/15 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 rounded-lg transition-all cursor-pointer flex items-center space-x-1"
                         title="Delete Order"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="text-[8px] font-black uppercase leading-none">Del</span>
                       </button>
                       {order.status === 'Completed' && (
                         <button
                           onClick={() => onUndoStatus?.(order)}
-                          className="p-2 bg-amber-500/15 hover:bg-amber-500 text-amber-400 hover:text-white border border-amber-500/30 rounded-lg transition-all cursor-pointer"
+                          className="px-2 py-1.5 bg-amber-500/15 hover:bg-amber-500 text-amber-400 hover:text-white border border-amber-500/30 rounded-lg transition-all cursor-pointer flex items-center space-x-1"
                           title="Undo status → back to Ongoing"
                         >
-                          <Undo2 className="w-4 h-4" />
+                          <Undo2 className="w-3.5 h-3.5" />
+                          <span className="text-[8px] font-black uppercase leading-none">Undo</span>
                         </button>
                       )}
                       {order.status !== 'Completed' && order.status !== 'Cancelled' && (
                         <button
                           onClick={() => { setCancelOrder(order); setCancelParty('None'); setCancelAdjust('Debit'); setCancelAmount(0); setCancelReason(''); }}
-                          className="p-2 bg-orange-500/15 hover:bg-orange-500 text-orange-400 hover:text-white border border-orange-500/30 rounded-lg transition-all cursor-pointer"
+                          className="px-2 py-1.5 bg-orange-500/15 hover:bg-orange-500 text-orange-400 hover:text-white border border-orange-500/30 rounded-lg transition-all cursor-pointer flex items-center space-x-1"
                           title="Cancel Order (admin only) — optional debit/credit"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
+                          <span className="text-[8px] font-black uppercase leading-none">Cancel</span>
                         </button>
                       )}
                       {order.status === 'Cancelled' && (
