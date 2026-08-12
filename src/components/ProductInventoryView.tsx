@@ -638,10 +638,10 @@ export default function ProductInventoryView({ products, onProductsChange, showT
               {ledger.length === 0 ? (
                 <p className="text-xs text-gray-500">No stock movements recorded yet. Add, restock, or adjust a product to build the trail.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+            <div className="overflow-auto max-h-[70vh]">
+              <table className="w-full text-xs min-w-[1000px]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-brand-card text-gray-400 border-b border-brand-border">
                         <th className="py-2 px-3 font-bold text-[10px] uppercase">Time</th>
                         <th className="py-2 px-3 font-bold text-[10px] uppercase">Product</th>
                         <th className="py-2 px-3 font-bold text-[10px] uppercase">Type</th>
@@ -732,8 +732,8 @@ export default function ProductInventoryView({ products, onProductsChange, showT
                       </td>
                       <td className="py-3 px-4 sticky right-0 bg-brand-card shadow-[-8px_0_12px_rgba(0,0,0,0.25)]">
                         <div className="flex items-center space-x-1.5">
-                          <button onClick={() => openWa(p, Math.max(p.rp * 2 - (p.stock ?? 0), 10))} className="px-2 py-1.5 bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 rounded-lg cursor-pointer hover:bg-emerald-500/20 flex items-center space-x-1" title="Notify supplier on WhatsApp"><MessageCircle className="w-3.5 h-3.5" /><span className="text-[8px] font-black uppercase">WA</span></button>
-                          <button onClick={() => openVariants(p)} className="px-2 py-1.5 bg-indigo-500/10 border border-indigo-500/40 text-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-500/20 flex items-center space-x-1" title="Manage variants"><Boxes className="w-3.5 h-3.5" /><span className="text-[8px] font-black uppercase">Var</span></button>
+                          <button onClick={() => openWa(p, Math.max(p.rp * 2 - (p.stock ?? 0), 10))} className="px-2 py-1.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 rounded-lg cursor-pointer hover:bg-emerald-500/25 flex items-center space-x-1" title="Notify supplier on WhatsApp"><MessageCircle className="w-3.5 h-3.5" /><span className="text-[8px] font-black uppercase">WA</span></button>
+                          <button onClick={() => openVariants(p)} className="px-2 py-1.5 bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-500/25 flex items-center space-x-1" title="Manage variants"><Boxes className="w-3.5 h-3.5" /><span className="text-[8px] font-black uppercase">Var</span></button>
                           <button onClick={() => setLabelSel([p])} className="px-2 py-1.5 bg-slate-600/20 border border-slate-500/40 text-slate-300 rounded-lg cursor-pointer hover:bg-slate-600/30 flex items-center space-x-1" title="Print label"><Barcode className="w-3.5 h-3.5" /><span className="text-[8px] font-black uppercase">Label</span></button>
                           <button onClick={() => openEdit(p)} className="px-2 py-1.5 bg-sky-500/15 border border-sky-500/40 text-sky-300 rounded-lg cursor-pointer hover:bg-sky-500/25 flex items-center space-x-1" title="Edit"><Pencil className="w-3.5 h-3.5" /><span className="text-[8px] font-black uppercase">Edit</span></button>
                           <button onClick={() => setDeleteId(p.id)} className="px-2 py-1.5 bg-red-500/15 border border-red-500/40 text-red-300 rounded-lg cursor-pointer hover:bg-red-500/25 flex items-center space-x-1" title="Delete"><Trash2 className="w-3.5 h-3.5" /><span className="text-[8px] font-black uppercase">Del</span></button>

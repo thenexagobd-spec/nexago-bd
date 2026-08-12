@@ -653,10 +653,10 @@ export default function OrdersView({
 
       {/* TABLE CONTAINER */}
       <div className="bg-brand-card border border-brand-border/60 rounded-xl overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[70vh]">
           <table className="w-full text-left text-xs min-w-[900px]">
-            <thead>
-              <tr className="text-gray-400 border-b border-brand-border/40 bg-brand-dark/40 select-none">
+            <thead className="sticky top-0 z-10">
+              <tr className="text-gray-400 border-b border-brand-border/40 bg-brand-card select-none">
                 <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Order ID</th>
                 <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Store</th>
                 <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Customer</th>
