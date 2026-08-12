@@ -2157,11 +2157,20 @@ export default function App() {
                     ['photo', 'Staff Photo'],
                     ['police', 'Police / Reference Check'],
                   ].map(([keyName, label]) => (
-                    <label key={keyName} className="rounded-xl border border-dashed border-brand-border bg-brand-dark/40 p-3">
+                    <div key={keyName} className="rounded-xl border border-dashed border-brand-border bg-brand-dark/40 p-3">
                       <span className="block text-[9px] font-black uppercase text-gray-500">{label}</span>
-                      <input type="file" accept="image/*,application/pdf" onChange={e => setStaffKycFiles(prev => ({ ...prev, [keyName]: e.target.files?.[0] }))} className="mt-2 w-full text-[10px] font-bold text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-orange file:px-3 file:py-2 file:text-[9px] file:font-black file:uppercase file:text-white" />
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <label className="flex cursor-pointer items-center justify-center rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20">
+                          Camera
+                          <input type="file" accept="image/*" capture="environment" onChange={e => setStaffKycFiles(prev => ({ ...prev, [keyName]: e.target.files?.[0] }))} className="hidden" />
+                        </label>
+                        <label className="flex cursor-pointer items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">
+                          Gallery/PDF
+                          <input type="file" accept="image/*,application/pdf" onChange={e => setStaffKycFiles(prev => ({ ...prev, [keyName]: e.target.files?.[0] }))} className="hidden" />
+                        </label>
+                      </div>
                       <p className="mt-2 truncate text-[9px] font-semibold text-gray-500">{(staffKycFiles as any)[keyName]?.name || 'No file selected'}</p>
-                    </label>
+                    </div>
                   ))}
                 </div>
                 <div className="mt-4 flex justify-end">
