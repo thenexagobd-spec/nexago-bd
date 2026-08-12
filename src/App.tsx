@@ -230,14 +230,37 @@ export default function App() {
   const [staffKycViewing, setStaffKycViewing] = useState<any | null>(null);
   const [staffKycForm, setStaffKycForm] = useState({
     name: '',
+    fatherName: '',
+    motherName: '',
     dob: '',
+    gender: '',
+    nationality: 'Bangladeshi',
+    bloodGroup: '',
     phone: '',
+    email: '',
+    emergencyContact: '',
     nid: '',
+    passport: '',
+    birthCertificate: '',
+    documentExpiry: '',
     address: '',
+    permanentAddress: '',
+    district: '',
+    upazila: '',
+    postCode: '',
     role: 'Support Staff',
     shift: 'Full Time',
+    joiningDate: '',
+    supervisor: '',
+    contractType: '',
+    salaryNote: '',
+    referenceOne: '',
+    referenceTwo: '',
+    deviceAccess: 'Allowed after approval',
+    confirmTruth: false,
     permissions: 'support,orders,reports,notifications',
   });
+  const [staffKycStep, setStaffKycStep] = useState(1);
   const [staffKycFiles, setStaffKycFiles] = useState<{ identity?: File; photo?: File; police?: File }>({});
   const [staffKycBusy, setStaffKycBusy] = useState(false);
   const [staffLoginTarget, setStaffLoginTarget] = useState<any | null>(null);
@@ -1029,17 +1052,29 @@ export default function App() {
   });
 
   const addSuperAdminStaff = () => {
-    setStaffKycForm({ name: '', dob: '', phone: '', nid: '', address: '', role: 'Support Staff', shift: 'Full Time', permissions: 'support,orders,reports,notifications' });
+    setStaffKycForm({
+      name: '', fatherName: '', motherName: '', dob: '', gender: '', nationality: 'Bangladeshi', bloodGroup: '',
+      phone: '', email: '', emergencyContact: '', nid: '', passport: '', birthCertificate: '', documentExpiry: '',
+      address: '', permanentAddress: '', district: '', upazila: '', postCode: '',
+      role: 'Support Staff', shift: 'Full Time', joiningDate: '', supervisor: '', contractType: '', salaryNote: '',
+      referenceOne: '', referenceTwo: '', deviceAccess: 'Allowed after approval', confirmTruth: false,
+      permissions: 'support,orders,reports,notifications'
+    });
     setStaffKycFiles({});
+    setStaffKycStep(1);
     setStaffKycOpen(true);
   };
 
   const submitSuperAdminStaffKyc = async (e: React.FormEvent) => {
     e.preventDefault();
     const draft = staffKycForm;
-    const required = [draft.name, draft.dob, draft.phone, draft.nid, draft.address, draft.role, draft.shift];
+    const required = [draft.name, draft.fatherName, draft.motherName, draft.dob, draft.gender, draft.phone, draft.emergencyContact, draft.nid, draft.address, draft.permanentAddress, draft.district, draft.upazila, draft.role, draft.shift, draft.joiningDate, draft.referenceOne, draft.referenceTwo];
     if (required.some(v => !String(v || '').trim())) {
-      showToast('Fill all KYC fields before submit.', 'info');
+      showToast('All required KYC fields must be filled before submit.', 'info');
+      return;
+    }
+    if (!draft.confirmTruth) {
+      showToast('Review confirmation checkbox is required.', 'info');
       return;
     }
     const permissions = draft.permissions.split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
@@ -1082,12 +1117,33 @@ export default function App() {
     const member = {
       id,
       name: draft.name.trim(),
+      fatherName: draft.fatherName.trim(),
+      motherName: draft.motherName.trim(),
       dob: draft.dob.trim(),
+      gender: draft.gender.trim(),
+      nationality: draft.nationality.trim(),
+      bloodGroup: draft.bloodGroup.trim(),
       phone: draft.phone.trim(),
+      email: draft.email.trim(),
+      emergencyContact: draft.emergencyContact.trim(),
       nid: draft.nid.trim(),
+      passport: draft.passport.trim(),
+      birthCertificate: draft.birthCertificate.trim(),
+      documentExpiry: draft.documentExpiry.trim(),
       address: draft.address.trim(),
+      permanentAddress: draft.permanentAddress.trim(),
+      district: draft.district.trim(),
+      upazila: draft.upazila.trim(),
+      postCode: draft.postCode.trim(),
       role: draft.role.trim(),
       shift: draft.shift.trim(),
+      joiningDate: draft.joiningDate.trim(),
+      supervisor: draft.supervisor.trim(),
+      contractType: draft.contractType.trim(),
+      salaryNote: draft.salaryNote.trim(),
+      referenceOne: draft.referenceOne.trim(),
+      referenceTwo: draft.referenceTwo.trim(),
+      deviceAccess: draft.deviceAccess.trim(),
       permissions,
       status: 'Pending Verification',
       scope: 'super-admin',
@@ -2162,77 +2218,124 @@ export default function App() {
                   </div>
                   <button type="button" onClick={() => setStaffKycOpen(false)} className="rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-card">Close</button>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Identity Information</p>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {[
-                    ['name', 'Full Name', 'text'],
-                    ['dob', 'Date of Birth', 'date'],
-                    ['phone', 'Verified Phone', 'tel'],
-                    ['nid', 'NID / Passport / Birth Certificate', 'text'],
-                    ['address', 'Present Address', 'text'],
-                    ['role', 'Role / Department', 'text'],
-                    ['shift', 'Shift Profile', 'text'],
-                  ].map(([keyName, label, type]) => (
-                    <label key={keyName} className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span>
-                      <input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" />
-                    </label>
+                <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+                  {['Personal', 'Identity', 'Address', 'Job Access', 'Security', 'Review'].map((label, index) => (
+                    <button key={label} type="button" onClick={() => setStaffKycStep(index + 1)} className={`shrink-0 rounded-lg border px-3 py-2 text-[9px] font-black uppercase ${staffKycStep === index + 1 ? 'border-brand-orange/50 bg-brand-orange/15 text-brand-orange' : 'border-white/10 bg-white/[0.03] text-gray-400'}`}>
+                      {index + 1}. {label}
+                    </button>
                   ))}
                 </div>
-                </div>
-                <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Permission Builder</p>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    {['support', 'orders', 'tools', 'reports', 'notifications', 'payouts', 'kyc-review', 'security'].map(permission => {
-                      const selected = staffKycForm.permissions.split(',').map(p => p.trim()).includes(permission);
-                      return (
-                        <label key={permission} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase ${selected ? 'border-brand-orange/40 bg-brand-orange/10 text-brand-orange' : 'border-brand-border bg-[#0d1726] text-gray-400'}`}>
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={e => {
-                              const current = new Set(staffKycForm.permissions.split(',').map(p => p.trim()).filter(Boolean));
-                              if (e.target.checked) current.add(permission); else current.delete(permission);
-                              setStaffKycForm(prev => ({ ...prev, permissions: Array.from(current).join(',') }));
-                            }}
-                            className="accent-brand-orange"
-                          />
-                          {permission}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Secure KYC Documents</p>
-                <div className="grid gap-3 md:grid-cols-3">
-                  {[
-                    ['identity', 'Identity Document'],
-                    ['photo', 'Staff Photo'],
-                    ['police', 'Police / Reference Check'],
-                  ].map(([keyName, label]) => (
-                    <div key={keyName} className="rounded-xl border border-dashed border-brand-border bg-[#070d16] p-3">
-                      <span className="block text-[9px] font-black uppercase text-gray-500">{label}</span>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        <label className="flex cursor-pointer items-center justify-center rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20">
-                          Camera
-                          <input type="file" accept="image/*" capture="environment" onChange={e => setStaffKycFiles(prev => ({ ...prev, [keyName]: e.target.files?.[0] }))} className="hidden" />
-                        </label>
-                        <label className="flex cursor-pointer items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">
-                          Gallery/PDF
-                          <input type="file" accept="image/*,application/pdf" onChange={e => setStaffKycFiles(prev => ({ ...prev, [keyName]: e.target.files?.[0] }))} className="hidden" />
-                        </label>
+
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
+                  {staffKycStep === 1 && (
+                    <>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Personal Details</p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[
+                          ['name', 'Full Legal Name', 'text'], ['fatherName', 'Father Name', 'text'], ['motherName', 'Mother Name', 'text'], ['dob', 'Date of Birth', 'date'],
+                          ['gender', 'Gender', 'text'], ['nationality', 'Nationality', 'text'], ['bloodGroup', 'Blood Group', 'text'], ['phone', 'Mobile Number', 'tel'], ['email', 'Email', 'email'], ['emergencyContact', 'Emergency Contact', 'tel'],
+                        ].map(([keyName, label, type]) => (
+                          <label key={keyName} className="block"><span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span><input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" /></label>
+                        ))}
                       </div>
-                      <p className="mt-2 truncate text-[9px] font-semibold text-gray-500">{(staffKycFiles as any)[keyName]?.name || 'No file selected'}</p>
-                    </div>
-                  ))}
+                    </>
+                  )}
+                  {staffKycStep === 2 && (
+                    <>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Identity Verification</p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[
+                          ['nid', 'NID Number', 'text'], ['passport', 'Passport Number', 'text'], ['birthCertificate', 'Birth Certificate Number', 'text'], ['documentExpiry', 'Document Expiry Date', 'date'],
+                        ].map(([keyName, label, type]) => (
+                          <label key={keyName} className="block"><span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span><input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" /></label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {staffKycStep === 3 && (
+                    <>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Address Information</p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[
+                          ['address', 'Present Address', 'text'], ['permanentAddress', 'Permanent Address', 'text'], ['district', 'District', 'text'], ['upazila', 'Thana / Upazila', 'text'], ['postCode', 'Post Code', 'text'],
+                        ].map(([keyName, label, type]) => (
+                          <label key={keyName} className="block"><span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span><input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" /></label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {staffKycStep === 4 && (
+                    <>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Job & Access</p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[
+                          ['role', 'Role / Department', 'text'], ['shift', 'Shift Profile', 'text'], ['joiningDate', 'Joining Date', 'date'], ['supervisor', 'Supervisor', 'text'], ['contractType', 'Contract Type', 'text'], ['salaryNote', 'Salary / Contract Note', 'text'],
+                        ].map(([keyName, label, type]) => (
+                          <label key={keyName} className="block"><span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span><input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" /></label>
+                        ))}
+                      </div>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {['support', 'orders', 'tools', 'reports', 'notifications', 'payouts', 'kyc-review', 'security'].map(permission => {
+                          const selected = staffKycForm.permissions.split(',').map(p => p.trim()).includes(permission);
+                          return <label key={permission} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase ${selected ? 'border-brand-orange/40 bg-brand-orange/10 text-brand-orange' : 'border-brand-border bg-[#0d1726] text-gray-400'}`}><input type="checkbox" checked={selected} onChange={e => { const current = new Set(staffKycForm.permissions.split(',').map(p => p.trim()).filter(Boolean)); if (e.target.checked) current.add(permission); else current.delete(permission); setStaffKycForm(prev => ({ ...prev, permissions: Array.from(current).join(',') })); }} className="accent-brand-orange" />{permission}</label>;
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {staffKycStep === 5 && (
+                    <>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Security & Documents</p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[
+                          ['referenceOne', 'Reference Person 1', 'text'], ['referenceTwo', 'Reference Person 2', 'text'], ['deviceAccess', 'Device Access Rule', 'text'],
+                        ].map(([keyName, label, type]) => (
+                          <label key={keyName} className="block"><span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span><input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" /></label>
+                        ))}
+                      </div>
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        {[
+                          ['identity', 'Identity Document'], ['photo', 'Live Selfie / Staff Photo'], ['police', 'Police / Reference Check'],
+                        ].map(([keyName, label]) => (
+                          <div key={keyName} className="rounded-xl border border-dashed border-brand-border bg-[#070d16] p-3">
+                            <span className="block text-[9px] font-black uppercase text-gray-500">{label}</span>
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <label className="flex cursor-pointer items-center justify-center rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20">Camera<input type="file" accept="image/*" capture="environment" onChange={e => setStaffKycFiles(prev => ({ ...prev, [keyName]: e.target.files?.[0] }))} className="hidden" /></label>
+                              <label className="flex cursor-pointer items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">Gallery/PDF<input type="file" accept="image/*,application/pdf" onChange={e => setStaffKycFiles(prev => ({ ...prev, [keyName]: e.target.files?.[0] }))} className="hidden" /></label>
+                            </div>
+                            <p className="mt-2 truncate text-[9px] font-semibold text-gray-500">{(staffKycFiles as any)[keyName]?.name || 'No file selected'}</p>
+                            {(staffKycFiles as any)[keyName] && (
+                              <div className="mt-3 h-36 overflow-hidden rounded-lg border border-white/10 bg-black/20">
+                                {String((staffKycFiles as any)[keyName].type || '').includes('pdf') ? (
+                                  <iframe title={`${label} preview`} src={URL.createObjectURL((staffKycFiles as any)[keyName])} className="h-full w-full bg-white" />
+                                ) : (
+                                  <img src={URL.createObjectURL((staffKycFiles as any)[keyName])} alt={`${label} preview`} className="h-full w-full object-contain" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {staffKycStep === 6 && (
+                    <>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Review & Submit</p>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {[
+                          ['Name', staffKycForm.name], ['Phone', staffKycForm.phone], ['NID', staffKycForm.nid], ['Role', staffKycForm.role], ['District', staffKycForm.district], ['Permissions', staffKycForm.permissions],
+                        ].map(([label, value]) => <div key={label} className="rounded-lg border border-white/10 bg-[#070d16] p-3"><p className="text-[9px] font-black uppercase text-gray-500">{label}</p><p className="mt-1 break-words text-xs font-bold text-white">{value || 'Not filled'}</p></div>)}
+                      </div>
+                      <label className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-[11px] font-bold text-amber-200"><input type="checkbox" checked={staffKycForm.confirmTruth} onChange={e => setStaffKycForm(prev => ({ ...prev, confirmTruth: e.target.checked }))} className="mt-0.5 accent-brand-orange" />I confirm all submitted information and documents are true. False information can cause permanent rejection, freeze or legal action.</label>
+                    </>
+                  )}
                 </div>
-                </div>
-                <div className="mt-5 flex justify-end border-t border-brand-border pt-4">
-                  <button disabled={staffKycBusy} type="submit" className="rounded-xl bg-emerald-600 px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
-                    {staffKycBusy ? 'Saving KYC...' : 'Submit KYC & Save Staff'}
-                  </button>
+                <div className="mt-5 flex items-center justify-between border-t border-brand-border pt-4">
+                  <button type="button" disabled={staffKycStep === 1} onClick={() => setStaffKycStep(step => Math.max(1, step - 1))} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-300 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40">Back</button>
+                  {staffKycStep < 6 ? (
+                    <button type="button" onClick={() => setStaffKycStep(step => Math.min(6, step + 1))} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white hover:bg-brand-orange-hover">Next Step</button>
+                  ) : (
+                    <button disabled={staffKycBusy} type="submit" className="rounded-xl bg-emerald-600 px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">{staffKycBusy ? 'Saving KYC...' : 'Submit KYC & Save Staff'}</button>
+                  )}
                 </div>
               </form>
               </>
