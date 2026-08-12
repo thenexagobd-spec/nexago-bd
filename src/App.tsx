@@ -1538,6 +1538,7 @@ export default function App() {
               <h3 className="text-lg font-bold text-white uppercase tracking-wider">Departmental Categories</h3>
               <p className="text-xs text-gray-400">Configure supermarket categories, grocery slots, and sub-sections</p>
             </div>
+            {!(staffKycViewing || staffProfile || staffIdCard || staffLoginTarget || staffActionTarget) && (
             <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -1564,6 +1565,7 @@ export default function App() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         );
 
