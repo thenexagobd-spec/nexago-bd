@@ -253,7 +253,27 @@ export default function DriverProfileView({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setNewDocDataUrl(String(reader.result));
+      const src = String(reader.result);
+      // Compress before saving so documents always fit in localStorage + cloud
+      // sync (large camera photos would silently overflow the quota otherwise).
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 900;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { setNewDocDataUrl(src); return; }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        setNewDocDataUrl(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = () => setNewDocDataUrl(src);
+      img.src = src;
     };
     reader.readAsDataURL(file);
   };
