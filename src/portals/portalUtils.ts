@@ -54,6 +54,7 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_driver_creds: 'driverCreds',
   sd_store_admin_apps: 'storeAdminApps',
   sd_store_admin_creds: 'storeAdminCreds',
+  sd_staff: 'staff',
 };
 
 // Every approved role writes its own store-scoped records. Server-side merge is

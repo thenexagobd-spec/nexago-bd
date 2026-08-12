@@ -214,6 +214,24 @@ export default function App() {
   const [coupons, setCoupons] = useState<any[]>(() => getStoredData('sd_coupons', []));
 
   const [staff, setStaff] = useState<any[]>(() => getStoredData('sd_staff', []));
+  const [staffKycOpen, setStaffKycOpen] = useState(false);
+  const [staffKycViewing, setStaffKycViewing] = useState<any | null>(null);
+  const [staffKycForm, setStaffKycForm] = useState({
+    name: '',
+    dob: '',
+    phone: '',
+    nid: '',
+    address: '',
+    role: 'Support Staff',
+    shift: 'Full Time',
+    permissions: 'support,orders,reports,notifications',
+  });
+  const [staffKycFiles, setStaffKycFiles] = useState<{ identity?: File; photo?: File; police?: File }>({});
+  const [staffKycBusy, setStaffKycBusy] = useState(false);
+  const [staffLoginTarget, setStaffLoginTarget] = useState<any | null>(null);
+  const [staffLoginPassword, setStaffLoginPassword] = useState('');
+  const [staffActionTarget, setStaffActionTarget] = useState<{ member: any; status: 'Active' | 'Rejected' | 'Suspended' } | null>(null);
+  const [staffActionReason, setStaffActionReason] = useState('');
 
   const [reviews, setReviews] = useState<any[]>(() => getStoredData('sd_reviews', []));
 
@@ -952,8 +970,12 @@ export default function App() {
     showToast(`Payment for #${orderId} marked Refunded (Tk ${amount.toFixed(2)}) · ${reason}`, 'info');
   };
 
-  const createStaffLogin = (member: any) => {
-    const password = window.prompt(`Create/reset login password for ${member.name || member.id}. Minimum 8 characters.`);
+  const createStaffLogin = (member: any, password = '') => {
+    if (!password) {
+      setStaffLoginTarget(member);
+      setStaffLoginPassword('');
+      return;
+    }
     if (!password || password.length < 8) {
       showToast('Staff password must be at least 8 characters.', 'info');
       return;
@@ -965,9 +987,12 @@ export default function App() {
       role: 'staff',
       storeId: member.storeId || '',
       branchId: member.branchId || '',
+      permissions: member.permissions || [],
       reason: 'Super Admin created staff portal login',
     }).then(() => {
       setStaff(prev => prev.map((s: any) => s.id === member.id ? { ...s, loginEnabled: true, loginCreatedAt: new Date().toISOString() } : s));
+      setStaffLoginTarget(null);
+      setStaffLoginPassword('');
       securityAudit('staff-login-created', { actor: 'super-admin', newValue: { staffId: userId, staffName: member.name }, reason: 'staff portal account created' });
       showToast(`Staff login ready. ID: ${userId}`, 'success');
     }).catch((err) => {
@@ -975,60 +1000,81 @@ export default function App() {
     });
   };
 
+  const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+
   const addSuperAdminStaff = () => {
-    const name = window.prompt('Staff full name');
-    if (!name?.trim()) return;
-    const dob = window.prompt('Date of birth (YYYY-MM-DD)');
-    if (!dob?.trim()) {
-      showToast('DOB is required before staff can be created.', 'info');
+    setStaffKycForm({ name: '', dob: '', phone: '', nid: '', address: '', role: 'Support Staff', shift: 'Full Time', permissions: 'support,orders,reports,notifications' });
+    setStaffKycFiles({});
+    setStaffKycOpen(true);
+  };
+
+  const submitSuperAdminStaffKyc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const draft = staffKycForm;
+    const required = [draft.name, draft.dob, draft.phone, draft.nid, draft.address, draft.role, draft.shift];
+    if (required.some(v => !String(v || '').trim())) {
+      showToast('Fill all KYC fields before submit.', 'info');
       return;
     }
-    const phone = window.prompt('Verified phone number');
-    if (!phone?.trim()) {
-      showToast('Phone number is required before staff can be created.', 'info');
+    const permissions = draft.permissions.split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+    if (!permissions.length) {
+      showToast('At least one staff permission is required.', 'info');
       return;
     }
-    const nid = window.prompt('NID / Passport / Birth Certificate number');
-    if (!nid?.trim()) {
-      showToast('Identity document number is required.', 'info');
+    const duplicate = staff.find((s: any) =>
+      String(s.nid || '').trim().toLowerCase() === draft.nid.trim().toLowerCase() ||
+      String(s.phone || '').trim() === draft.phone.trim()
+    );
+    if (duplicate) {
+      showToast(`Duplicate KYC blocked. Same phone/document already exists for ${duplicate.id}.`, 'info');
       return;
     }
-    const address = window.prompt('Present address');
-    if (!address?.trim()) {
-      showToast('Address is required before staff can be created.', 'info');
+    const { identity: nidFile, photo: photoFile, police: policeFile } = staffKycFiles;
+    if (!nidFile || !photoFile || !policeFile) {
+      showToast('Identity, photo and police/reference files are required.', 'info');
       return;
     }
-    const role = window.prompt('Staff role / department', 'Support Staff') || 'Support Staff';
-    const shift = window.prompt('Shift profile', 'Full Time') || 'Full Time';
-    const nidFile = window.prompt('NID/Passport document file/link reference');
-    if (!nidFile?.trim()) {
-      showToast('Identity document file/link is required.', 'info');
-      return;
-    }
-    const photoFile = window.prompt('Staff photo file/link reference');
-    if (!photoFile?.trim()) {
-      showToast('Staff photo file/link is required.', 'info');
-      return;
-    }
-    const policeFile = window.prompt('Police verification / reference document file/link', 'Pending physical verification');
+    setStaffKycBusy(true);
     const id = `STF-${Date.now().toString().slice(-7)}`;
     const now = new Date().toISOString();
+    const uploadDoc = async (type: string, file: File) => {
+      const dataUrl = await fileToDataUrl(file);
+      return secureFileUpload({ name: file.name, type: file.type, dataUrl }, { owner: id, role: 'staff', type: `staff-kyc-${type.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` });
+    };
+    let uploadedDocs: any[];
+    try {
+      uploadedDocs = await Promise.all([
+        uploadDoc('Identity Document', nidFile),
+        uploadDoc('Staff Photo', photoFile),
+        uploadDoc('Police Reference Check', policeFile),
+      ]);
+    } catch (err) {
+      setStaffKycBusy(false);
+      showToast(`KYC file upload failed: ${String((err as any)?.message || err)}`, 'info');
+      return;
+    }
     const member = {
       id,
-      name: name.trim(),
-      dob: dob.trim(),
-      phone: phone.trim(),
-      nid: nid.trim(),
-      address: address.trim(),
-      role: role.trim(),
-      shift: shift.trim(),
+      name: draft.name.trim(),
+      dob: draft.dob.trim(),
+      phone: draft.phone.trim(),
+      nid: draft.nid.trim(),
+      address: draft.address.trim(),
+      role: draft.role.trim(),
+      shift: draft.shift.trim(),
+      permissions,
       status: 'Pending Verification',
       scope: 'super-admin',
       documentStatus: 'Submitted',
       documents: [
-        { type: 'Identity Document', ref: nidFile.trim(), submittedAt: now },
-        { type: 'Staff Photo', ref: photoFile.trim(), submittedAt: now },
-        { type: 'Police/Reference Check', ref: (policeFile || 'Pending physical verification').trim(), submittedAt: now },
+        { type: 'Identity Document', ref: uploadedDocs[0].privateUrl || uploadedDocs[0].name, fileId: uploadedDocs[0].secureFile?.id, sha256: uploadedDocs[0].secureFile?.sha256, submittedAt: now, status: 'Stored' },
+        { type: 'Staff Photo', ref: uploadedDocs[1].privateUrl || uploadedDocs[1].name, fileId: uploadedDocs[1].secureFile?.id, sha256: uploadedDocs[1].secureFile?.sha256, submittedAt: now, status: 'Stored' },
+        { type: 'Police/Reference Check', ref: uploadedDocs[2].privateUrl || uploadedDocs[2].name, fileId: uploadedDocs[2].secureFile?.id, sha256: uploadedDocs[2].secureFile?.sha256, submittedAt: now, status: 'Stored' },
       ],
       auditTrail: [
         { action: 'staff-document-submitted', actor: 'super-admin', at: now, reason: 'new staff onboarding documents submitted before confirmation' },
@@ -1036,32 +1082,42 @@ export default function App() {
       createdAt: now,
     };
     setStaff(prev => [member, ...prev]);
+    setStaffKycBusy(false);
+    setStaffKycOpen(false);
     securityAudit('staff-record-created', { actor: 'super-admin', newValue: { staffId: id, name: member.name, role: member.role, documentStatus: member.documentStatus }, reason: 'super admin staff record created with required documents' });
     showToast(`Staff document record saved. ID: ${id}`, 'success');
   };
 
   const viewStaffDocuments = (member: any) => {
-    const docs = (member.documents || []).map((doc: any, index: number) => `${index + 1}. ${doc.type}: ${doc.ref}`).join('\n');
-    const audit = (member.auditTrail || []).map((a: any) => `- ${a.at}: ${a.action} (${a.reason || 'no reason'})`).join('\n');
-    window.alert([
-      `Staff ID: ${member.id}`,
-      `Name: ${member.name}`,
-      `DOB: ${member.dob || 'Not submitted'}`,
-      `Phone: ${member.phone || 'Not submitted'}`,
-      `NID/Document No: ${member.nid || 'Not submitted'}`,
-      `Address: ${member.address || 'Not submitted'}`,
-      `Document Status: ${member.documentStatus || 'Not submitted'}`,
-      '',
-      'Documents:',
-      docs || 'No documents submitted.',
-      '',
-      'Permanent Audit:',
-      audit || 'No audit yet.',
-    ].join('\n'));
+    setStaffKycViewing(member);
   };
 
-  const updateStaffVerification = (member: any, nextStatus: 'Active' | 'Rejected' | 'Suspended') => {
-    const reason = window.prompt(`Reason for ${nextStatus} status`);
+  const openStaffDocuments = async (member: any) => {
+    const docs = (member.documents || []).filter((doc: any) => doc.ref);
+    if (!docs.length) {
+      showToast('No KYC file found for this staff.', 'info');
+      return;
+    }
+    const first = docs[0];
+    let previewDataUrl = '';
+    try {
+      if (first.fileId) {
+        const fileData = await securityApi(`/file/${first.fileId}`);
+        previewDataUrl = fileData.dataUrl || '';
+      }
+    } catch {
+      /* metadata still opens in the panel */
+    }
+    setStaffKycViewing({ ...member, previewDataUrl, previewDoc: first });
+    securityAudit('staff-kyc-files-opened', { actor: 'super-admin', newValue: { staffId: member.id, files: docs.map((d: any) => d.fileId || d.ref) }, reason: 'super admin opened staff KYC files' });
+  };
+
+  const updateStaffVerification = (member: any, nextStatus: 'Active' | 'Rejected' | 'Suspended', reason = '') => {
+    if (!reason) {
+      setStaffActionTarget({ member, status: nextStatus });
+      setStaffActionReason('');
+      return;
+    }
     if (!reason?.trim()) {
       showToast('Reason is required and will be saved permanently.', 'info');
       return;
@@ -1077,6 +1133,8 @@ export default function App() {
         { action: `staff-${nextStatus.toLowerCase()}`, actor: 'super-admin', at: now, reason: reason.trim() },
       ],
     } : s));
+    setStaffActionTarget(null);
+    setStaffActionReason('');
     securityAudit('staff-verification-updated', { actor: 'super-admin', oldValue: { staffId: member.id, status: member.status }, newValue: { staffId: member.id, status: nextStatus }, reason: reason.trim() });
     showToast(`Staff ${nextStatus} saved with audit reason.`, 'success');
   };
@@ -2005,6 +2063,136 @@ export default function App() {
                 Add Super Admin Staff
               </button>
             </div>
+            {staffKycOpen && (
+              <form onSubmit={submitSuperAdminStaffKyc} className="rounded-2xl border border-brand-border bg-brand-card p-5 shadow-xl">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-wider text-white">Staff KYC Submission</h4>
+                    <p className="text-[10px] font-semibold text-gray-500">All fields and files are required. Documents are saved in secure storage and linked to the staff audit record.</p>
+                  </div>
+                  <button type="button" onClick={() => setStaffKycOpen(false)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    ['name', 'Full Name', 'text'],
+                    ['dob', 'Date of Birth', 'date'],
+                    ['phone', 'Verified Phone', 'tel'],
+                    ['nid', 'NID / Passport / Birth Certificate', 'text'],
+                    ['address', 'Present Address', 'text'],
+                    ['role', 'Role / Department', 'text'],
+                    ['shift', 'Shift Profile', 'text'],
+                    ['permissions', 'Permissions', 'text'],
+                  ].map(([keyName, label, type]) => (
+                    <label key={keyName} className="block">
+                      <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span>
+                      <input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-brand-dark px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" />
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  {[
+                    ['identity', 'Identity Document'],
+                    ['photo', 'Staff Photo'],
+                    ['police', 'Police / Reference Check'],
+                  ].map(([keyName, label]) => (
+                    <label key={keyName} className="rounded-xl border border-dashed border-brand-border bg-brand-dark/40 p-3">
+                      <span className="block text-[9px] font-black uppercase text-gray-500">{label}</span>
+                      <input type="file" accept="image/*,application/pdf" onChange={e => setStaffKycFiles(prev => ({ ...prev, [keyName]: e.target.files?.[0] }))} className="mt-2 w-full text-[10px] font-bold text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-orange file:px-3 file:py-2 file:text-[9px] file:font-black file:uppercase file:text-white" />
+                      <p className="mt-2 truncate text-[9px] font-semibold text-gray-500">{(staffKycFiles as any)[keyName]?.name || 'No file selected'}</p>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button disabled={staffKycBusy} type="submit" className="rounded-xl bg-emerald-600 px-5 py-2.5 text-[10px] font-black uppercase tracking-wider text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+                    {staffKycBusy ? 'Saving KYC...' : 'Submit KYC & Save Staff'}
+                  </button>
+                </div>
+              </form>
+            )}
+            {staffKycViewing && (
+              <div className="rounded-2xl border border-sky-500/20 bg-[#07111f] p-5 shadow-xl">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-wider text-white">KYC Document Viewer</h4>
+                    <p className="text-[10px] font-semibold text-gray-500">{staffKycViewing.id} · {staffKycViewing.name} · {staffKycViewing.documentStatus || 'Not submitted'}</p>
+                  </div>
+                  <button onClick={() => setStaffKycViewing(null)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+                  <div className="rounded-xl border border-brand-border bg-brand-dark/50 p-4 text-[11px] font-semibold text-gray-300">
+                    <p><span className="text-gray-500">DOB:</span> {staffKycViewing.dob || 'Not submitted'}</p>
+                    <p className="mt-2"><span className="text-gray-500">Phone:</span> {staffKycViewing.phone || 'Not submitted'}</p>
+                    <p className="mt-2"><span className="text-gray-500">Document No:</span> {staffKycViewing.nid || 'Not submitted'}</p>
+                    <p className="mt-2"><span className="text-gray-500">Address:</span> {staffKycViewing.address || 'Not submitted'}</p>
+                    <p className="mt-2"><span className="text-gray-500">Permissions:</span> {(staffKycViewing.permissions || []).join(', ') || 'None'}</p>
+                    <div className="mt-4 space-y-2">
+                      {(staffKycViewing.documents || []).map((doc: any) => (
+                        <button key={doc.fileId || doc.ref} onClick={async () => {
+                          let previewDataUrl = '';
+                          try {
+                            if (doc.fileId) {
+                              const fileData = await securityApi(`/file/${doc.fileId}`);
+                              previewDataUrl = fileData.dataUrl || '';
+                            }
+                          } catch { showToast('Could not load secure file preview.', 'info'); }
+                          setStaffKycViewing((prev: any) => ({ ...prev, previewDoc: doc, previewDataUrl }));
+                        }} className="block w-full rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-left text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">
+                          Show {doc.type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="min-h-[320px] rounded-xl border border-brand-border bg-brand-dark/60 p-3">
+                    {staffKycViewing.previewDataUrl ? (
+                      String(staffKycViewing.previewDataUrl).startsWith('data:application/pdf') ? (
+                        <iframe title="KYC PDF Preview" src={staffKycViewing.previewDataUrl} className="h-[520px] w-full rounded-lg border border-brand-border bg-white" />
+                      ) : (
+                        <img src={staffKycViewing.previewDataUrl} alt="KYC preview" className="max-h-[520px] w-full rounded-lg object-contain" />
+                      )
+                    ) : (
+                      <div className="flex h-full min-h-[320px] items-center justify-center text-center text-xs font-bold text-gray-500">Click a Show button to preview secure KYC file inside the app.</div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-4 rounded-xl border border-brand-border bg-brand-dark/40 p-3">
+                  <p className="mb-2 text-[9px] font-black uppercase text-gray-500">Permanent Audit Trail</p>
+                  <div className="space-y-1 text-[10px] font-semibold text-gray-400">
+                    {(staffKycViewing.auditTrail || []).map((a: any, idx: number) => <p key={idx}>{a.at} · {a.action} · {a.reason || 'No reason'}</p>)}
+                    {!(staffKycViewing.auditTrail || []).length && <p>No audit yet.</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+            {staffLoginTarget && (
+              <div className="rounded-2xl border border-brand-orange/20 bg-brand-card p-5 shadow-xl">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-wider text-white">Create Staff Portal Login</h4>
+                    <p className="text-[10px] font-semibold text-gray-500">{staffLoginTarget.id} · {staffLoginTarget.name} · Password is hashed on the server.</p>
+                  </div>
+                  <button onClick={() => setStaffLoginTarget(null)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                </div>
+                <div className="flex flex-col gap-3 md:flex-row">
+                  <input type="password" value={staffLoginPassword} onChange={e => setStaffLoginPassword(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-brand-border bg-brand-dark px-4 py-3 text-sm font-bold text-white outline-none focus:border-brand-orange" placeholder="Minimum 8 character staff password" />
+                  <button onClick={() => createStaffLogin(staffLoginTarget, staffLoginPassword)} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white hover:bg-brand-orange-hover">Save Login</button>
+                </div>
+              </div>
+            )}
+            {staffActionTarget && (
+              <div className="rounded-2xl border border-amber-500/20 bg-brand-card p-5 shadow-xl">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-wider text-white">Save Verification Decision</h4>
+                    <p className="text-[10px] font-semibold text-gray-500">{staffActionTarget.member.id} · {staffActionTarget.status} · Reason will be permanently audited.</p>
+                  </div>
+                  <button onClick={() => setStaffActionTarget(null)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                </div>
+                <textarea value={staffActionReason} onChange={e => setStaffActionReason(e.target.value)} className="min-h-[90px] w-full rounded-xl border border-brand-border bg-brand-dark px-4 py-3 text-sm font-bold text-white outline-none focus:border-amber-400" placeholder="Write the verification reason here..." />
+                <div className="mt-3 flex justify-end">
+                  <button onClick={() => updateStaffVerification(staffActionTarget.member, staffActionTarget.status, staffActionReason)} className="rounded-xl bg-amber-600 px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white hover:bg-amber-500">Save Decision</button>
+                </div>
+              </div>
+            )}
             <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -2027,9 +2215,14 @@ export default function App() {
                       <td className="py-3 px-4 text-brand-orange font-semibold">{s.role}</td>
                       <td className="py-3 px-4 text-gray-300">{s.shift}</td>
                       <td className="py-3 px-4">
-                        <button onClick={() => viewStaffDocuments(s)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">
-                          View Docs ({s.documents?.length || 0})
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => viewStaffDocuments(s)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">
+                            Details ({s.documents?.length || 0})
+                          </button>
+                          <button onClick={() => openStaffDocuments(s)} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-violet-300 hover:bg-violet-500/20">
+                            Show
+                          </button>
+                        </div>
                         <p className="mt-1 text-[9px] font-bold uppercase text-gray-500">{s.documentStatus || 'Not Submitted'}</p>
                       </td>
                       <td className="py-3 px-4">

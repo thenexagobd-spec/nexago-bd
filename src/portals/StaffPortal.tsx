@@ -109,15 +109,17 @@ export default function StaffPortal() {
   const unread = staffNotifs.filter(n => !n.read).length;
   const revenue = orders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.amount || 0), 0);
   const byStatus = ['Completed', 'Pending', 'Confirmed', 'Processing', 'Cancelled'].map(st => ({ st, n: orders.filter(o => o.status === st).length }));
+  const permissions = new Set<string>((session.user?.permissions || []).map((p: string) => String(p).toLowerCase()));
+  const can = (permission: string) => session.user?.role === 'super-admin' || permissions.has(permission) || permissions.has('all');
 
   const nav = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'orders', label: 'Orders', icon: ClipboardList, badge: orders.filter(o => o.status === 'Pending').length },
-    { id: 'tools', label: 'Order Tools', icon: Wrench, badge: pending.length },
-    { id: 'support', label: 'Support', icon: LifeBuoy, badge: openTickets.length + custTickets.length },
-    { id: 'notifications', label: 'Alerts', icon: Bell, badge: unread },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
-  ];
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, allow: true },
+    { id: 'orders', label: 'Orders', icon: ClipboardList, badge: orders.filter(o => o.status === 'Pending').length, allow: can('orders') },
+    { id: 'tools', label: 'Order Tools', icon: Wrench, badge: pending.length, allow: can('tools') || can('payouts') },
+    { id: 'support', label: 'Support', icon: LifeBuoy, badge: openTickets.length + custTickets.length, allow: can('support') },
+    { id: 'notifications', label: 'Alerts', icon: Bell, badge: unread, allow: can('notifications') },
+    { id: 'reports', label: 'Reports', icon: BarChart3, allow: can('reports') },
+  ].filter(item => item.allow);
 
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
 
