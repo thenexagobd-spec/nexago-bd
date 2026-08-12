@@ -89,7 +89,26 @@ export default function DriverPortal() {
     reader.onload = () => {
       const dataUrl = String(reader.result || '');
       if (!dataUrl.startsWith('data:image')) { showToast('Please choose an image file (JPG/PNG)'); return; }
-      setUploadedDocs(prev => ({ ...prev, [key]: dataUrl }));
+      // Compress before storing so signup documents always fit in localStorage +
+      // cloud sync (large camera photos would silently overflow the quota).
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 900;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { setUploadedDocs(prev => ({ ...prev, [key]: dataUrl })); return; }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        setUploadedDocs(prev => ({ ...prev, [key]: canvas.toDataURL('image/jpeg', 0.72) }));
+      };
+      img.onerror = () => setUploadedDocs(prev => ({ ...prev, [key]: dataUrl }));
+      img.src = dataUrl;
     };
     reader.onerror = () => showToast('Could not read that image — try again');
     reader.readAsDataURL(file);
