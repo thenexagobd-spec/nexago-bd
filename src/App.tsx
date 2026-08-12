@@ -72,6 +72,7 @@ const CODE39_PATTERNS: Record<string, string> = {
 };
 
 const staffCardCode = (card: any) => String(card?.permanentNumber || card?.id || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
+const staffCardBarcodeCode = (card: any) => String(card?.id || card?.permanentNumber || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
 const staffCardVerifyUrl = (card: any) => `${window.location.origin}/api/security/staff-card/verify?key=${encodeURIComponent(new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main')}&staffId=${encodeURIComponent(card?.id || '')}&permanentNo=${encodeURIComponent(staffCardCode(card))}`;
 const demoStaffPhotoDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f8fafc"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient><linearGradient id="suit" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#334155"/></linearGradient></defs><rect width="240" height="320" fill="url(#bg)"/><circle cx="120" cy="92" r="46" fill="#b77955"/><path d="M70 170c18-22 82-22 100 0l24 115H46z" fill="url(#suit)"/><path d="M91 165h58l-18 47h-22z" fill="#fff"/><path d="M108 166h24l-6 33h-12z" fill="#f97316"/><path d="M76 84c7-45 82-52 95-3-21-16-57-18-95 3z" fill="#111827"/><rect x="0" y="292" width="240" height="28" fill="#f97316" opacity=".9"/></svg>`)}`;
 const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap((char, charIndex, chars) => {
@@ -88,7 +89,7 @@ const code39SvgDataUrl = (value: string) => {
     x += w + 1;
     return rect;
   }).join('');
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="220" height="58" viewBox="0 0 220 58"><rect width="220" height="58" fill="#fff"/><g transform="scale(${Math.min(1, 204 / Math.max(x, 1))} 1)">${rects}</g></svg>`)}`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="260" height="64" viewBox="0 0 260 64"><rect width="260" height="64" rx="4" fill="#fff"/><g transform="translate(6 4) scale(${Math.min(1.25, 248 / Math.max(x, 1))} 1.16)">${rects}</g></svg>`)}`;
 };
 
 const STORE_ADMIN_PAGE_OPTIONS = [
@@ -1261,11 +1262,11 @@ export default function App() {
     body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Arial,sans-serif}
     .card{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:5mm;padding:5mm;color:white;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316);position:relative;overflow:hidden}
     .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}
-    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photoWrap{width:22mm}.photo{width:20mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover}
+    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:grid;grid-template-columns:22mm 1fr 16mm;gap:3.5mm;align-items:end}.photoWrap{width:22mm}.photo{width:22mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover}.info{min-width:0}
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
-    .qr{margin-left:auto;width:14mm;height:14mm;background:white;border-radius:1mm;padding:1mm}.qr svg{width:100%;height:100%}.photoBar{background:white;border:1px solid #e5e7eb;border-radius:1mm;width:20mm;height:5.5mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
+    .qr{width:16mm;height:16mm;background:white;border-radius:1.5mm;padding:1.2mm;display:grid;place-items:center;align-self:center}.qr svg{width:100%;height:100%}.photoBar{background:white;border:1px solid #e5e7eb;border-radius:1mm;width:22mm;height:6mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
     @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
-  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || demoStaffPhotoDataUrl}"></div><div class="photoBar"><img src="${code39SvgDataUrl(staffCardCode(card))}"></div></div><div><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
+  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || demoStaffPhotoDataUrl}"></div><div class="photoBar"><img src="${code39SvgDataUrl(staffCardBarcodeCode(card))}"></div></div><div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29">${Array.from({length:29*29}).map((_,i)=>{const x=i%29,y=Math.floor(i/29);const finder=(x<7&&y<7)||(x>21&&y<7)||(x<7&&y>21);const on=finder ? (x%6===0||y%6===0||(x>1&&x<5&&y>1&&y<5)||(x>23&&x<27&&y>1&&y<5)||(x>1&&x<5&&y>23&&y<27)) : ((x*y + String(card.id || '').length + x + y) % 5 < 2);return on?`<rect x="${x}" y="${y}" width="1" height="1" fill="#0b1220"/>`:''}).join('')}</svg></div></div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
     const blob = new Blob([staffCardHtml(card)], { type: 'text/html' });
@@ -2725,13 +2726,13 @@ export default function App() {
                           </div>
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[10px] font-black text-[#0b1220]">NXG</div>
                         </div>
-                        <div className="grid grid-cols-[72px_minmax(0,1fr)_56px] items-end gap-3">
-                          <div className="w-[72px] shrink-0">
-                            <div className="h-[4.4rem] w-[72px] overflow-hidden rounded-xl border border-white/25 bg-white/10">
+                        <div className="grid grid-cols-[82px_minmax(0,1fr)_64px] items-end gap-3">
+                          <div className="w-[82px] shrink-0">
+                            <div className="h-[4.6rem] w-[82px] overflow-hidden rounded-xl border border-white/25 bg-white/10">
                               <img src={staffIdCard.photoDataUrl || demoStaffPhotoDataUrl} alt="Staff" className="h-full w-full object-cover" />
                             </div>
-                            <div className="mt-1 h-6 w-[72px] overflow-hidden rounded border border-gray-200 bg-white">
-                              <img src={code39SvgDataUrl(staffCardCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
+                            <div className="mt-1 h-7 w-[82px] overflow-hidden rounded border border-gray-200 bg-white">
+                              <img src={code39SvgDataUrl(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
                             </div>
                           </div>
                           <div className="min-w-0 flex-1">
@@ -2741,8 +2742,8 @@ export default function App() {
                             <p className="mt-1 font-mono text-[8px] font-black text-white/90">{staffIdCard.permanentNumber || staffIdCard.id}</p>
                             <p className="mt-0.5 truncate text-[7px] font-semibold text-white/70">Phone: {staffIdCard.phone || 'N/A'}</p>
                           </div>
-                          <div className="flex h-14 w-14 items-center justify-center rounded bg-white p-1">
-                              <QRCodeSVG value={staffCardVerifyUrl(staffIdCard)} size={48} level="M" marginSize={0} />
+                          <div className="flex h-16 w-16 items-center justify-center self-center rounded-lg bg-white p-1.5">
+                              <QRCodeSVG value={staffCardVerifyUrl(staffIdCard)} size={52} level="M" marginSize={0} />
                           </div>
                         </div>
                         <div className="flex items-center justify-between border-t border-white/15 pt-1 text-[6.5px] font-bold uppercase text-white/70">
