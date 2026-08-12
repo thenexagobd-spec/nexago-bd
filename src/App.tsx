@@ -232,6 +232,9 @@ export default function App() {
   const [staffLoginPassword, setStaffLoginPassword] = useState('');
   const [staffActionTarget, setStaffActionTarget] = useState<{ member: any; status: 'Active' | 'Rejected' | 'Suspended' } | null>(null);
   const [staffActionReason, setStaffActionReason] = useState('');
+  const [staffKycFilter, setStaffKycFilter] = useState<'All' | 'Pending Verification' | 'Active' | 'Rejected' | 'Suspended'>('All');
+  const [staffKycSearch, setStaffKycSearch] = useState('');
+  const [staffProfile, setStaffProfile] = useState<any | null>(null);
 
   const [reviews, setReviews] = useState<any[]>(() => getStoredData('sd_reviews', []));
 
@@ -1138,6 +1141,22 @@ export default function App() {
     securityAudit('staff-verification-updated', { actor: 'super-admin', oldValue: { staffId: member.id, status: member.status }, newValue: { staffId: member.id, status: nextStatus }, reason: reason.trim() });
     showToast(`Staff ${nextStatus} saved with audit reason.`, 'success');
   };
+
+  const staffRiskOf = (member: any) => {
+    const duplicatePhone = staff.filter((s: any) => s.id !== member.id && String(s.phone || '').trim() === String(member.phone || '').trim()).length;
+    const duplicateDoc = staff.filter((s: any) => s.id !== member.id && String(s.nid || '').trim().toLowerCase() === String(member.nid || '').trim().toLowerCase()).length;
+    const missingDocs = (member.documents || []).length < 3 || (member.documents || []).some((d: any) => !d.fileId && !d.ref);
+    if (duplicatePhone || duplicateDoc) return { label: 'High Risk', tone: 'text-red-300 bg-red-500/10 border-red-500/30' };
+    if (missingDocs || member.status === 'Pending Verification') return { label: 'Review', tone: 'text-amber-300 bg-amber-500/10 border-amber-500/30' };
+    return { label: 'Clear', tone: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' };
+  };
+
+  const filteredStaff = staff.filter((s: any) => {
+    const haystack = [s.id, s.name, s.phone, s.nid, s.role, s.status, s.documentStatus].join(' ').toLowerCase();
+    const matchesSearch = !staffKycSearch.trim() || haystack.includes(staffKycSearch.trim().toLowerCase());
+    const matchesFilter = staffKycFilter === 'All' || s.status === staffKycFilter;
+    return matchesSearch && matchesFilter;
+  });
 
   // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
   const sidebarItems = React.useMemo(() => {
@@ -2063,6 +2082,27 @@ export default function App() {
                 Add Super Admin Staff
               </button>
             </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {[
+                ['All', staff.length],
+                ['Pending Verification', staff.filter((s: any) => s.status === 'Pending Verification').length],
+                ['Active', staff.filter((s: any) => s.status === 'Active').length],
+                ['Rejected', staff.filter((s: any) => s.status === 'Rejected').length],
+                ['Suspended', staff.filter((s: any) => s.status === 'Suspended').length],
+              ].map(([label, count]) => (
+                <button key={String(label)} onClick={() => setStaffKycFilter(label as any)} className={`rounded-xl border p-4 text-left transition-colors ${staffKycFilter === label ? 'border-brand-orange/50 bg-brand-orange/10' : 'border-brand-border bg-brand-card hover:bg-brand-dark/40'}`}>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-gray-500">{label}</p>
+                  <p className="mt-1 text-2xl font-black text-white">{count}</p>
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 rounded-2xl border border-brand-border bg-brand-card p-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white">KYC Queue Control</p>
+                <p className="mt-1 text-[10px] font-semibold text-gray-500">Only real submitted staff records appear here. No demo records are created.</p>
+              </div>
+              <input value={staffKycSearch} onChange={e => setStaffKycSearch(e.target.value)} className="w-full rounded-xl border border-brand-border bg-brand-dark px-4 py-3 text-xs font-bold text-white outline-none focus:border-brand-orange md:max-w-sm" placeholder="Search staff ID, name, phone, document..." />
+            </div>
             {staffKycOpen && (
               <form onSubmit={submitSuperAdminStaffKyc} className="rounded-2xl border border-brand-border bg-brand-card p-5 shadow-xl">
                 <div className="mb-4 flex items-center justify-between gap-3">
@@ -2081,13 +2121,35 @@ export default function App() {
                     ['address', 'Present Address', 'text'],
                     ['role', 'Role / Department', 'text'],
                     ['shift', 'Shift Profile', 'text'],
-                    ['permissions', 'Permissions', 'text'],
                   ].map(([keyName, label, type]) => (
                     <label key={keyName} className="block">
                       <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">{label}</span>
                       <input type={type} value={(staffKycForm as any)[keyName]} onChange={e => setStaffKycForm(prev => ({ ...prev, [keyName]: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-brand-dark px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-brand-orange" />
                     </label>
                   ))}
+                </div>
+                <div className="mt-4 rounded-xl border border-brand-border bg-brand-dark/40 p-3">
+                  <p className="mb-3 text-[9px] font-black uppercase tracking-wider text-gray-500">Permission Builder</p>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    {['support', 'orders', 'tools', 'reports', 'notifications', 'payouts', 'kyc-review', 'security'].map(permission => {
+                      const selected = staffKycForm.permissions.split(',').map(p => p.trim()).includes(permission);
+                      return (
+                        <label key={permission} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase ${selected ? 'border-brand-orange/40 bg-brand-orange/10 text-brand-orange' : 'border-brand-border bg-brand-card text-gray-400'}`}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={e => {
+                              const current = new Set(staffKycForm.permissions.split(',').map(p => p.trim()).filter(Boolean));
+                              if (e.target.checked) current.add(permission); else current.delete(permission);
+                              setStaffKycForm(prev => ({ ...prev, permissions: Array.from(current).join(',') }));
+                            }}
+                            className="accent-brand-orange"
+                          />
+                          {permission}
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {[
@@ -2193,6 +2255,50 @@ export default function App() {
                 </div>
               </div>
             )}
+            {staffProfile && (
+              <div className="rounded-2xl border border-violet-500/20 bg-[#0a1020] p-5 shadow-xl">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-wider text-white">Staff 360 Profile</h4>
+                    <p className="text-[10px] font-semibold text-gray-500">{staffProfile.id} · {staffProfile.name} · {staffProfile.status}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => viewStaffDocuments(staffProfile)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase text-sky-300 hover:bg-sky-500/20">KYC Viewer</button>
+                    <button onClick={() => updateStaffVerification(staffProfile, 'Suspended')} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase text-red-300 hover:bg-red-500/20">Emergency Freeze</button>
+                    <button onClick={() => setStaffProfile(null)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    ['Phone', staffProfile.phone || 'Not submitted'],
+                    ['Document', staffProfile.nid || 'Not submitted'],
+                    ['DOB', staffProfile.dob || 'Not submitted'],
+                    ['Docs', `${staffProfile.documents?.length || 0} secure files`],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border border-brand-border bg-brand-dark/60 p-4">
+                      <p className="text-[9px] font-black uppercase text-gray-500">{label}</p>
+                      <p className="mt-1 break-words text-xs font-black text-white">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-xl border border-brand-border bg-brand-dark/40 p-4">
+                    <p className="mb-3 text-[9px] font-black uppercase tracking-wider text-gray-500">Permission Access</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(staffProfile.permissions || []).map((p: string) => <span key={p} className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-2 py-1 text-[9px] font-black uppercase text-violet-300">{p}</span>)}
+                      {!(staffProfile.permissions || []).length && <span className="text-[10px] font-semibold text-gray-500">No permission assigned.</span>}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-brand-border bg-brand-dark/40 p-4">
+                    <p className="mb-3 text-[9px] font-black uppercase tracking-wider text-gray-500">Permanent Activity</p>
+                    <div className="max-h-32 space-y-1 overflow-auto text-[10px] font-semibold text-gray-400">
+                      {(staffProfile.auditTrail || []).map((a: any, idx: number) => <p key={idx}>{a.at} · {a.action} · {a.reason || 'No reason'}</p>)}
+                      {!(staffProfile.auditTrail || []).length && <p>No staff activity yet.</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -2201,6 +2307,7 @@ export default function App() {
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Full Name</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Assigned Role</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Shift Profile</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Risk</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Documents</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">System Status</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Control</th>
@@ -2208,12 +2315,19 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border/40">
-                  {staff.map(s => (
+                  {filteredStaff.map(s => {
+                    const risk = staffRiskOf(s);
+                    return (
                     <tr key={s.id} className="hover:bg-brand-dark/10 transition-colors">
-                      <td className="py-3 px-4 font-mono text-gray-400 font-bold">#{s.id}</td>
+                      <td className="py-3 px-4">
+                        <button onClick={() => setStaffProfile(s)} className="font-mono font-bold text-sky-300 hover:text-white">#{s.id}</button>
+                      </td>
                       <td className="py-3 px-4 font-bold text-white">{s.name}</td>
                       <td className="py-3 px-4 text-brand-orange font-semibold">{s.role}</td>
                       <td className="py-3 px-4 text-gray-300">{s.shift}</td>
+                      <td className="py-3 px-4">
+                        <span className={`rounded-lg border px-2 py-1 text-[9px] font-black uppercase ${risk.tone}`}>{risk.label}</span>
+                      </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-2">
                           <button onClick={() => viewStaffDocuments(s)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">
@@ -2239,7 +2353,7 @@ export default function App() {
                             Reject
                           </button>
                           <button onClick={() => updateStaffVerification(s, 'Suspended')} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase text-amber-300 hover:bg-amber-500/20">
-                            Suspend
+                            Freeze
                           </button>
                         </div>
                       </td>
@@ -2249,10 +2363,10 @@ export default function App() {
                         </button>
                       </td>
                     </tr>
-                  ))}
-                  {!staff.length && (
+                  );})}
+                  {!filteredStaff.length && (
                     <tr>
-                      <td colSpan={8} className="py-10 text-center text-xs font-semibold text-gray-500">No staff records yet. Add real Super Admin staff with required documents to create portal access.</td>
+                      <td colSpan={9} className="py-10 text-center text-xs font-semibold text-gray-500">No real staff KYC record found for this filter/search.</td>
                     </tr>
                   )}
                 </tbody>
