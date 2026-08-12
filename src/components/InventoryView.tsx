@@ -62,16 +62,76 @@ interface InventoryViewProps {
 }
 
 export default function InventoryView({ onAddNotification, showToast, products, onProductsChange }: InventoryViewProps) {
-  // Persistence States
+  // Persistence States — seeded from the REAL product catalog (never demo data)
+  const scaleStock = (p: any): number => Math.max(0, Math.round(Number(p?.stock ?? 0)));
   const [items, setItems] = useState<InventoryItem[]>(() => {
     const local = localStorage.getItem('sd_inventory_v2');
-    return local ? JSON.parse(local) : DEFAULT_INVENTORY_ITEMS;
+    const seedFromProducts = (): InventoryItem[] => {
+      if (products && products.length > 0) {
+        return products.map((p, i): InventoryItem => {
+          const rp = Math.max(1, Number((p as any).reorderPoint ?? (p as any).stock / 4 ?? 5));
+          const stock = scaleStock(p);
+          return {
+            id: (p as any).sku || `INV-${String(i + 1).padStart(3, '0')}`,
+            name: p.name,
+            store: (p as any).storeName || (p as any).store || 'Main Warehouse',
+            category: p.category || 'General',
+            stock,
+            maxCapacity: Math.max(rp * 4, 100),
+            unit: (p as any).unit || 'pcs',
+            price: Number(p.price ?? 0),
+            reorderPoint: rp,
+            status: stock === 0 ? 'Reorder Needed' : (stock <= rp ? 'Low Stock' : 'Healthy'),
+            lastAudited: `Checked by Auditor · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`,
+            supplier: (p as any).supplier || (p as any).supplierName || '—',
+          };
+        });
+      }
+      return DEFAULT_INVENTORY_ITEMS;
+    };
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        const isOldDemoSeed = Array.isArray(parsed) && parsed.length === DEFAULT_INVENTORY_ITEMS.length &&
+          parsed.every((it: any, idx: number) => it.id === DEFAULT_INVENTORY_ITEMS[idx].id && it.name === DEFAULT_INVENTORY_ITEMS[idx].name);
+        return isOldDemoSeed ? seedFromProducts() : parsed;
+      } catch { return seedFromProducts(); }
+    }
+    return seedFromProducts();
   });
 
   const [logs, setLogs] = useState<AuditLog[]>(() => {
     const local = localStorage.getItem('sd_inventory_logs');
-    return local ? JSON.parse(local) : DEFAULT_AUDIT_LOGS;
+    const realSeed = (): AuditLog[] => {
+      if (products && products.length > 0) {
+        return [{
+          id: 'LIVE',
+          timestamp: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+          item: `${products.length} catalog items`,
+          action: 'Live Snapshot',
+          change: 'Real-time inventory imported from the live product catalog',
+          operator: 'System (Live Data)',
+        }];
+      }
+      return DEFAULT_AUDIT_LOGS;
+    };
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        const isOldDemoLogs = Array.isArray(parsed) && parsed.length === DEFAULT_AUDIT_LOGS.length &&
+          parsed.every((l: any, idx: number) => l.id === DEFAULT_AUDIT_LOGS[idx].id && l.item === DEFAULT_AUDIT_LOGS[idx].item);
+        return isOldDemoLogs ? realSeed() : parsed;
+      } catch { return realSeed(); }
+    }
+    return realSeed();
   });
+
+  // Live system clock (real time, updates every second)
+  const [nowClock, setNowClock] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNowClock(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // Active Tab: Live Inventory or Audit Logs
   const [activeTab, setActiveTab] = useState<'live' | 'logs'>('live');
@@ -684,7 +744,7 @@ export default function InventoryView({ onAddNotification, showToast, products, 
             <span className="font-semibold text-gray-300 animate-pulse">{customVibeTip}</span>
           </div>
           <div className="text-[10px] text-gray-500 font-bold shrink-0">
-            System Clock: <span className="font-mono text-white">2026-07-06 23:14 UTC</span>
+            System Clock: <span className="font-mono text-white">{nowClock.toISOString().replace('T', ' ').slice(0, 19)} UTC</span>
           </div>
         </div>
 
@@ -992,10 +1052,10 @@ export default function InventoryView({ onAddNotification, showToast, products, 
 
           {/* TABLE CONTAINER */}
           <div className="bg-brand-card border border-brand-border/60 rounded-xl overflow-hidden shadow-2xl">
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[70vh]">
               <table className="w-full text-left text-xs min-w-[950px]">
-                <thead>
-                  <tr className="text-gray-400 border-b border-brand-border/40 bg-brand-dark/40 select-none">
+                <thead className="sticky top-0 z-10">
+                  <tr className="text-gray-400 border-b border-brand-border/40 bg-brand-card select-none">
                     <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px]">ID</th>
                     {isAuditModeActive && (
                       <th className="py-3.5 px-4 font-bold text-brand-orange tracking-wider uppercase text-[10px] animate-pulse">Floor Verification</th>
@@ -1216,10 +1276,10 @@ export default function InventoryView({ onAddNotification, showToast, products, 
           </div>
 
           <div className="bg-brand-card border border-brand-border/60 rounded-xl overflow-hidden shadow-2xl">
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[70vh]">
               <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-brand-dark/40 border-b border-brand-border/40 text-gray-400 select-none">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-brand-card border-b border-brand-border/40 text-gray-400 select-none">
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Audit ID</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Timestamp</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Audit Item</th>
