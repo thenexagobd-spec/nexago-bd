@@ -2645,8 +2645,10 @@ export default function App() {
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     {[
-                      ['Permanent ID No', staffIdCard.permanentNumber || staffIdCard.id], ['Staff Record ID', staffIdCard.id], ['Full Name', staffIdCard.name], ['Role', staffIdCard.role], ['Department/Shift', staffIdCard.shift],
-                      ['NID', staffIdCard.nid], ['Blood Group', staffIdCard.bloodGroup || 'N/A'], ['Emergency Contact', staffIdCard.emergencyContact || 'N/A'], ['Device Access', staffIdCard.deviceAccess || 'After approval'],
+                      ['Permanent ID No', staffIdCard.permanentNumber || staffIdCard.id], ['Staff Record ID', staffIdCard.id], ['Full Name', staffIdCard.name], ['Father Name', staffIdCard.fatherName], ['Mother Name', staffIdCard.motherName],
+                      ['Role', staffIdCard.role], ['Department/Shift', staffIdCard.shift], ['Phone', staffIdCard.phone], ['Email', staffIdCard.email], ['NID', staffIdCard.nid],
+                      ['Date of Birth', staffIdCard.dob], ['Blood Group', staffIdCard.bloodGroup || 'N/A'], ['Present Address', staffIdCard.address], ['Permanent Address', staffIdCard.permanentAddress], ['District/Upazila', `${staffIdCard.district || ''} ${staffIdCard.upazila || ''}`.trim()],
+                      ['Emergency Contact', staffIdCard.emergencyContact || 'N/A'], ['Device Access', staffIdCard.deviceAccess || 'After approval'], ['Permissions', (staffIdCard.permissions || []).join(', ')],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
                         <p className="text-[9px] font-black uppercase text-gray-500">{label}</p>
@@ -2695,6 +2697,9 @@ export default function App() {
                           </button>
                           <button onClick={() => openStaffDocuments(s)} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-violet-300 hover:bg-violet-500/20">
                             Show
+                          </button>
+                          <button onClick={() => openStaffIdCard(s)} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20">
+                            Smart Card
                           </button>
                         </div>
                         <p className="mt-1 text-[9px] font-bold uppercase text-gray-500">{s.documentStatus || 'Not Submitted'}</p>
