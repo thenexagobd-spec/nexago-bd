@@ -978,13 +978,107 @@ export default function App() {
   const addSuperAdminStaff = () => {
     const name = window.prompt('Staff full name');
     if (!name?.trim()) return;
+    const dob = window.prompt('Date of birth (YYYY-MM-DD)');
+    if (!dob?.trim()) {
+      showToast('DOB is required before staff can be created.', 'info');
+      return;
+    }
+    const phone = window.prompt('Verified phone number');
+    if (!phone?.trim()) {
+      showToast('Phone number is required before staff can be created.', 'info');
+      return;
+    }
+    const nid = window.prompt('NID / Passport / Birth Certificate number');
+    if (!nid?.trim()) {
+      showToast('Identity document number is required.', 'info');
+      return;
+    }
+    const address = window.prompt('Present address');
+    if (!address?.trim()) {
+      showToast('Address is required before staff can be created.', 'info');
+      return;
+    }
     const role = window.prompt('Staff role / department', 'Support Staff') || 'Support Staff';
     const shift = window.prompt('Shift profile', 'Full Time') || 'Full Time';
+    const nidFile = window.prompt('NID/Passport document file/link reference');
+    if (!nidFile?.trim()) {
+      showToast('Identity document file/link is required.', 'info');
+      return;
+    }
+    const photoFile = window.prompt('Staff photo file/link reference');
+    if (!photoFile?.trim()) {
+      showToast('Staff photo file/link is required.', 'info');
+      return;
+    }
+    const policeFile = window.prompt('Police verification / reference document file/link', 'Pending physical verification');
     const id = `STF-${Date.now().toString().slice(-7)}`;
-    const member = { id, name: name.trim(), role: role.trim(), shift: shift.trim(), status: 'Active', scope: 'super-admin' };
+    const now = new Date().toISOString();
+    const member = {
+      id,
+      name: name.trim(),
+      dob: dob.trim(),
+      phone: phone.trim(),
+      nid: nid.trim(),
+      address: address.trim(),
+      role: role.trim(),
+      shift: shift.trim(),
+      status: 'Pending Verification',
+      scope: 'super-admin',
+      documentStatus: 'Submitted',
+      documents: [
+        { type: 'Identity Document', ref: nidFile.trim(), submittedAt: now },
+        { type: 'Staff Photo', ref: photoFile.trim(), submittedAt: now },
+        { type: 'Police/Reference Check', ref: (policeFile || 'Pending physical verification').trim(), submittedAt: now },
+      ],
+      auditTrail: [
+        { action: 'staff-document-submitted', actor: 'super-admin', at: now, reason: 'new staff onboarding documents submitted before confirmation' },
+      ],
+      createdAt: now,
+    };
     setStaff(prev => [member, ...prev]);
-    securityAudit('staff-record-created', { actor: 'super-admin', newValue: { staffId: id, name: member.name, role: member.role }, reason: 'super admin staff record created' });
-    showToast(`Staff record created. ID: ${id}`, 'success');
+    securityAudit('staff-record-created', { actor: 'super-admin', newValue: { staffId: id, name: member.name, role: member.role, documentStatus: member.documentStatus }, reason: 'super admin staff record created with required documents' });
+    showToast(`Staff document record saved. ID: ${id}`, 'success');
+  };
+
+  const viewStaffDocuments = (member: any) => {
+    const docs = (member.documents || []).map((doc: any, index: number) => `${index + 1}. ${doc.type}: ${doc.ref}`).join('\n');
+    const audit = (member.auditTrail || []).map((a: any) => `- ${a.at}: ${a.action} (${a.reason || 'no reason'})`).join('\n');
+    window.alert([
+      `Staff ID: ${member.id}`,
+      `Name: ${member.name}`,
+      `DOB: ${member.dob || 'Not submitted'}`,
+      `Phone: ${member.phone || 'Not submitted'}`,
+      `NID/Document No: ${member.nid || 'Not submitted'}`,
+      `Address: ${member.address || 'Not submitted'}`,
+      `Document Status: ${member.documentStatus || 'Not submitted'}`,
+      '',
+      'Documents:',
+      docs || 'No documents submitted.',
+      '',
+      'Permanent Audit:',
+      audit || 'No audit yet.',
+    ].join('\n'));
+  };
+
+  const updateStaffVerification = (member: any, nextStatus: 'Active' | 'Rejected' | 'Suspended') => {
+    const reason = window.prompt(`Reason for ${nextStatus} status`);
+    if (!reason?.trim()) {
+      showToast('Reason is required and will be saved permanently.', 'info');
+      return;
+    }
+    const now = new Date().toISOString();
+    setStaff(prev => prev.map((s: any) => s.id === member.id ? {
+      ...s,
+      status: nextStatus,
+      documentStatus: nextStatus === 'Active' ? 'Verified' : nextStatus,
+      verifiedAt: nextStatus === 'Active' ? now : s.verifiedAt,
+      auditTrail: [
+        ...(s.auditTrail || []),
+        { action: `staff-${nextStatus.toLowerCase()}`, actor: 'super-admin', at: now, reason: reason.trim() },
+      ],
+    } : s));
+    securityAudit('staff-verification-updated', { actor: 'super-admin', oldValue: { staffId: member.id, status: member.status }, newValue: { staffId: member.id, status: nextStatus }, reason: reason.trim() });
+    showToast(`Staff ${nextStatus} saved with audit reason.`, 'success');
   };
 
   // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
@@ -1919,7 +2013,9 @@ export default function App() {
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Full Name</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Assigned Role</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">Shift Profile</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Documents</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase">System Status</th>
+                    <th className="py-3 px-4 font-bold text-[10px] uppercase">Control</th>
                     <th className="py-3 px-4 font-bold text-[10px] uppercase text-right">Portal Login</th>
                   </tr>
                 </thead>
@@ -1931,12 +2027,31 @@ export default function App() {
                       <td className="py-3 px-4 text-brand-orange font-semibold">{s.role}</td>
                       <td className="py-3 px-4 text-gray-300">{s.shift}</td>
                       <td className="py-3 px-4">
+                        <button onClick={() => viewStaffDocuments(s)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">
+                          View Docs ({s.documents?.length || 0})
+                        </button>
+                        <p className="mt-1 text-[9px] font-bold uppercase text-gray-500">{s.documentStatus || 'Not Submitted'}</p>
+                      </td>
+                      <td className="py-3 px-4">
                         <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase">
                           {s.status}
                         </span>
                       </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => updateStaffVerification(s, 'Active')} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase text-emerald-300 hover:bg-emerald-500/20">
+                            Approve
+                          </button>
+                          <button onClick={() => updateStaffVerification(s, 'Rejected')} className="rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase text-red-300 hover:bg-red-500/20">
+                            Reject
+                          </button>
+                          <button onClick={() => updateStaffVerification(s, 'Suspended')} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase text-amber-300 hover:bg-amber-500/20">
+                            Suspend
+                          </button>
+                        </div>
+                      </td>
                       <td className="py-3 px-4 text-right">
-                        <button onClick={() => createStaffLogin(s)} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20">
+                        <button disabled={s.status !== 'Active'} onClick={() => createStaffLogin(s)} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20 disabled:cursor-not-allowed disabled:opacity-40">
                           {s.loginEnabled ? 'Reset Login' : 'Create Login'}
                         </button>
                       </td>
@@ -1944,7 +2059,7 @@ export default function App() {
                   ))}
                   {!staff.length && (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-xs font-semibold text-gray-500">No staff records yet. Add real Super Admin staff to create portal access.</td>
+                      <td colSpan={8} className="py-10 text-center text-xs font-semibold text-gray-500">No staff records yet. Add real Super Admin staff with required documents to create portal access.</td>
                     </tr>
                   )}
                 </tbody>
