@@ -665,7 +665,7 @@ export default function OrdersView({
                 <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Payment Method</th>
                 <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Status</th>
                 <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px]">Driver</th>
-                <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px] text-center">Action</th>
+                <th className="py-3.5 px-4 font-bold text-gray-400 tracking-wider uppercase text-[10px] text-center sticky right-0 bg-brand-card shadow-[-8px_0_12px_rgba(0,0,0,0.25)] z-10">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border/30">
@@ -770,38 +770,38 @@ export default function OrdersView({
                   </td>
 
                   {/* Action buttons (Eye icon and dropdown for details) */}
-                  <td className="py-3.5 px-4 text-center">
+                  <td className="py-3.5 px-4 text-center sticky right-0 bg-brand-card shadow-[-8px_0_12px_rgba(0,0,0,0.25)]">
                     <div className="flex items-center justify-center space-x-1">
                       <button
                         onClick={() => startEdit(order)}
-                        className="p-1.5 bg-brand-dark hover:bg-brand-orange/20 text-gray-400 hover:text-brand-orange border border-brand-border/80 rounded transition-all cursor-pointer"
+                        className="p-2 bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-white border border-sky-500/30 rounded-lg transition-all cursor-pointer"
                         title="View & Edit Details"
                       >
-                        <Eye className="w-3.5 h-3.5" />
+                        <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onDeleteOrder(order.id)}
-                        className="p-1.5 bg-brand-dark hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-brand-border/80 rounded transition-all cursor-pointer"
+                        className="p-2 bg-red-500/15 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 rounded-lg transition-all cursor-pointer"
                         title="Delete Order"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                       {order.status === 'Completed' && (
                         <button
                           onClick={() => onUndoStatus?.(order)}
-                          className="p-1.5 bg-brand-dark hover:bg-amber-500/20 text-gray-400 hover:text-amber-400 border border-brand-border/80 rounded transition-all cursor-pointer"
+                          className="p-2 bg-amber-500/15 hover:bg-amber-500 text-amber-400 hover:text-white border border-amber-500/30 rounded-lg transition-all cursor-pointer"
                           title="Undo status → back to Ongoing"
                         >
-                          <Undo2 className="w-3.5 h-3.5" />
+                          <Undo2 className="w-4 h-4" />
                         </button>
                       )}
                       {order.status !== 'Completed' && order.status !== 'Cancelled' && (
                         <button
                           onClick={() => { setCancelOrder(order); setCancelParty('None'); setCancelAdjust('Debit'); setCancelAmount(0); setCancelReason(''); }}
-                          className="p-1.5 bg-brand-dark hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-brand-border/80 rounded transition-all cursor-pointer"
+                          className="p-2 bg-orange-500/15 hover:bg-orange-500 text-orange-400 hover:text-white border border-orange-500/30 rounded-lg transition-all cursor-pointer"
                           title="Cancel Order (admin only) — optional debit/credit"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                         </button>
                       )}
                       {order.status === 'Cancelled' && (
