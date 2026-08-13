@@ -1294,11 +1294,13 @@ export default function App() {
     .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:grid;grid-template-columns:25mm 1fr 16mm;gap:3mm;align-items:end}.photoWrap{width:25mm;display:grid;justify-items:center}.photo{width:25mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}.info{min-width:0}
     .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
     .qr{width:16mm;height:16mm;border:1px solid rgba(255,255,255,.32);border-radius:1mm;padding:.6mm;display:grid;place-items:center;align-self:center;justify-self:center}.qr svg{width:100%;height:100%}.photoBar{width:25mm;height:6mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill;display:block}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
-    @media print{body{background:white}.card{box-shadow:none} @page{size:85.6mm 54mm;margin:0}}
+    @media print{body{background:white;min-height:0}.card{box-shadow:none}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
   </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="photoBar"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div></div><div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr">${staffCardQrSvg(card)}</div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
-    const blob = new Blob([staffCardHtml(card)], { type: 'text/html' });
+    // Self-contained HTML (inline CSS, real photo, real barcode, real QR) so the
+    // saved file always renders the same original card — no app CSS dependency.
+    const blob = new Blob([staffCardHtml(card)], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1308,9 +1310,9 @@ export default function App() {
   };
 
   const printStaffIdCard = (card: any) => {
-    // Print the EXACT on-screen card (real photo, real Code39 barcode, real QR)
-    // cloned as-is, sized to the original 85.6mm x 54mm card.
-    const source = staffCardPrintRef.current;
+    // Print the ORIGINAL 85.6mm x 54mm card. Body HTML is fully self-contained
+    // (its own inline CSS, data-url photo/barcode, inline SVG QR) — the print
+    // output never depends on the running app styles being reachable.
     const frame = document.createElement('iframe');
     frame.style.position = 'fixed';
     frame.style.right = '0';
@@ -1319,36 +1321,20 @@ export default function App() {
     frame.style.height = '0';
     frame.style.border = '0';
     document.body.appendChild(frame);
+    let done = false;
+    const doPrint = () => {
+      if (done) return;
+      done = true;
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      setTimeout(() => frame.remove(), 1500);
+    };
     const doc = frame.contentDocument;
     if (!doc) { frame.remove(); return; }
-    let styles = '';
-    document.querySelectorAll('style, link[rel="stylesheet"]').forEach((el) => {
-      if (el.tagName === 'STYLE') styles += (el as HTMLStyleElement).outerHTML;
-      else styles += `<link rel="stylesheet" href="${(el as HTMLLinkElement).href}">`;
-    });
-    let bodyHtml = '';
-    if (source) {
-      const clone = source.cloneNode(true) as HTMLElement;
-      clone.style.width = '85.6mm';
-      clone.style.height = '54mm';
-      clone.style.maxWidth = '85.6mm';
-      clone.style.aspectRatio = 'auto';
-      clone.style.borderRadius = '4mm';
-      clone.style.margin = '0 auto';
-      bodyHtml = clone.outerHTML;
-    } else {
-      bodyHtml = staffCardHtml(card);
-    }
     doc.open();
-    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${card.id} Staff ID</title>${styles}<style>
-      html,body{margin:0;padding:0;min-height:100vh;background:#fff}
-      body{display:grid;place-items:center}
-      .staff-print-card{box-sizing:border-box;overflow:hidden;box-shadow:none}
-      .staff-print-card img{max-width:none}
-      @media print{html,body{display:block;margin:0;padding:0;background:#fff}@page{size:85.6mm 54mm;margin:0}.staff-print-card{box-shadow:none}}
-    </style></head><body>${bodyHtml}</body></html>`);
+    doc.write(staffCardHtml(card));
     doc.close();
-    setTimeout(() => { frame.contentWindow?.focus(); frame.contentWindow?.print(); setTimeout(() => frame.remove(), 1200); }, 350);
+    setTimeout(doPrint, 500);
   };
 
   const changeStaffCardPhoto = async (card: any, file?: File | null) => {
