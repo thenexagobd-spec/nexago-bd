@@ -99,7 +99,6 @@ const code39SvgDataUrlThick = (value: string) => {
   const width = Math.max(x - 2, 1);
   return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64" viewBox="0 0 ${width} 64"><rect width="${width}" height="64" fill="#fff"/>${rects}</svg>`)}`;
 };
-const demoStaffPhotoDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f8fafc"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient><linearGradient id="suit" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#334155"/></linearGradient></defs><rect width="240" height="320" fill="url(#bg)"/><circle cx="120" cy="92" r="46" fill="#b77955"/><path d="M70 170c18-22 82-22 100 0l24 115H46z" fill="url(#suit)"/><path d="M91 165h58l-18 47h-22z" fill="#fff"/><path d="M108 166h24l-6 33h-12z" fill="#f97316"/><path d="M76 84c7-45 82-52 95-3-21-16-57-18-95 3z" fill="#111827"/><rect x="0" y="292" width="240" height="28" fill="#f97316" opacity=".9"/></svg>`)}`;
 const staffInitialsAvatarDataUrl = (name?: string) => {
   const initials = String(name || 'S').split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'S';
   return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><rect width="240" height="320" fill="#0f1a2e"/><rect x="20" y="20" width="200" height="280" rx="16" fill="#162a45"/><text x="120" y="178" font-family="Arial,sans-serif" font-size="96" font-weight="900" fill="#f97316" text-anchor="middle">${initials}</text><text x="120" y="252" font-family="Arial,sans-serif" font-size="20" font-weight="700" letter-spacing="4" fill="#94a3b8" text-anchor="middle">STAFF</text></svg>`)}`;
@@ -290,7 +289,7 @@ export default function App() {
     };
   });
 
-  const [staff, setStaff] = useState<any[]>(() => normalizeStaffKyc(getStoredData('sd_staff', [])));
+  const [staff, setStaff] = useState<any[]>(() => normalizeStaffKyc(getStoredData('sd_staff', [])).filter((s: any) => !(s && (s.testRecord === true || s.id === 'STF-TEST-001'))));
   const [staffKycOpen, setStaffKycOpen] = useState(false);
   const [staffKycViewing, setStaffKycViewing] = useState<any | null>(null);
   const [staffKycForm, setStaffKycForm] = useState({
@@ -1126,6 +1125,32 @@ export default function App() {
     reader.readAsDataURL(file);
   });
 
+  const compressStaffPhoto = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 900;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(String(reader.result || '')); return; }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => resolve(String(reader.result || ''));
+      img.src = String(reader.result || '');
+    };
+    reader.onerror = () => reject(reader.error || new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+
   const addSuperAdminStaff = () => {
     setStaffKycForm({
       name: '', fatherName: '', motherName: '', dob: '', gender: '', nationality: 'Bangladeshi', bloodGroup: '',
@@ -1339,7 +1364,7 @@ export default function App() {
 
   const changeStaffCardPhoto = async (card: any, file?: File | null) => {
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
+    const dataUrl = await compressStaffPhoto(file);
     const now = new Date().toISOString();
     setStaff(prev => prev.map((s: any) => s.id === card.id ? {
       ...s,
@@ -1477,61 +1502,6 @@ export default function App() {
     } : s));
     securityAudit('staff-incomplete-archived', { actor: 'super-admin', newValue: { staffId: member.id }, reason: 'incomplete KYC archived from main queue' });
     showToast('Incomplete staff record archived. Recovery Archived filter-e thakbe.', 'success');
-  };
-
-  const addOneTestStaff = () => {
-    if (staff.some((s: any) => s.id === 'STF-TEST-001')) {
-      showToast('One test staff already exists.', 'info');
-      return;
-    }
-    const now = new Date().toISOString();
-    const testStaff = {
-      id: 'STF-TEST-001',
-      permanentNumber: 'NXG202600000001',
-      name: 'Test Staff',
-      fatherName: 'Test Father',
-      motherName: 'Test Mother',
-      dob: '1995-01-01',
-      gender: 'Male',
-      nationality: 'Bangladeshi',
-      bloodGroup: 'B+',
-      phone: '01700000000',
-      email: 'test.staff@nexago.local',
-      emergencyContact: '01800000000',
-      nid: 'TEST-NID-0001',
-      address: 'Test present address',
-      permanentAddress: 'Test permanent address',
-      district: 'Dhaka',
-      upazila: 'Dhaka',
-      role: 'Support Staff',
-      shift: 'Full Time',
-      joiningDate: new Date().toISOString().slice(0, 10),
-      supervisor: 'Super Admin',
-      contractType: 'Test',
-      referenceOne: 'Test Reference 1',
-      referenceTwo: 'Test Reference 2',
-      deviceAccess: 'Allowed after approval',
-      permissions: ['support', 'orders', 'reports', 'notifications'],
-      status: 'Active',
-      scope: 'super-admin',
-      documentStatus: 'Verified',
-      documents: [
-        { type: 'Identity Document', ref: 'test-preview-only', submittedAt: now, status: 'Stored' },
-        { type: 'Staff Photo', ref: 'test-preview-only', submittedAt: now, status: 'Stored' },
-        { type: 'Police/Reference Check', ref: 'test-preview-only', submittedAt: now, status: 'Stored' },
-      ],
-      auditTrail: [
-        { action: 'test-staff-created', actor: 'super-admin', at: now, reason: 'single test staff requested for preview only' },
-      ],
-      createdAt: now,
-      verifiedAt: now,
-      updatedAt: now,
-      photoDataUrl: demoStaffPhotoDataUrl,
-      testRecord: true,
-    };
-    setStaff(prev => [testStaff, ...prev]);
-    securityAudit('test-staff-created', { actor: 'super-admin', newValue: { staffId: testStaff.id }, reason: 'single test staff requested for preview only' });
-    showToast('One test staff created for preview.', 'success');
   };
 
   // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
@@ -2455,9 +2425,6 @@ export default function App() {
                 <p className="text-xs text-gray-400">Authorized personnel managing logistics and partner portals</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={addOneTestStaff} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-sky-300 hover:bg-sky-500/20">
-                  Add 1 Test Staff
-                </button>
                 <button onClick={addSuperAdminStaff} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-brand-orange/20 hover:bg-brand-orange-hover">
                   Add Super Admin Staff
                 </button>
