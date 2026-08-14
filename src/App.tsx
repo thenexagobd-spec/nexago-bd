@@ -1327,7 +1327,7 @@ export default function App() {
     .photoCol{display:flex;flex-direction:column;align-items:center}
     .photo{width:25.5mm;height:19.5mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
     .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
-    .bar{width:25.5mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:10mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.5mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);letter-spacing:.4mm;white-space:nowrap}
+    .bar{width:25.5mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:10mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.6mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);letter-spacing:.4mm;white-space:nowrap;text-align:center}
     .info{min-width:0}
     .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
