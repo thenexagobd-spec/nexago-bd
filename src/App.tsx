@@ -74,7 +74,7 @@ const CODE39_PATTERNS: Record<string, string> = {
 };
 
 const staffCardCode = (card: any) => String(card?.permanentNumber || card?.id || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
-const staffCardBarcodeCode = (card: any) => String(card?.id || card?.permanentNumber || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
+const staffCardBarcodeCode = (card: any) => staffCardCode(card);
 const staffCardVerifyUrl = (card: any) => `${window.location.origin}/api/security/staff-card/verify?key=${encodeURIComponent(new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main')}&staffId=${encodeURIComponent(card?.id || '')}&permanentNo=${encodeURIComponent(staffCardCode(card))}`;
 
 // Renders the REAL scannable QR code to an SVG string (same QR the on-screen card shows).
@@ -91,12 +91,12 @@ const code39SvgDataUrlThick = (value: string) => {
   const bars = code39Bars(value);
   let x = 0;
   const rects = bars.map((bar) => {
-    const w = bar.wide ? 12 : 6;
+    const w = bar.wide ? 18 : 9;
     const rect = bar.on ? `<rect x="${x}" y="0" width="${w}" height="64" fill="#020617"/>` : '';
-    x += w + 2;
+    x += w + 1;
     return rect;
   }).join('');
-  const width = Math.max(x - 2, 1);
+  const width = Math.max(x - 1, 1);
   return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64" viewBox="0 0 ${width} 64"><rect width="${width}" height="64" fill="#fff"/>${rects}</svg>`)}`;
 };
 const staffInitialsAvatarDataUrl = (name?: string) => {
@@ -1327,7 +1327,7 @@ export default function App() {
     .photoCol{display:flex;flex-direction:column;align-items:center}
     .photo{width:25.5mm;height:19.5mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
     .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
-    .bar{width:25.5mm;height:8.5mm;margin-top:1mm;overflow:hidden}.bar img{width:100%;height:100%;object-fit:fill;display:block}
+    .bar{width:25.5mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:7mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.5mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);letter-spacing:.4mm;white-space:nowrap}
     .info{min-width:0}
     .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1339,7 +1339,7 @@ export default function App() {
     @media print{html,body{display:block;margin:0;padding:0;background:#fff;min-height:0;place-items:initial}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
   </style></head><body><div class="card"><div class="shine"></div><div class="ring"></div>
   <div class="head"><div><div class="brand">The NexaGo BD</div><div class="sub">Super Admin Staff</div></div><div class="logo">NXG</div></div>
-  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div></div>
+  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div><div class="barTxt">${staffCardBarcodeCode(card)}</div></div></div>
   <div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="grey">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="grey">Phone: ${card.phone || 'N/A'}</div></div>
   <div class="qr">${staffCardQrSvg(card)}</div></div>
   <div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div>
@@ -2786,8 +2786,11 @@ export default function App() {
                                 }}
                               />
                             </div>
-                            <div className="mt-1 h-8 w-24 overflow-hidden">
-                              <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
+                            <div className="mt-1 flex w-24 flex-col items-center">
+                              <div className="h-7 w-24 overflow-hidden">
+                                <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
+                              </div>
+                              <p className="mt-0.5 truncate font-mono text-[5.5px] font-bold tracking-[0.12em] text-white/80">{staffCardBarcodeCode(staffIdCard)}</p>
                             </div>
                           </div>
                           <div className="min-w-0 flex-1">
