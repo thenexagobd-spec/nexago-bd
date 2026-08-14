@@ -1313,14 +1313,37 @@ export default function App() {
   };
 
   const staffCardHtml = (card: any) => `<!doctype html><html><head><meta charset="utf-8"><title>${card.id} Staff ID</title><style>
-    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Arial,sans-serif}
-    .card{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:5mm;padding:5mm;color:white;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316);position:relative;overflow:hidden}
-    .top{display:flex;justify-content:space-between;align-items:flex-start}.brand{font-size:9px;font-weight:900;letter-spacing:2px;background:linear-gradient(90deg,#ffffff,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent}.logo{background:linear-gradient(135deg,#ffffff,#fde68a 55%,#fb923c);color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px;border:1px solid rgba(251,146,60,.85);box-shadow:0 0 0 .6mm rgba(251,146,60,.35)}
-    .main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:grid;grid-template-columns:25mm 1fr 16mm;gap:3mm;align-items:end}.photoWrap{width:25mm;display:grid;justify-items:center}.photo{width:25mm;height:22mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;overflow:hidden;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}.info{min-width:0}
-    .name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}
-    .qr{width:16mm;height:16mm;border:1px solid rgba(255,255,255,.32);border-radius:1mm;padding:.6mm;display:grid;place-items:center;align-self:center;justify-self:center}.qr svg{width:100%;height:100%}.photoBar{width:25mm;height:6mm;margin-top:1mm;overflow:hidden}.photoBar img{width:100%;height:100%;object-fit:fill;display:block}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}
-    @media print{body{background:white;min-height:0}.card{box-shadow:none}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
-  </style></head><body><div class="card"><div class="top"><div><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div></div><div class="logo">NXG</div></div><div class="main"><div class="photoWrap"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="photoBar"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div></div><div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="meta">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="meta">Phone: ${card.phone || 'N/A'}</div></div><div class="qr">${staffCardQrSvg(card)}</div><div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div></div></body></html>`;
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100vh;background:#111827}
+    body{display:grid;place-items:center;font-family:Inter,Arial,sans-serif}
+    .card{width:85.6mm;height:54mm;padding:4mm;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;border-radius:4mm;color:#fff;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316)}
+    .shine{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.14),transparent 35%,rgba(255,255,255,.08))}
+    .ring{position:absolute;right:-10mm;top:-10mm;width:28mm;height:28mm;border-radius:9999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05)}
+    .head{display:flex;justify-content:space-between;align-items:flex-start;position:relative}
+    .brand{font-size:2.1mm;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:#ffedd5}
+    .sub{font-size:1.85mm;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:.6mm}
+    .logo{width:8.5mm;height:8.5mm;display:flex;align-items:center;justify-content:center;border-radius:2mm;background:linear-gradient(135deg,#fff,#fde68a 55%,#fb923c);color:#0b1220;font-size:2.6mm;font-weight:900;box-shadow:0 0 0 .3mm rgba(251,146,60,.6),0 2mm 4mm rgba(249,115,22,.2)}
+    .mid{display:grid;grid-template-columns:25.5mm minmax(0,1fr) 17mm;gap:3mm;align-items:end;position:relative}
+    .photoCol{display:flex;flex-direction:column;align-items:center}
+    .photo{width:25.5mm;height:19.5mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
+    .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
+    .bar{width:25.5mm;height:8.5mm;margin-top:1mm;overflow:hidden}.bar img{width:100%;height:100%;object-fit:fill;display:block}
+    .info{min-width:0}
+    .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .grey{font-size:1.85mm;font-weight:700;color:rgba(255,255,255,.7);margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .id{font-size:2.1mm;font-weight:900;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.9);margin-top:1mm}
+    .qr{width:17mm;height:17mm;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3);border-radius:2mm;padding:1mm;align-self:center}
+    .qr svg{width:100%;height:100%}
+    .foot{display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.15);padding-top:1mm;font-size:1.7mm;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.7);position:relative}
+    @media print{html,body{display:block;margin:0;padding:0;background:#fff;min-height:0;place-items:initial}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
+  </style></head><body><div class="card"><div class="shine"></div><div class="ring"></div>
+  <div class="head"><div><div class="brand">The NexaGo BD</div><div class="sub">Super Admin Staff</div></div><div class="logo">NXG</div></div>
+  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div></div>
+  <div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="grey">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="grey">Phone: ${card.phone || 'N/A'}</div></div>
+  <div class="qr">${staffCardQrSvg(card)}</div></div>
+  <div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div>
+  </div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
     // Self-contained HTML (inline CSS, real photo, real barcode, real QR) so the
