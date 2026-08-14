@@ -91,7 +91,7 @@ const code39SvgDataUrlThick = (value: string) => {
   const bars = code39Bars(value);
   let x = 0;
   const rects = bars.map((bar) => {
-    const w = bar.wide ? 18 : 9;
+    const w = bar.wide ? 24 : 8;
     const rect = bar.on ? `<rect x="${x}" y="0" width="${w}" height="64" fill="#020617"/>` : '';
     x += w + 1;
     return rect;
