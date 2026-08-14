@@ -1328,11 +1328,11 @@ export default function App() {
     .brand{font-size:2.1mm;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:#ffedd5}
     .sub{font-size:1.85mm;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:.6mm}
     .logo{width:8.5mm;height:8.5mm;display:flex;align-items:center;justify-content:center;border-radius:2mm;background:linear-gradient(135deg,#fff,#fde68a 55%,#fb923c);color:#0b1220;font-size:2.6mm;font-weight:900;box-shadow:0 0 0 .3mm rgba(251,146,60,.6),0 2mm 4mm rgba(249,115,22,.2)}
-    .mid{display:grid;grid-template-columns:25.5mm minmax(0,1fr) 17mm;gap:3mm;align-items:end;position:relative}
+    .mid{display:grid;grid-template-columns:29mm minmax(0,1fr) 16mm;gap:3mm;align-items:end;position:relative}
     .photoCol{display:flex;flex-direction:column;align-items:center}
-    .photo{width:25.5mm;height:19.5mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
+    .photo{width:29mm;height:20mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
     .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
-    .bar{width:25.5mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:10mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.6mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);letter-spacing:.4mm;white-space:nowrap;text-align:center}
+    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:10mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.6mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);letter-spacing:.4mm;white-space:nowrap;text-align:center}
     .info{min-width:0}
     .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;line-height:1.3;overflow:visible}
@@ -2844,9 +2844,9 @@ export default function App() {
                           </div>
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-white via-orange-100 to-orange-400 text-[10px] font-black text-[#0b1220] ring-1 ring-orange-400/60 shadow-lg shadow-orange-500/20">NXG</div>
                         </div>
-                        <div className="grid grid-cols-[96px_minmax(0,1fr)_64px] items-end gap-3">
-                          <div className="flex w-24 shrink-0 flex-col items-center">
-                            <div className="h-[4.6rem] w-24 overflow-hidden rounded-xl border border-white/25 bg-white/10">
+                        <div className="grid grid-cols-[110px_minmax(0,1fr)_64px] items-end gap-3">
+                          <div className="flex w-[110px] shrink-0 flex-col items-center">
+                            <div className="h-[4.6rem] w-[110px] overflow-hidden rounded-xl border border-white/25 bg-white/10">
                               <img
                                 src={staffIdCard.photoDataUrl || staffInitialsAvatarDataUrl(staffIdCard.name)}
                                 alt="Staff"
@@ -2858,8 +2858,8 @@ export default function App() {
                                 }}
                               />
                             </div>
-                            <div className="mt-1 flex w-24 flex-col items-center">
-                              <div className="h-10 w-24 overflow-hidden">
+                            <div className="mt-1 flex w-[110px] flex-col items-center">
+                              <div className="h-10 w-[110px] overflow-hidden">
                                 <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
                               </div>
                               <p className="mt-0.5 truncate font-mono text-[5.5px] font-bold tracking-[0.12em] text-white/80">{staffCardBarcodeCode(staffIdCard)}</p>
