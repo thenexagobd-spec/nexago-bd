@@ -30,6 +30,7 @@ import DeliveryDashboardView from './components/DeliveryDashboardView';
 import { CustomerStorefront } from './components/CustomerStorefront';
 import { useLiveDrivers } from './hooks/useLiveDrivers';
 import { ScanOrderModule } from './components/ScanOrderModule';
+import { Html5Qrcode } from 'html5-qrcode';
 import OrderToolsDashboard from './components/OrderToolsDashboard';
 import MobileAppSimulator from './components/MobileAppSimulator';
 import MFSBusinessView from './components/MFSBusinessView';
@@ -290,6 +291,10 @@ export default function App() {
   });
 
   const [staff, setStaff] = useState<any[]>(() => normalizeStaffKyc(getStoredData('sd_staff', [])).filter((s: any) => !(s && (s.testRecord === true || s.id === 'STF-TEST-001'))));
+  const [staffScanOpen, setStaffScanOpen] = useState(false);
+  const [staffScanMsg, setStaffScanMsg] = useState<string | null>(null);
+  const [staffScanManual, setStaffScanManual] = useState('');
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [staffKycOpen, setStaffKycOpen] = useState(false);
   const [staffKycViewing, setStaffKycViewing] = useState<any | null>(null);
   const [staffKycForm, setStaffKycForm] = useState({
@@ -1527,6 +1532,46 @@ export default function App() {
     showToast('Incomplete staff record archived. Recovery Archived filter-e thakbe.', 'success');
   };
 
+  const applyStaffScan = (code: string) => {
+    const clean = String(code || '').trim().toUpperCase();
+    if (!clean) return;
+    const match = staff.find((s: any) => String(s.permanentNumber || s.id || '').toUpperCase().trim() === clean || String(s.id || '').toUpperCase().trim() === clean);
+    if (match) {
+      setStaffScanMsg(null);
+      setStaffScanManual('');
+      setStaffScanOpen(false);
+      openStaffIdCard(match);
+      securityAudit('staff-id-card-scanned', { actor: 'super-admin', newValue: { staffId: match.id, scanned: clean }, reason: 'staff ID card barcode/QR scanned and opened' });
+      showToast(`${match.name} — full card opened.`, 'success');
+    } else {
+      setStaffScanMsg(`No staff matches "${clean}". Verify the Permanent No on the card.`);
+    }
+  };
+
+  const scanStaffCleanup = () => {
+    try { scannerRef.current?.stop().then(() => scannerRef.current?.clear()).catch(() => {}); } catch { /* noop */ }
+    scannerRef.current = null;
+  };
+  useEffect(() => {
+    if (!staffScanOpen) { scanStaffCleanup(); return; }
+    setStaffScanMsg(null);
+    const scanner = new Html5Qrcode('staff-scan-video');
+    scannerRef.current = scanner;
+    let stopped = false;
+    scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 180 } },
+      (text) => {
+        if (stopped) return;
+        stopped = true;
+        scanner.stop().then(() => scanner.clear()).catch(() => {});
+        scannerRef.current = null;
+        applyStaffScan(text);
+      },
+      () => { /* ignore decode errors */ }
+    ).catch(() => { if (!stopped) setStaffScanMsg('Camera unavailable — type the Permanent No below.'); });
+    return () => { stopped = true; scanStaffCleanup(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffScanOpen]);
+
   // --- SIDEBAR NAVIGATION DEFINITION WITH ALL STORE & DELIVERY MANAGEMENT MODULES ---
   const sidebarItems = React.useMemo(() => {
     const allItems: Array<{ name: string; icon: any; badgeCount?: number; section?: string; onClick?: () => void }> = [
@@ -2448,11 +2493,38 @@ export default function App() {
                 <p className="text-xs text-gray-400">Authorized personnel managing logistics and partner portals</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button onClick={() => setStaffScanOpen(o => !o)} className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-emerald-300 hover:bg-emerald-500/20">
+                  {staffScanOpen ? 'Close Card Scanner' : 'Scan Staff ID Card'}
+                </button>
                 <button onClick={addSuperAdminStaff} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-brand-orange/20 hover:bg-brand-orange-hover">
                   Add Super Admin Staff
                 </button>
               </div>
             </div>
+            {staffScanOpen && (
+              <div className="rounded-2xl border border-emerald-500/20 bg-black/30 p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-white">Scan Staff ID Card</h4>
+                    <p className="text-[10px] font-semibold text-gray-500">Point the camera at the printed card barcode or QR — the full staff card opens automatically.</p>
+                  </div>
+                  <button onClick={() => setStaffScanOpen(false)} className="rounded-lg border border-brand-border px-3 py-2 text-[9px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                </div>
+                <div id="staff-scan-video" className="mx-auto h-56 w-full max-w-sm overflow-hidden rounded-xl border border-emerald-500/30 bg-black" />
+                {staffScanMsg && (
+                  <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-[10px] font-bold text-red-300">{staffScanMsg}</p>
+                )}
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    value={staffScanManual}
+                    onChange={e => setStaffScanManual(e.target.value)}
+                    placeholder="Or type the Permanent No manually, e.g. NXG202606133353"
+                    className="flex-1 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none placeholder:text-gray-600 focus:border-emerald-400/50"
+                  />
+                  <button onClick={() => applyStaffScan(staffScanManual)} className="rounded-lg bg-emerald-500/20 px-4 py-2 text-[10px] font-black uppercase text-emerald-300 hover:bg-emerald-500/30">Look Up</button>
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.035] p-2">
               {[
                 ['All', staff.filter((s: any) => !s.archived && s.status !== 'Archived').length],
