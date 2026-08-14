@@ -1335,7 +1335,7 @@ export default function App() {
     .bar{width:25.5mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:10mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.6mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);letter-spacing:.4mm;white-space:nowrap;text-align:center}
     .info{min-width:0}
     .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;line-height:1.3;overflow:visible}
     .grey{font-size:1.85mm;font-weight:700;color:rgba(255,255,255,.7);margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .id{font-size:2.1mm;font-weight:900;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.9);margin-top:1mm}
     .qr{width:17mm;height:17mm;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3);border-radius:2mm;padding:1mm;align-self:center}
@@ -2867,7 +2867,7 @@ export default function App() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
-                            <p className="truncate text-[8px] font-bold uppercase text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.contractType || 'Official'}</p>
+                            <p className="text-[8px] font-bold uppercase leading-tight text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.contractType || 'Official'}</p>
                             <p className="truncate text-[7px] font-bold uppercase text-white/70">Join: {staffIdCard.joiningDate || new Date(staffIdCard.createdAt || Date.now()).toLocaleDateString()}</p>
                             <p className="mt-1 font-mono text-[8px] font-black text-white/90">ID: {staffIdCard.permanentNumber || staffIdCard.id}</p>
                             <p className="mt-0.5 truncate text-[7px] font-semibold text-white/70">Phone: {staffIdCard.phone || 'N/A'}</p>
