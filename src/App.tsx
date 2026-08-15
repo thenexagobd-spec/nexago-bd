@@ -98,12 +98,12 @@ const staffCardQrSvg = (card: any): string => {
 // crisp/vertical instead of being squeezed from a 3883px image — keeps full wide:narrow 3:1 scannability.
 const code39SvgDataUrlThick = (value: string, boxW = 3883, boxH = 64) => {
   const bars = code39Bars(value);
-  const natural = bars.reduce((s, b) => s + (b.wide ? 20 : 8) + 1, 0);
+  const natural = bars.reduce((s, b) => s + (b.wide ? 16 : 8) + 1, 0);
   const scale = boxW / natural;
   let x = 0;
   const rects = bars.map((bar) => {
-    const nw = (bar.wide ? 20 : 8) + 1;
-    const w = (bar.on ? (bar.wide ? 20 : 8) : 0) * scale;
+    const nw = (bar.wide ? 16 : 8) + 1;
+    const w = (bar.on ? (bar.wide ? 16 : 8) : 0) * scale;
     const rect = bar.on ? `<rect x="${x}" y="0" width="${w}" height="${boxH}" fill="#020617"/>` : '';
     x += nw * scale;
     return rect;
