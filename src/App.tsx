@@ -370,6 +370,21 @@ export default function App() {
   const [inventory, setInventory] = useState<any[]>(() => stripDemoData(getStoredData<any[]>('sd_inventory', []), 'inventory'));
 
   const [coupons, setCoupons] = useState<any[]>(() => getStoredData('sd_coupons', []));
+  const [couponFormOpen, setCouponFormOpen] = useState(false);
+  const [couponForm, setCouponForm] = useState({ code: '', discount: '10% Off', minOrder: '0' });
+
+  const submitNewCoupon = () => {
+    const code = couponForm.code.trim().toUpperCase();
+    if (!code) {
+      showToast('Coupon code required.', 'info');
+      return;
+    }
+    setCoupons(prev => [{ id: `CPN-${Date.now().toString().slice(-5)}`, code, discount: couponForm.discount.trim() || '10% Off', minOrder: Number(couponForm.minOrder) || 0, usages: 0, status: 'Active' }, ...prev]);
+    setCouponForm({ code: '', discount: '10% Off', minOrder: '0' });
+    setCouponFormOpen(false);
+    securityAudit('coupon-created', { actor: 'super-admin', newValue: { code, discount: couponForm.discount.trim(), minOrder: Number(couponForm.minOrder) || 0 }, reason: 'promo coupon code created from Coupon Campaigns' });
+    showToast(`Coupon ${code} created`, 'success');
+  };
 
   const normalizeStaffKyc = (rows: any[]) => (rows || []).map((s: any) => {
     const docs = Array.isArray(s.documents) ? s.documents : [];
@@ -2708,14 +2723,7 @@ export default function App() {
                 <p className="text-xs text-gray-400">Configure promotional discounts and code triggers</p>
               </div>
               <button 
-                onClick={() => {
-                  const code = window.prompt('Coupon code');
-                  if (!code) return;
-                  const discount = window.prompt('Discount display', '10% Off') || '10% Off';
-                  const minOrder = Number(window.prompt('Minimum order amount', '0') || 0);
-                  setCoupons(prev => [{ id: `CPN-${Date.now().toString().slice(-5)}`, code: code.trim().toUpperCase(), discount, minOrder, usages: 0, status: 'Active' }, ...prev]);
-                  showToast(`Coupon ${code.trim().toUpperCase()} created`, 'success');
-                }}
+                onClick={() => setCouponFormOpen(true)}
                 className="px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
               >
                 + Create Promo Code
@@ -2727,6 +2735,13 @@ export default function App() {
                   <div className="absolute right-0 top-0 bg-brand-orange/10 text-brand-orange text-[10px] font-black uppercase px-2.5 py-1 rounded-bl">
                     Active
                   </div>
+                  <button
+                    onClick={() => { setCoupons(prev => prev.filter(x => x.id !== c.id)); showToast(`Coupon ${c.code} deleted`, 'info'); }}
+                    title="Delete coupon"
+                    className="absolute right-2 bottom-2 p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                   <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">CODE</span>
                   <div className="text-xl font-black text-white mt-1 font-mono tracking-wider">{c.code}</div>
                   <div className="text-xs text-brand-orange font-bold mt-2">{c.discount}</div>
@@ -2737,6 +2752,31 @@ export default function App() {
                 </div>
               ))}
             </div>
+            {couponFormOpen && (
+              <div className="fixed inset-0 z-50 bg-brand-dark/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-brand-card border border-brand-border rounded-xl max-w-sm w-full overflow-hidden shadow-2xl fade-in">
+                  <div className="flex items-center justify-between p-4 border-b border-brand-border">
+                    <h3 className="font-semibold text-white text-xs uppercase tracking-wider">Create Promo Code</h3>
+                    <button onClick={() => setCouponFormOpen(false)} className="text-gray-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Coupon Code</label>
+                      <input value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="EID20" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Discount Display</label>
+                      <input value={couponForm.discount} onChange={e => setCouponForm(f => ({ ...f, discount: e.target.value }))} placeholder="10% Off" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Minimum Order (৳)</label>
+                      <input type="number" min="0" value={couponForm.minOrder} onChange={e => setCouponForm(f => ({ ...f, minOrder: e.target.value }))} placeholder="0" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                    </div>
+                    <button onClick={submitNewCoupon} className="w-full px-4 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold cursor-pointer">Create Promo Code</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 
