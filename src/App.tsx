@@ -1332,7 +1332,7 @@ export default function App() {
     .photoCol{display:flex;flex-direction:column;align-items:center}
     .photo{width:29mm;height:20mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
     .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
-    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:10mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.6mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);letter-spacing:.4mm;white-space:nowrap;text-align:center}
+    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:12mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.6mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);letter-spacing:.4mm;white-space:nowrap;text-align:center}
     .info{min-width:0}
     .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;line-height:1.3;overflow:visible}
@@ -2859,7 +2859,7 @@ export default function App() {
                               />
                             </div>
                             <div className="mt-1 flex w-[110px] flex-col items-center">
-                              <div className="h-10 w-[110px] overflow-hidden">
+                              <div className="h-12 w-[110px] overflow-hidden">
                                 <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
                               </div>
                               <p className="mt-0.5 truncate font-mono text-[5.5px] font-bold tracking-[0.12em] text-white/80">{staffCardBarcodeCode(staffIdCard)}</p>
