@@ -252,6 +252,10 @@ function requireSession(req, key) {
   const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
   const session = sessions[token];
   if (!session || Date.now() > Number(session.expiresAt || 0)) return null;
+  const users = readSecurity(`users-${safeKey(key)}`, {});
+  const user = users[session.userId];
+  if (!user || user.status !== 'Active') return null;
+  if (user.cardExpiresAt && Date.now() > Date.parse(user.cardExpiresAt)) return null;
   return { token, ...session };
 }
 
@@ -619,6 +623,11 @@ const server = http.createServer((req, res) => {
         sendJson(res, 401, { ok: false, error: 'INVALID_LOGIN' });
         return;
       }
+      if (user.cardExpiresAt && Date.now() > Date.parse(user.cardExpiresAt)) {
+        appendAudit(key, { actor: found.userId, role: user.role, action: 'login-denied-card-expired', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'staff ID card expired' });
+        sendJson(res, 401, { ok: false, error: 'CARD_EXPIRED' });
+        return;
+      }
       if (user.role === 'super-admin') {
         if (!SUPER_ADMIN_LOGIN_SECRET_CODE) {
           appendAudit(key, { actor: found.userId, role: user.role, action: 'super-admin-login-denied', ip: clientIp(req), reason: 'login secret env missing' });
@@ -808,6 +817,7 @@ const server = http.createServer((req, res) => {
           branchId: String(body.branchId || users[userId]?.branchId || ''),
           permissions: Array.isArray(body.permissions) ? body.permissions.map((x) => String(x).trim()).filter(Boolean) : (users[userId]?.permissions || []),
           status: 'Active',
+          cardExpiresAt: body.cardExpiresAt ? String(body.cardExpiresAt) : (users[userId]?.cardExpiresAt || ''),
           password: hashPassword(password),
         createdAt: users[userId]?.createdAt || new Date().toISOString(),
         lastPasswordChangeAt: new Date().toISOString(),
@@ -816,6 +826,38 @@ const server = http.createServer((req, res) => {
       writeSecurity(`users-${safeKey(key)}`, users);
       appendAudit(key, { actor: session.userId, role: session.role, action: 'admin-set-user-password', ip: clientIp(req), reason: body.reason || 'super admin staff password reset', newValue: { userId, role } });
       sendJson(res, 200, { ok: true, userId, role });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/admin-set-user-status') {
+    if (!rateLimit(req, 'admin-set-user-status', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const session = requireSession(req, key);
+      if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+      const userId = String(body.userId || '').trim();
+      if (!userId) { sendJson(res, 400, { ok: false, error: 'userId required' }); return; }
+      const users = readSecurity(`users-${safeKey(key)}`, {});
+      const existing = users[userId];
+      if (!existing) { sendJson(res, 404, { ok: false, error: 'USER_NOT_FOUND' }); return; }
+      const next = { ...existing };
+      if (body.status) next.status = String(body.status).trim();
+      if (body.cardExpiresAt) next.cardExpiresAt = String(body.cardExpiresAt);
+      users[userId] = next;
+      writeSecurity(`users-${safeKey(key)}`, users);
+      let revoked = 0;
+      if (next.status !== 'Active') {
+        const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+        for (const [token, s] of Object.entries(sessions)) {
+          if (s.userId === userId && Date.now() <= Number(s.expiresAt || 0)) {
+            sessions[token] = { ...s, expiresAt: 0, status: 'Blocked', changedBy: session.userId, changedAt: Date.now() };
+            revoked++;
+          }
+        }
+        if (revoked) writeSecurity(`sessions-${safeKey(key)}`, sessions);
+      }
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'admin-set-user-status', ip: clientIp(req), reason: body.reason || '', oldValue: { userId, status: existing.status }, newValue: { userId, status: next.status, cardExpiresAt: next.cardExpiresAt || null, revokedSessions: revoked } });
+      sendJson(res, 200, { ok: true, userId, status: next.status, revokedSessions: revoked });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }

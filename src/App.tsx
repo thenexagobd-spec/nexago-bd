@@ -1120,6 +1120,7 @@ export default function App() {
       storeId: member.storeId || '',
       branchId: member.branchId || '',
       permissions: member.permissions || [],
+      cardExpiresAt: member.cardExpiresAt || member.expiresAt || '',
       reason: 'Super Admin created staff portal login',
     }).then(() => {
       const now = new Date().toISOString();
@@ -1466,6 +1467,7 @@ export default function App() {
     setStaffRenewalRef(ref);
     setStaffRenewalStep(4);
     securityAudit('staff-id-card-renewed', { actor: 'super-admin', newValue: { staffId: card.id, cardIssuedAt: now, cardExpiresAt: expiresAt, durationMonths: months, ref }, reason: staffRenewalForm.reason.trim() });
+    securityApi('/admin-set-user-status', { userId: card.id, cardExpiresAt: expiresAt, reason: `renew ${ref}` }).catch(() => {});
     showToast('Staff ID card renewed and synced live.', 'success');
   };
 
@@ -1500,6 +1502,7 @@ export default function App() {
     setStaffActionTarget(null);
     setStaffActionReason('');
     securityAudit('staff-verification-updated', { actor: 'super-admin', oldValue: { staffId: member.id, status: member.status }, newValue: { staffId: member.id, status: nextStatus }, reason: reason.trim() });
+    securityApi('/admin-set-user-status', { userId: member.id, status: nextStatus, reason: reason.trim() }).catch(() => {});
     showToast(`Staff ${nextStatus} saved with audit reason.`, 'success');
   };
 

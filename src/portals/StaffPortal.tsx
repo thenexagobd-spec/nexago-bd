@@ -36,9 +36,45 @@ export default function StaffPortal() {
     return () => { window.removeEventListener('storage', refresh); window.removeEventListener('nexago-local-write', refresh); clearInterval(timer); };
   }, []);
 
+  useEffect(() => {
+    if (!session) return;
+    const timer = setInterval(() => {
+      const rec = staffRecords.find((s: any) => s.id === session.user?.userId);
+      if (!rec) return;
+      const cardExp = rec.cardExpiresAt || rec.expiresAt;
+      const blocked = (rec.status && rec.status !== 'Active') || rec.loginEnabled === false || (cardExp && Date.now() > Date.parse(cardExp));
+      if (blocked) {
+        localStorage.removeItem('sd_staff_security_session');
+        localStorage.removeItem('sd_security_session');
+        setSession(null);
+      }
+    }, 30000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, staffRecords]);
+
   const staffLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const userId = login.userId.trim();
+    const rec = staffRecords.find((s: any) => String(s.id || '').trim().toLowerCase() === userId.toLowerCase());
+    if (rec) {
+      const cardExp = rec.cardExpiresAt || rec.expiresAt;
+      if (cardExp && Date.now() > Date.parse(cardExp)) {
+        setLoginError('Your staff ID card has expired. Super Admin renewal required.');
+        securityAudit('staff-login-denied', { actor: userId, reason: 'staff ID card expired' });
+        return;
+      }
+      if (rec.status && rec.status !== 'Active') {
+        setLoginError(`Your account is ${rec.status}. Contact Super Admin.`);
+        securityAudit('staff-login-denied', { actor: userId, reason: `staff status ${rec.status}` });
+        return;
+      }
+      if (rec.loginEnabled === false) {
+        setLoginError('Portal access is not enabled for this account.');
+        securityAudit('staff-login-denied', { actor: userId, reason: 'staff portal access disabled' });
+        return;
+      }
+    }
     securityApi('/login', { userId, password: login.password }).then((data) => {
       if (data.user?.role !== 'staff' && data.user?.role !== 'super-admin-staff' && data.user?.role !== 'super-admin') throw new Error('not staff');
       const next = { token: data.token, user: data.user, loggedAt: Date.now() };
@@ -47,8 +83,8 @@ export default function StaffPortal() {
       setSession(next);
       setLoginError('');
       securityAudit('staff-login-success', { actor: userId, role: data.user?.role || 'staff', reason: 'staff portal login' });
-    }).catch(() => {
-      setLoginError('Invalid Staff ID/email or password.');
+    }).catch((err) => {
+      setLoginError(String(err?.message || '') === 'CARD_EXPIRED' ? 'Your staff ID card has expired. Super Admin renewal required.' : 'Invalid Staff ID/email or password.');
       securityAudit('staff-login-failed', { actor: userId || 'unknown', reason: 'server rejected staff login' });
     });
   };
