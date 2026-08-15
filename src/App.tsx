@@ -1339,7 +1339,7 @@ export default function App() {
     .photo{width:29mm;height:20mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
     .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
     .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:12mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.7mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.9);letter-spacing:.5mm;white-space:nowrap;text-align:center}
-    .info{min-width:0}
+    .info{min-width:0;text-align:center}
     .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;line-height:1.3;overflow:visible}
     .grey{font-size:1.85mm;font-weight:700;color:rgba(255,255,255,.7);margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2875,7 +2875,7 @@ export default function App() {
                               <p className="mt-0.5 truncate font-mono text-[6px] font-bold tracking-[0.14em] text-white/90">{staffCardCode(staffIdCard)}</p>
                             </div>
                           </div>
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 text-center">
                             <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
                             <p className="text-[8px] font-bold uppercase leading-tight text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.contractType || 'Official'}</p>
                             <p className="truncate text-[7px] font-bold uppercase text-white/70">Join: {staffIdCard.joiningDate || new Date(staffIdCard.createdAt || Date.now()).toLocaleDateString()}</p>
