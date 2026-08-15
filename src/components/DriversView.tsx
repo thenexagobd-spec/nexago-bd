@@ -8,7 +8,7 @@ import { Driver, DriverStatusLog, DriverDocument, Order } from '../types';
 import { 
   Search, UserPlus, Phone, Star, Award, MapPin, Edit3, Trash2, X, AlertCircle, 
   Eye, UserCheck, Download, GitCompare, Lock, Unlock, ShieldCheck, DollarSign, 
-  MessageSquare, Send, CheckCircle2, XCircle, Zap, Truck, Gauge, Fuel, Wrench, Clock
+  MessageSquare, Send, CheckCircle2, XCircle, Zap, Truck, Gauge, Fuel, Wrench, Clock, CreditCard
 } from 'lucide-react';
 import DriverProfileView from './DriverProfileView';
 import CompareDriversModal from './CompareDriversModal';
@@ -21,11 +21,12 @@ interface DriversViewProps {
   onAddDriver: (driver: Omit<Driver, 'id' | 'completedOrders' | 'earnings'>) => void;
   onUpdateDriver: (driver: Driver) => void;
   onDeleteDriver: (id: string) => void;
+  onOpenCard?: (driver: Driver) => void;
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
   vehicles?: VehicleInfo[];
 }
 
-export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriver, onDeleteDriver, showToast, vehicles = [] }: DriversViewProps) {
+export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriver, onDeleteDriver, onOpenCard, showToast, vehicles = [] }: DriversViewProps) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Online' | 'On-Delivery' | 'Offline' | 'Audit Pending' | 'Dispatch Locked'>('All');
@@ -588,6 +589,17 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   <ShieldCheck className="w-2.5 h-2.5" />
                   <span>Docs</span>
                 </button>
+
+                {onOpenCard && (
+                  <button
+                    onClick={() => onOpenCard(driver)}
+                    className="px-2 py-1 bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-white border border-sky-500/30 rounded text-[10px] font-bold transition-all flex items-center space-x-1 cursor-pointer"
+                    title="Open Driver smart ID card (photo + barcode + QR)"
+                  >
+                    <CreditCard className="w-2.5 h-2.5" />
+                    <span>ID Card</span>
+                  </button>
+                )}
 
                 {/* Dispatch Lock Toggle */}
                 <button

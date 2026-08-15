@@ -94,6 +94,89 @@ const staffCardQrSvg = (card: any): string => {
   return svg;
 };
 
+type RoleCardKind = 'driver' | 'store-admin' | 'super-admin';
+const ROLE_CARD_META: Record<RoleCardKind, { prefix: string; sub: string; tag: string }> = {
+  'super-admin': { prefix: 'NXS', sub: 'Super Admin', tag: 'SUPER' },
+  'store-admin': { prefix: 'NXM', sub: 'Store Admin', tag: 'STORE' },
+  driver: { prefix: 'NXD', sub: 'Driver Fleet', tag: 'DRIVER' },
+};
+const roleCardVerifyUrl = (card: any, kind: RoleCardKind) => `${window.location.origin}/api/security/staff-card/verify?key=${encodeURIComponent(new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main')}&kind=${kind}&staffId=${encodeURIComponent(card?.id || '')}&permanentNo=${encodeURIComponent(staffCardCode(card))}`;
+const roleCardQrSvg = (card: any, kind: RoleCardKind): string => {
+  const holder = document.createElement('div');
+  const root = createRoot(holder);
+  flushSync(() => root.render(<QRCodeSVG value={roleCardVerifyUrl(card, kind)} size={120} level="M" marginSize={0} />));
+  const svg = holder.innerHTML;
+  root.unmount();
+  return svg;
+};
+const roleCardInfo = (card: any, kind: RoleCardKind) => {
+  const code = staffCardCode(card);
+  if (kind === 'driver') {
+    return {
+      meta: `${card.vehicleType || 'Vehicle'} · ${card.status || 'Driver'}`,
+      line2: `License: ${card.licenseNumber || 'N/A'}`,
+      line3: `ID: ${code}`,
+      phone: `Phone: ${card.phone || 'N/A'}`,
+    };
+  }
+  if (kind === 'store-admin') {
+    return {
+      meta: `${card.storeName || card.name || 'Store'} · ${card.status || 'Store Admin'}`,
+      line2: `ID: ${code}`,
+      line3: `Email: ${card.email || 'N/A'}`,
+      phone: `Phone: ${card.phone || 'N/A'}`,
+    };
+  }
+  return {
+    meta: `${card.role || 'Super Admin'} · Executive`,
+    line2: `ID: ${code}`,
+    line3: `Email: ${card.email || 'N/A'}`,
+    phone: `Phone: ${card.phone || 'N/A'}`,
+  };
+};
+
+// Self-contained 85.6mm x 54mm printable card for Driver / Store Admin / Super Admin roles.
+const roleCardHtml = (card: any, kind: RoleCardKind) => {
+  const meta = ROLE_CARD_META[kind];
+  const code = staffCardCode(card);
+  const info = roleCardInfo(card, kind);
+  const avatar = card.photoDataUrl || staffInitialsAvatarDataUrl(card.name, meta.tag);
+  const issuedAt = card.issuedAt || new Date().toISOString();
+  const expiresAt = card.expiresAt || new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${card.id} ${meta.sub} ID</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100vh;background:#111827}
+    body{display:grid;place-items:center;font-family:Inter,Arial,sans-serif}
+    .card{width:85.6mm;height:54mm;padding:4mm;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;border-radius:4mm;color:#fff;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316)}
+    .shine{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.14),transparent 35%,rgba(255,255,255,.08))}
+    .ring{position:absolute;right:-10mm;top:-10mm;width:28mm;height:28mm;border-radius:9999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05)}
+    .head{display:flex;justify-content:space-between;align-items:flex-start;position:relative}
+    .brand{font-size:2.1mm;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:#ffedd5}
+    .sub{font-size:1.85mm;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:.6mm}
+    .logo{width:8.5mm;height:8.5mm;display:flex;align-items:center;justify-content:center;border-radius:2mm;background:linear-gradient(135deg,#fff,#fde68a 55%,#fb923c);color:#0b1220;font-size:2.6mm;font-weight:900;box-shadow:0 0 0 .3mm rgba(251,146,60,.6),0 2mm 4mm rgba(249,115,22,.2)}
+    .mid{display:grid;grid-template-columns:29mm minmax(0,1fr) 16mm;gap:3mm;align-items:center;position:relative}
+    .photoCol{display:flex;flex-direction:column;align-items:center}
+    .photo{width:29mm;height:20mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
+    .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
+    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:4mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:2mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.95);letter-spacing:.4mm;white-space:nowrap;text-align:center}
+    .info{min-width:0;text-align:center}
+    .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .meta{font-size:1.55mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .grey{font-size:1.85mm;font-weight:700;color:rgba(255,255,255,.7);margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .id{font-size:2.1mm;font-weight:900;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.9);margin-top:1mm}
+    .qr{width:17mm;height:17mm;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3);border-radius:2mm;padding:1mm;align-self:center}
+    .qr svg{width:100%;height:100%}
+    .foot{display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.15);padding-top:1mm;font-size:1.7mm;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.7);position:relative}
+    @media print{html,body{display:block;margin:0;padding:0;background:#fff;min-height:0;place-items:initial}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
+  </style></head><body><div class="card"><div class="shine"></div><div class="ring"></div>
+  <div class="head"><div><div class="brand">The NexaGo BD</div><div class="sub">${meta.sub}</div></div><div class="logo">NXG</div></div>
+  <div class="mid"><div class="photoCol"><div class="photo"><img src="${avatar}"></div><div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card), 580, 80)}"></div><div class="barTxt">${code}</div></div></div>
+  <div class="info"><div class="name">${card.name || meta.sub}</div><div class="meta">${info.meta}</div><div class="grey">${info.line2}</div><div class="id">ID: ${code}</div><div class="grey">${info.phone}</div></div>
+  <div class="qr">${roleCardQrSvg(card, kind)}</div></div>
+  <div class="foot"><span>Issue: ${new Date(issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div>
+  </div></body></html>`;
+};
+
 // Renders Code39 at the SAME aspect as its display box (uniform scale, ratios intact) so lines stay
 // crisp/vertical instead of being squeezed from a 3883px image — keeps full wide:narrow 3:1 scannability.
 const code39SvgDataUrlThick = (value: string, boxW = 3883, boxH = 64) => {
@@ -110,9 +193,9 @@ const code39SvgDataUrlThick = (value: string, boxW = 3883, boxH = 64) => {
   }).join('');
   return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${boxW}" height="${boxH}" viewBox="0 0 ${boxW} ${boxH}"><rect width="${boxW}" height="${boxH}" fill="#fff"/>${rects}</svg>`)}`;
 };
-const staffInitialsAvatarDataUrl = (name?: string) => {
+const staffInitialsAvatarDataUrl = (name?: string, tag = 'STAFF') => {
   const initials = String(name || 'S').split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'S';
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><rect width="240" height="320" fill="#0f1a2e"/><rect x="20" y="20" width="200" height="280" rx="16" fill="#162a45"/><text x="120" y="178" font-family="Arial,sans-serif" font-size="96" font-weight="900" fill="#f97316" text-anchor="middle">${initials}</text><text x="120" y="252" font-family="Arial,sans-serif" font-size="20" font-weight="700" letter-spacing="4" fill="#94a3b8" text-anchor="middle">STAFF</text></svg>`)}`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="320" viewBox="0 0 240 320"><rect width="240" height="320" fill="#0f1a2e"/><rect x="20" y="20" width="200" height="280" rx="16" fill="#162a45"/><text x="120" y="178" font-family="Arial,sans-serif" font-size="96" font-weight="900" fill="#f97316" text-anchor="middle">${initials}</text><text x="120" y="252" font-family="Arial,sans-serif" font-size="20" font-weight="700" letter-spacing="4" fill="#94a3b8" text-anchor="middle">${tag}</text></svg>`)}`;
 };
 const code39Bars = (value: string) => `*${value || 'STAFF'}*`.split('').flatMap((char, charIndex, chars) => {
   const pattern = CODE39_PATTERNS[char] || CODE39_PATTERNS['-'];
@@ -353,6 +436,14 @@ export default function App() {
   const [staffRenewalStep, setStaffRenewalStep] = useState(1);
   const [staffRenewalForm, setStaffRenewalForm] = useState({ role: '', shift: '', joiningDate: '', phone: '', address: '', emergencyContact: '', reason: '', durationMonths: 12 });
   const [staffRenewalRef, setStaffRenewalRef] = useState('');
+
+  const [roleCard, setRoleCard] = useState<any | null>(null);
+  const [roleCardKind, setRoleCardKind] = useState<RoleCardKind>('driver');
+  const [roleCardsStore, setRoleCardsStore] = useState<Record<string, any>>(() => getStoredData('sd_role_cards', {}));
+  const [superAdminCardProfile, setSuperAdminCardProfile] = useState<any>(() => getStoredData('sd_super_admin_card_profile', {}));
+  const [roleRenewMonths, setRoleRenewMonths] = useState(12);
+  useEffect(() => { setStoredData('sd_role_cards', roleCardsStore); }, [roleCardsStore]);
+  useEffect(() => { setStoredData('sd_super_admin_card_profile', superAdminCardProfile); }, [superAdminCardProfile]);
 
   const [reviews, setReviews] = useState<any[]>(() => getStoredData('sd_reviews', []));
 
@@ -1483,6 +1574,125 @@ export default function App() {
     showToast('Staff ID card renewed and synced live.', 'success');
   };
 
+  const roleCardKeyOf = (kind: RoleCardKind, id: string) => `${kind}:${id}`;
+  const ensureRoleCardMeta = (kind: RoleCardKind, id: string, seed: any = {}) => {
+    const key = roleCardKeyOf(kind, id);
+    const existing = roleCardsStore[key];
+    if (existing) return existing;
+    const permanentNumber = `${ROLE_CARD_META[kind].prefix}${new Date().getFullYear()}${Date.now().toString().slice(-8)}`;
+    const now = new Date().toISOString();
+    const meta = {
+      permanentNumber,
+      cardIssuedAt: seed.cardIssuedAt || now,
+      cardExpiresAt: seed.cardExpiresAt || new Date(new Date(now).setFullYear(new Date(now).getFullYear() + 1)).toISOString(),
+    };
+    setRoleCardsStore(prev => ({ ...prev, [key]: meta }));
+    securityAudit('role-card-created', { actor: 'super-admin', newValue: { kind, roleId: id, permanentNumber }, reason: `${kind} smart ID card generated` });
+    return meta;
+  };
+
+  const openRoleCard = (kind: RoleCardKind, record: any) => {
+    const cardId = String(kind === 'store-admin' ? (record.adminId || record.id) : record.id || 'CARD');
+    const meta = ensureRoleCardMeta(kind, cardId, record);
+    let photo = record.photoDataUrl || (kind === 'driver' ? record.photo : '') || '';
+    if (!photo && kind === 'store-admin') {
+      const doc = (record.documents || []).find((d: any) => /photo|avatar|profile|image/i.test(String(d.type || d.key || '')));
+      if (doc?.dataUrl) photo = doc.dataUrl;
+    }
+    const issuedAt = meta.cardIssuedAt || record.verifiedAt || record.createdAt || new Date().toISOString();
+    const expiresAt = meta.cardExpiresAt || new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
+    setRoleCard({ ...record, id: cardId, kind, permanentNumber: meta.permanentNumber, photoDataUrl: photo, issuedAt, expiresAt });
+    setRoleCardKind(kind);
+    securityAudit('role-card-opened', { actor: 'super-admin', newValue: { kind, roleId: cardId }, reason: `${kind} smart ID card preview opened` });
+  };
+
+  const renewRoleCard = (months: number) => {
+    if (!roleCard) return;
+    const now = new Date().toISOString();
+    const expiresAt = renewExpiryOf(roleCard, months).toISOString();
+    const key = roleCardKeyOf(roleCardKind, roleCard.id);
+    setRoleCardsStore(prev => ({ ...prev, [key]: { ...(prev[key] || {}), permanentNumber: roleCard.permanentNumber, cardIssuedAt: now, cardExpiresAt: expiresAt } }));
+    setRoleCard(prev => prev ? { ...prev, cardIssuedAt: now, cardExpiresAt: expiresAt, issuedAt: now, expiresAt } : prev);
+    securityAudit('role-card-renewed', { actor: 'super-admin', newValue: { kind: roleCardKind, roleId: roleCard.id, cardExpiresAt: expiresAt, durationMonths: months }, reason: `${ROLE_CARD_META[roleCardKind].sub} ID card renewed` });
+    showToast(`${ROLE_CARD_META[roleCardKind].sub} ID card renewed. New expiry: ${new Date(expiresAt).toLocaleDateString()}`, 'success');
+  };
+
+  const changeRoleCardPhoto = async (file?: File | null) => {
+    if (!file || !roleCard) return;
+    const dataUrl = await compressStaffPhoto(file);
+    const key = roleCardKeyOf(roleCardKind, roleCard.id);
+    setRoleCardsStore(prev => ({ ...prev, [key]: { ...(prev[key] || {}), permanentNumber: roleCard.permanentNumber, photoDataUrl: dataUrl } }));
+    setRoleCard(prev => prev ? { ...prev, photoDataUrl: dataUrl } : prev);
+    securityAudit('role-card-photo-updated', { actor: 'super-admin', newValue: { kind: roleCardKind, roleId: roleCard.id }, reason: 'role ID card photo updated' });
+    showToast('Card photo updated.', 'success');
+  };
+
+  const updateRoleCardPhotoSetting = (keyName: string, value: number) => {
+    if (!roleCard) return;
+    const now = new Date().toISOString();
+    const storeKey = roleCardKeyOf(roleCardKind, roleCard.id);
+    setRoleCardsStore(prev => ({ ...prev, [storeKey]: { ...(prev[storeKey] || {}), [keyName]: value, permanentNumber: roleCard.permanentNumber } }));
+    setRoleCard(prev => prev ? { ...prev, [keyName]: value, updatedAt: now } : prev);
+  };
+
+  const downloadRoleCard = (card: any) => {
+    const blob = new Blob([roleCardHtml(card, card.kind)], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${card.permanentNumber || card.id}-${card.kind}-smart-id-card.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printRoleCard = (card: any) => {
+    const frame = document.createElement('iframe');
+    frame.style.position = 'fixed';
+    frame.style.right = '0';
+    frame.style.bottom = '0';
+    frame.style.width = '0';
+    frame.style.height = '0';
+    frame.style.border = '0';
+    document.body.appendChild(frame);
+    let done = false;
+    const doPrint = () => {
+      if (done) return;
+      done = true;
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      setTimeout(() => frame.remove(), 1500);
+    };
+    const doc = frame.contentDocument;
+    if (!doc) { frame.remove(); return; }
+    doc.open();
+    doc.write(roleCardHtml(card, card.kind));
+    doc.close();
+    setTimeout(doPrint, 500);
+  };
+
+  const saveSuperAdminCardProfile = (patch: any) => {
+    setSuperAdminCardProfile(prev => ({ ...prev, ...patch, updatedAt: new Date().toISOString() }));
+  };
+
+  const changeSuperAdminCardPhoto = async (file?: File | null) => {
+    if (!file) return;
+    const dataUrl = await compressStaffPhoto(file);
+    setSuperAdminCardProfile(prev => ({ ...prev, photoDataUrl: dataUrl, updatedAt: new Date().toISOString() }));
+    showToast('Super Admin photo saved.', 'success');
+  };
+
+  const openSuperAdminCard = () => {
+    openRoleCard('super-admin', {
+      id: 'SUPERADMIN',
+      name: superAdminCardProfile.name || superAdminCardProfile.fullName || 'Super Admin',
+      phone: superAdminCardProfile.phone || '',
+      email: superAdminCardProfile.email || '',
+      role: superAdminCardProfile.role || 'Super Admin',
+      photoDataUrl: superAdminCardProfile.photoDataUrl || '',
+      status: 'Active',
+    });
+  };
+
   const updateStaffVerification = (member: any, nextStatus: 'Active' | 'Rejected' | 'Suspended', reason = '') => {
     const docs = Array.isArray(member.documents) ? member.documents : [];
     const hasFullKyc = docs.length >= 3 && docs.every((d: any) => d && (d.fileId || d.ref));
@@ -2401,6 +2611,23 @@ export default function App() {
                         <span className="text-gray-400 text-[11px]">Orders: <b className="text-brand-orange">{s.orders}</b></span>
                       </div>
                       <button
+                        onClick={() => openRoleCard('store-admin', {
+                          adminId: s.adminId,
+                          name: s.ownerName || s.name,
+                          phone: s.phone || '',
+                          email: s.email || '',
+                          storeName: s.name,
+                          storeAddress: s.address || '',
+                          businessType: s.category || '',
+                          tradeLicenseNo: s.tradeLicenseNo || '',
+                          tinBin: s.tinBin || '',
+                          status: s.status,
+                        })}
+                        className="flex items-center space-x-1 px-3 py-1.5 bg-sky-500/10 border border-sky-500/30 hover:bg-sky-500/20 text-sky-300 rounded text-[11px] font-bold transition-all cursor-pointer"
+                      >
+                        <span>ID Card</span>
+                      </button>
+                      <button
                         onClick={() => handleLaunchStore(s.id)}
                         className="flex items-center space-x-1 px-3 py-1.5 bg-brand-orange/10 border border-brand-orange/30 hover:bg-brand-orange/20 text-brand-orange hover:text-white rounded text-[11px] font-bold transition-all cursor-pointer"
                       >
@@ -2529,6 +2756,40 @@ export default function App() {
                 <button onClick={addSuperAdminStaff} className="rounded-xl bg-brand-orange px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-brand-orange/20 hover:bg-brand-orange-hover">
                   Add Super Admin Staff
                 </button>
+              </div>
+            </div>
+            <div className="grid gap-4 rounded-2xl border border-orange-500/20 bg-[#0b1526] p-4 md:grid-cols-[1fr_auto] md:items-center">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-orange-300">Super Admin Smart ID Card</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-gray-500">Manual profile → photo + barcode + QR + permanent number (NXS...) with print/download. Platform owner-এর নিজের card।</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  <label className="block">
+                    <span className="mb-0.5 block text-[8px] font-black uppercase text-gray-500">Full Name</span>
+                    <input value={superAdminCardProfile.name || ''} onChange={e => saveSuperAdminCardProfile({ name: e.target.value })} placeholder="Super Admin" className="w-full rounded-lg border border-brand-border bg-[#070d16] px-2.5 py-2 text-xs font-bold text-white outline-none focus:border-orange-400" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-0.5 block text-[8px] font-black uppercase text-gray-500">Phone</span>
+                    <input value={superAdminCardProfile.phone || ''} onChange={e => saveSuperAdminCardProfile({ phone: e.target.value })} placeholder="01XXXXXXXXX" className="w-full rounded-lg border border-brand-border bg-[#070d16] px-2.5 py-2 text-xs font-bold text-white outline-none focus:border-orange-400" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-0.5 block text-[8px] font-black uppercase text-gray-500">Email</span>
+                    <input value={superAdminCardProfile.email || ''} onChange={e => saveSuperAdminCardProfile({ email: e.target.value })} placeholder="admin@nexago.com" className="w-full rounded-lg border border-brand-border bg-[#070d16] px-2.5 py-2 text-xs font-bold text-white outline-none focus:border-orange-400" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-0.5 block text-[8px] font-black uppercase text-gray-500">Designation</span>
+                    <input value={superAdminCardProfile.role || ''} onChange={e => saveSuperAdminCardProfile({ role: e.target.value })} placeholder="Super Admin" className="w-full rounded-lg border border-brand-border bg-[#070d16] px-2.5 py-2 text-xs font-bold text-white outline-none focus:border-orange-400" />
+                  </label>
+                  <label className="flex cursor-pointer items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-2 text-[9px] font-black uppercase text-sky-300 hover:bg-sky-500/20">
+                    {superAdminCardProfile.photoDataUrl ? 'Change Photo' : 'Upload Photo'}
+                    <input type="file" accept="image/*" onChange={e => changeSuperAdminCardPhoto(e.target.files?.[0])} className="hidden" />
+                  </label>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 md:w-56">
+                <button onClick={openSuperAdminCard} className="rounded-xl bg-brand-orange px-4 py-2.5 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-brand-orange/20 hover:bg-brand-orange-hover">
+                  Open Super Admin Card
+                </button>
+                <p className="text-center text-[8px] font-semibold text-gray-500">Permanent No কখনো change হবে না (NXS...)</p>
               </div>
             </div>
             {staffScanOpen && (
@@ -6308,6 +6569,7 @@ export default function App() {
               onAddDriver={handleAddDriver}
               onUpdateDriver={handleUpdateDriver}
               onDeleteDriver={handleDeleteDriver}
+              onOpenCard={(driver) => openRoleCard('driver', driver)}
               vehicles={vehicles}
             />
           )}
@@ -6455,6 +6717,144 @@ export default function App() {
             renderGenericView(activeTab)
           )}
         </main>
+
+        {/* ROLE ID CARD MODAL (Driver / Store Admin / Super Admin smart cards) */}
+        {roleCard && (
+          <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6">
+            <div className="mx-auto max-w-4xl rounded-2xl border border-brand-border bg-[#0b1526] p-5 shadow-2xl">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-black uppercase tracking-wider text-white">Digital Smart {ROLE_CARD_META[roleCardKind].sub} ID Card</h4>
+                  <p className="text-[10px] font-semibold text-gray-500">Permanent No: {roleCard.permanentNumber || roleCard.id} · original 85.6mm x 54mm card for neck badge printing.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => renewRoleCard(roleRenewMonths)} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-[10px] font-black uppercase text-violet-300 hover:bg-violet-500/20">Renew Card</button>
+                  <button onClick={() => downloadRoleCard(roleCard)} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300 hover:bg-emerald-500/20">Download</button>
+                  <button onClick={() => printRoleCard(roleCard)} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase text-sky-300 hover:bg-sky-500/20">Print</button>
+                  <button onClick={() => setRoleCard(null)} className="rounded-lg border border-brand-border px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-dark">Close</button>
+                </div>
+              </div>
+              <div className="grid gap-5 lg:grid-cols-[390px_1fr]">
+                <div className="mx-auto w-full max-w-[340px]">
+                  <div className="staff-print-card relative aspect-[85.6/54] overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-[#07111f] via-[#102138] to-[#f97316] p-4 shadow-2xl">
+                    <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent_35%,rgba(255,255,255,0.08))]" />
+                    <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full border border-white/10 bg-white/5" />
+                    <div className="relative flex h-full flex-col justify-between">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-orange-100">The NexaGo BD</p>
+                          <p className="mt-0.5 text-[7px] font-bold uppercase text-white/70">{ROLE_CARD_META[roleCardKind].sub}</p>
+                        </div>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-white via-orange-100 to-orange-400 text-[10px] font-black text-[#0b1220] ring-1 ring-orange-400/60 shadow-lg shadow-orange-500/20">NXG</div>
+                      </div>
+                      <div className="grid grid-cols-[110px_minmax(0,1fr)_64px] items-center gap-3">
+                        <div className="flex w-[110px] shrink-0 flex-col items-center">
+                          <div className="h-[4.6rem] w-[110px] overflow-hidden rounded-xl border border-white/25 bg-white/10">
+                            <img src={roleCard.photoDataUrl || staffInitialsAvatarDataUrl(roleCard.name, ROLE_CARD_META[roleCardKind].tag)} alt={ROLE_CARD_META[roleCardKind].sub} className="h-full w-full object-cover" style={{ objectPosition: `${roleCard.photoX || 50}% ${roleCard.photoY || 50}%`, transform: `scale(${roleCard.photoScale || 1})`, transformOrigin: `${roleCard.photoX || 50}% ${roleCard.photoY || 50}%` }} />
+                          </div>
+                          <div className="mt-1 flex w-[110px] flex-col items-center">
+                            <div className="h-4 w-[110px] overflow-hidden">
+                              <img src={code39SvgDataUrlThick(staffCardBarcodeCode(roleCard), 220, 32)} alt="Barcode" className="h-full w-full object-fill" />
+                            </div>
+                            <p className="mt-0.5 truncate font-mono text-[7px] font-bold tracking-[0.14em] text-white/95">{staffCardCode(roleCard)}</p>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1 text-center">
+                          <p className="truncate text-sm font-black uppercase text-white">{roleCard.name || ROLE_CARD_META[roleCardKind].sub}</p>
+                          <p className="truncate text-[6px] font-bold uppercase text-orange-100">{roleCardInfo(roleCard, roleCardKind).meta}</p>
+                          <p className="truncate text-[7px] font-bold uppercase text-white/70">{roleCardInfo(roleCard, roleCardKind).line2}</p>
+                          <p className="mt-1 font-mono text-[8px] font-black text-white/90">ID: {roleCard.permanentNumber || roleCard.id}</p>
+                          <p className="mt-0.5 truncate text-[7px] font-semibold text-white/70">{roleCardInfo(roleCard, roleCardKind).phone}</p>
+                        </div>
+                        <div className="flex h-16 w-16 items-center justify-center self-center rounded-md border border-white/30 p-1">
+                          <QRCodeSVG value={roleCardVerifyUrl(roleCard, roleCardKind)} size={56} level="M" marginSize={0} bgColor="transparent" fgColor="#ffffff" />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-white/15 pt-1 text-[6.5px] font-bold uppercase text-white/70">
+                        <span>Issue: {new Date(roleCard.issuedAt).toLocaleDateString()}</span>
+                        <span>Expire: {new Date(roleCard.expiresAt).toLocaleDateString()}</span>
+                        <span>{roleCard.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-gray-500">Card Tools</p>
+                    <label className="flex cursor-pointer items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[9px] font-black uppercase text-sky-200 hover:bg-sky-500/20">
+                      Change Photo
+                      <input type="file" accept="image/*" onChange={e => changeRoleCardPhoto(e.target.files?.[0])} className="hidden" />
+                    </label>
+                    <div className="grid gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[9px] font-black uppercase text-gray-400">Photo Zoom</span>
+                        <span className="font-mono text-[9px] font-bold text-white">{Math.round((roleCard.photoScale || 1) * 100)}%</span>
+                      </div>
+                      <input type="range" min="1" max="1.8" step="0.01" value={roleCard.photoScale || 1} onChange={e => updateRoleCardPhotoSetting('photoScale', Number(e.target.value))} className="w-full accent-orange-500" />
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[9px] font-black uppercase text-gray-400">Left / Right</span>
+                        <span className="font-mono text-[9px] font-bold text-white">{roleCard.photoX || 50}%</span>
+                      </div>
+                      <input type="range" min="0" max="100" step="1" value={roleCard.photoX || 50} onChange={e => updateRoleCardPhotoSetting('photoX', Number(e.target.value))} className="w-full accent-orange-500" />
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[9px] font-black uppercase text-gray-400">Up / Down</span>
+                        <span className="font-mono text-[9px] font-bold text-white">{roleCard.photoY || 50}%</span>
+                      </div>
+                      <input type="range" min="0" max="100" step="1" value={roleCard.photoY || 50} onChange={e => updateRoleCardPhotoSetting('photoY', Number(e.target.value))} className="w-full accent-orange-500" />
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-[9px] font-black uppercase text-gray-400">Renewal Duration</span>
+                        <span className="font-mono text-[9px] font-bold text-violet-300">New Expiry: {renewExpiryOf(roleCard, roleRenewMonths).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[3, 6, 9, 12, 18, 24].map((m) => (
+                          <button key={m} type="button" onClick={() => setRoleRenewMonths(m)} className={`rounded-lg border px-2.5 py-1.5 text-[9px] font-black uppercase ${roleRenewMonths === m ? 'border-violet-400/70 bg-violet-500/20 text-violet-200' : 'border-white/10 bg-white/[0.03] text-gray-400 hover:bg-white/[0.06]'}`}>{m}m</button>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-center text-[9px] font-semibold text-gray-500">Print size: 85.6mm x 54mm. Permanent No kakhono change hobe na.</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {[
+                    ['Permanent ID No', roleCard.permanentNumber || roleCard.id],
+                    [`${ROLE_CARD_META[roleCardKind].sub} Record ID`, roleCard.id],
+                    ['Full Name', roleCard.name],
+                    ...(roleCardKind === 'driver' ? [
+                      ['Vehicle Type', roleCard.vehicleType || 'N/A'],
+                      ['License No', roleCard.licenseNumber || 'N/A'],
+                      ['License Expiry', roleCard.licenseExpiry || 'N/A'],
+                      ['NID No', roleCard.nidNumber || 'N/A'],
+                      ['Verification', roleCard.verificationStatus || 'N/A'],
+                      ['Duty Status', roleCard.status || 'N/A'],
+                    ] : roleCardKind === 'store-admin' ? [
+                      ['Store Name', roleCard.storeName || 'N/A'],
+                      ['Store Address', roleCard.storeAddress || 'N/A'],
+                      ['Business Type', roleCard.businessType || 'N/A'],
+                      ['Email', roleCard.email || 'N/A'],
+                      ['Trade License', roleCard.tradeLicenseNo || 'N/A'],
+                      ['TIN / BIN', roleCard.tinBin || 'N/A'],
+                    ] : [
+                      ['Designation', roleCard.role || 'Super Admin'],
+                      ['Email', roleCard.email || 'N/A'],
+                      ['Access', 'Full Super Admin Control'],
+                      ['Scope', 'Platform-wide operations'],
+                      ['Issue Basis', 'Manual Super Admin profile'],
+                      ['Status', roleCard.status || 'Active'],
+                    ]),
+                    ['Phone', roleCard.phone || 'N/A'],
+                    ['Issue Date', new Date(roleCard.issuedAt).toLocaleDateString()],
+                    ['Expiry Date', new Date(roleCard.expiresAt).toLocaleDateString()],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                      <p className="text-[9px] font-black uppercase text-gray-500">{label}</p>
+                      <p className="mt-1 break-words text-xs font-bold text-white">{value || 'Not set'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* APP FOOTER LINE */}
         {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && (
