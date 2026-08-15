@@ -1334,26 +1334,31 @@ export default function App() {
     .brand{font-size:2.1mm;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:#ffedd5}
     .sub{font-size:1.85mm;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:.6mm}
     .logo{width:8.5mm;height:8.5mm;display:flex;align-items:center;justify-content:center;border-radius:2mm;background:linear-gradient(135deg,#fff,#fde68a 55%,#fb923c);color:#0b1220;font-size:2.6mm;font-weight:900;box-shadow:0 0 0 .3mm rgba(251,146,60,.6),0 2mm 4mm rgba(249,115,22,.2)}
-    .mid{display:grid;grid-template-columns:29mm minmax(0,1fr) 16mm;gap:3mm;align-items:end;position:relative}
+    .top{display:flex;justify-content:space-between;align-items:flex-start;position:relative}
     .photoCol{display:flex;flex-direction:column;align-items:center}
-    .photo{width:29mm;height:20mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
+    .photo{width:29mm;height:17mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
     .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
-    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:12mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.7mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.9);letter-spacing:.5mm;white-space:nowrap;text-align:center}
-    .info{min-width:0}
-    .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;line-height:1.3;overflow:visible}
-    .grey{font-size:1.85mm;font-weight:700;color:rgba(255,255,255,.7);margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .id{font-size:2.1mm;font-weight:900;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.9);margin-top:1mm}
+    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;border:1px solid rgba(255,255,255,.28);border-radius:2mm;background:rgba(255,255,255,.05);padding:1mm;box-sizing:border-box}
+    .barImg{width:100%;height:6.5mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}
+    .barInfo{width:100%;text-align:center}
+    .bn{font-size:2.3mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .br{font-size:1.6mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.3mm;line-height:1.2;overflow:visible}
+    .brow{display:flex;justify-content:space-between;gap:1mm;font-size:1.4mm;font-weight:700;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.85);margin-top:.3mm;white-space:nowrap;overflow:hidden}
     .qr{width:17mm;height:17mm;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3);border-radius:2mm;padding:1mm;align-self:center}
     .qr svg{width:100%;height:100%}
     .foot{display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.15);padding-top:1mm;font-size:1.7mm;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.7);position:relative}
     @media print{html,body{display:block;margin:0;padding:0;background:#fff;min-height:0;place-items:initial}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
   </style></head><body><div class="card"><div class="shine"></div><div class="ring"></div>
   <div class="head"><div><div class="brand">The NexaGo BD</div><div class="sub">Super Admin Staff</div></div><div class="logo">NXG</div></div>
-  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div><div class="barTxt">${staffCardCode(card)}</div></div></div>
-  <div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="grey">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="grey">Phone: ${card.phone || 'N/A'}</div></div>
-  <div class="qr">${staffCardQrSvg(card)}</div></div>
-  <div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div>
+  <div class="top"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div></div><div class="qr">${staffCardQrSvg(card)}</div></div>
+  <div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div>
+    <div class="barInfo"><div class="bn">${card.name || 'Staff Name'}</div><div class="br">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div>
+    <div class="brow"><span>JOIN: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</span></div>
+    <div class="brow"><span>PHONE: ${card.phone || 'N/A'}</span></div>
+    <div class="brow"><span>ID: ${staffCardCode(card)}</span></div>
+    <div class="brow"><span>ISSUE: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>EXPIRE: ${new Date(card.expiresAt).toLocaleDateString()}</span></div>
+  </div></div>
+  <div class="foot"><span>${card.status || ''}</span></div>
   </div></body></html>`;
 
   const downloadStaffIdCard = (card: any) => {
@@ -2854,9 +2859,9 @@ export default function App() {
                           </div>
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-white via-orange-100 to-orange-400 text-[10px] font-black text-[#0b1220] ring-1 ring-orange-400/60 shadow-lg shadow-orange-500/20">NXG</div>
                         </div>
-                        <div className="grid grid-cols-[110px_minmax(0,1fr)_64px] items-end gap-3">
+                        <div className="flex items-end justify-between gap-3">
                           <div className="flex w-[110px] shrink-0 flex-col items-center">
-                            <div className="h-[4.6rem] w-[110px] overflow-hidden rounded-xl border border-white/25 bg-white/10">
+                            <div className="h-[4.2rem] w-[110px] overflow-hidden rounded-xl border border-white/25 bg-white/10">
                               <img
                                 src={staffIdCard.photoDataUrl || staffInitialsAvatarDataUrl(staffIdCard.name)}
                                 alt="Staff"
@@ -2868,27 +2873,25 @@ export default function App() {
                                 }}
                               />
                             </div>
-                            <div className="mt-1 flex w-[110px] flex-col items-center">
-                              <div className="h-12 w-[110px] overflow-hidden">
+                            <div className="mt-1 flex w-[110px] flex-col items-center rounded-lg border border-white/25 bg-white/5 p-1">
+                              <div className="h-7 w-full overflow-hidden">
                                 <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
                               </div>
-                              <p className="mt-0.5 truncate font-mono text-[6px] font-bold tracking-[0.14em] text-white/90">{staffCardCode(staffIdCard)}</p>
+                              <div className="mt-0.5 w-full text-center">
+                                <p className="truncate text-[8px] font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
+                                <p className="text-[5.5px] font-bold uppercase leading-tight text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.contractType || 'Official'}</p>
+                                <p className="mt-0.5 truncate font-mono text-[5px] font-bold text-white/85">JOIN: {staffIdCard.joiningDate || new Date(staffIdCard.createdAt || Date.now()).toLocaleDateString()}</p>
+                                <p className="truncate font-mono text-[5px] font-bold text-white/85">PHONE: {staffIdCard.phone || 'N/A'}</p>
+                                <p className="truncate font-mono text-[5px] font-bold text-white/90">ID: {staffIdCard.permanentNumber || staffIdCard.id}</p>
+                                <p className="truncate font-mono text-[5px] font-bold text-white/85">ISSUE: {new Date(staffIdCard.issuedAt).toLocaleDateString()} · EXPIRE: {new Date(staffIdCard.expiresAt).toLocaleDateString()}</p>
+                              </div>
                             </div>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
-                            <p className="text-[8px] font-bold uppercase leading-tight text-orange-100">{staffIdCard.role || 'Staff'} · {staffIdCard.contractType || 'Official'}</p>
-                            <p className="truncate text-[7px] font-bold uppercase text-white/70">Join: {staffIdCard.joiningDate || new Date(staffIdCard.createdAt || Date.now()).toLocaleDateString()}</p>
-                            <p className="mt-1 font-mono text-[8px] font-black text-white/90">ID: {staffIdCard.permanentNumber || staffIdCard.id}</p>
-                            <p className="mt-0.5 truncate text-[7px] font-semibold text-white/70">Phone: {staffIdCard.phone || 'N/A'}</p>
                           </div>
                           <div className="flex h-16 w-16 items-center justify-center self-center rounded-md border border-white/30 p-1">
                               <QRCodeSVG value={staffCardVerifyUrl(staffIdCard)} size={56} level="M" marginSize={0} bgColor="transparent" fgColor="#ffffff" />
                           </div>
                         </div>
                         <div className="flex items-center justify-between border-t border-white/15 pt-1 text-[6.5px] font-bold uppercase text-white/70">
-                          <span>Issue: {new Date(staffIdCard.issuedAt).toLocaleDateString()}</span>
-                          <span>Expire: {new Date(staffIdCard.expiresAt).toLocaleDateString()}</span>
                           <span>{staffIdCard.status}</span>
                         </div>
                       </div>
