@@ -94,17 +94,21 @@ const staffCardQrSvg = (card: any): string => {
   return svg;
 };
 
-const code39SvgDataUrlThick = (value: string) => {
+// Renders Code39 at the SAME aspect as its display box (uniform scale, ratios intact) so lines stay
+// crisp/vertical instead of being squeezed from a 3883px image — keeps full wide:narrow 3:1 scannability.
+const code39SvgDataUrlThick = (value: string, boxW = 3883, boxH = 64) => {
   const bars = code39Bars(value);
+  const natural = bars.reduce((s, b) => s + (b.wide ? 20 : 8) + 1, 0);
+  const scale = boxW / natural;
   let x = 0;
   const rects = bars.map((bar) => {
-    const w = bar.wide ? 24 : 8;
-    const rect = bar.on ? `<rect x="${x}" y="0" width="${w}" height="64" fill="#020617"/>` : '';
-    x += w + 1;
+    const nw = (bar.wide ? 20 : 8) + 1;
+    const w = (bar.on ? (bar.wide ? 20 : 8) : 0) * scale;
+    const rect = bar.on ? `<rect x="${x}" y="0" width="${w}" height="${boxH}" fill="#020617"/>` : '';
+    x += nw * scale;
     return rect;
   }).join('');
-  const width = Math.max(x - 1, 1);
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64" viewBox="0 0 ${width} 64"><rect width="${width}" height="64" fill="#fff"/>${rects}</svg>`)}`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${boxW}" height="${boxH}" viewBox="0 0 ${boxW} ${boxH}"><rect width="${boxW}" height="${boxH}" fill="#fff"/>${rects}</svg>`)}`;
 };
 const staffInitialsAvatarDataUrl = (name?: string) => {
   const initials = String(name || 'S').split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'S';
@@ -1350,7 +1354,7 @@ export default function App() {
     @media print{html,body{display:block;margin:0;padding:0;background:#fff;min-height:0;place-items:initial}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
   </style></head><body><div class="card"><div class="shine"></div><div class="ring"></div>
   <div class="head"><div><div class="brand">The NexaGo BD</div><div class="sub">Super Admin Staff</div></div><div class="logo">NXG</div></div>
-  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div><div class="barTxt">${staffCardCode(card)}</div></div></div>
+  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card), 580, 240)}"></div><div class="barTxt">${staffCardCode(card)}</div></div></div>
   <div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="grey">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="grey">Phone: ${card.phone || 'N/A'}</div></div>
   <div class="qr">${staffCardQrSvg(card)}</div></div>
   <div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div>
@@ -2870,7 +2874,7 @@ export default function App() {
                             </div>
                             <div className="mt-1 flex w-[110px] flex-col items-center">
                               <div className="h-12 w-[110px] overflow-hidden">
-                                <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
+                                <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard), 220, 96)} alt="Staff barcode" className="h-full w-full object-fill" />
                               </div>
                               <p className="mt-0.5 truncate font-mono text-[7px] font-bold tracking-[0.14em] text-white/95">{staffCardCode(staffIdCard)}</p>
                             </div>
