@@ -1519,6 +1519,23 @@ export default function App() {
     setStaffIdCard((prev: any) => prev && prev.id === card.id ? { ...prev, [key]: nextValue, updatedAt: now } : prev);
   };
 
+  const saveStaffCardSettings = (card: any) => {
+    const now = new Date().toISOString();
+    setStaff(prev => prev.map((s: any) => s.id === card.id ? {
+      ...s,
+      photoDataUrl: card.photoDataUrl || s.photoDataUrl,
+      photoScale: card.photoScale || 1,
+      photoX: card.photoX || 50,
+      photoY: card.photoY || 50,
+      cardIssuedAt: card.cardIssuedAt || card.issuedAt || s.cardIssuedAt,
+      cardExpiresAt: card.cardExpiresAt || card.expiresAt || s.cardExpiresAt,
+      updatedAt: now,
+      auditTrail: [...(s.auditTrail || []), { action: 'staff-card-saved', actor: 'super-admin', at: now, reason: 'smart staff ID card settings saved from Card Tools' }],
+    } : s));
+    securityAudit('staff-card-saved', { actor: 'super-admin', newValue: { staffId: card.id, photoScale: card.photoScale, photoX: card.photoX, photoY: card.photoY }, reason: 'smart staff ID card settings saved from Card Tools' });
+    showToast('Staff ID card saved.', 'success');
+  };
+
   const openStaffRenewal = (card: any) => {
     setStaffRenewalForm({
       role: card.role || '',
@@ -1594,14 +1611,15 @@ export default function App() {
   const openRoleCard = (kind: RoleCardKind, record: any) => {
     const cardId = String(kind === 'store-admin' ? (record.adminId || record.id) : record.id || 'CARD');
     const meta = ensureRoleCardMeta(kind, cardId, record);
-    let photo = record.photoDataUrl || (kind === 'driver' ? record.photo : '') || '';
+    const saved = roleCardsStore[roleCardKeyOf(kind, cardId)] || {};
+    let photo = record.photoDataUrl || (kind === 'driver' ? record.photo : '') || saved.photoDataUrl || '';
     if (!photo && kind === 'store-admin') {
       const doc = (record.documents || []).find((d: any) => /photo|avatar|profile|image/i.test(String(d.type || d.key || '')));
       if (doc?.dataUrl) photo = doc.dataUrl;
     }
     const issuedAt = meta.cardIssuedAt || record.verifiedAt || record.createdAt || new Date().toISOString();
     const expiresAt = meta.cardExpiresAt || new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
-    setRoleCard({ ...record, id: cardId, kind, permanentNumber: meta.permanentNumber, photoDataUrl: photo, issuedAt, expiresAt });
+    setRoleCard({ ...record, id: cardId, kind, permanentNumber: meta.permanentNumber, photoDataUrl: photo, photoScale: saved.photoScale || 1, photoX: saved.photoX || 50, photoY: saved.photoY || 50, issuedAt, expiresAt });
     setRoleCardKind(kind);
     securityAudit('role-card-opened', { actor: 'super-admin', newValue: { kind, roleId: cardId }, reason: `${kind} smart ID card preview opened` });
   };
@@ -3214,6 +3232,9 @@ export default function App() {
                         </div>
                         <input type="range" min="0" max="100" step="1" value={staffIdCard.photoY || 50} onChange={e => updateStaffCardPhotoSetting(staffIdCard, 'photoY', Number(e.target.value))} className="w-full accent-orange-500" />
                       </div>
+                      <button onClick={() => saveStaffCardSettings(staffIdCard)} className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-500">
+                        Save Card
+                      </button>
                       <p className="text-center text-[9px] font-semibold text-gray-500">Print size: 85.6mm x 54mm. Use PVC/ID-card print scale 100%.</p>
                     </div>
                   </div>
