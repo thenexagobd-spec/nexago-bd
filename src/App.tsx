@@ -75,7 +75,13 @@ const CODE39_PATTERNS: Record<string, string> = {
 };
 
 const staffCardCode = (card: any) => String(card?.permanentNumber || card?.id || 'STAFF').toUpperCase().replace(/[^A-Z0-9-. $/+%]/g, '-');
-const staffCardBarcodeCode = (card: any) => staffCardCode(card);
+// Compact barcode value = trailing digits of the Permanent No (e.g. NXG202606133353 -> 06133353).
+// Keeps Code39 bars thick + scannable at the small under-photo size; scan matches staff by suffix.
+const staffCardBarcodeCode = (card: any) => {
+  const full = staffCardCode(card);
+  const tail = full.match(/\d+$/)?.[0] || full;
+  return tail.length > 8 ? tail.slice(-8) : tail;
+};
 const staffCardVerifyUrl = (card: any) => `${window.location.origin}/api/security/staff-card/verify?key=${encodeURIComponent(new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main')}&staffId=${encodeURIComponent(card?.id || '')}&permanentNo=${encodeURIComponent(staffCardCode(card))}`;
 
 // Renders the REAL scannable QR code to an SVG string (same QR the on-screen card shows).
@@ -1332,7 +1338,7 @@ export default function App() {
     .photoCol{display:flex;flex-direction:column;align-items:center}
     .photo{width:29mm;height:20mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
     .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
-    .bar{width:100%;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:12mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.7mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.9);letter-spacing:.5mm;white-space:nowrap;text-align:center}
+    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:12mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:1.7mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.9);letter-spacing:.5mm;white-space:nowrap;text-align:center}
     .info{min-width:0}
     .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .meta{font-size:2.1mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;line-height:1.3;overflow:visible}
@@ -1344,10 +1350,9 @@ export default function App() {
     @media print{html,body{display:block;margin:0;padding:0;background:#fff;min-height:0;place-items:initial}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
   </style></head><body><div class="card"><div class="shine"></div><div class="ring"></div>
   <div class="head"><div><div class="brand">The NexaGo BD</div><div class="sub">Super Admin Staff</div></div><div class="logo">NXG</div></div>
-  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div></div>
+  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div><div class="barTxt">${staffCardCode(card)}</div></div></div>
   <div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="grey">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="grey">Phone: ${card.phone || 'N/A'}</div></div>
   <div class="qr">${staffCardQrSvg(card)}</div></div>
-  <div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card))}"></div><div class="barTxt">${staffCardBarcodeCode(card)}</div></div>
   <div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div>
   </div></body></html>`;
 
@@ -1536,7 +1541,11 @@ export default function App() {
   const applyStaffScan = (code: string) => {
     const clean = String(code || '').trim().toUpperCase();
     if (!clean) return;
-    const match = staff.find((s: any) => String(s.permanentNumber || s.id || '').toUpperCase().trim() === clean || String(s.id || '').toUpperCase().trim() === clean);
+    const match = staff.find((s: any) => {
+      const pn = String(s.permanentNumber || '').toUpperCase().trim();
+      const id = String(s.id || '').toUpperCase().trim();
+      return pn === clean || id === clean || (clean.length >= 6 && (pn.endsWith(clean) || id.endsWith(clean)));
+    });
     if (match) {
       setStaffScanMsg(null);
       setStaffScanManual('');
@@ -2859,6 +2868,12 @@ export default function App() {
                                 }}
                               />
                             </div>
+                            <div className="mt-1 flex w-[110px] flex-col items-center">
+                              <div className="h-12 w-[110px] overflow-hidden">
+                                <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
+                              </div>
+                              <p className="mt-0.5 truncate font-mono text-[6px] font-bold tracking-[0.14em] text-white/90">{staffCardCode(staffIdCard)}</p>
+                            </div>
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-black uppercase text-white">{staffIdCard.name || 'Staff Name'}</p>
@@ -2870,12 +2885,6 @@ export default function App() {
                           <div className="flex h-16 w-16 items-center justify-center self-center rounded-md border border-white/30 p-1">
                               <QRCodeSVG value={staffCardVerifyUrl(staffIdCard)} size={56} level="M" marginSize={0} bgColor="transparent" fgColor="#ffffff" />
                           </div>
-                        </div>
-                        <div className="mt-2 flex w-full flex-col items-center">
-                          <div className="h-12 w-full overflow-hidden">
-                            <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard))} alt="Staff barcode" className="h-full w-full object-fill" />
-                          </div>
-                          <p className="mt-0.5 truncate font-mono text-[6px] font-bold tracking-[0.14em] text-white/90">{staffCardBarcodeCode(staffIdCard)}</p>
                         </div>
                         <div className="flex items-center justify-between border-t border-white/15 pt-1 text-[6.5px] font-bold uppercase text-white/70">
                           <span>Issue: {new Date(staffIdCard.issuedAt).toLocaleDateString()}</span>
