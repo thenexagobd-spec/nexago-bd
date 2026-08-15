@@ -3654,40 +3654,142 @@ export default function App() {
         );
 
       case 'Reports & Analytics':
-        return (
-          <div className="space-y-6 fade-in">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-white uppercase tracking-wider">Reports & Analytics</h3>
-                <p className="text-xs text-gray-400">Platform performance metrics, order latency, and financial exports</p>
+        return (() => {
+          const totalOrders = orders.length;
+          const completed = orders.filter((o: any) => o.status === 'Completed').length;
+          const pending = orders.filter((o: any) => o.status === 'Pending').length;
+          const cancelled = orders.filter((o: any) => o.status === 'Cancelled').length;
+          const inProgress = orders.filter((o: any) => ['Confirmed', 'Processing', 'Ongoing'].includes(o.status)).length;
+          const revenue = orders.filter((o: any) => o.status !== 'Cancelled').reduce((s, o: any) => s + (Number(o.amount) || 0), 0);
+          const onlineDrivers = drivers.filter((d: any) => d.status === 'Online').length;
+          const activeCoupons = coupons.filter((c: any) => c.status === 'Active').length;
+          let latencyTotal = 0, latencyN = 0;
+          for (const o of orders) {
+            if (o.status !== 'Completed') continue;
+            const placed = o.placedAt || (o.timeline && o.timeline[0]?.time) || 0;
+            const done = o.timeline?.find((t: any) => t.status === 'Completed')?.time || 0;
+            if (placed && done && done > placed) { latencyTotal += (done - placed) / 60000; latencyN++; }
+            else if (o.estimatedMinutes) { latencyTotal += o.estimatedMinutes; latencyN++; }
+          }
+          const avgLatency = latencyN ? Math.round(latencyTotal / latencyN) : 0;
+          const fulfillmentRate = totalOrders ? ((completed / totalOrders) * 100).toFixed(1) : '0.0';
+          const exportCsv = (filename: string, header: string[], rows: any[][]) => {
+            const csv = [header, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+          return (
+            <div className="space-y-6 fade-in">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-white uppercase tracking-wider">Reports & Analytics</h3>
+                  <p className="text-xs text-gray-400">Platform performance metrics, order latency, and financial exports</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => { exportCsv(`nexago-orders-${new Date().toISOString().slice(0, 10)}.csv`, ['Order ID', 'Customer', 'Phone', 'Store', 'Status', 'Amount', 'Payment', 'Date', 'Time'], orders.map((o: any) => [o.id, o.customerName, o.customerPhone, o.storeName, o.status, o.amount, o.paymentMethod, o.date, o.time || ''])); showToast(`Orders report exported (${orders.length} rows)`, 'success'); }}
+                    className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export Orders (CSV)</span>
+                  </button>
+                  <button
+                    onClick={() => { exportCsv(`nexago-payments-${new Date().toISOString().slice(0, 10)}.csv`, ['Order ID', 'Customer', 'Amount', 'Method', 'Status', 'Date'], orders.map((o: any) => [o.id, o.customerName, o.amount, o.paymentMethod, o.paymentStatus || o.status, o.date])); showToast(`Payments report exported (${orders.length} rows)`, 'success'); }}
+                    className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-dark hover:bg-brand-orange/10 border border-brand-border text-brand-orange rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export Payments (CSV)</span>
+                  </button>
+                </div>
               </div>
-              <button 
-                onClick={() => showToast("Full platform audit report downloaded!", "success")}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-semibold cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-                <span>Export System Audit (CSV)</span>
-              </button>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Orders</span>
+                  <div className="text-2xl font-black text-white mt-1">{totalOrders}</div>
+                  <span className="text-[10px] text-emerald-400 font-semibold">{completed} completed · {inProgress} in progress</span>
+                </div>
+                <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Fulfillment Rate</span>
+                  <div className="text-2xl font-black text-emerald-400 mt-1">{fulfillmentRate}%</div>
+                  <span className="text-[10px] text-gray-400 font-semibold">{cancelled} cancelled · {pending} pending</span>
+                </div>
+                <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Gross Revenue</span>
+                  <div className="text-2xl font-black text-brand-orange mt-1">৳ {revenue.toLocaleString()}</div>
+                  <span className="text-[10px] text-gray-400 font-semibold">{orders.filter((o: any) => o.status !== 'Cancelled').length} billable orders</span>
+                </div>
+                <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Avg Delivery Latency</span>
+                  <div className="text-2xl font-black text-sky-400 mt-1">{avgLatency} Mins</div>
+                  <span className="text-[10px] text-gray-400 font-semibold">measured from {latencyN} completed orders</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Drivers Online</span>
+                  <div className="text-2xl font-black text-emerald-400 mt-1">{onlineDrivers}</div>
+                  <span className="text-[10px] text-gray-400 font-semibold">of {drivers.length} registered drivers</span>
+                </div>
+                <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Active Coupons</span>
+                  <div className="text-2xl font-black text-violet-400 mt-1">{activeCoupons}</div>
+                  <span className="text-[10px] text-gray-400 font-semibold">of {coupons.length} total promo codes</span>
+                </div>
+                <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Registered Users</span>
+                  <div className="text-2xl font-black text-white mt-1">{users.length}</div>
+                  <span className="text-[10px] text-gray-400 font-semibold">{stores.length} partner stores</span>
+                </div>
+                <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Coverage Zones</span>
+                  <div className="text-2xl font-black text-brand-orange mt-1">{zones.length} Areas</div>
+                  <span className="text-[10px] text-gray-400 font-semibold">{zones.map((z: any) => z.name).filter(Boolean).join(', ') || 'No zones configured'}</span>
+                </div>
+              </div>
+
+              <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">
+                <div className="px-4 py-3 border-b border-brand-border flex items-center justify-between">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">Recent Orders</span>
+                  <span className="text-[10px] text-gray-500">latest {Math.min(orders.length, 8)} of {totalOrders}</span>
+                </div>
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-brand-dark/40 text-gray-400 border-b border-brand-border">
+                      <th className="py-3 px-4 font-bold text-[10px] uppercase">Order</th>
+                      <th className="py-3 px-4 font-bold text-[10px] uppercase">Customer</th>
+                      <th className="py-3 px-4 font-bold text-[10px] uppercase">Store</th>
+                      <th className="py-3 px-4 font-bold text-[10px] uppercase">Status</th>
+                      <th className="py-3 px-4 font-bold text-[10px] uppercase">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-border/40">
+                    {orders.slice(0, 8).map(o => (
+                      <tr key={o.id} className="hover:bg-brand-dark/10 transition-colors">
+                        <td className="py-3 px-4 font-mono text-brand-orange font-bold">#{o.id}</td>
+                        <td className="py-3 px-4 font-bold text-white">{o.customerName}</td>
+                        <td className="py-3 px-4 text-gray-300 font-semibold">{o.storeName}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${o.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : o.status === 'Cancelled' ? 'bg-red-500/10 text-red-400' : 'bg-orange-500/10 text-orange-400'}`}>{o.status}</span>
+                        </td>
+                        <td className="py-3 px-4 font-mono font-bold text-white">৳ {o.amount}</td>
+                      </tr>
+                    ))}
+                    {orders.length === 0 && (
+                      <tr><td colSpan={5} className="py-8 text-center text-[10px] text-gray-500 font-bold">No orders yet. Orders appear here as they are placed on the platform.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Average Delivery Latency</span>
-                <div className="text-2xl font-black text-emerald-400 mt-1">24.5 Mins</div>
-                <span className="text-[10px] text-emerald-400 font-semibold">-3.2 mins vs target</span>
-              </div>
-              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Customer Fulfillment Rate</span>
-                <div className="text-2xl font-black text-white mt-1">98.5%</div>
-                <span className="text-[10px] text-emerald-400 font-semibold">1,248 total orders</span>
-              </div>
-              <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Active Coverage Zones</span>
-                <div className="text-2xl font-black text-brand-orange mt-1">5 Areas</div>
-                <span className="text-[10px] text-gray-400 font-semibold">Dhanmondi, Gulshan, Uttara, Mirpur, Banani</span>
-              </div>
-            </div>
-          </div>
-        );
+          );
+        })();
 
       case 'Marketing':
         return (
