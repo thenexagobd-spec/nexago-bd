@@ -1342,7 +1342,7 @@ export default function App() {
     .photoCol{display:flex;flex-direction:column;align-items:center}
     .photo{width:29mm;height:20mm;border-radius:3mm;overflow:hidden;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1)}
     .photo img{width:100%;height:100%;object-fit:cover;object-position:${card.photoX || 50}% ${card.photoY || 50}%;transform:scale(${card.photoScale || 1});transform-origin:${card.photoX || 50}% ${card.photoY || 50}%}
-    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:5mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:2mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.95);letter-spacing:.4mm;white-space:nowrap;text-align:center}
+    .bar{width:29mm;margin-top:1mm;display:flex;flex-direction:column;align-items:center;gap:.5mm}.barImg{width:100%;height:4mm;overflow:hidden}.barImg img{width:100%;height:100%;object-fit:fill;display:block}.barTxt{font-size:2mm;font-weight:800;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.95);letter-spacing:.4mm;white-space:nowrap;text-align:center}
     .info{min-width:0;text-align:center}
     .name{font-size:3.7mm;font-weight:900;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .meta{font-size:1.55mm;font-weight:700;text-transform:uppercase;color:#ffedd5;margin-top:.6mm;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1354,7 +1354,7 @@ export default function App() {
     @media print{html,body{display:block;margin:0;padding:0;background:#fff;min-height:0;place-items:initial}@page{size:85.6mm 54mm;margin:0}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
   </style></head><body><div class="card"><div class="shine"></div><div class="ring"></div>
   <div class="head"><div><div class="brand">The NexaGo BD</div><div class="sub">Super Admin Staff</div></div><div class="logo">NXG</div></div>
-  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card), 580, 100)}"></div><div class="barTxt">${staffCardCode(card)}</div></div></div>
+  <div class="mid"><div class="photoCol"><div class="photo"><img src="${card.photoDataUrl || staffInitialsAvatarDataUrl(card.name)}"></div><div class="bar"><div class="barImg"><img src="${code39SvgDataUrlThick(staffCardBarcodeCode(card), 580, 80)}"></div><div class="barTxt">${staffCardCode(card)}</div></div></div>
   <div class="info"><div class="name">${card.name || 'Staff Name'}</div><div class="meta">${card.role || 'Staff'} · ${card.contractType || 'Official'}</div><div class="grey">Join: ${card.joiningDate || new Date(card.createdAt || Date.now()).toLocaleDateString()}</div><div class="id">ID: ${staffCardCode(card)}</div><div class="grey">Phone: ${card.phone || 'N/A'}</div></div>
   <div class="qr">${staffCardQrSvg(card)}</div></div>
   <div class="foot"><span>Issue: ${new Date(card.issuedAt).toLocaleDateString()}</span><span>Expire: ${new Date(card.expiresAt).toLocaleDateString()}</span><span>${card.status || ''}</span></div>
@@ -2873,8 +2873,8 @@ export default function App() {
                               />
                             </div>
                             <div className="mt-1 flex w-[110px] flex-col items-center">
-                              <div className="h-5 w-[110px] overflow-hidden">
-                                <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard), 220, 40)} alt="Staff barcode" className="h-full w-full object-fill" />
+                              <div className="h-4 w-[110px] overflow-hidden">
+                                <img src={code39SvgDataUrlThick(staffCardBarcodeCode(staffIdCard), 220, 32)} alt="Staff barcode" className="h-full w-full object-fill" />
                               </div>
                               <p className="mt-0.5 truncate font-mono text-[7px] font-bold tracking-[0.14em] text-white/95">{staffCardCode(staffIdCard)}</p>
                             </div>
