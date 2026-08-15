@@ -1444,6 +1444,18 @@ export default function App() {
     setStaffRenewalOpen(true);
   };
 
+  const renewExpiryOf = (card: any, months: number) => {
+    const m = Math.max(1, parseInt(String(months || '12'), 10) || 12);
+    const nowTs = Date.now();
+    const currentExpiry = Date.parse(card?.cardExpiresAt || card?.expiresAt || '') || 0;
+    const base = new Date(Math.max(nowTs, currentExpiry));
+    const baseDay = base.getDate();
+    const exp = new Date(base.getFullYear(), base.getMonth() + m, 1, base.getHours(), base.getMinutes(), base.getSeconds(), base.getMilliseconds());
+    const expLastDay = new Date(exp.getFullYear(), exp.getMonth() + 1, 0).getDate();
+    exp.setDate(Math.min(baseDay, expLastDay));
+    return exp;
+  };
+
   const renewStaffIdCard = (card: any) => {
     if (!staffRenewalForm.reason.trim()) {
       showToast('Renew reason required. Eta permanent audit-e save hobe.', 'info');
@@ -1452,7 +1464,7 @@ export default function App() {
     }
     const now = new Date().toISOString();
     const months = Math.max(1, parseInt(String(staffRenewalForm.durationMonths || '12'), 10) || 12);
-    const expiresAt = new Date(new Date(now).setMonth(new Date(now).getMonth() + months)).toISOString();
+    const expiresAt = renewExpiryOf(card, months).toISOString();
     const ref = `NXG-RENEW-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(card.permanentNumber || card.id || 'STAFF').replace(/[^A-Z0-9]/gi, '').toUpperCase()}-${Date.now().toString().slice(-8)}`;
     // Permanent No + Record ID are immutable forever — renewal must NEVER overwrite them.
     const patch = { ...staffRenewalForm, cardIssuedAt: now, cardExpiresAt: expiresAt, lastRenewalRef: ref, updatedAt: now, renewalDurationMonths: months };
@@ -3003,7 +3015,7 @@ export default function App() {
                               </button>
                             ))}
                           </div>
-                          <p className="mt-1.5 text-[10px] font-bold text-violet-200">New Expiry: {new Date(new Date(new Date().setMonth(new Date().getMonth() + Math.max(1, staffRenewalForm.durationMonths || 12)))).toLocaleDateString()}</p>
+                          <p className="mt-1.5 text-[10px] font-bold text-violet-200">New Expiry: {renewExpiryOf(staffIdCard, staffRenewalForm.durationMonths || 12).toLocaleDateString()}</p>
                         </label>
                         <label className="block">
                           <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">Renewal Reason / Note</span>
