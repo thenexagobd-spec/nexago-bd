@@ -69,9 +69,7 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
 const CLOUD_PUSH_EXCLUDE = new Set<string>();
 
 const configuredApiBase = ((import.meta.env.VITE_RELAY_BASE as string) || '').replace(/\/+$/, '');
-const API_BASE = window.location.hostname.endsWith('.onrender.com')
-  ? window.location.origin
-  : (configuredApiBase || window.location.origin).replace(/\/+$/, '');
+const API_BASE = (configuredApiBase || window.location.origin).replace(/\/+$/, '');
 
 const cloudKeyOf = () =>
   new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main';

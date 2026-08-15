@@ -4,7 +4,7 @@
  *
  * Roles Hub — a standalone landing page listing every role portal site on the
  * NexaGo platform. Each site opens on its own clean route (served live by the
- * relay, e.g. https://nexago-relay.onrender.com/driver?key=nexago-main) with a
+ * relay, e.g. https://sea-lion-app-eqin8.ondigitalocean.app/driver?key=nexago-main) with a
  * one-click copy link so teams can share their portal. Each role site's back
  * button lands here so the portals stay fully separate from the super admin panel.
  */
