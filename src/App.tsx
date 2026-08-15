@@ -2752,31 +2752,6 @@ export default function App() {
                 </div>
               ))}
             </div>
-            {couponFormOpen && (
-              <div className="fixed inset-0 z-50 bg-brand-dark/80 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-brand-card border border-brand-border rounded-xl max-w-sm w-full overflow-hidden shadow-2xl fade-in">
-                  <div className="flex items-center justify-between p-4 border-b border-brand-border">
-                    <h3 className="font-semibold text-white text-xs uppercase tracking-wider">Create Promo Code</h3>
-                    <button onClick={() => setCouponFormOpen(false)} className="text-gray-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
-                  </div>
-                  <div className="p-4 space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Coupon Code</label>
-                      <input value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="EID20" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Discount Display</label>
-                      <input value={couponForm.discount} onChange={e => setCouponForm(f => ({ ...f, discount: e.target.value }))} placeholder="10% Off" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Minimum Order (৳)</label>
-                      <input type="number" min="0" value={couponForm.minOrder} onChange={e => setCouponForm(f => ({ ...f, minOrder: e.target.value }))} placeholder="0" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
-                    </div>
-                    <button onClick={submitNewCoupon} className="w-full px-4 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold cursor-pointer">Create Promo Code</button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         );
 
@@ -6944,6 +6919,33 @@ export default function App() {
         </footer>
         )}
       </div>
+
+      {/* COUPON CAMPAIGN CREATE MODAL (root level so it stays above the top bar) */}
+      {couponFormOpen && (
+        <div className="fixed inset-0 z-[80] bg-brand-dark/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-brand-card border border-brand-border rounded-xl max-w-sm w-full overflow-hidden shadow-2xl fade-in">
+            <div className="flex items-center justify-between p-4 border-b border-brand-border">
+              <h3 className="font-semibold text-white text-xs uppercase tracking-wider">Create Promo Code</h3>
+              <button onClick={() => setCouponFormOpen(false)} className="text-gray-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Coupon Code</label>
+                <input value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="EID20" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Discount Display</label>
+                <input value={couponForm.discount} onChange={e => setCouponForm(f => ({ ...f, discount: e.target.value }))} placeholder="10% Off" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-gray-300 uppercase tracking-wider mb-1.5">Minimum Order (৳)</label>
+                <input type="number" min="0" value={couponForm.minOrder} onChange={e => setCouponForm(f => ({ ...f, minOrder: e.target.value }))} placeholder="0" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
+              </div>
+              <button onClick={submitNewCoupon} className="w-full px-4 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold cursor-pointer">Create Promo Code</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QUICK ACTIONS SUBMIT POPUP MODAL (Triggers direct dashboard quick grid submits) */}
       {quickActionModal && (
