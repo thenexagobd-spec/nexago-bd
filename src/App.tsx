@@ -351,7 +351,7 @@ export default function App() {
   const [staffProfile, setStaffProfile] = useState<any | null>(null);
   const [staffIdCard, setStaffIdCard] = useState<any | null>(null);  const staffCardPrintRef = useRef<HTMLDivElement | null>(null); const [staffRenewalOpen, setStaffRenewalOpen] = useState(false);
   const [staffRenewalStep, setStaffRenewalStep] = useState(1);
-  const [staffRenewalForm, setStaffRenewalForm] = useState({ role: '', shift: '', joiningDate: '', phone: '', address: '', emergencyContact: '', reason: '' });
+  const [staffRenewalForm, setStaffRenewalForm] = useState({ role: '', shift: '', joiningDate: '', phone: '', address: '', emergencyContact: '', reason: '', durationMonths: 12 });
   const [staffRenewalRef, setStaffRenewalRef] = useState('');
 
   const [reviews, setReviews] = useState<any[]>(() => getStoredData('sd_reviews', []));
@@ -1436,6 +1436,7 @@ export default function App() {
       address: card.address || '',
       emergencyContact: card.emergencyContact || '',
       reason: '',
+      durationMonths: 12,
     });
     setStaffRenewalStep(1);
     setStaffRenewalRef('');
@@ -1449,22 +1450,22 @@ export default function App() {
       return;
     }
     const now = new Date().toISOString();
-    const expiresAt = new Date(new Date(now).setFullYear(new Date(now).getFullYear() + 1)).toISOString();
+    const months = Math.max(1, parseInt(String(staffRenewalForm.durationMonths || '12'), 10) || 12);
+    const expiresAt = new Date(new Date(now).setMonth(new Date(now).getMonth() + months)).toISOString();
     const ref = `NXG-RENEW-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(card.permanentNumber || card.id || 'STAFF').replace(/[^A-Z0-9]/gi, '').toUpperCase()}-${Date.now().toString().slice(-8)}`;
-    const renewed = { ...card, ...staffRenewalForm, cardIssuedAt: now, cardExpiresAt: expiresAt, lastRenewalRef: ref, updatedAt: now };
+    // Permanent No + Record ID are immutable forever — renewal must NEVER overwrite them.
+    const patch = { ...staffRenewalForm, cardIssuedAt: now, cardExpiresAt: expiresAt, lastRenewalRef: ref, updatedAt: now, renewalDurationMonths: months };
     setStaff(prev => prev.map((s: any) => s.id === card.id ? {
       ...s,
-      ...staffRenewalForm,
-      cardIssuedAt: now,
-      cardExpiresAt: expiresAt,
-      lastRenewalRef: ref,
-      updatedAt: now,
-      auditTrail: [...(s.auditTrail || []), { action: 'staff-id-card-renewed', actor: 'super-admin', at: now, reason: staffRenewalForm.reason.trim(), ref }],
+      ...patch,
+      id: s.id,
+      permanentNumber: s.permanentNumber,
+      auditTrail: [...(s.auditTrail || []), { action: 'staff-id-card-renewed', actor: 'super-admin', at: now, reason: staffRenewalForm.reason.trim(), ref, newValue: { durationMonths: months, cardExpiresAt: expiresAt } }],
     } : s));
-    setStaffIdCard({ ...renewed, issuedAt: now, expiresAt });
+    setStaffIdCard({ ...card, ...patch, id: card.id, permanentNumber: card.permanentNumber, issuedAt: now, expiresAt });
     setStaffRenewalRef(ref);
     setStaffRenewalStep(4);
-    securityAudit('staff-id-card-renewed', { actor: 'super-admin', newValue: { staffId: card.id, cardIssuedAt: now, cardExpiresAt: expiresAt, ref }, reason: staffRenewalForm.reason.trim() });
+    securityAudit('staff-id-card-renewed', { actor: 'super-admin', newValue: { staffId: card.id, cardIssuedAt: now, cardExpiresAt: expiresAt, durationMonths: months, ref }, reason: staffRenewalForm.reason.trim() });
     showToast('Staff ID card renewed and synced live.', 'success');
   };
 
@@ -2986,10 +2987,26 @@ export default function App() {
                     {staffRenewalStep === 3 && (
                       <div className="space-y-3">
                         <label className="block">
+                          <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">Renewal Duration</span>
+                          <div className="flex flex-wrap gap-2">
+                            {[3, 6, 9, 12, 15, 18, 21, 24].map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setStaffRenewalForm(prev => ({ ...prev, durationMonths: m }))}
+                                className={`rounded-lg border px-3 py-2 text-[10px] font-black uppercase ${staffRenewalForm.durationMonths === m ? 'border-violet-400/70 bg-violet-500/20 text-violet-200' : 'border-white/10 bg-white/[0.03] text-gray-400 hover:bg-white/[0.06]'}`}
+                              >
+                                {m} month{m > 1 ? 's' : ''}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="mt-1.5 text-[10px] font-bold text-violet-200">New Expiry: {new Date(new Date(new Date().setMonth(new Date().getMonth() + Math.max(1, staffRenewalForm.durationMonths || 12)))).toLocaleDateString()}</p>
+                        </label>
+                        <label className="block">
                           <span className="mb-1 block text-[9px] font-black uppercase text-gray-500">Renewal Reason / Note</span>
                           <textarea value={staffRenewalForm.reason} onChange={e => setStaffRenewalForm(prev => ({ ...prev, reason: e.target.value }))} className="min-h-[90px] w-full rounded-lg border border-brand-border bg-[#070d16] px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-violet-400" placeholder="Example: yearly ID card renewal after staff document review." />
                         </label>
-                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-[10px] font-bold text-amber-200">Renew korle new issue/expiry date, updated staff details, renewal reason and reference number permanent audit-e save hobe.</div>
+                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-[10px] font-bold text-amber-200">Renew korle new issue/expiry date, updated staff details, renewal reason and reference number permanent audit-e save hobe. Permanent No kakhono change hobe na.</div>
                       </div>
                     )}
                     {staffRenewalStep === 4 && (
