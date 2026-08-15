@@ -1635,6 +1635,23 @@ export default function App() {
     setRoleCard(prev => prev ? { ...prev, [keyName]: value, updatedAt: now } : prev);
   };
 
+  const saveRoleCardSettings = () => {
+    if (!roleCard) return;
+    const key = roleCardKeyOf(roleCardKind, roleCard.id);
+    setRoleCardsStore(prev => ({ ...prev, [key]: {
+      ...(prev[key] || {}),
+      permanentNumber: roleCard.permanentNumber,
+      photoDataUrl: roleCard.photoDataUrl || prev[key]?.photoDataUrl,
+      photoScale: roleCard.photoScale,
+      photoX: roleCard.photoX,
+      photoY: roleCard.photoY,
+      cardIssuedAt: roleCard.cardIssuedAt || roleCard.issuedAt,
+      cardExpiresAt: roleCard.cardExpiresAt || roleCard.expiresAt,
+    } }));
+    securityAudit('role-card-saved', { actor: 'super-admin', newValue: { kind: roleCardKind, roleId: roleCard.id, permanentNumber: roleCard.permanentNumber }, reason: `${ROLE_CARD_META[roleCardKind].sub} ID card settings saved` });
+    showToast(`${ROLE_CARD_META[roleCardKind].sub} ID card saved.`, 'success');
+  };
+
   const downloadRoleCard = (card: any) => {
     const blob = new Blob([roleCardHtml(card, card.kind)], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -6798,8 +6815,11 @@ export default function App() {
                         <span className="text-[9px] font-black uppercase text-gray-400">Up / Down</span>
                         <span className="font-mono text-[9px] font-bold text-white">{roleCard.photoY || 50}%</span>
                       </div>
-                      <input type="range" min="0" max="100" step="1" value={roleCard.photoY || 50} onChange={e => updateRoleCardPhotoSetting('photoY', Number(e.target.value))} className="w-full accent-orange-500" />
+<input type="range" min="0" max="100" step="1" value={roleCard.photoY || 50} onChange={e => updateRoleCardPhotoSetting('photoY', Number(e.target.value))} className="w-full accent-orange-500" />
                     </div>
+                    <button onClick={saveRoleCardSettings} className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-500">
+                      Save Card
+                    </button>
                     <div className="rounded-lg border border-white/10 bg-black/20 p-3">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <span className="text-[9px] font-black uppercase text-gray-400">Renewal Duration</span>
