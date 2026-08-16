@@ -20,6 +20,7 @@ import ZonesView from './components/ZonesView';
 import SupportView from './components/SupportView';
 import NotificationsView from './components/NotificationsView';
 import SettingsView from './components/SettingsView';
+import { LEGAL_DOCS } from './legalContent';
 import EarningsView from './components/EarningsView';
 import FleetPromosView from './components/FleetPromosView';
 import InventoryView from './components/InventoryView';
@@ -44,7 +45,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
-  Map, Truck, Bookmark, FileText, LifeBuoy, Bell, Settings, LogOut, Menu, X, 
+  Map, Truck, Bookmark, FileText, LifeBuoy, Bell, Settings, LogOut, Menu, X, ScrollText, 
   Check, Calendar, BellOff, Box, FolderOpen, Store, ClipboardList, Ticket,
   BarChart3, ShieldCheck, MapPin, Star, Megaphone, ShieldAlert, Award, Download,
   Copy, ExternalLink, Plus, Link, Search, Mail, Trash2, Edit, MessageSquare, CheckCircle, XCircle, Clock, ArrowRight, Sparkles, TrendingUp, Printer, Globe, ShoppingBag,
@@ -259,6 +260,7 @@ export default function App() {
   const [superAdminLoginStep, setSuperAdminLoginStep] = useState<'credentials' | 'secret' | 'otp'>('credentials');
   const [superAdminOtp, setSuperAdminOtp] = useState({ email: '', code: '' });
   const [superAdminOtpSending, setSuperAdminOtpSending] = useState(false);
+  const [legalPopup, setLegalPopup] = useState<'privacy' | 'terms' | null>(null);
 
   // Supabase Google OAuth account chooser. The anon key is safe for browsers.
   const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
@@ -6091,9 +6093,43 @@ export default function App() {
   }, [isSuperAdminLoggedIn]);
 
   if (isSuperAdminRoute && !isSuperAdminLoggedIn) {
+    const loginDoc = legalPopup ? LEGAL_DOCS[legalPopup] : null;
     return (
       <div className="min-h-screen bg-[#070d16] text-gray-100 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(20,184,166,0.18),transparent_28%)]" />
+        {loginDoc && (
+          <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setLegalPopup(null)}>
+            <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-brand-border bg-[#0c1624] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-brand-border bg-[#0c1624] p-4">
+                <div className="flex items-center space-x-2">
+                  {legalPopup === 'privacy' ? <ShieldCheck className="h-4 w-4 text-brand-orange" /> : <ScrollText className="h-4 w-4 text-brand-orange" />}
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-brand-orange">Legal</p>
+                    <h3 className="mt-0.5 text-sm font-black text-white">{loginDoc.title}</h3>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setLegalPopup(null)} className="rounded-lg border border-brand-border p-2 text-gray-300 hover:border-brand-orange hover:text-white">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="space-y-4 p-5">
+                <div className="flex items-center justify-between border-b border-brand-border pb-3">
+                  <div>
+                    <h4 className="text-xs font-black text-white">{loginDoc.title}</h4>
+                    <p className="mt-0.5 text-[10px] text-gray-400">Effective Date: {loginDoc.effectiveDate}</p>
+                  </div>
+                  <span className="rounded-lg border border-brand-border bg-[#070e17] px-2.5 py-1 text-[9px] font-black uppercase text-gray-400">{loginDoc.website}</span>
+                </div>
+                {loginDoc.content.map((section, i) => (
+                  <div key={i} className="rounded-xl border border-brand-border bg-[#070e17] p-3.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-brand-orange">{section.heading}</p>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-gray-300">{section.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl border border-brand-border bg-[#0c1624] shadow-2xl">
           <div className="grid min-h-[560px] lg:grid-cols-[1fr_420px]">
             <div className="flex flex-col justify-between p-6 sm:p-8">
@@ -6108,10 +6144,10 @@ export default function App() {
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-[#080e17] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gray-400">
                   <ShieldCheck className="h-3 w-3 text-brand-orange" /> Legal
                 </span>
-                <button type="button" onClick={() => { window.location.href = `${window.location.origin}${window.location.pathname}?legal=privacy`; }} className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-[#080e17] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gray-300 transition-colors hover:border-brand-orange hover:text-brand-orange cursor-pointer">
+                <button type="button" onClick={() => setLegalPopup('privacy')} className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-[#080e17] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gray-300 transition-colors hover:border-brand-orange hover:text-brand-orange cursor-pointer">
                   Privacy Policy
                 </button>
-                <button type="button" onClick={() => { window.location.href = `${window.location.origin}${window.location.pathname}?legal=terms`; }} className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-[#080e17] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gray-300 transition-colors hover:border-brand-orange hover:text-brand-orange cursor-pointer">
+                <button type="button" onClick={() => setLegalPopup('terms')} className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-[#080e17] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gray-300 transition-colors hover:border-brand-orange hover:text-brand-orange cursor-pointer">
                   Terms of Service
                 </button>
               </div>
