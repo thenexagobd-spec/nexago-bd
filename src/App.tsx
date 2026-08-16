@@ -255,7 +255,9 @@ export default function App() {
   const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(() => localStorage.getItem('sd_super_admin_login') === 'verified');
   const [superAdminLogin, setSuperAdminLogin] = useState({ user: '', password: '', secretCode: '' });
   const [superAdminLoginError, setSuperAdminLoginError] = useState('');
-  const [superAdminLoginStep, setSuperAdminLoginStep] = useState<'credentials' | 'secret'>('credentials');
+  const [superAdminLoginStep, setSuperAdminLoginStep] = useState<'credentials' | 'secret' | 'otp'>('credentials');
+  const [superAdminOtp, setSuperAdminOtp] = useState({ email: '', code: '' });
+  const [superAdminOtpSending, setSuperAdminOtpSending] = useState(false);
   const [superAdminPasswordForm, setSuperAdminPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '', secretCode: '' });
   const [superAdminPasswordError, setSuperAdminPasswordError] = useState('');
   const [superAdminSessions, setSuperAdminSessions] = useState<any[]>([]);
@@ -5921,6 +5923,56 @@ export default function App() {
     runLogin();
   };
 
+  const handleSuperAdminGoogleOtpSend = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const email = superAdminOtp.email.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setSuperAdminLoginError('Enter a valid Gmail address to receive the one-time code.');
+      return;
+    }
+    setSuperAdminOtpSending(true);
+    setSuperAdminLoginError('');
+    securityApi('/otp-send', { email }).then(() => {
+      setSuperAdminLoginStep('otp');
+      setSuperAdminLoginError('');
+      securityAudit('super-admin-otp-sent', { actor: email, reason: 'Gmail OTP requested from login' });
+      showToast('One-time code sent to your Gmail.', 'info');
+    }).catch((err) => {
+      const msg = String(err?.message || '');
+      setSuperAdminLoginError(msg.includes('SUPABASE') ? 'Gmail OTP is not configured yet. Use username & password.' : msg.includes('rate') ? 'Too many attempts. Wait a minute and retry.' : 'That email is not an authorized account.');
+      securityAudit('super-admin-otp-send-failed', { actor: email || 'unknown', reason: 'server rejected OTP send' });
+    }).finally(() => setSuperAdminOtpSending(false));
+  };
+
+  const handleSuperAdminGoogleOtpLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = superAdminOtp.email.trim();
+    const code = superAdminOtp.code.trim();
+    if (!code) {
+      setSuperAdminLoginError('Enter the code you received on Gmail.');
+      return;
+    }
+    securityApi('/otp-login', { email, code, secretCode: superAdminLoginStep === 'secret' ? superAdminLogin.secretCode : '' }).then((data) => {
+      if (data.requiresSecret) {
+        setSuperAdminLoginStep('secret');
+        setSuperAdminLoginError('');
+        showToast('Email verified. Enter the secret code.', 'info');
+        return;
+      }
+      if (data.user?.role !== 'super-admin') throw new Error('not super admin');
+      localStorage.setItem('sd_security_session', data.token);
+      localStorage.setItem('sd_super_admin_login', 'verified');
+      setIsSuperAdminLoggedIn(true);
+      setSuperAdminLoginStep('credentials');
+      setSuperAdminLoginError('');
+      securityAudit('super-admin-login-success', { actor: email, reason: 'Gmail OTP verified super admin login' });
+      showToast('Super Admin login successful.', 'success');
+    }).catch((err) => {
+      setSuperAdminLoginError(superAdminLoginStep === 'secret' ? 'Invalid secret code.' : String(err?.message || 'Invalid verification code.'));
+      securityAudit('super-admin-login-failed', { actor: email || 'unknown', reason: 'Gmail OTP login rejected' });
+    });
+  };
+
   const handleSuperAdminPasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
     if (superAdminPasswordForm.newPassword !== superAdminPasswordForm.confirmPassword) {
@@ -6005,15 +6057,24 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <form onSubmit={handleSuperAdminLogin} className="flex flex-col justify-center border-t border-brand-border bg-[#101d30] p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <form onSubmit={superAdminLoginStep === 'otp' || (superAdminLoginStep === 'secret' && superAdminOtp.email) ? handleSuperAdminGoogleOtpLogin : handleSuperAdminLogin} className="flex flex-col justify-center border-t border-brand-border bg-[#101d30] p-6 sm:p-8 lg:border-l lg:border-t-0">
               <div className="mb-6">
                 <p className="text-[10px] font-black uppercase tracking-widest text-brand-orange">Login Required</p>
                 <h2 className="mt-2 text-xl font-black text-white">Super Admin Dashboard</h2>
-                <p className="mt-1 text-[11px] text-gray-400">{superAdminLoginStep === 'secret' ? 'Password accepted. Enter the Super Admin secret code.' : 'Enter authorized username/email and password.'}</p>
+                <p className="mt-1 text-[11px] text-gray-400">{superAdminLoginStep === 'secret' ? 'Password/email accepted. Enter the Super Admin secret code.' : superAdminLoginStep === 'otp' ? 'Enter the one-time code sent to your Gmail.' : 'Sign in with Gmail OTP, or enter authorized username/email and password.'}</p>
               </div>
               <div className="space-y-3">
                 {superAdminLoginStep === 'credentials' ? (
                   <>
+                    <button type="button" onClick={handleSuperAdminGoogleOtpSend} disabled={superAdminOtpSending} className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-border bg-white px-4 py-3 text-[11px] font-black uppercase tracking-wider text-gray-900 shadow-lg transition-colors hover:border-brand-orange disabled:opacity-60">
+                      {superAdminOtpSending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-brand-orange" /> : <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A11 11 0 0 0 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52Z"/></svg>}
+                      <span>Continue with Google (Gmail OTP)</span>
+                    </button>
+                    <div className="flex items-center gap-3 py-1">
+                      <span className="h-px flex-1 bg-brand-border" />
+                      <span className="text-[9px] font-black uppercase text-gray-500">or use password</span>
+                      <span className="h-px flex-1 bg-brand-border" />
+                    </div>
                     <label className="block">
                       <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Username / Email</span>
                       <input value={superAdminLogin.user} onChange={e => setSuperAdminLogin(prev => ({ ...prev, user: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Username or email" autoComplete="username" />
@@ -6023,6 +6084,20 @@ export default function App() {
                       <input value={superAdminLogin.password} onChange={e => setSuperAdminLogin(prev => ({ ...prev, password: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="Password" type="password" autoComplete="current-password" />
                     </label>
                   </>
+                ) : superAdminLoginStep === 'otp' ? (
+                  <>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Gmail Address</span>
+                      <input value={superAdminOtp.email} onChange={e => setSuperAdminOtp(prev => ({ ...prev, email: e.target.value }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="you@gmail.com" type="email" autoComplete="email" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">One-Time Code</span>
+                      <input value={superAdminOtp.code} onChange={e => setSuperAdminOtp(prev => ({ ...prev, code: e.target.value.replace(/\D/g, '').slice(0, 6) }))} className="w-full rounded-xl border border-brand-border bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-brand-orange" placeholder="6-digit code" type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus />
+                    </label>
+                    <button type="button" onClick={handleSuperAdminGoogleOtpSend} disabled={superAdminOtpSending} className="w-full rounded-xl border border-brand-border px-4 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-brand-orange disabled:opacity-60">
+                      {superAdminOtpSending ? 'Sending…' : 'Resend code'}
+                    </button>
+                  </>
                 ) : (
                   <label className="block">
                     <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Secret Code</span>
@@ -6031,10 +6106,10 @@ export default function App() {
                 )}
                 {superAdminLoginError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">{superAdminLoginError}</p>}
                 <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white shadow-lg transition-colors hover:bg-brand-orange-hover">
-                  <ShieldCheck className="h-4 w-4" /> {superAdminLoginStep === 'secret' ? 'Verify Secret Code' : 'Next'}
+                  <ShieldCheck className="h-4 w-4" /> {superAdminLoginStep === 'secret' ? 'Verify Secret Code' : superAdminLoginStep === 'otp' ? 'Verify Code' : 'Next'}
                 </button>
-                {superAdminLoginStep === 'secret' && (
-                  <button type="button" onClick={() => { setSuperAdminLoginStep('credentials'); setSuperAdminLogin(prev => ({ ...prev, secretCode: '' })); setSuperAdminLoginError(''); }} className="w-full rounded-xl border border-brand-border px-4 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-brand-orange">
+                {superAdminLoginStep !== 'credentials' && (
+                  <button type="button" onClick={() => { setSuperAdminLoginStep('credentials'); setSuperAdminLogin(prev => ({ ...prev, secretCode: '' })); setSuperAdminOtp(prev => ({ ...prev, code: '' })); setSuperAdminLoginError(''); }} className="w-full rounded-xl border border-brand-border px-4 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-brand-orange">
                     Back
                   </button>
                 )}

@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { supabaseConfigured, serviceClient } from './supabase.mjs';
+import { supabaseConfigured, serviceClient, sendEmailOtp, verifyEmailOtp } from './supabase.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || process.env.RELAY_PORT || 3100;
@@ -639,6 +639,102 @@ const server = http.createServer((req, res) => {
     sendJson(res, 200, { ok: true, key, version: store.version, updatedAt: store.updatedAt, state: store.state });
     return;
   }
+
+  // ---- Gmail/Google OTP login (Supabase email OTP) ----
+  // Flow: POST /otp-send { email } → Supabase emails a 6-digit code to the
+  // address; POST /otp-login { email, code, secretCode } verifies the code
+  // server-side, then (for super-admin) checks the login secret code and mints
+  // the same relay session as the password flow. The code is only minted when
+  // Supabase is configured; otherwise this returns 503 so the UI can fall back
+  // to the classic username/password form.
+  const otpSend = async () => {
+    if (!supabaseConfigured) { sendJson(res, 503, { ok: false, error: 'SUPABASE_NOT_CONFIGURED' }); return; }
+    if (!rateLimit(req, 'otp-send', 6, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const email = String(body.email || '').trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { sendJson(res, 400, { ok: false, error: 'INVALID_EMAIL' }); return; }
+      const users = readSecurity(`users-${safeKey(key)}`, {});
+      const found = findSecurityUser(users, email);
+      if (!found.user || found.user.status !== 'Active') {
+        appendAudit(key, { actor: email, action: 'otp-send-unknown-user', ip: clientIp(req), reason: 'email not an active platform user' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_EMAIL' });
+        return;
+      }
+      try {
+        await sendEmailOtp(email);
+        appendAudit(key, { actor: email, role: found.user.role, action: 'otp-send-success', ip: clientIp(req), reason: 'Gmail OTP requested' });
+        sendJson(res, 200, { ok: true });
+      } catch (e) {
+        appendAudit(key, { actor: email, action: 'otp-send-failed', ip: clientIp(req), reason: String(e && e.message || e) });
+        sendJson(res, 500, { ok: false, error: String(e && e.message || e) });
+      }
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+  };
+
+  const otpLogin = async () => {
+    if (!supabaseConfigured) { sendJson(res, 503, { ok: false, error: 'SUPABASE_NOT_CONFIGURED' }); return; }
+    if (!rateLimit(req, 'otp-login', 8, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const email = String(body.email || '').trim().toLowerCase();
+      const code = String(body.code || '').trim().replace(/\D/g, '');
+      const secretCode = cleanEnvSecret(body.secretCode);
+      if (!email || !code) { sendJson(res, 400, { ok: false, error: 'email and code required' }); return; }
+      ensureEnvSuperAdmins(key);
+      const users = readSecurity(`users-${safeKey(key)}`, {});
+      const found = findSecurityUser(users, email);
+      const user = found.user;
+      if (!user || user.status !== 'Active') {
+        appendAudit(key, { actor: email, action: 'otp-login-unknown-user', ip: clientIp(req) });
+        sendJson(res, 401, { ok: false, error: 'INVALID_EMAIL' });
+        return;
+      }
+      try {
+        await verifyEmailOtp(email, code);
+      } catch {
+        appendAudit(key, { actor: email, action: 'otp-login-bad-code', ip: clientIp(req), reason: 'email OTP verification failed' });
+        sendSecurityAlert('otp-login-bad-code', { actor: email, ip: clientIp(req), device: req.headers['user-agent'] || '' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_CODE' });
+        return;
+      }
+      if (user.role === 'super-admin') {
+        if (!SUPER_ADMIN_LOGIN_SECRET_CODE) {
+          appendAudit(key, { actor: email, role: 'super-admin', action: 'otp-login-secret-missing', ip: clientIp(req) });
+          sendJson(res, 503, { ok: false, error: 'LOGIN_SECRET_NOT_CONFIGURED' });
+          return;
+        }
+        if (!secretCode) {
+          sendJson(res, 200, { ok: true, requiresSecret: true, user: { userId: found.userId, role: user.role } });
+          return;
+        }
+        if (secretCode !== SUPER_ADMIN_LOGIN_SECRET_CODE) {
+          appendAudit(key, { actor: found.userId, role: 'super-admin', action: 'otp-login-secret-denied', ip: clientIp(req) });
+          sendSecurityAlert('super-admin-login-secret-failed', { actor: found.userId, ip: clientIp(req), device: req.headers['user-agent'] || '' });
+          sendJson(res, 401, { ok: false, error: 'INVALID_SECRET_CODE' });
+          return;
+        }
+      }
+      const canonicalUserId = found.userId;
+      const token = crypto.randomBytes(32).toString('hex');
+      const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+      sessions[token] = {
+        userId: canonicalUserId,
+        role: user.role,
+        storeId: user.storeId || '',
+        branchId: user.branchId || '',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 1000 * 60 * 60 * 12,
+        ip: clientIp(req),
+        device: req.headers['user-agent'] || '',
+        via: 'google-otp',
+      };
+      writeSecurity(`sessions-${safeKey(key)}`, sessions);
+      appendAudit(key, { actor: canonicalUserId, role: user.role, action: 'otp-login-success', storeId: user.storeId, branchId: user.branchId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Gmail OTP verified' });
+      sendJson(res, 200, { ok: true, token, expiresAt: sessions[token].expiresAt, user: { userId: canonicalUserId, role: user.role, storeId: user.storeId || '', branchId: user.branchId || '' } });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+  };
+
+  if (req.method === 'POST' && url.pathname === '/api/security/otp-send') { otpSend(); return; }
+  if (req.method === 'POST' && url.pathname === '/api/security/otp-login') { otpLogin(); return; }
 
   if (req.method === 'POST' && url.pathname === '/api/security/register') {
     if (!rateLimit(req, 'security-register', 10, 60_000)) { sendSecurityAlert('register-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '' }); sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }

@@ -48,3 +48,30 @@ export async function supabaseFetch(path, options = {}) {
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.text();
 }
+
+// Send a one-time email OTP to an address using Supabase Auth's built-in email
+// sender. Requires Supabase project email/SMTP configured (Supabase Dashboard →
+// Authentication → Providers → Email, or a custom SMTP provider).
+export async function sendEmailOtp(email, channel = 'email') {
+  if (!serviceClient) throw new Error('supabase not configured');
+  const { data, error } = await serviceClient.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: SUPABASE_URL,
+      data: { channel },
+    },
+  });
+  if (error) throw error;
+  return data;
+}
+
+// Verify a 6-digit email OTP. If it verifies, Supabase returns a session; we
+// only care that the token matched, so we then sign out the issued session to
+// keep the flow under our own relay session control.
+export async function verifyEmailOtp(email, token) {
+  if (!serviceClient) throw new Error('supabase not configured');
+  const { data, error } = await serviceClient.auth.verifyOtp({ email, token, type: 'email' });
+  if (error) throw error;
+  return data;
+}
