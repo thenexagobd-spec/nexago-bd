@@ -40,6 +40,7 @@ import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
 import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit } from './portals/portalUtils';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
@@ -258,6 +259,51 @@ export default function App() {
   const [superAdminLoginStep, setSuperAdminLoginStep] = useState<'credentials' | 'secret' | 'otp'>('credentials');
   const [superAdminOtp, setSuperAdminOtp] = useState({ email: '', code: '' });
   const [superAdminOtpSending, setSuperAdminOtpSending] = useState(false);
+
+  // Supabase Google OAuth account chooser. The anon key is safe for browsers.
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const supabase = supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+    : null;
+  const supabaseRef = useRef(supabase);
+  supabaseRef.current = supabase;
+
+  // Google OAuth callback: after the user picks a Gmail account on Google's
+  // account chooser, Supabase redirects back with #access_token in the URL.
+  // Read the session, pull the chosen email, then auto-send the OTP to it.
+  useEffect(() => {
+    const sb = supabaseRef.current;
+    if (!sb) return;
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (!params.get('access_token')) return;
+    (async () => {
+      try {
+        const { data, error } = await sb.auth.getSession();
+        if (error || !data.session) throw error || new Error('no session');
+        const email = String(data.session.user.email || '').trim().toLowerCase();
+        setSuperAdminOtp((prev) => ({ ...prev, email, code: '' }));
+        if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          setSuperAdminOtpSending(true);
+          setSuperAdminLoginError('');
+          securityApi('/otp-send', { email }).then(() => {
+            setSuperAdminLoginStep('otp');
+            securityAudit('super-admin-otp-sent', { actor: email, reason: 'Gmail OTP after Google account chooser' });
+            showToast('One-time code sent to your Gmail.', 'info');
+          }).catch((err) => {
+            const msg = String(err?.message || '');
+            setSuperAdminLoginError(msg.includes('rate') ? 'Too many attempts. Wait a minute and retry.' : 'That email is not an authorized account.');
+          }).finally(() => setSuperAdminOtpSending(false));
+        } else {
+          setSuperAdminLoginError('Google account has no email. Use username & password instead.');
+        }
+      } catch {
+        setSuperAdminLoginError('Google sign-in could not be completed. Try again or use username & password.');
+      }
+      // Clean the hash so a reload doesn't re-trigger the OTP flow.
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    })();
+  }, []);
   const [superAdminPasswordForm, setSuperAdminPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '', secretCode: '' });
   const [superAdminPasswordError, setSuperAdminPasswordError] = useState('');
   const [superAdminSessions, setSuperAdminSessions] = useState<any[]>([]);
@@ -5925,6 +5971,20 @@ export default function App() {
 
   const handleSuperAdminGoogleOtpSend = (e?: React.FormEvent) => {
     e?.preventDefault();
+    // Google account chooser flow (Supabase OAuth): redirect to Google, pick a
+    // Gmail, come back, then send the OTP to the chosen address automatically.
+    if (supabase && !superAdminOtp.email) {
+      const redirectTo = window.location.origin + window.location.pathname + window.location.search;
+      supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
+        .then(({ error }) => {
+          if (error) {
+            setSuperAdminLoginError('Google sign-in unavailable right now. Try again or use username & password.');
+            securityAudit('super-admin-google-oauth-error', { actor: 'unknown', reason: String(error.message || 'oauth error') });
+          }
+        })
+        .catch(() => setSuperAdminLoginError('Google sign-in unavailable right now. Try again or use username & password.'));
+      return;
+    }
     const email = superAdminOtp.email.trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setSuperAdminLoginError('Enter a valid Gmail address to receive the one-time code.');
