@@ -6104,6 +6104,17 @@ export default function App() {
                 <h1 className="mt-6 max-w-xl text-3xl font-black leading-tight text-white sm:text-4xl">The NexaGo BD Control Center</h1>
                 <p className="mt-3 max-w-lg text-sm leading-6 text-gray-400">Protected dashboard access for platform records, store approvals, staff controls, security audit and emergency operations.</p>
               </div>
+              <div className="mb-6 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-[#080e17] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gray-400">
+                  <ShieldCheck className="h-3 w-3 text-brand-orange" /> Legal
+                </span>
+                <button type="button" onClick={() => { window.location.href = `${window.location.origin}${window.location.pathname}?legal=privacy`; }} className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-[#080e17] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gray-300 transition-colors hover:border-brand-orange hover:text-brand-orange cursor-pointer">
+                  Privacy Policy
+                </button>
+                <button type="button" onClick={() => { window.location.href = `${window.location.origin}${window.location.pathname}?legal=terms`; }} className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-[#080e17] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gray-300 transition-colors hover:border-brand-orange hover:text-brand-orange cursor-pointer">
+                  Terms of Service
+                </button>
+              </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 {[
                   ['Security', 'Audit alerts active'],

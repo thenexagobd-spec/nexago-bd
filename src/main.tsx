@@ -2,11 +2,16 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 // @ts-expect-error Vite supports query-qualified local modules for cache invalidation.
 import App from './App.tsx?v=pos-receipt-barcode-qr-20260804';
+import LegalView from './components/LegalView';
+import { LEGAL_DOCS } from './legalContent';
 import './index.css';
+
+const legalParam = new URLSearchParams(window.location.search).get('legal');
+const legalDoc = legalParam === 'privacy' || legalParam === 'terms' ? LEGAL_DOCS[legalParam] : null;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {legalDoc ? <LegalView doc={legalDoc} /> : <App />}
   </StrictMode>,
 );
 

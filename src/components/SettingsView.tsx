@@ -4,7 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { Settings, Shield, Bell, Check, Save, RotateCcw } from 'lucide-react';
+import { Settings, Shield, Bell, Check, Save, RotateCcw, FileText, ScrollText, X, ExternalLink } from 'lucide-react';
+import { LEGAL_DOCS } from '../legalContent';
 
 export default function SettingsView() {
   const [baseFee, setBaseFee] = useState(40);
@@ -15,8 +16,9 @@ export default function SettingsView() {
   const [codEnabled, setCodEnabled] = useState(true);
   const [cardEnabled, setCardEnabled] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  
+
   const [saved, setSaved] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<'privacy' | 'terms' | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,8 +26,63 @@ export default function SettingsView() {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const legalUrl = (doc: 'privacy' | 'terms') =>
+    `${window.location.origin}${window.location.pathname}?legal=${doc}`;
+
+  const copyLegalUrl = (doc: 'privacy' | 'terms') => {
+    navigator.clipboard.writeText(legalUrl(doc)).then(() => {
+      setLegalDoc(null);
+      setTimeout(() => window.location.href = legalUrl(doc), 200);
+    });
+  };
+
+  const openDoc = legalDoc === 'privacy' ? LEGAL_DOCS.privacy : LEGAL_DOCS.terms;
+
   return (
     <div className="max-w-3xl space-y-6 fade-in">
+      {legalDoc && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setLegalDoc(null)}>
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-brand-border bg-[#0c1624] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-brand-border bg-[#0c1624] p-4">
+              <div className="flex items-center space-x-2">
+                {legalDoc === 'privacy' ? <Shield className="h-4 w-4 text-brand-orange" /> : <ScrollText className="h-4 w-4 text-brand-orange" />}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-brand-orange">{legalDoc === 'privacy' ? 'Legal' : 'Legal'}</p>
+                  <h3 className="mt-0.5 text-sm font-black text-white">{openDoc.title}</h3>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button type="button" onClick={() => copyLegalUrl(legalDoc)} className="rounded-lg border border-brand-border p-2 text-gray-300 hover:border-brand-orange hover:text-white" title="Open public link">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" onClick={() => setLegalDoc(null)} className="rounded-lg border border-brand-border p-2 text-gray-300 hover:border-brand-orange hover:text-white">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+            <div className="space-y-4 p-5">
+              <div className="flex items-center justify-between border-b border-brand-border pb-3">
+                <div>
+                  <h4 className="text-xs font-black text-white">{openDoc.title}</h4>
+                  <p className="mt-0.5 text-[10px] text-gray-400">Effective Date: {openDoc.effectiveDate}</p>
+                </div>
+                <span className="rounded-lg border border-brand-border bg-[#070e17] px-2.5 py-1 text-[9px] font-black uppercase text-gray-400">thanexsago.com</span>
+              </div>
+              {openDoc.content.map((section, i) => (
+                <div key={i} className="rounded-xl border border-brand-border bg-[#070e17] p-3.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-brand-orange">{section.heading}</p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-gray-300">{section.text}</p>
+                </div>
+              ))}
+              <div className="rounded-xl border border-brand-border bg-[#070e17] p-3.5 text-center">
+                <p className="text-[10px] text-gray-400">Public URL</p>
+                <p className="mt-1 break-all font-mono text-[10px] text-brand-orange">{legalUrl(legalDoc)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h2 className="text-xl font-bold text-white">System Settings</h2>
         <p className="text-xs text-gray-400">Configure global dispatch fees, payment gateways, and system maintenance</p>
@@ -182,6 +239,59 @@ export default function SettingsView() {
           </div>
         </div>
       </form>
+
+      {/* Legal Documents */}
+      <div className="bg-brand-card border border-brand-border rounded-xl p-5 space-y-4 shadow-sm">
+        <h3 className="font-semibold text-white text-sm flex items-center space-x-2 border-b border-brand-border/60 pb-2.5">
+          <FileText className="w-4 h-4 text-brand-orange" />
+          <span>Legal Documents</span>
+        </h3>
+        <p className="text-[10px] text-gray-400">Public Privacy Policy and Terms of Service for the platform. Open them here, or share their public links.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setLegalDoc('privacy')}
+            className="group flex items-center justify-between rounded-xl border border-brand-border bg-[#070e17] p-4 text-left transition-colors hover:border-brand-orange"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="rounded-lg border border-brand-border bg-[#0c1624] p-2 text-brand-orange">
+                <Shield className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white">Privacy Policy</p>
+                <p className="mt-0.5 text-[9px] text-gray-400">Effective {LEGAL_DOCS.privacy.effectiveDate}</p>
+              </div>
+            </div>
+            <ExternalLink className="h-4 w-4 text-gray-500 group-hover:text-brand-orange" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setLegalDoc('terms')}
+            className="group flex items-center justify-between rounded-xl border border-brand-border bg-[#070e17] p-4 text-left transition-colors hover:border-brand-orange"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="rounded-lg border border-brand-border bg-[#0c1624] p-2 text-brand-orange">
+                <ScrollText className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white">Terms of Service</p>
+                <p className="mt-0.5 text-[9px] text-gray-400">Effective {LEGAL_DOCS.terms.effectiveDate}</p>
+              </div>
+            </div>
+            <ExternalLink className="h-4 w-4 text-gray-500 group-hover:text-brand-orange" />
+          </button>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-brand-border bg-brand-dark/40 px-3 py-2">
+            <p className="text-[9px] font-black uppercase text-gray-400">Privacy Policy Link</p>
+            <p className="mt-0.5 break-all font-mono text-[9px] text-brand-orange">{legalUrl('privacy')}</p>
+          </div>
+          <div className="rounded-lg border border-brand-border bg-brand-dark/40 px-3 py-2">
+            <p className="text-[9px] font-black uppercase text-gray-400">Terms of Service Link</p>
+            <p className="mt-0.5 break-all font-mono text-[9px] text-brand-orange">{legalUrl('terms')}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
