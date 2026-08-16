@@ -52,13 +52,18 @@ export async function supabaseFetch(path, options = {}) {
 // Send a one-time email OTP to an address using Supabase Auth's built-in email
 // sender. Requires Supabase project email/SMTP configured (Supabase Dashboard →
 // Authentication → Providers → Email, or a custom SMTP provider).
+//
+// IMPORTANT: emailRedirectTo must stay null. If a redirect URL is provided,
+// Supabase switches to the "Magic Link" email template; our UI expects a
+// 6-digit numeric code instead, so we deliberately leave emailRedirectTo null
+// to force the One-Time Password (token) email.
 export async function sendEmailOtp(email, channel = 'email') {
   if (!serviceClient) throw new Error('supabase not configured');
   const { data, error } = await serviceClient.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: false,
-      emailRedirectTo: SUPABASE_URL,
+      emailRedirectTo: null,
       data: { channel },
     },
   });
