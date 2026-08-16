@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { supabaseConfigured, serviceClient } from './supabase.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || process.env.RELAY_PORT || 3100;
@@ -171,12 +172,69 @@ function decryptJson(value) {
 }
 
 function readSecurity(name, fallback) {
+  const mirrored = supabaseSecurityMirror.get(name);
+  if (supabaseReady && mirrored !== undefined) return mirrored;
   try { return decryptJson(JSON.parse(fs.readFileSync(securityFile(name), 'utf8'))); } catch { return fallback; }
 }
 
 function writeSecurity(name, value) {
   fs.writeFileSync(securityFile(name), JSON.stringify(encryptJson(value)), 'utf8');
+  supabaseSecurityWrite(name, value);
   return value;
+}
+
+// ---- Supabase bridge ----
+// When SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are configured, security and
+// store payloads are mirrored to the nexago_security / nexago_stores tables so
+// data survives in PostgreSQL (DigitalOcean). The local JSON files stay as a
+// fallback so nothing breaks if Supabase is unreachable. A single in-process
+// memory mirror keeps reads fast and consistent during the server's lifetime.
+const supabaseStoreMirror = new Map();
+const supabaseSecurityMirror = new Map();
+let supabaseReady = false;
+
+const SUPABASE_TABLE = {
+  stores: 'nexago_stores',
+  security: 'nexago_security',
+};
+
+function supabaseWrite(table, row) {
+  if (!supabaseConfigured || !serviceClient) return;
+  try {
+    serviceClient
+      .from(table)
+      .upsert(row, { onConflict: table === SUPABASE_TABLE.stores ? 'key' : 'name' })
+      .then(({ error }) => {
+        if (error) console.error('[supabase] upsert failed:', table, error.message);
+      })
+      .catch((e) => console.error('[supabase] upsert error:', e.message));
+  } catch { /* ignore */ }
+}
+
+function supabaseStoreWrite(key, value) {
+  if (!supabaseReady || !supabaseConfigured) return;
+  supabaseStoreMirror.set(key, value);
+  supabaseWrite(SUPABASE_TABLE.stores, { key, payload: value, updated_at: new Date().toISOString() });
+}
+
+function supabaseSecurityWrite(name, value) {
+  if (!supabaseReady || !supabaseConfigured) return;
+  supabaseSecurityMirror.set(name, value);
+  supabaseWrite(SUPABASE_TABLE.security, { name, payload: value, updated_at: new Date().toISOString() });
+}
+
+async function initSupabaseBridge() {
+  if (!supabaseConfigured || !serviceClient) return;
+  const [storeRes, secRes] = await Promise.all([
+    serviceClient.from(SUPABASE_TABLE.stores).select('key,payload'),
+    serviceClient.from(SUPABASE_TABLE.security).select('name,payload'),
+  ]);
+  if (storeRes.error) console.error('[supabase] load stores failed:', storeRes.error.message);
+  else for (const r of storeRes.data || []) if (r && r.key != null) supabaseStoreMirror.set(r.key, r.payload);
+  if (secRes.error) console.error('[supabase] load security failed:', secRes.error.message);
+  else for (const r of secRes.data || []) if (r && r.name != null) supabaseSecurityMirror.set(r.name, r.payload);
+  supabaseReady = true;
+  console.log(`[supabase] mirror ready: ${supabaseStoreMirror.size} stores, ${supabaseSecurityMirror.size} security docs`);
 }
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -336,6 +394,8 @@ function backupStore(key, obj, reason = 'autosave') {
 }
 
 function loadStore(key) {
+  const mirrored = supabaseStoreMirror.get(key);
+  if (supabaseReady && mirrored) return mirrored;
   try {
     const raw = fs.readFileSync(storeFile(key), 'utf8');
     const obj = JSON.parse(raw);
@@ -350,6 +410,7 @@ function saveStore(key, obj) {
   backupStore(key, loadStore(key), 'before-save');
   fs.writeFileSync(storeFile(key), JSON.stringify(obj), 'utf8');
   backupStore(key, obj, 'after-save');
+  supabaseStoreWrite(key, obj);
   return obj;
 }
 
@@ -1195,6 +1256,7 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => {});
 });
 
+await initSupabaseBridge();
 server.listen(PORT, HOST, () => {
   console.log(`NexaGo Remote Relay running on ${HOST}:${PORT}`);
   console.log(`Share page: http://localhost:${PORT}/share`);
