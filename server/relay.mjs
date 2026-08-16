@@ -1162,7 +1162,14 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url.pathname === '/info') {
-    sendJson(res, 200, { base: publicBase(req), lanIps: lanIps(), publicUrl: PUBLIC_URL, port: PORT });
+    sendJson(res, 200, {
+      base: publicBase(req),
+      lanIps: lanIps(),
+      publicUrl: PUBLIC_URL,
+      port: PORT,
+      supabase: supabaseConfigured,
+      supabaseMirror: supabaseReady ? { stores: supabaseStoreMirror.size, security: supabaseSecurityMirror.size } : null,
+    });
     return;
   }
   res.writeHead(404, corsHeaders); res.end('not found');
