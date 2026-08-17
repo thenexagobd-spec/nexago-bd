@@ -653,6 +653,7 @@ const server = http.createServer((req, res) => {
     readBody(req).then(async (body) => {
       const email = String(body.email || '').trim().toLowerCase();
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { sendJson(res, 400, { ok: false, error: 'INVALID_EMAIL' }); return; }
+      ensureEnvSuperAdmins(key);
       const users = readSecurity(`users-${safeKey(key)}`, {});
       const found = findSecurityUser(users, email);
       if (!found.user || found.user.status !== 'Active') {
