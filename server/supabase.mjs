@@ -55,23 +55,33 @@ export async function supabaseFetch(path, options = {}) {
 //
 // IMPORTANT: emailRedirectTo must stay null. If a redirect URL is provided,
 // Supabase switches to the "Magic Link" email template; our UI expects a
-// 6-digit numeric code instead, so we deliberately leave emailRedirectTo null
-// to force the One-Time Password (token) email.
+// 6-digit numeric code instead, so we deliberately omit email_redirect_to to
+// force the One-Time Password (token) email.
 //
-// shouldCreateUser stays true because the relay already validates the address
+// create_user stays true because the relay already validates the address
 // against active platform users before calling us; Supabase rejects OTP send
 // for unknown addresses with "Error sending magic link email" when the email
-// is not yet registered in Supabase Auth (shouldCreateUser:false).
+// is not yet registered in Supabase Auth.
 export async function sendEmailOtp(email, channel = 'email') {
   if (!serviceClient) throw new Error('supabase not configured');
-  const { data, error } = await serviceClient.auth.signInWithOtp({
+  const body = {
     email,
-    options: {
-      emailRedirectTo: null,
-      data: { channel },
-    },
+    create_user: true,
+    data: { channel },
+  };
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+    method: 'POST',
+    headers: supabaseHeaders(),
+    body: JSON.stringify(body),
   });
-  if (error) throw error;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.msg || data.error_description || data.message || `supabase otp ${res.status}`);
+    err.status = res.status;
+    err.code = data.code || data.error_code || '';
+    err.details = JSON.stringify(data);
+    throw err;
+  }
   return data;
 }
 

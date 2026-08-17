@@ -667,8 +667,9 @@ const server = http.createServer((req, res) => {
         sendJson(res, 200, { ok: true });
       } catch (e) {
         const errCode = e && (e.code || e.error_code || e.status) ? ` [${e.code || e.error_code || e.status}]` : '';
-        appendAudit(key, { actor: email, action: 'otp-send-failed', ip: clientIp(req), reason: `${String(e && e.message || e)}${errCode}` });
-        sendJson(res, 500, { ok: false, error: `${String(e && e.message || e)}${errCode}` });
+        const details = e && e.details ? ` :: ${e.details}` : '';
+        appendAudit(key, { actor: email, action: 'otp-send-failed', ip: clientIp(req), reason: `${String(e && e.message || e)}${errCode}${details}` });
+        sendJson(res, 500, { ok: false, error: `${String(e && e.message || e)}${errCode}${details}` });
       }
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
   };
