@@ -666,8 +666,9 @@ const server = http.createServer((req, res) => {
         appendAudit(key, { actor: email, role: found.user.role, action: 'otp-send-success', ip: clientIp(req), reason: 'Gmail OTP requested' });
         sendJson(res, 200, { ok: true });
       } catch (e) {
-        appendAudit(key, { actor: email, action: 'otp-send-failed', ip: clientIp(req), reason: String(e && e.message || e) });
-        sendJson(res, 500, { ok: false, error: String(e && e.message || e) });
+        const errCode = e && (e.code || e.error_code || e.status) ? ` [${e.code || e.error_code || e.status}]` : '';
+        appendAudit(key, { actor: email, action: 'otp-send-failed', ip: clientIp(req), reason: `${String(e && e.message || e)}${errCode}` });
+        sendJson(res, 500, { ok: false, error: `${String(e && e.message || e)}${errCode}` });
       }
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
   };
