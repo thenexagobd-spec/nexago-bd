@@ -27,6 +27,11 @@ const SUPER_ADMIN_PASSWORD = cleanEnvSecret(process.env.NEXAGO_SUPER_ADMIN_PASSW
 const SUPER_ADMIN_PASSWORD_CHANGE_CODE = cleanEnvSecret(process.env.NEXAGO_SUPER_ADMIN_PASSWORD_CHANGE_CODE);
 const SUPER_ADMIN_LOGIN_SECRET_CODE = cleanEnvSecret(process.env.NEXAGO_SUPER_ADMIN_LOGIN_SECRET_CODE) || SUPER_ADMIN_PASSWORD_CHANGE_CODE;
 
+// One-time email OTPs from Supabase can only be verified once. After the code
+// is accepted we remember the address here so the second step (secret code)
+// can mint the session without re-verifying the already-consumed OTP.
+const otpVerifiedPending = new Map(); // key:email -> { expiresAt }
+
 import os from 'node:os';
 
 function lanIps() {
@@ -691,13 +696,21 @@ const server = http.createServer((req, res) => {
         sendJson(res, 401, { ok: false, error: 'INVALID_EMAIL' });
         return;
       }
-      try {
-        await verifyEmailOtp(email, code);
-      } catch {
-        appendAudit(key, { actor: email, action: 'otp-login-bad-code', ip: clientIp(req), reason: 'email OTP verification failed' });
-        sendSecurityAlert('otp-login-bad-code', { actor: email, ip: clientIp(req), device: req.headers['user-agent'] || '' });
-        sendJson(res, 401, { ok: false, error: 'INVALID_CODE' });
-        return;
+      const pendingKey = `${key}:${email}`;
+      const pending = otpVerifiedPending.get(pendingKey);
+      const pendingValid = pending && Date.now() < Number(pending.expiresAt || 0);
+      if (!pendingValid) {
+        // The email OTP has not been verified yet in this session (or it
+        // expired): verify it before accepting the secret code.
+        try {
+          await verifyEmailOtp(email, code);
+          otpVerifiedPending.set(pendingKey, { expiresAt: Date.now() + 1000 * 60 * 10 });
+        } catch {
+          appendAudit(key, { actor: email, action: 'otp-login-bad-code', ip: clientIp(req), reason: 'email OTP verification failed' });
+          sendSecurityAlert('otp-login-bad-code', { actor: email, ip: clientIp(req), device: req.headers['user-agent'] || '' });
+          sendJson(res, 401, { ok: false, error: 'INVALID_CODE' });
+          return;
+        }
       }
       if (user.role === 'super-admin') {
         if (!SUPER_ADMIN_LOGIN_SECRET_CODE) {

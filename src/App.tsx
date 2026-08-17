@@ -6030,7 +6030,12 @@ export default function App() {
       securityAudit('super-admin-login-success', { actor: email, reason: 'Gmail OTP verified super admin login' });
       showToast('Super Admin login successful.', 'success');
     }).catch((err) => {
-      setSuperAdminLoginError(superAdminLoginStep === 'secret' ? 'Invalid secret code.' : String(err?.message || 'Invalid verification code.'));
+      const msg = String(err?.message || '');
+      if (superAdminLoginStep === 'secret') {
+        setSuperAdminLoginError(msg.includes('INVALID_CODE') ? 'That code has already been used or expired. Resend a new code.' : msg.includes('INVALID_SECRET_CODE') ? 'Invalid secret code.' : msg || 'Login failed. Try again.');
+      } else {
+        setSuperAdminLoginError(msg.includes('INVALID_CODE') ? 'Invalid verification code.' : msg || 'Invalid verification code.');
+      }
       securityAudit('super-admin-login-failed', { actor: email || 'unknown', reason: 'Gmail OTP login rejected' });
     });
   };
