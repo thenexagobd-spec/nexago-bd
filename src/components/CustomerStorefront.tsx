@@ -3,7 +3,7 @@ import {
   ShoppingBag, Search, MapPin, Bell, Heart, CreditCard, Wallet, Ticket,
   HelpCircle, Settings, ChevronDown, ChevronLeft, ChevronRight, Filter, Star,
   Clock, Truck, Shield, Gift, Store, Plus, Minus, CheckCircle, CheckCircle2, X,
-  ShieldCheck, Home, Package, Map, Phone, Copy, Check, RefreshCw,
+  ShieldCheck, Home, Package, Map, Phone, Copy, Check, RefreshCw, LogOut,
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
   MessageCircle, Share2, LocateFixed, CalendarClock, AlertCircle, Link2,
@@ -988,14 +988,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   useEffect(() => setStoredData(LS_KEYS.wtxn, walletTransactions), [walletTransactions]);
   const [splitPinInput, setSplitPinInput] = useState('');
 
-  // Customer instant OTP login/signup: a Gmail OTP is required before the first
-  // order (one-time). After verification the customer is marked verified so
-  // repeat orders on this device skip the step.
-  const [custVerifyOpen, setCustVerifyOpen] = useState(false);
-  const [custOtpStep, setCustOtpStep] = useState<'idle' | 'sent' | 'verified'>('idle');
-  const [custOtpCode, setCustOtpCode] = useState('');
-  const [custOtpBusy, setCustOtpBusy] = useState(false);
-  const [custOtpError, setCustOtpError] = useState('');
+  // Customer instant OTP login/signup: the site opens on a Gmail OTP auth
+  // screen; once verified the customer is marked verified on this device.
   const [custVerified, setCustVerified] = useState<boolean>(() => { try { return localStorage.getItem('ss_cust_verified') === '1'; } catch { return false; } });
 
   // Customer directory (A-Z) — all customers + add to wallet
@@ -1629,7 +1623,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     if (!custVerified) {
-      setCustVerifyOpen(true);
+      showToast('Sign in with your Gmail first to place an order', 'info');
       return;
     }
     proceedToPlaceOrder();
@@ -1651,42 +1645,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     setPayModal('COD');
-  };
-
-  // Customer instant OTP verification (signup-verify endpoint: no session,
-  // no approval — one-time gate before the first order).
-  const sendCustOtp = () => {
-    const email = (customerProfile.email || '').trim().toLowerCase();
-    if (!email || !/^[\w.+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email)) {
-      setCustOtpError('Enter a valid email address in your profile first.');
-      return;
-    }
-    setCustOtpBusy(true);
-    setCustOtpError('');
-    securityApi('/otp-signup-send', { email }).then(() => {
-      setCustOtpStep('sent');
-      showToast('Verification code sent to your email');
-    }).catch((err) => {
-      setCustOtpError(String(err?.message || 'Could not send the code. Try again.'));
-    }).finally(() => setCustOtpBusy(false));
-  };
-
-  const verifyCustOtp = () => {
-    const email = (customerProfile.email || '').trim().toLowerCase();
-    if (!custOtpCode.trim()) { setCustOtpError('Enter the 6-digit code from your email.'); return; }
-    setCustOtpBusy(true);
-    setCustOtpError('');
-    securityApi('/otp-signup-verify', { email, code: custOtpCode }).then(() => {
-      setCustOtpStep('verified');
-      setCustVerified(true);
-      try { localStorage.setItem('ss_cust_verified', '1'); } catch { /* ignore */ }
-      setCustVerifyOpen(false);
-      setCustOtpCode('');
-      showToast('Email verified — you can now place your order');
-      setTimeout(proceedToPlaceOrder, 350);
-    }).catch((err) => {
-      setCustOtpError(String(err?.message || 'Invalid or expired code.'));
-    }).finally(() => setCustOtpBusy(false));
   };
 
   const confirmPayment = () => {
@@ -2266,6 +2224,19 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   return (
     <div className={`cs-glass min-h-screen font-sans text-gray-800 flex flex-col overflow-x-hidden ${dark ? 'cs-dark' : ''}`}>
+      {!custVerified && (
+        <CustomerAuthScreen
+          email={customerProfile.email}
+          name={customerProfile.name}
+          phone={customerProfile.phone}
+          onUpdateProfile={(patch) => setCustomerProfile((p) => ({ ...p, ...patch }))}
+          onVerified={() => {
+            setCustVerified(true);
+            try { localStorage.setItem('ss_cust_verified', '1'); } catch { /* ignore */ }
+          }}
+          showToast={showToast}
+        />
+      )}
       <style>{`
         html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-x: hidden; }
         .cs-glass { scrollbar-gutter: stable; }
@@ -2530,6 +2501,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                   <button onClick={() => { setActiveNav('Settings'); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-gray-300 font-semibold hover:bg-white/5 hover:text-white rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
                     <Settings className="w-4 h-4 text-gray-400" /><span>My Account Settings</span>
+                  </button>
+                  <button onClick={() => { setCustVerified(false); setIsProfileOpen(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast('Logged out — see you soon!', 'info'); }} className="w-full text-left px-3 py-2 text-red-400 font-semibold hover:bg-white/5 hover:text-red-300 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
+                    <LogOut className="w-4 h-4" /><span>Log Out</span>
                   </button>
                 </div>
               )}
@@ -4137,55 +4111,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         </div>
       )}
 
-      {/* ============ CUSTOMER OTP VERIFY MODAL ============ */}
-      {custVerifyOpen && (
-        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-              <div>
-                <h3 className="font-black text-gray-900 text-sm flex items-center space-x-1.5"><ShieldCheck className="w-4 h-4 text-emerald-600" /><span>Verify Your Account</span></h3>
-                <p className="text-[10px] text-gray-500 mt-0.5">One-time Gmail OTP before your first order — instant, no approval needed.</p>
-              </div>
-              <button onClick={() => setCustVerifyOpen(false)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
-            </div>
-
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Email address</label>
-                <input
-                  value={customerProfile.email}
-                  onChange={(e) => setCustomerProfile({ ...customerProfile, email: e.target.value })}
-                  placeholder="name@gmail.com"
-                  className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500"
-                />
-              </div>
-              {custOtpStep === 'verified' ? (
-                <p className="text-[11px] font-bold text-emerald-600 flex items-center space-x-1"><CheckCircle2 className="w-4 h-4" /><span>Email verified — placing your order…</span></p>
-              ) : (
-                <div className="space-y-2">
-                  {custOtpStep === 'sent' && (
-                    <div className="flex items-center space-x-2">
-                      <input
-                        value={custOtpCode}
-                        onChange={(e) => setCustOtpCode(e.target.value)}
-                        placeholder="6-digit code"
-                        className="flex-1 p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500"
-                      />
-                      <button onClick={verifyCustOtp} disabled={custOtpBusy} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl font-black text-[11px] uppercase cursor-pointer">Verify</button>
-                    </div>
-                  )}
-                  <button onClick={sendCustOtp} disabled={custOtpBusy} className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl font-black text-[11px] uppercase cursor-pointer">
-                    {custOtpStep === 'sent' ? 'Resend Code' : 'Send OTP'}
-                  </button>
-                  {custOtpError && <p className="text-[10px] font-bold text-red-500">{custOtpError}</p>}
-                </div>
-              )}
-            </div>
-            <p className="text-[9px] text-gray-400">A single account rule applies — the same email/phone can only be used for one account. Your order proceeds as soon as the code is confirmed.</p>
-          </div>
-        </div>
-      )}
-
       {/* ============ REFUND MODAL ============ */}
       {refundModal && (
         <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -5663,6 +5588,154 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       <footer className="bg-white border-t border-gray-200 py-4 px-6 text-center text-xs text-gray-500 hidden md:block">
         <p>© 2026 Smart Shop E-Commerce Platform by NexaGo BD. All rights reserved.</p>
       </footer>
+    </div>
+  );
+};
+
+/* ============ CUSTOMER AUTH SCREEN (premium glass) ============ */
+const CustomerAuthScreen: React.FC<{
+  email: string;
+  name: string;
+  phone: string;
+  onUpdateProfile: (patch: Partial<{ name: string; email: string; phone: string }>) => void;
+  onVerified: () => void;
+  showToast?: (msg: string, type?: string) => void;
+}> = ({ email, name, phone, onUpdateProfile, onVerified, showToast }) => {
+  const [emailField, setEmailField] = useState(email || '');
+  const [nameField, setNameField] = useState(name || '');
+  const [phoneField, setPhoneField] = useState(phone || '');
+  const [step, setStep] = useState<'form' | 'otp' | 'done'>('form');
+  const [otpCode, setOtpCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sentTo, setSentTo] = useState('');
+
+  const emailOk = () => /^[\w.+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(emailField.trim());
+
+  const sendOtp = () => {
+    if (!emailOk()) { setError('Enter a valid email address.'); return; }
+    setBusy(true);
+    setError('');
+    const target = emailField.trim().toLowerCase();
+    setSentTo(target);
+    securityApi('/otp-signup-send', { email: target })
+      .then(() => { setStep('otp'); })
+      .catch((err) => setError(String(err?.message || 'Could not send the code. Try again.')))
+      .finally(() => setBusy(false));
+  };
+
+  const verifyOtp = () => {
+    if (!otpCode.trim()) { setError('Enter the 6-digit code from your email.'); return; }
+    setBusy(true);
+    setError('');
+    securityApi('/otp-signup-verify', { email: sentTo, code: otpCode })
+      .then(() => {
+        onUpdateProfile({ email: sentTo });
+        if (nameField.trim()) onUpdateProfile({ name: nameField.trim() });
+        if (phoneField.trim()) onUpdateProfile({ phone: phoneField.trim() });
+        setStep('done');
+        showToast?.('Welcome to Smart Shop! Your order is now unlocked.', 'success');
+        setTimeout(onVerified, 600);
+      })
+      .catch((err) => setError(String(err?.message || 'Invalid or expired code.')))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto" style={{
+      background: 'radial-gradient(1200px 600px at 20% -10%, rgba(16,185,129,0.25), transparent 60%), radial-gradient(1000px 500px at 90% 10%, rgba(45,212,191,0.18), transparent 55%), radial-gradient(900px 600px at 50% 110%, rgba(59,130,246,0.18), transparent 60%), #050a14',
+    }}>
+      <style>{`
+        .cs-auth-card { background: rgba(255,255,255,0.06); backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 24px 80px rgba(2,44,34,0.5), inset 0 1px 0 rgba(255,255,255,0.18); }
+        .cs-auth-glow { box-shadow: 0 0 60px rgba(16,185,129,0.35), 0 0 0 1px rgba(16,185,129,0.25); }
+        .cs-auth-input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); transition: all 0.2s; }
+        .cs-auth-input:focus { border-color: rgba(52,211,153,0.7); box-shadow: 0 0 0 3px rgba(52,211,153,0.18); background: rgba(255,255,255,0.12); }
+      `}</style>
+
+      <div className="cs-auth-card cs-auth-glow relative w-full max-w-md rounded-3xl p-7 sm:p-9 text-white overflow-hidden">
+        <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
+
+        <div className="relative">
+          <div className="flex items-center space-x-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg">
+              <ShoppingBag className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-lg font-black tracking-tight leading-none">Smart Shop</p>
+              <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mt-1">by NexaGo BD</p>
+            </div>
+          </div>
+
+          <h1 className="mt-6 text-xl font-black leading-tight">Welcome to Smart Shop</h1>
+          <p className="mt-1.5 text-[12px] text-gray-300 leading-relaxed">
+            {step === 'done'
+              ? 'Account created instantly — no approval needed. Enjoy shopping!'
+              : 'Sign in or create your account with a Gmail OTP. It takes less than a minute and unlocks ordering.'}
+          </p>
+
+          {step === 'form' && (
+            <div className="mt-6 space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Full Name</label>
+                <input value={nameField} onChange={(e) => setNameField(e.target.value)} placeholder="e.g. Rahim Khan"
+                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Phone (optional)</label>
+                <input value={phoneField} onChange={(e) => setPhoneField(e.target.value)} placeholder="e.g. 01712345678"
+                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail Address</label>
+                <input value={emailField} onChange={(e) => { setEmailField(e.target.value); setError(''); }} placeholder="name@gmail.com"
+                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+              </div>
+              <button onClick={sendOtp} disabled={busy}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                {busy ? 'Sending…' : 'Send OTP to Gmail'}
+              </button>
+              {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
+            </div>
+          )}
+
+          {step === 'otp' && (
+            <div className="mt-6 space-y-3">
+              <div className="rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3 text-[11px] text-emerald-200">
+                A 6-digit code was sent to <b className="text-white">{sentTo}</b>. Enter it below to finish.
+              </div>
+              <input value={otpCode} onChange={(e) => { setOtpCode(e.target.value); setError(''); }} placeholder="6-digit code"
+                className="cs-auth-input w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:text-gray-500" />
+              <button onClick={verifyOtp} disabled={busy}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                {busy ? 'Verifying…' : 'Verify & Continue'}
+              </button>
+              <button onClick={sendOtp} disabled={busy}
+                className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
+                Resend Code
+              </button>
+              {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
+            </div>
+          )}
+
+          {step === 'done' && (
+            <div className="mt-6 space-y-3 text-center">
+              <div className="w-14 h-14 mx-auto rounded-full bg-emerald-400/15 border border-emerald-400/30 flex items-center justify-center">
+                <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+              </div>
+              <p className="text-sm font-bold text-emerald-300">You're in! Preparing your storefront…</p>
+            </div>
+          )}
+
+          <div className="mt-6 pt-5 border-t border-white/10 text-center space-y-2">
+            <p className="text-[10px] text-gray-400 flex items-center justify-center space-x-1.5">
+              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              <span>One account per Gmail · Secure OTP verification</span>
+            </p>
+            <p className="text-[9px] text-gray-500">By continuing you agree to our Terms & Privacy Policy.</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
