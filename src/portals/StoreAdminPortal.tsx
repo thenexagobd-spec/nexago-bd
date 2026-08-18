@@ -57,7 +57,12 @@ export default function StoreAdminPortal() {
   const [loginId, setLoginId] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [trackId, setTrackId] = useState('');
-  const [signup, setSignup] = useState({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
+  const [signup, setSignup] = useState({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '', password: '', confirmPassword: '' });
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpStep, setOtpStep] = useState<'idle' | 'sent' | 'verified'>('idle');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpError, setOtpError] = useState('');
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, any>>({});
   const [signupReview, setSignupReview] = useState(false);
   const [submittedAppId, setSubmittedAppId] = useState('');
@@ -154,6 +159,9 @@ export default function StoreAdminPortal() {
   const submitSignup = () => {
     const missing = storeDocMeta.find(d => d.required && !uploadedDocs[d.key]);
     if (!signup.ownerName || !signup.phone || !signup.email || !signup.storeName || !signup.storeAddress || !signup.tradeLicenseNo || !signup.tinBin) return;
+    if (otpStep !== 'verified') return;
+    if (!signup.password || signup.password.length < 8) return;
+    if (signup.password !== signup.confirmPassword) return;
     if (missing) return;
     if (!signupReview) { setSignupReview(true); return; }
     const docData = (key: string) => typeof uploadedDocs[key] === 'string' ? uploadedDocs[key] : uploadedDocs[key]?.dataUrl || '';
@@ -168,6 +176,9 @@ export default function StoreAdminPortal() {
       storeId,
       status: 'Pending Audit',
       submittedAt: new Date().toLocaleString('en-GB'),
+      emailVerified: true,
+      verifiedEmail: signup.email,
+      password: signup.password,
       ...signup,
       documents: storeDocMeta.map(d => ({
         key: d.key,
@@ -180,12 +191,17 @@ export default function StoreAdminPortal() {
         fingerprint: docData(d.key) ? fingerprintOf(docData(d.key)) : '',
       })),
     };
+    delete (app as any).confirmPassword;
     setStoreAdminApps(prev => [app, ...prev]);
-    securityAudit('store-admin-signup-submitted', { actor: adminId, storeId, reason: 'new store admin application' });
+    securityAudit('store-admin-signup-submitted', { actor: adminId, storeId, reason: 'new store admin application (email verified, password set by owner)' });
     setSubmittedAppId(adminId);
     setTrackId(adminId);
     setAuthView('track');
-    setSignup({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '' });
+    setSignup({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '', password: '', confirmPassword: '' });
+    setEmailVerified(false);
+    setOtpStep('idle');
+    setOtpCode('');
+    setOtpError('');
     setUploadedDocs({});
     setSignupReview(false);
   };
@@ -197,7 +213,8 @@ export default function StoreAdminPortal() {
     const branch = branches.find((b: any) => b.branchAdminId === id && b.branchPassword === loginPassword && b.status === 'Active');
     const loginStore = stores.find((s: any) => s.id === (app?.storeId || branch?.storeId));
     if (['Suspended', 'Blacklisted'].includes(loginStore?.status || '') || ['suspend', 'blacklist'].includes(loginStore?.adminRiskStatus || '')) return;
-    if ((!cred || !app || cred.password !== loginPassword) && !branch) return;
+    const ownerPassword = (app && app.password) || (cred && cred.password);
+    if ((!ownerPassword || ownerPassword !== loginPassword) && !branch) return;
     securityApi('/login', { userId: id, password: loginPassword }).then((data) => {
       if (data.token) localStorage.setItem('sd_security_session', data.token);
     }).catch(() => {});
@@ -211,6 +228,33 @@ export default function StoreAdminPortal() {
     setSessionAdminId('');
     setLoginPassword('');
     setAuthView('login');
+  };
+
+  const sendSignupOtp = () => {
+    const email = signup.email.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setOtpError('Enter a valid email address first.'); return; }
+    setOtpBusy(true);
+    setOtpError('');
+    securityApi('/otp-signup-send', { email }).then(() => {
+      setOtpStep('sent');
+      setOtpError('');
+    }).catch((err) => {
+      setOtpError(String(err?.message || 'Could not send the code. Try again.'));
+    }).finally(() => setOtpBusy(false));
+  };
+
+  const verifySignupOtp = () => {
+    const email = signup.email.trim().toLowerCase();
+    if (!otpCode.trim()) { setOtpError('Enter the 6-digit code from your email.'); return; }
+    setOtpBusy(true);
+    setOtpError('');
+    securityApi('/otp-signup-verify', { email, code: otpCode }).then(() => {
+      setOtpStep('verified');
+      setEmailVerified(true);
+      setOtpError('');
+    }).catch((err) => {
+      setOtpError(String(err?.message || 'That code is invalid or expired.'));
+    }).finally(() => setOtpBusy(false));
   };
 
   const updateStatus = (id: string, status: string) => {
@@ -420,12 +464,44 @@ export default function StoreAdminPortal() {
                 ].map(([key, label]) => (
                   <input key={key} value={(signup as any)[key]} onChange={e => setSignup(prev => ({ ...prev, [key]: e.target.value }))} placeholder={label} className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
                 ))}
+                <input value={signup.password} onChange={e => setSignup(prev => ({ ...prev, password: e.target.value }))} placeholder="Choose a login password (min 8 chars)" type="password" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+                <input value={signup.confirmPassword} onChange={e => setSignup(prev => ({ ...prev, confirmPassword: e.target.value }))} placeholder="Confirm password" type="password" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
                 <select value={signup.businessType} onChange={e => setSignup(prev => ({ ...prev, businessType: e.target.value }))} className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange">
                   <option>Grocery / Super Shop</option>
                   <option>Restaurant / Food</option>
                   <option>Pharmacy</option>
                   <option>Electronics / Retail</option>
                 </select>
+              </div>
+              <div className="mt-4 rounded-2xl border border-[#1e3050] bg-[#0a1322] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-2 text-[11px] font-black uppercase text-white"><ShieldCheck className="h-3.5 w-3.5 text-brand-orange" /> Verify Owner Gmail with OTP</p>
+                    <p className="mt-1 text-[9px] text-gray-500">We email a 6-digit code to the address above. Signup stays locked until this is verified.</p>
+                  </div>
+                  <span className={`rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase ${otpStep === 'verified' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : otpStep === 'sent' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-[#1e3050] bg-[#101d30] text-gray-400'}`}>
+                    {otpStep === 'verified' ? 'Verified' : otpStep === 'sent' ? 'Code Sent' : 'Not Verified'}
+                  </span>
+                </div>
+                {otpStep !== 'verified' && (
+                  <div className="mt-3 space-y-2.5">
+                    <button onClick={sendSignupOtp} disabled={otpBusy} className="w-full rounded-xl border border-[#1e3050] bg-[#101d30] px-4 py-2 text-[10px] font-black uppercase text-gray-200 hover:border-brand-orange disabled:opacity-60">
+                      {otpBusy ? 'Sending…' : otpStep === 'sent' ? 'Resend code' : 'Send verification code'}
+                    </button>
+                    {otpStep === 'sent' && (
+                      <div className="flex gap-2">
+                        <input value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" inputMode="numeric" className="min-w-0 flex-1 rounded-xl border border-[#1e3050] bg-[#101d30] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+                        <button onClick={verifySignupOtp} disabled={otpBusy} className="rounded-xl bg-brand-orange px-4 py-2 text-[10px] font-black uppercase text-white disabled:opacity-60">
+                          {otpBusy ? '…' : 'Verify'}
+                        </button>
+                      </div>
+                    )}
+                    {otpError && <p className="text-[10px] font-bold text-red-400">{otpError}</p>}
+                  </div>
+                )}
+                {otpStep === 'verified' && (
+                  <p className="mt-3 text-[10px] font-black text-emerald-400">Email verified — you can now submit the application with your chosen password.</p>
+                )}
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {storeDocMeta.map(d => (
@@ -441,7 +517,9 @@ export default function StoreAdminPortal() {
                 <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-50">
                   <p className="text-[10px] font-black uppercase text-amber-300">Confirm Before Submit</p>
                   <div className="mt-2 grid gap-1 sm:grid-cols-2">
-                    {Object.entries(signup).map(([k, v]) => <p key={k}><b>{k}:</b> {v || '-'}</p>)}
+                    {Object.entries(signup).filter(([k]) => k !== 'password' && k !== 'confirmPassword').map(([k, v]) => <p key={k}><b>{k}:</b> {v || '-'}</p>)}
+                    <p><b>password:</b> {signup.password ? '••••••••' : '-'}</p>
+                    <p><b>emailVerified:</b> {emailVerified ? 'Yes' : 'No'}</p>
                     {storeDocMeta.map(d => <p key={d.key}><b>{d.label}:</b> {uploadedDocs[d.key] ? 'Attached' : 'Not submitted'}</p>)}
                   </div>
                   <p className="mt-3 text-[11px] leading-relaxed">Notice: Submit only true owner, store and document information. False, edited, borrowed or reused documents can permanently reject or block the Store Admin account. After final submit, Super Admin will verify every document.</p>

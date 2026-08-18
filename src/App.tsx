@@ -2111,8 +2111,10 @@ export default function App() {
           setStoreAdminApps(nextApps);
           if (approve) {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-            let password = '';
-            for (let i = 0; i < 10; i++) password += chars[Math.floor(Math.random() * chars.length)];
+            let password = app.password && String(app.password).length >= 8 ? String(app.password) : '';
+            if (!password) {
+              for (let i = 0; i < 10; i++) password += chars[Math.floor(Math.random() * chars.length)];
+            }
             setStoreAdminCreds({ ...storeAdminCreds, [app.adminId]: { password, storeId: app.storeId } });
             securityApi('/register', {
               role: 'store-admin',
@@ -2121,7 +2123,7 @@ export default function App() {
               storeId: app.storeId,
               reason: 'Super Admin approved Store Admin documents',
             }).catch(() => {});
-            securityAudit('store-admin-approved', { actor: 'super-admin', storeId: app.storeId, newValue: { adminId: app.adminId }, reason: 'document verified and permanent password generated' });
+            securityAudit('store-admin-approved', { actor: 'super-admin', storeId: app.storeId, newValue: { adminId: app.adminId, passwordSource: app.password ? 'owner-set' : 'generated' }, reason: 'document verified and permanent password set' });
             const storeRecord = {
               id: app.storeId,
               name: app.storeName,

@@ -752,6 +752,48 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/security/otp-send') { otpSend(); return; }
   if (req.method === 'POST' && url.pathname === '/api/security/otp-login') { otpLogin(); return; }
 
+  // ---- Store Admin signup email verification ----
+  // These differ from otp-send/otp-login: they do NOT require the address to be
+  // an active platform user yet, because the store admin is verifying their
+  // Gmail before submitting their application. The verification result is only
+  // used to unlock the signup form in the browser (no session is minted).
+  if (req.method === 'POST' && url.pathname === '/api/security/otp-signup-send') {
+    if (!supabaseConfigured) { sendJson(res, 503, { ok: false, error: 'SUPABASE_NOT_CONFIGURED' }); return; }
+    if (!rateLimit(req, 'otp-signup-send', 6, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const email = String(body.email || '').trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { sendJson(res, 400, { ok: false, error: 'INVALID_EMAIL' }); return; }
+      try {
+        await sendEmailOtp(email, 'store-admin-signup');
+        appendAudit(key, { actor: email, action: 'otp-signup-send-success', ip: clientIp(req), reason: 'store admin signup OTP requested' });
+        sendJson(res, 200, { ok: true });
+      } catch (e) {
+        appendAudit(key, { actor: email, action: 'otp-signup-send-failed', ip: clientIp(req), reason: String(e && e.message || e) });
+        sendJson(res, 500, { ok: false, error: String(e && e.message || e) });
+      }
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/otp-signup-verify') {
+    if (!supabaseConfigured) { sendJson(res, 503, { ok: false, error: 'SUPABASE_NOT_CONFIGURED' }); return; }
+    if (!rateLimit(req, 'otp-signup-verify', 10, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const email = String(body.email || '').trim().toLowerCase();
+      const code = String(body.code || '').trim().replace(/\D/g, '');
+      if (!email || !code) { sendJson(res, 400, { ok: false, error: 'email and code required' }); return; }
+      try {
+        await verifyEmailOtp(email, code);
+        appendAudit(key, { actor: email, action: 'otp-signup-verify-success', ip: clientIp(req), reason: 'store admin signup email verified' });
+        sendJson(res, 200, { ok: true });
+      } catch {
+        appendAudit(key, { actor: email, action: 'otp-signup-verify-failed', ip: clientIp(req), reason: 'store admin signup OTP verification failed' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_CODE' });
+      }
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/security/register') {
     if (!rateLimit(req, 'security-register', 10, 60_000)) { sendSecurityAlert('register-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '' }); sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {
