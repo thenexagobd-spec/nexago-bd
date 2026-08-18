@@ -230,6 +230,7 @@ const SUPABASE_TABLE = {
   wallets: 'nexago_wallets',
   walletTxns: 'nexago_wallet_txns',
   auditLog: 'nexago_audit_log',
+  files: 'nexago_files',
 };
 
 function supabaseWrite(table, row) {
@@ -306,8 +307,7 @@ function appendAudit(key, entry) {
   audit.push(item);
   writeSecurity(`audit-${safeKey(key)}`, audit.slice(-5000));
   // Permanent append-only mirror: every audit row is inserted once into
-  // nexago_audit_log (never updated or deleted) so the full history survives in
-  // PostgreSQL even though the local JSON file rotates at 5000 entries.
+  // nexago_audit_log, so the full history survives in PostgreSQL.
   if (supabaseConfigured && serviceClient) {
     try {
       serviceClient.from(SUPABASE_TABLE.auditLog).insert({
@@ -329,7 +329,7 @@ function appendAudit(key, entry) {
         created_at: item.time,
       }).then(({ error }) => {
         if (error && !String(error.message).includes('duplicate')) console.error('[supabase] audit insert failed:', error.message);
-      }).catch((e) => { /* non-fatal */ });
+      }).catch(() => { /* non-fatal */ });
     } catch { /* ignore */ }
   }
   return item;
@@ -649,6 +649,15 @@ function saveStore(key, obj) {
   return obj;
 }
 
+async function loadStoreLatest(key) {
+  return loadStore(key);
+}
+
+async function saveStorePermanent(key, obj) {
+  saveStore(key, obj);
+  return obj;
+}
+
 // Merge a client push into the stored state. Banner counters coming from the
 // live storefront (impressions/clicks) survive subsequent admin pushes, and
 // customer-placed orders + notifications are merged (union by id) so they
@@ -885,13 +894,14 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/storefront') {
     const store = loadStore(key);
     const customerId = (url.searchParams.get('customerId') || '').trim();
-    sendJson(res, 200, { ok: true, key, updatedAt: store.updatedAt, ...storefrontView(store.state, customerId) });
+    sendJson(res, 200, { ok: true, key, updatedAt: store.updatedAt, cloud: supabaseConfigured ? 'supabase' : 'local', ...storefrontView(store.state, customerId) });
     return;
   }
 
   if (req.method === 'GET' && url.pathname === '/api/state') {
-    const store = loadStore(key);
-    sendJson(res, 200, { ok: true, key, version: store.version, updatedAt: store.updatedAt, state: store.state });
+    loadStoreLatest(key)
+      .then((store) => sendJson(res, 200, { ok: true, key, version: store.version, updatedAt: store.updatedAt, state: store.state, cloud: supabaseConfigured ? 'supabase' : 'local' }))
+      .catch((e) => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
     return;
   }
 
@@ -1311,6 +1321,7 @@ const server = http.createServer((req, res) => {
       superAdminLoginSecretConfigured: Boolean(SUPER_ADMIN_LOGIN_SECRET_CODE),
       superAdminPasswordChangeSecretConfigured: Boolean(SUPER_ADMIN_PASSWORD_CHANGE_CODE),
       encryptionConfigured: Boolean(DATA_ENCRYPTION_KEY),
+      supabaseConfigured,
       strictSecurity: STRICT_SECURITY,
       checkedAt: new Date().toISOString(),
     });
@@ -1533,7 +1544,7 @@ const server = http.createServer((req, res) => {
     if (storeId) audit = audit.filter((a) => a && String(a.storeId || '') === storeId);
     if (role) audit = audit.filter((a) => a && String(a.role || '').toLowerCase() === role);
     if (since) audit = audit.filter((a) => a && (a.time ? Date.parse(a.time) : 0) >= since);
-    sendJson(res, 200, { ok: true, key, count: audit.length, audit: audit.slice().reverse().slice(0, limit) });
+    sendJson(res, 200, { ok: true, key, count: audit.length, audit: audit.slice().reverse().slice(0, limit), cloud: supabaseConfigured ? 'supabase' : 'local' });
     return;
   }
 
@@ -1589,7 +1600,25 @@ const server = http.createServer((req, res) => {
       };
       const dir = path.join(FILES_DIR, safeKey(key));
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(encryptJson({ ...meta, dataUrl })), 'utf8');
+      const storedFile = { ...meta, dataUrl };
+      fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(encryptJson(storedFile)), 'utf8');
+      if (supabaseConfigured && serviceClient) {
+        serviceClient.from(SUPABASE_TABLE.files).upsert({
+          file_id: id,
+          platform_key: safeKey(key),
+          owner_id: meta.owner,
+          role: meta.role,
+          store_id: meta.storeId,
+          branch_id: meta.branchId,
+          name: meta.name,
+          mime_type: meta.type,
+          sha256: meta.sha256,
+          payload: encryptJson(storedFile),
+          created_at: meta.uploadedAt,
+        }, { onConflict: 'file_id' }).then(({ error }) => {
+          if (error) console.error('[supabase] file upsert failed:', error.message);
+        }).catch(() => {});
+      }
       appendAudit(key, { actor: meta.owner, role: meta.role, action: 'secure-file-uploaded', storeId: meta.storeId, branchId: meta.branchId, ip: clientIp(req), newValue: { id, name, type: meta.type, sha256: meta.sha256 } });
       sendJson(res, 200, { ok: true, file: meta, privateUrl: `/api/security/file/${id}?key=${encodeURIComponent(key)}` });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
@@ -1599,13 +1628,30 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname.startsWith('/api/security/file/')) {
     if (!requireSession(req, key) && !isTrustedAutomation(req)) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
     const id = url.pathname.split('/').pop().replace(/[^a-zA-Z0-9_-]/g, '');
-    const file = path.join(FILES_DIR, safeKey(key), `${id}.json`);
-    try {
-      const obj = decryptJson(JSON.parse(fs.readFileSync(file, 'utf8')));
-      sendJson(res, 200, { ok: true, file: { ...obj, dataUrl: undefined }, dataUrl: obj.dataUrl });
-    } catch {
+    (async () => {
+      const file = path.join(FILES_DIR, safeKey(key), `${id}.json`);
+      try {
+        const obj = decryptJson(JSON.parse(fs.readFileSync(file, 'utf8')));
+        sendJson(res, 200, { ok: true, file: { ...obj, dataUrl: undefined }, dataUrl: obj.dataUrl, cloud: 'local' });
+        return;
+      } catch { /* try supabase */ }
+      if (supabaseConfigured && serviceClient) {
+        try {
+          const { data, error } = await serviceClient.from(SUPABASE_TABLE.files)
+            .select('payload')
+            .eq('file_id', id)
+            .eq('platform_key', safeKey(key))
+            .maybeSingle();
+          if (error) throw error;
+          const obj = data && data.payload ? decryptJson(data.payload) : null;
+          if (obj) {
+            sendJson(res, 200, { ok: true, file: { ...obj, dataUrl: undefined }, dataUrl: obj.dataUrl, cloud: 'supabase' });
+            return;
+          }
+        } catch { /* not found */ }
+      }
       sendJson(res, 404, { ok: false, error: 'file not found' });
-    }
+    })();
     return;
   }
 
@@ -1628,13 +1674,13 @@ const server = http.createServer((req, res) => {
       sendJson(res, 401, { ok: false, error: 'STATE_WRITE_LOCKED' });
       return;
     }
-    readBody(req).then((body) => {
-      const store = loadStore(key);
+    readBody(req).then(async (body) => {
+      const store = await loadStoreLatest(key);
       const merged = mergeState(store, body || {});
-      saveStore(key, merged);
+      await saveStorePermanent(key, merged);
       if (safeKey(key) !== 'nexago-main') {
-        const central = loadStore('nexago-main');
-        saveStore('nexago-main', mergeState(central, body || {}));
+        const central = await loadStoreLatest('nexago-main');
+        await saveStorePermanent('nexago-main', mergeState(central, body || {}));
         notifyStateSubscribers('nexago-main', { sourceKey: safeKey(key), reason: 'state-push' });
       }
       notifyStateSubscribers(key, { reason: 'state-push' });
@@ -1645,7 +1691,7 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/recover') {
     if (!hasStateWriteAccess(req, key)) { sendJson(res, 401, { ok: false, error: 'RECOVER_LOCKED' }); return; }
-    readBody(req).then((body) => {
+    readBody(req).then(async (body) => {
       const dir = path.join(BACKUP_DIR, safeKey(key));
       if (!fs.existsSync(dir)) { sendJson(res, 404, { ok: false, error: 'No backups found' }); return; }
       const requested = body && body.backupId ? String(body.backupId).replace(/[^a-zA-Z0-9_-]/g, '') + '.json' : '';
@@ -1653,10 +1699,10 @@ const server = http.createServer((req, res) => {
       const file = requested && files.includes(requested) ? requested : files[files.length - 1];
       if (!file) { sendJson(res, 404, { ok: false, error: 'No backups found' }); return; }
       const recovered = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
-      const current = loadStore(key);
+      const current = await loadStoreLatest(key);
       backupStore(key, current, 'before-recover');
       const merged = mergeState(current, recovered.state || {});
-      saveStore(key, merged);
+      await saveStorePermanent(key, merged);
       notifyStateSubscribers(key, { reason: 'state-recover' });
       sendJson(res, 200, { ok: true, key, recoveredFrom: file, updatedAt: merged.updatedAt });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
@@ -1665,8 +1711,8 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/events') {
     if (!rateLimit(req, 'events', 120, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
-    readBody(req).then((body) => {
-      const store = loadStore(key);
+    readBody(req).then(async (body) => {
+      const store = await loadStoreLatest(key);
       const banners = Array.isArray(store.state && store.state.banners) ? store.state.banners : [];
       const ev = body || {};
       if ((ev.type === 'banner-impression' || ev.type === 'banner-click') && ev.bannerId) {
@@ -1674,7 +1720,7 @@ const server = http.createServer((req, res) => {
         if (idx >= 0) {
           if (ev.type === 'banner-impression') banners[idx].impressions = Number(banners[idx].impressions || 0) + 1;
           else banners[idx].clicks = Number(banners[idx].clicks || 0) + 1;
-          saveStore(key, store);
+          await saveStorePermanent(key, store);
           notifyStateSubscribers(key, { reason: ev.type });
           sendJson(res, 200, { ok: true, counted: ev.type });
           return;
@@ -1687,8 +1733,8 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/order') {
     if (!rateLimit(req, 'orders', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
-    readBody(req).then((body) => {
-      const store = loadStore(key);
+    readBody(req).then(async (body) => {
+      const store = await loadStoreLatest(key);
       const order = body && body.order;
       if (!order || !order.id) { sendJson(res, 400, { ok: false, error: 'order.id required' }); return; }
       const orders = Array.isArray(store.state.orders) ? store.state.orders : [];
@@ -1715,10 +1761,10 @@ const server = http.createServer((req, res) => {
       });
       store.state.notifications = notifs.slice(0, 100);
       store.updatedAt = new Date().toISOString();
-      saveStore(key, store);
+      await saveStorePermanent(key, store);
       if (safeKey(key) !== 'nexago-main') {
-        const central = loadStore('nexago-main');
-        saveStore('nexago-main', mergeState(central, { orders: [order], notifications: store.state.notifications }));
+        const central = await loadStoreLatest('nexago-main');
+        await saveStorePermanent('nexago-main', mergeState(central, { orders: [order], notifications: store.state.notifications }));
         notifyStateSubscribers('nexago-main', { sourceKey: safeKey(key), reason: 'order' });
       }
       notifyStateSubscribers(key, { reason: 'order' });

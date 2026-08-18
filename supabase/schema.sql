@@ -117,3 +117,27 @@ create policy "service role only" on nexago_customers for all using (auth.role()
 create policy "service role only" on nexago_wallets for all using (auth.role() = 'service_role');
 create policy "service role only" on nexago_wallet_txns for all using (auth.role() = 'service_role');
 create policy "service role only" on nexago_audit_log for all using (auth.role() = 'service_role');
+
+-- Permanent encrypted document/file storage. Staff KYC files, store admin
+-- documents, delivery proofs, receipts, PDF uploads and all other secure files
+-- are mirrored here in addition to local encrypted relay files.
+create table if not exists nexago_files (
+  id uuid primary key default gen_random_uuid(),
+  file_id text not null unique,
+  platform_key text not null default 'nexago-main',
+  owner_id text default '',
+  role text default '',
+  store_id text default '',
+  branch_id text default '',
+  name text default '',
+  mime_type text default '',
+  sha256 text default '',
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists nexago_files_platform_idx on nexago_files (platform_key, created_at desc);
+create index if not exists nexago_files_store_branch_idx on nexago_files (store_id, branch_id, created_at desc);
+
+alter table nexago_files enable row level security;
+create policy "service role only" on nexago_files for all using (auth.role() = 'service_role');
