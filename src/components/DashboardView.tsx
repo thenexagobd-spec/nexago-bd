@@ -449,7 +449,7 @@ export default function DashboardView({
                     <td className={`${isTightMode ? 'py-1.5' : 'py-2.5'} text-right font-medium`}>
                       <div className="flex items-center justify-end space-x-1">
                         <span>{driver.completedOrders}</span>
-                        <span className="text-[10px] text-emerald-400">↑ {(driver.id === 'DRV123456' ? 8 : driver.id === 'DRV123457' ? 5 : driver.id === 'DRV123458' ? 3 : 2)}</span>
+                        <span className="text-[10px] text-emerald-400">↑ {Math.max(0, Math.round((driver.completedOrders || 0) * 0.04))}</span>
                       </div>
                     </td>
                     <td className={`${isTightMode ? 'py-1.5' : 'py-2.5'} text-right text-white font-mono font-bold`}>

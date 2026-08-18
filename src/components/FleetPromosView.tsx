@@ -317,7 +317,7 @@ export default function FleetPromosView({
                   required
                   value={vDriver}
                   onChange={(e) => setVDriver(e.target.value)}
-                  placeholder="e.g. Rahim Khan"
+                  placeholder="Enter full name"
                   className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
                 />
               </div>

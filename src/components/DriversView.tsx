@@ -503,7 +503,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                 </div>
               </div>
 
-              {/* Assigned Vehicle — only real assigned data, no demo fallbacks */}
+              {/* Assigned Vehicle — only real assigned data, no synthetic fallbacks */}
               {(()=>{const veh=vehicles.find(v=>v.driverName===driver.name);if(!veh)return null;return(<div className="bg-brand-dark/30 border border-brand-border/40 rounded-lg px-3 py-2 space-y-1">
                 <div className="flex items-center justify-between"><span className="text-[8px] text-gray-500 uppercase font-black flex items-center gap-1"><Truck className="w-2.5 h-2.5"/>Assigned Vehicle</span><span className={`px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase ${veh.status==='Active'?'bg-emerald-500/10 text-emerald-400':veh.status==='Maintenance'?'bg-amber-500/10 text-amber-400':'bg-gray-500/10 text-gray-400'}`}>{veh.status}</span></div>
                 <p className="text-[10px] font-mono font-black text-white truncate">{veh.regNo}</p>

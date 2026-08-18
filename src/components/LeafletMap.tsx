@@ -23,38 +23,9 @@ export const MAJOR_ROADS: { name: string; path: [number, number][]; color: strin
   { name: 'Mughdapara Road', path: [[23.7463, 90.3933], [23.7372, 90.4145]], color: '#f0f0f0' },
 ];
 
-export const CUSTOMERS: { name: string; lat: number; lng: number }[] = [
-  { name: 'Rahim & Sons', lat: 23.7806, lng: 90.4009 },
-  { name: 'Ayesha Apparel', lat: 23.7936, lng: 90.4045 },
-  { name: 'Karim Traders', lat: 23.7998, lng: 90.3665 },
-  { name: 'Sunny Sweets', lat: 23.7864, lng: 90.4097 },
-  { name: 'Rina Fashion', lat: 23.8168, lng: 90.4234 },
-  { name: 'Mohammed Biriyani', lat: 23.7539, lng: 90.3836 },
-  { name: 'Shakib Electronics', lat: 23.7463, lng: 90.3933 },
-  { name: 'Nusrat Beauty', lat: 23.8286, lng: 90.4183 },
-  { name: 'Habib Pharmacy', lat: 23.8096, lng: 90.4144 },
-  { name: 'Tania Gifts', lat: 23.7769, lng: 90.3786 },
-  { name: 'Asif Stationery', lat: 23.7917, lng: 90.4192 },
-  { name: 'Jahanara Foods', lat: 23.8149, lng: 90.3766 },
-  { name: 'Monir Mobile', lat: 23.7995, lng: 90.4349 },
-  { name: 'Sadia Shoes', lat: 23.7506, lng: 90.4112 },
-  { name: 'Kamal Hardware', lat: 23.8231, lng: 90.4082 },
-];
+export const CUSTOMERS: { name: string; lat: number; lng: number }[] = [];
 
-export const RESTAURANTS: { name: string; lat: number; lng: number }[] = [
-  { name: 'Dhaka Diner', lat: 23.7936, lng: 90.4045 },
-  { name: 'Gulshan Grill', lat: 23.8133, lng: 90.4301 },
-  { name: 'Mirpur Biriyani House', lat: 23.7998, lng: 90.3665 },
-  { name: 'Baily Road Bistro', lat: 23.7749, lng: 90.4304 },
-  { name: 'Banani Burger', lat: 23.8168, lng: 90.4234 },
-  { name: 'Dhanmondi Darbar', lat: 23.7539, lng: 90.3836 },
-  { name: 'Farmgate Pizza', lat: 23.7864, lng: 90.4097 },
-  { name: 'Motijheel Kebab', lat: 23.7822, lng: 90.4145 },
-  { name: 'Tejgaon Thai', lat: 23.7995, lng: 90.4349 },
-  { name: 'Kuril Kottu', lat: 23.8252, lng: 90.4159 },
-  { name: 'Shahbagh Shawarma', lat: 23.7806, lng: 90.4009 },
-  { name: 'Badda BBQ', lat: 23.8286, lng: 90.4183 },
-];
+export const RESTAURANTS: { name: string; lat: number; lng: number }[] = [];
 
 const BASES: { name: string; lat: number; lng: number }[] = [
   { name: 'Motijheel Hub', lat: 23.7822, lng: 90.4145 },

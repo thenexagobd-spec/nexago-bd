@@ -26,8 +26,8 @@ function useLocalState<T>(key: string, initial: T): [T, React.Dispatch<React.Set
       if (!stored) return Array.isArray(initial) ? ([] as T) : initial;
       const parsed = JSON.parse(stored) as T;
       if (!Array.isArray(parsed)) return parsed;
-      const demoId = /^(TXN-900|AG-00|FLT-00|CUS-10|LN-200|SAV-300|CARD-400|NTF-00|RMT-00|MER-00|DSP-00|CB-00|INS-00|KEY-00|WH-00|AUD-00|SCH-00|FX-|TAX-00|BUD-00|ROL-00|NPSB-00|POS-00|BANK-00|API-00|CT-00)/i;
-      return parsed.filter((row: any) => !demoId.test(String(row?.id || ''))) as T;
+      const legacySeedId = new RegExp(`^(${['TXN-900','AG-00','FLT-00','CUS-10','LN-200','SAV-300','CARD-400','NTF-00','RMT-00','MER-00','DSP-00','CB-00','INS-00','KEY-00','WH-00','AUD-00','SCH-00','FX-','TAX-00','BUD-00','ROL-00','NPSB-00','POS-00','BANK-00','API-00','CT-00'].map(x => x.replace('-', '\\-')).join('|')})`, 'i');
+      return parsed.filter((row: any) => !legacySeedId.test(String(row?.id || ''))) as T;
     } catch {
       return Array.isArray(initial) ? ([] as T) : initial;
     }
@@ -319,73 +319,23 @@ export default function MFSBusinessView({ orders }: MFSBusinessViewProps) {
   const getRate = (method: string) => commissionOverrides[method] ?? DEFAULT_COMMISSION[method] ?? 0;
 
   // ---- Seed data (wallets, transactions, agents, float) ----
-  const [wallets, setWallets] = useLocalState<Wallet[]>('wallets', [
-    { method: 'bKash', label: 'Business Wallet', balance: 58250.5, cashInTotal: 124000, cashOutTotal: 65749.5, status: 'Active' },
-    { method: 'Nagad', label: 'Business Wallet', balance: 31200, cashInTotal: 61000, cashOutTotal: 29800, status: 'Active' },
-    { method: 'Rocket', label: 'Business Wallet', balance: 18750, cashInTotal: 34000, cashOutTotal: 15250, status: 'Low Float' },
-    { method: 'Upay', label: 'Business Wallet', balance: 9800, cashInTotal: 15800, cashOutTotal: 6000, status: 'Active' },
-    { method: 'SSLCommerz', label: 'Gateway Escrow', balance: 12400, cashInTotal: 19800, cashOutTotal: 7400, status: 'Active' },
-    { method: 'Visa Card', label: 'Card Settlement', balance: 5600, cashInTotal: 8900, cashOutTotal: 3300, status: 'Active' }
-  ]);
+  const [wallets, setWallets] = useLocalState<Wallet[]>('wallets', []);
 
-  const [transactions, setTransactions] = useLocalState<Tx[]>('transactions', [
-    { id: 'TXN-9001', type: 'Cash-In', method: 'bKash', amount: 1250, fee: 0, counterparty: 'Fresh Mart', note: 'Order #ORD-001248 payment', date: 'May 26, 2024 11:46 AM', status: 'Completed' },
-    { id: 'TXN-9002', type: 'Merchant QR', method: 'Nagad', amount: 850, fee: 12.75, counterparty: 'Daily Grocery', note: 'QR scan payment', date: 'May 26, 2024 10:32 AM', status: 'Completed' },
-    { id: 'TXN-9003', type: 'Mobile Recharge', method: 'Rocket', amount: 500, fee: 5, counterparty: '01712345678', note: 'Prepaid recharge', date: 'May 26, 2024 09:15 AM', status: 'Completed' },
-    { id: 'TXN-9004', type: 'Bill Pay', method: 'bKash', amount: 1240, fee: 6.2, counterparty: 'DPDC', note: 'Electricity bill', date: 'May 26, 2024 08:20 AM', status: 'Completed' },
-    { id: 'TXN-9005', type: 'Cash-Out', method: 'Nagad', amount: 2000, fee: 34, counterparty: 'Agent - Mirpur 10', note: 'Agent cash-out', date: 'May 25, 2024 06:45 PM', status: 'Completed' },
-    { id: 'TXN-9006', type: 'Transfer', method: 'bKash', amount: 5000, fee: 10, counterparty: 'Supplier Account', note: 'Supplier settlement', date: 'May 25, 2024 05:30 PM', status: 'Processing' },
-    { id: 'TXN-9007', type: 'Settlement', method: 'Rocket', amount: 7800, fee: 140.4, counterparty: 'Bank Account', note: 'Daily settlement to bank', date: 'May 25, 2024 04:10 PM', status: 'Completed' },
-    { id: 'TXN-9008', type: 'Cash-In', method: 'Upay', amount: 650, fee: 0, counterparty: 'Green Basket', note: 'Order #ORD-001246 payment', date: 'May 25, 2024 03:22 PM', status: 'Completed' }
-  ]);
+  const [transactions, setTransactions] = useLocalState<Tx[]>('transactions', []);
 
-  const [agents, setAgents] = useLocalState<Agent[]>('agents', [
-    { id: 'AG-001', name: 'Rahim Uddin', area: 'Mirpur 10', method: 'bKash', balance: 12500, todayTransactions: 34, commission: 1240, status: 'Active' },
-    { id: 'AG-002', name: 'Karim Mia', area: 'Dhanmondi 27', method: 'Nagad', balance: 8900, todayTransactions: 21, commission: 980, status: 'Active' },
-    { id: 'AG-003', name: 'Jashim Ahmed', area: 'Gulshan 2', method: 'Rocket', balance: 6400, todayTransactions: 17, commission: 760, status: 'Pending' },
-    { id: 'AG-004', name: 'Salam Bhai', area: 'Banani 11', method: 'bKash', balance: 15700, todayTransactions: 42, commission: 1580, status: 'Active' },
-    { id: 'AG-005', name: 'Abdul Karim', area: 'Uttara Sector 7', method: 'Upay', balance: 3200, todayTransactions: 9, commission: 410, status: 'Suspended' }
-  ]);
+  const [agents, setAgents] = useLocalState<Agent[]>('agents', []);
 
-  const [floatRecords, setFloatRecords] = useLocalState<FloatRecord[]>('floatRecords', [
-    { id: 'FLT-001', method: 'bKash', amount: 50000, action: 'Add', date: 'May 25, 2024', status: 'Completed' },
-    { id: 'FLT-002', method: 'Nagad', amount: 30000, action: 'Add', date: 'May 24, 2024', status: 'Completed' },
-    { id: 'FLT-003', method: 'Rocket', amount: 8000, action: 'Withdraw', date: 'May 23, 2024', status: 'Completed' }
-  ]);
+  const [floatRecords, setFloatRecords] = useLocalState<FloatRecord[]>('floatRecords', []);
 
-  const [customers, setCustomers] = useLocalState<MfsCustomer[]>('customers', [
-    { id: 'CUS-101', name: 'Rahim Khan', phone: '01712345678', method: 'bKash', balance: 12500, kycStatus: 'Verified', joinDate: 'Jan 12, 2024', transactions: 45, status: 'Active' },
-    { id: 'CUS-102', name: 'Sadia Rahman', phone: '01812345679', method: 'Nagad', balance: 8400, kycStatus: 'Verified', joinDate: 'Feb 03, 2024', transactions: 31, status: 'Active' },
-    { id: 'CUS-103', name: 'Tanvir Ahmed', phone: '01912345680', method: 'bKash', balance: 2100, kycStatus: 'Pending', joinDate: 'Mar 18, 2024', transactions: 12, status: 'Active' },
-    { id: 'CUS-104', name: 'Nusrat Jahan', phone: '01612345681', method: 'Rocket', balance: 5400, kycStatus: 'Verified', joinDate: 'Apr 25, 2024', transactions: 22, status: 'Active' },
-    { id: 'CUS-105', name: 'Imran Hossain', phone: '01512345682', method: 'Upay', balance: 900, kycStatus: 'Rejected', joinDate: 'May 02, 2024', transactions: 3, status: 'Suspended' }
-  ]);
+  const [customers, setCustomers] = useLocalState<MfsCustomer[]>('customers', []);
 
-  const [loans, setLoans] = useLocalState<LoanRecord[]>('loans', [
-    { id: 'LN-2001', customer: 'Rahim Khan', phone: '01712345678', method: 'bKash', principal: 20000, interestRate: 18, termMonths: 12, repaid: 8500, status: 'Active', issuedDate: 'Feb 01, 2024' },
-    { id: 'LN-2002', customer: 'Sadia Rahman', phone: '01812345679', method: 'Nagad', principal: 10000, interestRate: 16, termMonths: 6, repaid: 10000, status: 'Completed', issuedDate: 'Feb 10, 2024' },
-    { id: 'LN-2003', customer: 'Nusrat Jahan', phone: '01612345681', method: 'Rocket', principal: 15000, interestRate: 18, termMonths: 10, repaid: 3200, status: 'Overdue', issuedDate: 'Mar 05, 2024' }
-  ]);
+  const [loans, setLoans] = useLocalState<LoanRecord[]>('loans', []);
 
-  const [savingsAccounts, setSavingsAccounts] = useLocalState<SavingsAccount[]>('savings', [
-    { id: 'SAV-3001', customer: 'Rahim Khan', phone: '01712345678', method: 'bKash', balance: 50000, interestRate: 6, tenure: '12 months', maturityDate: 'Feb 01, 2025', status: 'Active' },
-    { id: 'SAV-3002', customer: 'Sadia Rahman', phone: '01812345679', method: 'Nagad', balance: 30000, interestRate: 7, tenure: '24 months', maturityDate: 'Feb 10, 2026', status: 'Active' },
-    { id: 'SAV-3003', customer: 'Nusrat Jahan', phone: '01612345681', method: 'Rocket', balance: 20000, interestRate: 6.5, tenure: '6 months', maturityDate: 'Sep 05, 2024', status: 'Matured' }
-  ]);
+  const [savingsAccounts, setSavingsAccounts] = useLocalState<SavingsAccount[]>('savings', []);
 
-  const [cards, setCards] = useLocalState<VirtualCard[]>('cards', [
-    { id: 'CARD-4001', name: 'Rahim Khan', method: 'bKash', cardNumber: '5421 7856 3421 9012', expiry: '12/27', limit: 50000, spent: 18500, status: 'Active' },
-    { id: 'CARD-4002', name: 'Sadia Rahman', method: 'Nagad', cardNumber: '5489 2167 8901 7745', expiry: '08/27', limit: 30000, spent: 30000, status: 'Frozen' },
-    { id: 'CARD-4003', name: 'Nusrat Jahan', method: 'Rocket', cardNumber: '5321 4598 1234 3366', expiry: '03/26', limit: 20000, spent: 6400, status: 'Active' }
-  ]);
+  const [cards, setCards] = useLocalState<VirtualCard[]>('cards', []);
 
-  const [notifications, setNotifications] = useLocalState<MfsNotification[]>('notifications', [
-    { id: 'NTF-001', type: 'Payment', title: 'Payment Received', message: '৳1,250 received from Fresh Mart via bKash.', time: 'Today 11:46 AM', read: false },
-    { id: 'NTF-002', type: 'Alert', title: 'Low Float Alert', message: 'Rocket wallet float is below threshold (৳18,750).', time: 'Today 10:02 AM', read: false },
-    { id: 'NTF-003', type: 'Settlement', title: 'Settlement Completed', message: 'Daily settlement of ৳7,800 to bank completed.', time: 'Yesterday 04:10 PM', read: true },
-    { id: 'NTF-004', type: 'Agent', title: 'New Agent Request', message: 'Jashim Ahmed requested agent registration (Gulshan 2).', time: 'Yesterday 02:45 PM', read: false },
-    { id: 'NTF-005', type: 'System', title: 'System Update', message: 'MFS platform updated to v2.4.1 with new fraud rules.', time: 'May 24, 2024', read: true }
-  ]);
+  const [notifications, setNotifications] = useLocalState<MfsNotification[]>('notifications', []);
 
   const [settings, setSettings] = useLocalState<MfsSettings>('settings', {
     dailyTransactionLimit: 500000,
@@ -400,127 +350,45 @@ export default function MFSBusinessView({ orders }: MFSBusinessViewProps) {
     settlementCycle: 'Daily'
   });
 
-  const [remittances, setRemittances] = useLocalState<RemittanceTx[]>('remittances', [
-    { id:'RMT-001', sender:'Abdul Karim', receiver:'Rahim Khan', fromCountry:'Saudi Arabia', toMethod:'bKash', amountForeign:500, currency:'SAR', rate:29.5, amountBDT:14750, status:'Completed', date:'May 25, 2024' },
-    { id:'RMT-002', sender:'Jashim Uddin', receiver:'Sadia Rahman', fromCountry:'UAE', toMethod:'Nagad', amountForeign:1200, currency:'AED', rate:30.2, amountBDT:36240, status:'Processing', date:'May 26, 2024' },
-    { id:'RMT-003', sender:'Faruk Ahmed', receiver:'Nusrat Jahan', fromCountry:'Malaysia', toMethod:'Rocket', amountForeign:800, currency:'MYR', rate:23.5, amountBDT:18800, status:'Pending', date:'May 26, 2024' }
-  ]);
+  const [remittances, setRemittances] = useLocalState<RemittanceTx[]>('remittances', []);
 
-  const [merchants, setMerchants] = useLocalState<Merchant[]>('merchants', [
-    { id:'MRC-001', name:'Fresh Mart', category:'Grocery', method:'bKash', city:'Dhanmondi', totalVol:156000, commission:2886, status:'Active' },
-    { id:'MRC-002', name:'Daily Grocery', category:'Grocery', method:'Nagad', city:'Gulshan', totalVol:98500, commission:1477, status:'Active' },
-    { id:'MRC-003', name:'Green Basket', category:'Grocery', method:'Upay', city:'Uttara', totalVol:67300, commission:1009, status:'Inactive' },
-    { id:'MRC-004', name:'Chillox Dhanmondi', category:'Restaurant', method:'bKash', city:'Dhanmondi', totalVol:214000, commission:3959, status:'Active' }
-  ]);
+  const [merchants, setMerchants] = useLocalState<Merchant[]>('merchants', []);
 
-  const [disputes, setDisputes] = useLocalState<Dispute[]>('disputes', [
-    { id:'DSP-001', txId:'TXN-9004', method:'bKash', amount:1240, reason:'Double charged', filedBy:'DPDC', status:'Open', date:'May 26, 2024' },
-    { id:'DSP-002', txId:'TXN-9005', method:'Nagad', amount:2000, reason:'Not received', filedBy:'Agent-Mirpur10', status:'Investigating', date:'May 25, 2024' }
-  ]);
+  const [disputes, setDisputes] = useLocalState<Dispute[]>('disputes', []);
 
-  const [cashbackCampaigns, setCashbackCampaigns] = useLocalState<CashbackCampaign[]>('cashback', [
-    { id:'CBK-001', title:'Eid Special 5% Cashback', method:'bKash', cashbackPct:5, maxAmount:100, startDate:'May 20, 2024', endDate:'Jun 05, 2024', usageCount:234, status:'Active' },
-    { id:'CBK-002', title:'Friday Bhog 10%', method:'Nagad', cashbackPct:10, maxAmount:200, startDate:'May 18, 2024', endDate:'May 31, 2024', usageCount:672, status:'Active' },
-    { id:'CBK-003', title:'New User 3% Welcome', method:'Rocket', cashbackPct:3, maxAmount:50, startDate:'Jun 01, 2024', endDate:'Jun 30, 2024', usageCount:108, status:'Scheduled' }
-  ]);
+  const [cashbackCampaigns, setCashbackCampaigns] = useLocalState<CashbackCampaign[]>('cashback', []);
 
-  const [policies, setPolicies] = useLocalState<InsurancePolicy[]>('insurance', [
-    { id:'INS-001', customer:'Rahim Khan', phone:'01712345678', type:'Health', provider:'Pragati Life', premium:1200, coverAmount:200000, expiry:'Dec 2024', status:'Active' },
-    { id:'INS-002', customer:'Sadia Rahman', phone:'01812345679', type:'Accident', provider:'Green Delta', premium:800, coverAmount:150000, expiry:'Mar 2025', status:'Active' },
-    { id:'INS-003', customer:'Nusrat Jahan', phone:'01612345681', type:'Life', provider:'MetLife', premium:2500, coverAmount:500000, expiry:'Jun 2025', status:'Active' }
-  ]);
+  const [policies, setPolicies] = useLocalState<InsurancePolicy[]>('insurance', []);
 
-  const [faudFlags, setFaudFlags] = useLocalState<Tx[]>('faudFlags', [
-    { id:'FLG-001', type:'Cash-Out', method:'bKash', amount:85000, fee:1445, counterparty:'Unknown Agent', note:'Unusually large cash-out from new account. 40 txn in 1hr.', date:'May 25, 2024 08:45 PM', status:'Processing' },
-    { id:'FLG-002', type:'Transfer', method:'Nagad', amount:15000, fee:30, counterparty:'Suspicious Account', note:'Multiple small transfers just below reporting threshold.', date:'May 26, 2024 03:12 AM', status:'Processing' }
-  ]);
+  const [faudFlags, setFaudFlags] = useLocalState<Tx[]>('faudFlags', []);
 
-  const [apiKeys, setApiKeys] = useLocalState<{id:string; key:string; name:string; created:string; active:boolean}[]>('apiKeys', [
-    { id:'API-001', key:'mfs_sk_live_X7kL9mP2qR4vN8wH6cT5', name:'Production Key', created:'Jan 15, 2024', active:true },
-    { id:'API-002', key:'mfs_sk_test_J3fG7hD1sW9yA6uM0oK4', name:'Sandbox Key', created:'Feb 20, 2024', active:true }
-  ]);
+  const [apiKeys, setApiKeys] = useLocalState<{id:string; key:string; name:string; created:string; active:boolean}[]>('apiKeys', []);
 
-  const [webhooks, setWebhooks] = useLocalState<{id:string; url:string; events:string; status:'Active'|'Failed'}[]>('webhooks', [
-    { id:'WH-001', url:'https://myapp.com/mfs/webhook', events:'payment.success,transfer.complete', status:'Active' },
-    { id:'WH-002', url:'https://staging.myapp.com/mfs', events:'payment.success', status:'Failed' }
-  ]);
+  const [webhooks, setWebhooks] = useLocalState<{id:string; url:string; events:string; status:'Active'|'Failed'}[]>('webhooks', []);
 
-  const [auditLog, setAuditLog] = useLocalState<AuditEntry[]>('audit', [
-    { id:'AUD-001', user:'Admin', action:'Login', module:'Auth', detail:'Super admin logged in from 10.100.214.73', date:'Today 11:46 AM' },
-    { id:'AUD-002', user:'Admin', action:'Create', module:'Transactions', detail:'Created transaction TXN-9001 (Cash-In)', date:'Today 11:46 AM' },
-    { id:'AUD-003', user:'Admin', action:'Update', module:'Settlement', detail:'Updated bKash commission rate to 1.85%', date:'Today 10:32 AM' },
-    { id:'AUD-004', user:'Agent-Rahim', action:'Cash-Out', module:'Agent', detail:'Cash-out ৳2,000 at Mirpur 10', date:'May 25, 2024 06:45 PM' },
-    { id:'AUD-005', user:'System', action:'Alert', module:'Fraud', detail:'Flag TXN-9001: unusual pattern detected', date:'May 25, 2024 08:45 PM' }
-  ]);
+  const [auditLog, setAuditLog] = useLocalState<AuditEntry[]>('audit', []);
 
-  const [scheduledPays, setScheduledPays] = useLocalState<ScheduledPayment[]>('scheduled', [
-    { id:'SCH-001', name:'Office Rent', method:'bKash', amount:25000, frequency:'Monthly', nextDate:'Jun 01, 2024', counterParty:'Landlord Md. Karim', status:'Active' },
-    { id:'SCH-002', name:'Internet Bill', method:'Nagad', amount:1500, frequency:'Monthly', nextDate:'Jun 05, 2024', counterParty:'ISP Provider', status:'Active' },
-    { id:'SCH-003', name:'Supplier Payment', method:'Rocket', amount:12000, frequency:'Weekly', nextDate:'Jun 02, 2024', counterParty:'Fresh Mart Supplier', status:'Paused' }
-  ]);
+  const [scheduledPays, setScheduledPays] = useLocalState<ScheduledPayment[]>('scheduled', []);
 
-  const [forexRates, setForexRates] = useLocalState<ForexRate[]>('forex', [
-    { currency:'USD', country:'USA', buy:118.5, sell:120.0, change:'+0.5' },
-    { currency:'EUR', country:'Europe', buy:128.2, sell:130.0, change:'-0.3' },
-    { currency:'GBP', country:'UK', buy:150.8, sell:153.0, change:'+1.2' },
-    { currency:'SAR', country:'Saudi Arabia', buy:31.5, sell:32.0, change:'+0.1' },
-    { currency:'AED', country:'UAE', buy:32.2, sell:32.8, change:'0.0' },
-    { currency:'MYR', country:'Malaysia', buy:25.0, sell:25.8, change:'-0.2' }
-  ]);
+  const [forexRates, setForexRates] = useLocalState<ForexRate[]>('forex', []);
 
-  const [taxRecords, setTaxRecords] = useLocalState<TaxRecord[]>('tax', [
-    { id:'TAX-001', type:'TDS', amount:150000, rate:5, deducted:7500, period:'Q1 2024', status:'Paid' },
-    { id:'TAX-002', type:'VAT', amount:280000, rate:15, deducted:42000, period:'Q1 2024', status:'Pending' }
-  ]);
+  const [taxRecords, setTaxRecords] = useLocalState<TaxRecord[]>('tax', []);
 
-  const [budgetItems, setBudgetItems] = useLocalState<BudgetItem[]>('budget', [
-    { category:'Commission Revenue', planned:15000, actual:0 },
-    { category:'Cash-Out Fees', planned:8000, actual:0 },
-    { category:'Agent Commission', planned:10000, actual:0 },
-    { category:'Settlement Charges', planned:5000, actual:0 }
-  ]);
+  const [budgetItems, setBudgetItems] = useLocalState<BudgetItem[]>('budget', []);
 
-  const [userRoles, setUserRoles] = useLocalState<UserRole[]>('roles', [
-    { id:'ROL-001', name:'Admin Panel', role:'Super Admin', permissions:'ALL', status:'Active' },
-    { id:'ROL-002', name:'Agent-Rahim', role:'Agent', permissions:'Cash-In, Cash-Out, TX View', status:'Active' },
-    { id:'ROL-003', name:'Store-Manager', role:'Admin', permissions:'Reports, Settle, Read', status:'Active' },
-    { id:'ROL-004', name:'Auditor-Viewer', role:'Viewer', permissions:'Read Only', status:'Active' }
-  ]);
+  const [userRoles, setUserRoles] = useLocalState<UserRole[]>('roles', []);
 
-  const [npsbTransfers, setNpsbTransfers] = useLocalState<NpsbTransfer[]>('npsb', [
-    { id:'NPSB-001', fromMethod:'bKash', bankName:'Dutch-Bangla Bank', branch:'Banani', accountNo:'110.102.XXXXX', amount:45000, fee:50, status:'Completed', date:'May 25, 2024' },
-    { id:'NPSB-002', fromMethod:'Nagad', bankName:'Islami Bank', branch:'Gulshan', accountNo:'20501XXXXX', amount:32000, fee:35, status:'Processing', date:'May 26, 2024' }
-  ]);
+  const [npsbTransfers, setNpsbTransfers] = useLocalState<NpsbTransfer[]>('npsb', []);
 
-  const [posTxns, setPosTxns] = useLocalState<PosTransaction[]>('pos', [
-    { id:'POS-001', terminal:'POS-T1 (Dhanmondi)', method:'bKash', amount:1250, merchant:'Fresh Mart', date:'May 26, 2024 11:46 AM', status:'Approved' },
-    { id:'POS-002', terminal:'POS-T2 (Gulshan)', method:'Nagad', amount:850, merchant:'Daily Grocery', date:'May 26, 2024 10:32 AM', status:'Approved' },
-    { id:'POS-003', terminal:'POS-T1 (Dhanmondi)', method:'Visa Card', amount:650, merchant:'Fresh Mart', date:'May 26, 2024 09:15 AM', status:'Declined' }
-  ]);
+  const [posTxns, setPosTxns] = useLocalState<PosTransaction[]>('pos', []);
 
   const [isDarkMode, setIsDarkMode] = useLocalState<boolean>('darkMode', false);
 
-  const [bankAccounts, setBankAccounts] = useLocalState<BankAccount[]>('bankAccounts', [
-    { id:'BNK-001', bankName:'Dutch-Bangla Bank', accountNo:'110.102.45678', branch:'Banani', accountType:'Current', linkedMethod:'bKash', balance:145000, status:'Active', contactPhone:'01712345678' },
-    { id:'BNK-002', bankName:'Islami Bank BD', accountNo:'20501234567', branch:'Gulshan', accountType:'Savings', linkedMethod:'Nagad', balance:85000, status:'Active', contactPhone:'01812345679' },
-    { id:'BNK-003', bankName:'BRAC Bank', accountNo:'150.110.78901', branch:'Mirpur', accountType:'Current', linkedMethod:'Rocket', balance:42500, status:'Pending', contactPhone:'01912345680' }
-  ]);
+  const [bankAccounts, setBankAccounts] = useLocalState<BankAccount[]>('bankAccounts', []);
 
-  const [mfsApiStatuses, setMfsApiStatuses] = useLocalState<MfsApiStatus[]>('apiStatus', [
-    { provider:'bKash', apiKey:'bkash_live_X7kL9mP2qR4vN8wH6cT5', endpoint:'api.bkash.com', status:'Online', lastChecked:'Just now', successRate:99.8, dailyCalls:1245 },
-    { provider:'Nagad', apiKey:'nagad_live_J3fG7hD1sW9yA6uM0oK4', endpoint:'api.nagad.com', status:'Online', lastChecked:'2 min ago', successRate:98.5, dailyCalls:890 },
-    { provider:'Rocket', apiKey:'rocket_sandbox_W9dC2eR5tG8hJ1kN3pS6', endpoint:'api.rocket.com.bd', status:'Degraded', lastChecked:'5 min ago', successRate:89.2, dailyCalls:456 },
-    { provider:'Upay', apiKey:'upay_live_M0vB3nC6xZ9lK2jH5gF8', endpoint:'api.upay.com', status:'Online', lastChecked:'1 min ago', successRate:100, dailyCalls:312 },
-    { provider:'SSLCommerz', apiKey:'ssl_store_A5dS8fG1hJ4kL7zX0cV3', endpoint:'api.sslcommerz.com', status:'Online', lastChecked:'Just now', successRate:97.1, dailyCalls:678 }
-  ]);
+  const [mfsApiStatuses, setMfsApiStatuses] = useLocalState<MfsApiStatus[]>('apiStatus', []);
 
-  const [contactPhones, setContactPhones] = useLocalState<ContactPhone[]>('contacts', [
-    { id:'CT-001', name:'Fresh Mart', phone:'01712345678', type:'Merchant', method:'bKash' },
-    { id:'CT-002', name:'Daily Grocery', phone:'01812345679', type:'Merchant', method:'Nagad' },
-    { id:'CT-003', name:'Rahim Khan (Customer)', phone:'01712345678', type:'Customer' },
-    { id:'CT-004', name:'Agent Rahim Uddin', phone:'01712345678', type:'Agent', method:'bKash' },
-    { id:'CT-005', name:'The NexaGo BD Support', phone:'thenexagobd@gmail.com', type:'Support' }
-  ]);
+  const [contactPhones, setContactPhones] = useLocalState<ContactPhone[]>('contacts', []);
 
   // ---- Algorithm: Customer Risk Score (0-100, lower is better) ----
   const getCustomerRiskScore = (c: any): number => {
@@ -1397,7 +1265,7 @@ export default function MFSBusinessView({ orders }: MFSBusinessViewProps) {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Sender Name / Account</label>
-                <input type="text" value={cashInFrom} onChange={(e) => setCashInFrom(e.target.value)} placeholder="e.g. Fresh Mart / 01712345678" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange" />
+                <input type="text" value={cashInFrom} onChange={(e) => setCashInFrom(e.target.value)} placeholder="Enter merchant or phone" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Amount (৳)</label>
@@ -2093,7 +1961,7 @@ export default function MFSBusinessView({ orders }: MFSBusinessViewProps) {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-300 uppercase mb-1">Merchant</label>
-                  <input type="text" value={qrMerchant} onChange={(e) => setQrMerchant(e.target.value)} placeholder="e.g. Fresh Mart" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange" />
+                  <input type="text" value={qrMerchant} onChange={(e) => setQrMerchant(e.target.value)} placeholder="Enter store name" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange" />
                 </div>
               </div>
               <div>

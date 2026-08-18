@@ -90,18 +90,25 @@ export default function StorePortal() {
 
   const acceptOrder = (id: string) => {
     const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
+    if (!rider) {
+      setNotifications(prev => [
+        makeNotif('Driver unavailable', `Order #${id} is accepted by store, but no real driver is online yet.`, 'order', { audience: 'all' }),
+        ...prev,
+      ]);
+      return;
+    }
     const pickupPin = String(Math.floor(1000 + Math.random() * 9000));
     setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
       ...o,
       status: 'Confirmed' as any,
-      driverId: rider?.id || 'DRV123456',
+      driverId: rider.id,
       driverDeadline: Date.now() + 60 * 1000,
       placedAt: o.placedAt || Date.now(),
       pickupPin,
-    }, 'accepted', 'store', `Store accepted — rider ${rider?.name || ''} assigned`) : o)));
+    }, 'accepted', 'store', `Store accepted — rider ${rider.name} assigned`) : o)));
     setNotifications(prev => [
-      makeNotif('🚚 Order Confirmed', `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, 'order', { audience: 'driver', driverId: rider?.id }),
-      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — rider ${rider?.name || 'assigned'} on the way.`, 'order', { audience: 'all' }),
+      makeNotif('🚚 Order Confirmed', `Store accepted order #${id} — assigned to ${rider.name}.`, 'order', { audience: 'driver', driverId: rider.id }),
+      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — rider ${rider.name} on the way.`, 'order', { audience: 'all' }),
       ...prev,
     ]);
   };

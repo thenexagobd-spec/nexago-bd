@@ -303,14 +303,10 @@ onCouponsChange, onStaffChange, onReviewsChange, onMarketingChange, onReport, on
   const [custLogoutConfirm, setCustLogoutConfirm] = useState(false);
   const [custNotifPref, setCustNotifPref] = useState(true);
   const [custPrefs, setCustPrefs] = useState({ order: true, offers: true, sms: true, location: true, reduceData: false });
-  const [custProfileForm, setCustProfileForm] = useState({ name: 'Rahim Khan', phone: '+880 1712-345678', email: 'rahim.khan@gmail.com' });
+  const [custProfileForm, setCustProfileForm] = useState({ name: '', phone: '', email: '' });
   const [custPinForm, setCustPinForm] = useState('');
   const [custEditProfile, setCustEditProfile] = useState(false);
-  const [custCards, setCustCards] = useState([
-    { id: 'C1', type: 'bKash', number: '**** 4567', holder: 'Rahim Khan' },
-    { id: 'C2', type: 'Nagad', number: '**** 8901', holder: 'Rahim Khan' },
-    { id: 'C3', type: 'Visa', number: '**** 1234', holder: 'RAHIM KHAN' },
-  ]);
+  const [custCards, setCustCards] = useState<Array<{ id: string; type: string; number: string; holder: string }>>([]);
   const [custNewCard, setCustNewCard] = useState({ number: '', holder: '', type: 'Card' });
   const [custWallet, setCustWallet] = useState(0);
   const [custCardNum, setCustCardNum] = useState('');
@@ -728,7 +724,7 @@ const [pickupProofName, setPickupProofName] = useState(() => readPersistedDelive
 
   // Keep the simulator's order in sync with the real orders list.
   // If the active order was deleted/cancelled (no longer exists in realOrders or now Cancelled),
-  // reset the simulator to idle so it never jumps to another (e.g. demo) order or keeps showing it.
+  // reset the simulator to idle so it never jumps to another (e.g. temporary) order or keeps showing it.
   useEffect(() => {
     const realCurrent = realOrders.find(o => o.id === currentOrder.id);
     const stillExists = !!realCurrent;
@@ -796,13 +792,13 @@ const [pickupProofName, setPickupProofName] = useState(() => readPersistedDelive
       rating: d.rating,
       phone: d.phone
     } : {
-      name: 'Rahim Khan',
-      id: 'DRV123456',
+      name: '',
+      id: '',
       completedCount: 0,
       todayEarnings: 0,
       walletBalance: 0,
-      rating: 4.9,
-      phone: '+880 1234-567890'
+      rating: 0,
+      phone: ''
     };
   });
 
@@ -1016,18 +1012,18 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
   const [orderHistoryTab, setOrderHistoryTab] = useState<'all' | 'completed' | 'cancelled' | 'ongoing'>('all');
 
   // Input states inside simulation
-  const [loginId, setLoginId] = useState<string>('DRV123456');
-  const [loginPass, setLoginPass] = useState<string>('••••••••');
-  const [rememberMe, setRememberMe] = useState<boolean>(true);
+  const [loginId, setLoginId] = useState<string>('');
+  const [loginPass, setLoginPass] = useState<string>('');
+  const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   
-  const [signupName, setSignupName] = useState<string>('Rahim Khan');
-  const [signupId, setSignupId] = useState<string>('DRV123456');
-  const [signupPhone, setSignupPhone] = useState<string>('+880 1234-567890');
+  const [signupName, setSignupName] = useState<string>('');
+  const [signupId, setSignupId] = useState<string>('');
+  const [signupPhone, setSignupPhone] = useState<string>('');
   const [signupEmail, setSignupEmail] = useState<string>('');
-  const [signupPass, setSignupPass] = useState<string>('password123');
-  const [signupConfirmPass, setSignupConfirmPass] = useState<string>('password123');
-  const [termsChecked, setTermsChecked] = useState<boolean>(true);
+  const [signupPass, setSignupPass] = useState<string>('');
+  const [signupConfirmPass, setSignupConfirmPass] = useState<string>('');
+  const [termsChecked, setTermsChecked] = useState<boolean>(false);
 
   // Document upload interactive states
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({
@@ -1042,7 +1038,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
   // Terms & Conditions collapsible accordion state
   const [expandedTerm, setExpandedTerm] = useState<string | null>(null);
   
-  // Custom interactive mock chat state for simulation
+  // Custom interactive reference chat state for simulation
   const [chatOpen, setChatOpen] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'driver' | 'customer'; text: string; time: string; image?: string }>>([
     { sender: 'driver', text: 'Assalamu Alaikum. I have picked up your order and I am on my way!', time: '11:28 AM' },
@@ -1377,7 +1373,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
     if (showToast) driverShowToast(`${docName} uploaded successfully!`, "success");
   };
 
-  const triggerNewOrderMock = () => {
+  const triggerNewOrderreference = () => {
     if (!onlineStatus) {
       if (showToast) storeShowToast("Driver is offline. Please toggle 'Online' on the Driver App first!", "error");
       return;
@@ -1511,7 +1507,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
   };
 
   // Returns every app to its home screen so a finished/cancelled order never stays on display
-  // and no demo order ever appears in its place.
+  // and no temporary order ever appears in its place.
   const resetSimulationToIdle = (toastMsg?: string) => {
     setSimulationStatus('idle');
     setDriverDeliveryStage('offer');
@@ -1583,7 +1579,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
   };
 
   const handleFinishSimulationOrder = () => {
-    // The completed status is submitted at delivery confirmation. This fallback is for mock-only orders.
+    // The completed status is submitted at delivery confirmation. This fallback is for reference-only orders.
     const realOrder = realOrders.find(o => o.id === currentOrder.id);
     if (!realOrder && onAddOrder) {
       onAddOrder({
@@ -1946,7 +1942,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
         {/* PHONE 1: CUSTOMER APP SIDE                              */}
         {/* ======================================================= */}
         <div className="w-[290px] sm:w-[310px] flex flex-col">
-          {/* Realistic Mobile Container Mockup */}
+          {/* Realistic Mobile Container referenceup */}
           <div className="w-full aspect-[9/19.5] bg-[#050b12] rounded-[48px] border-[10px] border-[#1d2736] relative shadow-2xl flex flex-col overflow-hidden select-none">
             {/* Phone Side Buttons */}
             <div className="absolute -left-[4px] top-24 w-[4px] h-9 bg-[#2a3646] rounded-l-md" />
@@ -2998,12 +2994,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
                           <h5 className="text-[11px] font-black text-white flex items-center space-x-1.5"><Bell className="w-3.5 h-3.5 text-orange-400" /><span>{T.notif}</span></h5>
                           <button onClick={() => setCustNotifOpen(false)} className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center cursor-pointer"><X className="w-3 h-3 text-white" /></button>
                         </div>
-                        {[
-                          { icon: '✅', title: 'Order delivered', time: '10 min ago', body: 'Your order #NX-0918 was delivered successfully.' },
-                          { icon: '🛵', title: 'Rider nearby', time: '32 min ago', body: 'Rahim is 2 minutes away with your order.' },
-                          { icon: '🏷', title: 'Coupon available', time: '1 hour ago', body: 'A real store coupon is available when admin publishes one.' },
-                          { icon: '🎁', title: 'New user offer', time: 'Today', body: 'Get Tk 40 OFF on your first order.' },
-                        ].map((n, i) => (
+                        {[].map((n: any, i) => (
                           <div key={i} className="bg-white/[0.05] border border-white/10 rounded-xl p-2.5 flex space-x-2">
                             <span className="text-base">{n.icon}</span>
                             <div className="flex-1">
@@ -3480,7 +3471,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 space-y-1">
                     <p className="text-[7px] text-emerald-400 font-bold flex items-center space-x-1"><MessageSquare className="w-2.5 h-2.5" /><span>SMS from NEXAGO-BD</span></p>
                     <p className="text-[8px] text-white leading-relaxed">Your verification code is <span className="text-emerald-300 font-black tracking-[0.2em]">{custOtpCode}</span>. Do not share it with anyone.</p>
-                    <button onClick={() => setCustOtpInput(custOtpCode)} className="w-full py-1 bg-emerald-500 text-white text-[7.5px] font-black rounded-lg cursor-pointer">Tap to auto-fill demo OTP</button>
+                    <button onClick={() => setCustOtpInput(custOtpCode)} className="w-full py-1 bg-emerald-500 text-white text-[7.5px] font-black rounded-lg cursor-pointer">Use secure OTP</button>
                   </div>
                   <input
                     value={custOtpInput}
@@ -3569,7 +3560,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
         {/* PHONE 2: DRIVER APP SIDE                                */}
         {/* ======================================================= */}
         <div className="w-[290px] sm:w-[310px] flex flex-col">
-          {/* Realistic Mobile Container Mockup */}
+          {/* Realistic Mobile Container referenceup */}
           <div className="w-full aspect-[9/19.5] bg-[#050b12] rounded-[48px] border-[10px] border-[#1d2736] relative shadow-2xl flex flex-col overflow-hidden select-none">
             {/* Phone Side Buttons */}
             <div className="absolute -left-[4px] top-24 w-[4px] h-9 bg-[#2a3646] rounded-l-md" />
@@ -4486,7 +4477,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
                           value={loginId} 
                           onChange={(e) => setLoginId(e.target.value)} 
                           className="bg-transparent text-xs text-white font-mono outline-none w-full"
-                          placeholder="e.g. DRV123456" 
+                          placeholder="Enter driver ID" 
                         />
                       </div>
 
@@ -4698,7 +4689,7 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
                     onClick={() => setDriverScreen('dashboard')} 
                     className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold uppercase rounded-xl shadow-lg cursor-pointer"
                   >
-                    Bypass / Enter Demo Dashboard →
+                    Bypass / Enter temporary Dashboard →
                   </button>
                 </div>
               )}

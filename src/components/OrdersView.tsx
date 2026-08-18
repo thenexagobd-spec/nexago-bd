@@ -591,7 +591,7 @@ export default function OrdersView({
       {/* FILTER BUTTONS & EXPORT/FILTER TOOLS */}
       <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between bg-brand-card/30 border border-brand-border/60 p-4 rounded-xl">
         
-        {/* Dynamic status filters with counts matching the mockup structure */}
+        {/* Dynamic status filters with counts matching the referenceup structure */}
         <div className="flex items-center space-x-2 w-full xl:w-auto overflow-x-auto pb-2 xl:pb-0 scrollbar-none">
           {(['All', 'Pending', 'Confirmed', 'Processing', 'Completed', 'Cancelled'] as const).map((tab) => {
             const isActive = statusFilter === tab;
@@ -966,7 +966,7 @@ export default function OrdersView({
                     required
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
-                    placeholder="e.g. Fresh Mart"
+                    placeholder="Enter store name"
                     className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
                   />
                 </div>
@@ -977,7 +977,7 @@ export default function OrdersView({
                     required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="e.g. Rahim Khan"
+                    placeholder="Enter full name"
                     className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
                   />
                 </div>
@@ -1041,7 +1041,7 @@ export default function OrdersView({
                     type="text"
                     value={pickupLocation}
                     onChange={(e) => setPickupLocation(e.target.value)}
-                    placeholder="e.g. Fresh Mart, Dhanmondi"
+                    placeholder="Enter store and area"
                     className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
                   />
                 </div>

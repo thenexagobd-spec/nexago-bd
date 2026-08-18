@@ -27,7 +27,7 @@ interface SimulatedRoute {
   completed: boolean;
 }
 
-// Pre-determined coordinate regions for the mock zones
+// Coordinate regions for live zones
 const zoneCoords: Record<string, { x: number; y: number; r: number; color: string }> = {
   'Dhanmondi': { x: 90, y: 310, r: 45, color: '#3b82f6' }, // Blue
   'Gulshan': { x: 350, y: 110, r: 55, color: '#10b981' },   // Emerald
@@ -229,7 +229,7 @@ export const TrackingMapView: React.FC<TrackingMapViewProps> = ({ orders, driver
     return activeRoutes.find(r => r.orderId === selectedRouteId) || activeRoutes[0] || null;
   }, [activeRoutes, selectedRouteId]);
 
-  // Real mode: never create fake routes. New routes must come from real orders.
+  // Real mode: routes must come from real orders.
   const handleSpawnTestOrder = () => {
     setActiveRoutes([]);
     setSelectedRouteId(null);

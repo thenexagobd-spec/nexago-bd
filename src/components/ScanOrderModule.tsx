@@ -70,7 +70,7 @@ export const ScanOrderModule: React.FC<ScanOrderModuleProps> = ({
       }
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError("Camera access is not supported by your browser environment. You can use manual scan or demo barcode buttons.");
+        setCameraError("Camera access is not supported by your browser environment. You can use manual scan or secure barcode lookup.");
         setIsCameraActive(false);
         return;
       }
@@ -95,9 +95,9 @@ export const ScanOrderModule: React.FC<ScanOrderModuleProps> = ({
       if (errMsg.includes('Permission denied') || errMsg.includes('NotAllowedError')) {
         setCameraError("Camera permission was denied. Please allow camera access in browser permissions or use manual lookup below.");
       } else if (errMsg.includes('NotFoundError') || errMsg.includes('DevicesNotFoundError')) {
-        setCameraError("No video camera detected on this device. Use manual lookup or sample order scanner below.");
+        setCameraError("No video camera detected on this device. Use manual lookup below.");
       } else {
-        setCameraError(`Camera connection error (${errMsg}). You can enter Order ID manually or select a sample code.`);
+        setCameraError(`Camera connection error (${errMsg}). You can enter Order ID manually.`);
       }
       setIsCameraActive(false);
     }

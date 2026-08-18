@@ -2227,7 +2227,7 @@ export default function DriverProfileView({
                   rows={3}
                   value={newLogReason}
                   onChange={(e) => setNewLogReason(e.target.value)}
-                  placeholder="e.g., Rider requested short tea break / Assigned Order #ORD-001258 / Bike Maintenance"
+                  placeholder="e.g., Rider requested short tea break / Assigned Order #ORDER-ID / Bike Maintenance"
                   className="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-xs text-white outline-none focus:border-brand-orange"
                 />
               </div>

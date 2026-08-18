@@ -11,7 +11,7 @@ export interface OrderTimelineEntry {
 }
 
 export interface Order {
-  id: string; // e.g. "ORD-001248"
+  id: string; // e.g. "ORDER-ID"
   storeName: string;
   address: string;
   status: 'Completed' | 'Pending' | 'Confirmed' | 'Processing' | 'Cancelled' | 'Ongoing';
@@ -91,7 +91,7 @@ export interface DriverStatusLog {
 }
 
 export interface Driver {
-  id: string; // e.g. "DRV123456"
+  id: string; // e.g. "DRIVER-ID"
   name: string;
   photo?: string; // driver profile photo URL
   completedOrders: number;

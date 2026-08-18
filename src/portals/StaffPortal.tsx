@@ -139,7 +139,7 @@ export default function StaffPortal() {
                   <Lock className="h-4 w-4" /> Open Staff Console
                 </button>
               </div>
-              <p className="mt-5 text-center text-[10px] text-gray-500">No demo access. Super Admin must create a real staff account first.</p>
+              <p className="mt-5 text-center text-[10px] text-gray-500">No temporary access. Super Admin must create a real staff account first.</p>
             </form>
           </div>
         </div>

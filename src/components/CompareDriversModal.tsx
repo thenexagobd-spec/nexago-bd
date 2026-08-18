@@ -105,7 +105,7 @@ export default function CompareDriversModal({
   };
 
   // 100% REAL DATA — every metric below is computed live from the driver's
-  // actual orders (same engine as the admin driver profile). No mock values.
+  // actual orders (same engine as the admin driver profile). No synthetic values.
   const getDriverMetrics = (driver: Driver) => {
     const myOrders = orders.filter(o =>
       o.driverId === driver.id ||

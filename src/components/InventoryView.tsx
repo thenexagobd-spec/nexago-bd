@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Plus, Filter, Trash2, Check, Clock, X, Copy, Edit3, Download, 
   ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Database, Activity, 
@@ -46,7 +46,7 @@ interface InventoryViewProps {
 }
 
 export default function InventoryView({ onAddNotification, showToast, products, onProductsChange }: InventoryViewProps) {
-  // Persistence States — seeded from the REAL product catalog (never demo data)
+  // Persistence states come from the real product catalog.
   const scaleStock = (p: any): number => Math.max(0, Math.round(Number(p?.stock ?? 0)));
   const [items, setItems] = useState<InventoryItem[]>(() => {
     const local = localStorage.getItem('sd_inventory_v2');
@@ -133,14 +133,17 @@ export default function InventoryView({ onAddNotification, showToast, products, 
 
   // Form Fields
   const [formName, setFormName] = useState('');
-  const [formStore, setFormStore] = useState('Fresh Mart');
-  const [formCategory, setFormCategory] = useState('Fruits & Vegetables');
-  const [formStock, setFormStock] = useState<number>(50);
-  const [formMaxCap, setFormMaxCap] = useState<number>(100);
+  const [formStore, setFormStore] = useState('');
+  const [formCategory, setFormCategory] = useState('');
+  const [formStock, setFormStock] = useState<number>(0);
+  const [formMaxCap, setFormMaxCap] = useState<number>(0);
   const [formUnit, setFormUnit] = useState('pcs');
-  const [formPrice, setFormPrice] = useState<number>(100);
-  const [formReorder, setFormReorder] = useState<number>(15);
+  const [formPrice, setFormPrice] = useState<number>(0);
+  const [formReorder, setFormReorder] = useState<number>(0);
   const [formSupplier, setFormSupplier] = useState('');
+
+  const storeOptions = useMemo(() => Array.from(new Set(items.map(i => i.store).filter(Boolean))).sort(), [items]);
+  const categoryOptions = useMemo(() => Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort(), [items]);
 
   // Bulk Operations Simulation
   const [isLoading, setIsLoading] = useState<string | null>(null);
@@ -501,13 +504,13 @@ export default function InventoryView({ onAddNotification, showToast, products, 
 
   const resetForm = () => {
     setFormName('');
-    setFormStore('Fresh Mart');
-    setFormCategory('Fruits & Vegetables');
-    setFormStock(50);
-    setFormMaxCap(100);
+    setFormStore('');
+    setFormCategory('');
+    setFormStock(0);
+    setFormMaxCap(0);
     setFormUnit('pcs');
-    setFormPrice(100);
-    setFormReorder(15);
+    setFormPrice(0);
+    setFormReorder(0);
     setFormSupplier('');
   };
 
@@ -868,11 +871,7 @@ export default function InventoryView({ onAddNotification, showToast, products, 
                   className="w-full bg-brand-dark text-xs text-white border border-brand-border/80 rounded-lg px-3 py-2 outline-none focus:border-brand-orange cursor-pointer"
                 >
                   <option value="All">All Partner Outlets</option>
-                  <option value="Fresh Mart">Fresh Mart</option>
-                  <option value="Daily Grocery">Daily Grocery</option>
-                  <option value="Green Basket">Green Basket</option>
-                  <option value="Super Shop">Super Shop</option>
-                  <option value="Save Mart">Save Mart</option>
+                  {storeOptions.map(store => <option key={store} value={store}>{store}</option>)}
                 </select>
               </div>
 
@@ -885,11 +884,7 @@ export default function InventoryView({ onAddNotification, showToast, products, 
                   className="w-full bg-brand-dark text-xs text-white border border-brand-border/80 rounded-lg px-3 py-2 outline-none focus:border-brand-orange cursor-pointer"
                 >
                   <option value="All">All Categories</option>
-                  <option value="Fruits & Vegetables">Fruits & Vegetables</option>
-                  <option value="Rice & Grains">Rice & Grains</option>
-                  <option value="Dairy & Eggs">Dairy & Eggs</option>
-                  <option value="Beverages">Beverages</option>
-                  <option value="Bakery">Bakery & Bread</option>
+                  {categoryOptions.map(category => <option key={category} value={category}>{category}</option>)}
                 </select>
               </div>
 
@@ -1344,11 +1339,8 @@ export default function InventoryView({ onAddNotification, showToast, products, 
                     onChange={(e) => setFormStore(e.target.value)}
                     className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange cursor-pointer"
                   >
-                    <option value="Fresh Mart">Fresh Mart</option>
-                    <option value="Daily Grocery">Daily Grocery</option>
-                    <option value="Green Basket">Green Basket</option>
-                    <option value="Super Shop">Super Shop</option>
-                    <option value="Save Mart">Save Mart</option>
+                    <option value="">Select real store</option>
+                    {storeOptions.map(store => <option key={store} value={store}>{store}</option>)}
                   </select>
                 </div>
 
@@ -1359,11 +1351,8 @@ export default function InventoryView({ onAddNotification, showToast, products, 
                     onChange={(e) => setFormCategory(e.target.value)}
                     className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange cursor-pointer"
                   >
-                    <option value="Fruits & Vegetables">Fruits & Vegetables</option>
-                    <option value="Rice & Grains">Rice & Grains</option>
-                    <option value="Dairy & Eggs">Dairy & Eggs</option>
-                    <option value="Beverages">Beverages</option>
-                    <option value="Bakery">Bakery & Bread</option>
+                    <option value="">Select real category</option>
+                    {categoryOptions.map(category => <option key={category} value={category}>{category}</option>)}
                   </select>
                 </div>
               </div>

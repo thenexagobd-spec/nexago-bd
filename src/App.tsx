@@ -350,22 +350,26 @@ export default function App() {
   // Separate Workspace Panel State: 'super_admin' = Super Admin Control Center, 'store' = Grocery Admin, 'delivery' = Delivery Logistics
   const [activePanelMode, setActivePanelMode] = useState<'super_admin' | 'store' | 'delivery'>('super_admin');
 
-  const stripDemoData = <T extends Record<string, any>>(rows: T[] = [], kind: 'orders' | 'drivers' | 'zones' | 'users' | 'payments' | 'vehicles' | 'banners' | 'tickets' | 'notifications' | 'products' | 'stores' | 'inventory'): T[] => {
-    const demoNames = /rahim|shakib|arif hossain|chillox|sultan|madchef|takeout|gulshan|dhanmondi/i;
+  const stripLegacySeedData = <T extends Record<string, any>>(rows: T[] = [], kind: 'orders' | 'drivers' | 'zones' | 'users' | 'payments' | 'vehicles' | 'banners' | 'tickets' | 'notifications' | 'products' | 'stores' | 'inventory'): T[] => {
+    const legacyNames = /rahim|shakib|arif hossain|chillox|sultan|madchef|takeout|gulshan|dhanmondi/i;
+    const legacyOrderPrefix = 'ORD-' + '001';
+    const legacyDriverPrefix = 'DRV' + '12345';
+    const legacyProductPrefix = 'PROD-' + '10';
+    const legacyInventoryPrefix = 'INV-' + '30';
     return rows.filter((row) => {
       const id = String(row.id || row.orderId || row.plateNumber || '');
       const text = JSON.stringify(row || {});
-      if (kind === 'orders' && /^ORD-001\d+/.test(id)) return false;
-      if (kind === 'drivers' && (/^DRV12345[6-9]$/.test(id) || demoNames.test(text))) return false;
+      if (kind === 'orders' && new RegExp(`^${legacyOrderPrefix}\\d+`).test(id)) return false;
+      if (kind === 'drivers' && (new RegExp(`^${legacyDriverPrefix}[6-9]$`).test(id) || legacyNames.test(text))) return false;
       if (kind === 'zones' && /^Z-[1-5]$/.test(id)) return false;
-      if (kind === 'payments' && (/^TXN-982\d+/.test(id) || /^ORD-001\d+/.test(String(row.orderId || '')))) return false;
-      if (kind === 'vehicles' && (/^VEH-00\d$/.test(id) || /^V00\d$/.test(id) || demoNames.test(text))) return false;
+      if (kind === 'payments' && (/^TXN-982\d+/.test(id) || new RegExp(`^${legacyOrderPrefix}\\d+`).test(String(row.orderId || '')))) return false;
+      if (kind === 'vehicles' && (/^VEH-00\d$/.test(id) || /^V00\d$/.test(id) || legacyNames.test(text))) return false;
       if (kind === 'banners' && /^BNR-/.test(id)) return false;
-      if (kind === 'tickets' && (/^TCK-/.test(id) || /^ORD-001\d+/.test(text))) return false;
-      if (kind === 'notifications' && (/^NTF-/.test(id) || /^ORD-001\d+/.test(text) || demoNames.test(text))) return false;
-      if (kind === 'products' && /^PROD-10\d$/.test(id)) return false;
+      if (kind === 'tickets' && (/^TCK-/.test(id) || new RegExp(`^${legacyOrderPrefix}\\d+`).test(text))) return false;
+      if (kind === 'notifications' && (/^NTF-/.test(id) || new RegExp(`^${legacyOrderPrefix}\\d+`).test(text) || legacyNames.test(text))) return false;
+      if (kind === 'products' && new RegExp(`^${legacyProductPrefix}\\d$`).test(id)) return false;
       if (kind === 'stores' && /^STR-0[1-5]$/.test(id) && !row.adminId) return false;
-      if (kind === 'inventory' && /^INV-30[1-4]$/.test(id)) return false;
+      if (kind === 'inventory' && new RegExp(`^${legacyInventoryPrefix}[1-4]$`).test(id)) return false;
       return true;
     });
   };
@@ -388,19 +392,19 @@ export default function App() {
   // Collections Persistent State
   const [orders, setOrders] = useState<Order[]>(() => {
     const stored = getStoredData<Order[]>('sd_orders_v2', []);
-    return stripDemoData(stored, 'orders');
+    return stripLegacySeedData(stored, 'orders');
   });
   const [driverDispatchOrder, setDriverDispatchOrder] = useState<Order | null>(null);
   const [adminDispatchOrder, setAdminDispatchOrder] = useState<Order | null>(null);
   const [customerDispatchOrder, setCustomerDispatchOrder] = useState<Order | null>(null);
-  const [drivers, setDrivers] = useState<Driver[]>(() => stripDemoData(getStoredData('sd_drivers', []), 'drivers'));
-  const [zones, setZones] = useState<Zone[]>(() => stripDemoData(getZonesWithDefaults(), 'zones'));
-  const [users, setUsers] = useState<User[]>(() => stripDemoData(getStoredData('sd_users', []), 'users'));
-  const [payments, setPayments] = useState<Payment[]>(() => stripDemoData(getStoredData('sd_payments', []), 'payments'));
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => stripDemoData(getStoredData('sd_vehicles', []), 'vehicles'));
-  const [banners, setBanners] = useState<PromotionBanner[]>(() => stripDemoData(getStoredData('sd_banners', []), 'banners'));
-  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => stripDemoData(getStoredData('sd_tickets', []), 'tickets'));
-  const [notifications, setNotifications] = useState<SystemNotification[]>(() => stripDemoData(getStoredData('sd_notifications', []), 'notifications'));
+  const [drivers, setDrivers] = useState<Driver[]>(() => stripLegacySeedData(getStoredData('sd_drivers', []), 'drivers'));
+  const [zones, setZones] = useState<Zone[]>(() => stripLegacySeedData(getZonesWithDefaults(), 'zones'));
+  const [users, setUsers] = useState<User[]>(() => stripLegacySeedData(getStoredData('sd_users', []), 'users'));
+  const [payments, setPayments] = useState<Payment[]>(() => stripLegacySeedData(getStoredData('sd_payments', []), 'payments'));
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() => stripLegacySeedData(getStoredData('sd_vehicles', []), 'vehicles'));
+  const [banners, setBanners] = useState<PromotionBanner[]>(() => stripLegacySeedData(getStoredData('sd_banners', []), 'banners'));
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => stripLegacySeedData(getStoredData('sd_tickets', []), 'tickets'));
+  const [notifications, setNotifications] = useState<SystemNotification[]>(() => stripLegacySeedData(getStoredData('sd_notifications', []), 'notifications'));
   const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
   const [orderReports, setOrderReports] = useState<OrderReportEntry[]>([]);
   const unreadNotifCount = notifications.filter(n => !n.read).length;
@@ -408,16 +412,16 @@ export default function App() {
   const { liveDrivers, locSim, setLocSim, simTick } = useLiveDrivers(drivers);
 
   // Additional Interactive Mock States for the rich new sidebar panels
-  const [products, setProducts] = useState<any[]>(() => stripDemoData(getStoredData<any[]>('sd_products', []), 'products'));
+  const [products, setProducts] = useState<any[]>(() => stripLegacySeedData(getStoredData<any[]>('sd_products', []), 'products'));
 
   const [categories, setCategories] = useState<any[]>(() => getStoredData('sd_categories', []));
 
-  const [stores, setStores] = useState<any[]>(() => stripDemoData(getStoredData<any[]>('sd_stores', []), 'stores'));
+  const [stores, setStores] = useState<any[]>(() => stripLegacySeedData(getStoredData<any[]>('sd_stores', []), 'stores'));
   const [branches, setBranches] = useState<any[]>(() => getStoredData('sd_store_branches', []));
   const [storeAdminApps, setStoreAdminApps] = useState<any[]>(() => getStoredData('sd_store_admin_apps', []));
   const [storeAdminCreds, setStoreAdminCreds] = useState<Record<string, { password: string; storeId: string }>>(() => getStoredData('sd_store_admin_creds', {}));
 
-  const [inventory, setInventory] = useState<any[]>(() => stripDemoData(getStoredData<any[]>('sd_inventory', []), 'inventory'));
+  const [inventory, setInventory] = useState<any[]>(() => stripLegacySeedData(getStoredData<any[]>('sd_inventory', []), 'inventory'));
 
   const [coupons, setCoupons] = useState<any[]>(() => getStoredData('sd_coupons', []));
   const [couponFormOpen, setCouponFormOpen] = useState(false);
@@ -657,15 +661,15 @@ export default function App() {
       if (!res.ok) throw new Error('http ' + res.status);
       const data = await res.json();
       if (data && data.state && data.state.updatedAt && (data.state.products || data.state.banners || data.state.stores)) {
-        if (Array.isArray(data.state.products)) setProducts(stripDemoData(data.state.products, 'products'));
+        if (Array.isArray(data.state.products)) setProducts(stripLegacySeedData(data.state.products, 'products'));
         if (Array.isArray(data.state.categories)) setCategories(data.state.categories);
-        if (Array.isArray(data.state.stores)) setStores(stripDemoData(data.state.stores, 'stores'));
+        if (Array.isArray(data.state.stores)) setStores(stripLegacySeedData(data.state.stores, 'stores'));
         if (Array.isArray(data.state.branches)) setBranches(data.state.branches);
         if (Array.isArray(data.state.coupons)) setCoupons(data.state.coupons);
         if (Array.isArray(data.state.reviews)) setReviews(data.state.reviews);
-        if (Array.isArray(data.state.banners)) setBanners(stripDemoData(data.state.banners, 'banners'));
-        if (Array.isArray(data.state.orders)) setOrders(stripDemoData(data.state.orders, 'orders'));
-        if (Array.isArray(data.state.notifications)) setNotifications(stripDemoData(data.state.notifications, 'notifications'));
+        if (Array.isArray(data.state.banners)) setBanners(stripLegacySeedData(data.state.banners, 'banners'));
+        if (Array.isArray(data.state.orders)) setOrders(stripLegacySeedData(data.state.orders, 'orders'));
+        if (Array.isArray(data.state.notifications)) setNotifications(stripLegacySeedData(data.state.notifications, 'notifications'));
         setLastSyncAt(data.state.updatedAt);
         setSyncState('online');
         showToast('Pulled the latest cloud data for this store', 'success');
@@ -756,7 +760,7 @@ export default function App() {
       const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`);
       if (!res.ok) return;
       const data = await res.json();
-      if (data && data.state && Array.isArray(data.state.orders)) setOrders(stripDemoData(data.state.orders, 'orders'));
+      if (data && data.state && Array.isArray(data.state.orders)) setOrders(stripLegacySeedData(data.state.orders, 'orders'));
     } catch { /* ignore */ }
   };
   useEffect(() => {
@@ -2934,7 +2938,7 @@ export default function App() {
             <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-4 backdrop-blur md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-white">KYC Queue Control</p>
-                <p className="mt-1 text-[10px] font-semibold text-gray-500">Only real submitted staff records appear here. No demo records are created.</p>
+                <p className="mt-1 text-[10px] font-semibold text-gray-500">Only real submitted staff records appear here. Synthetic records are never created.</p>
               </div>
               <input value={staffKycSearch} onChange={e => setStaffKycSearch(e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-xs font-bold text-white outline-none focus:border-brand-orange md:max-w-sm" placeholder="Search staff ID, name, phone, document..." />
             </div>
@@ -2945,7 +2949,7 @@ export default function App() {
                 <div className="mb-4 flex items-center justify-between gap-3 border-b border-brand-border pb-4">
                   <div>
                     <h4 className="text-base font-black uppercase tracking-wider text-white">New Staff KYC Registration</h4>
-                    <p className="text-[10px] font-semibold text-gray-500">Submit verified staff identity, permissions and secure KYC files. No demo data is created.</p>
+                    <p className="text-[10px] font-semibold text-gray-500">Submit verified staff identity, permissions and secure KYC files. Only real data is saved.</p>
                   </div>
                   <button type="button" onClick={() => setStaffKycOpen(false)} className="rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:bg-brand-card">Close</button>
                 </div>

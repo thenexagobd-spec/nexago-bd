@@ -288,16 +288,23 @@ export default function StoreAdminPortal() {
   const acceptOrder = (id: string) => {
     if (!myOrderIds.has(id)) return;
     const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
+    if (!rider) {
+      setNotifications(prev => [
+        makeNotif('Driver unavailable', `Order #${id} cannot be dispatched until a real driver is online.`, 'order', { audience: 'store-admin', storeId: activeStoreId }),
+        ...prev,
+      ]);
+      return;
+    }
     setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
       ...o,
       status: 'Confirmed' as any,
-      driverId: rider?.id || 'DRV123456',
+      driverId: rider.id,
       driverDeadline: Date.now() + 60 * 1000,
       placedAt: o.placedAt || Date.now(),
-    }, 'accepted', 'store', `Store admin accepted — rider ${rider?.name || ''} assigned`) : o)));
+    }, 'accepted', 'store', `Store admin accepted — rider ${rider.name} assigned`) : o)));
     setNotifications(prev => [
-      makeNotif('🚚 Order Accepted & Dispatched', `Store accepted order #${id} — assigned to ${rider?.name || 'a rider'}.`, 'order', { audience: 'driver', driverId: rider?.id }),
-      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — rider ${rider?.name || 'assigned'} is on the way to the store.`, 'order', { audience: 'all' }),
+      makeNotif('🚚 Order Accepted & Dispatched', `Store accepted order #${id} — assigned to ${rider.name}.`, 'order', { audience: 'driver', driverId: rider.id }),
+      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — rider ${rider.name} is on the way to the store.`, 'order', { audience: 'all' }),
       ...prev,
     ]);
   };
@@ -450,7 +457,7 @@ export default function StoreAdminPortal() {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-brand-orange">NexaGo Store Admin</p>
                 <h1 className="mt-1 text-xl font-black text-white">Real Store Admin Account</h1>
-                <p className="mt-1 text-[11px] text-gray-400">No demo data. Submit Bangladesh business documents, track approval, then login with permanent ID.</p>
+                <p className="mt-1 text-[11px] text-gray-400">Only real data. Submit Bangladesh business documents, track approval, then login with permanent ID.</p>
               </div>
               <div className="flex rounded-xl border border-[#1e3050] bg-[#0a1322] p-1">
                 {(['login', 'signup', 'track'] as const).map(v => (

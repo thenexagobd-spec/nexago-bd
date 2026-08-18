@@ -414,7 +414,7 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     copyNumber: 'Copy Number',
     completeWithin: 'Complete payment within',
     sessionExpired: 'Session expired',
-    expiredMsg: 'This payment window has expired to prevent fake orders. Your cart is untouched — start again to place a fresh order.',
+    expiredMsg: 'This payment window has expired to prevent invalid orders. Your cart is untouched — start again to place a fresh order.',
     close: 'Close',
     yourNumber: 'Your {m} number (sender)',
     sentAmount: 'Sent amount (must equal ৳{x})',
@@ -1271,7 +1271,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     return () => clearInterval(t);
   }, [addMoneyDeadline]);
 
-  // Auto-expiry: cancel pending-payment orders whose window lapsed (fake-order cleanup)
+  // Auto-expiry: cancel pending-payment orders whose window lapsed (invalid-order cleanup)
   useEffect(() => {
     const t = setInterval(() => {
       for (const o of orders) {
@@ -2036,7 +2036,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const etaMins = Math.max(1, Math.round((parseInt(trackingOrder?.estimatedMinutes ? String(trackingOrder.estimatedMinutes) : '35') || 35) * (1 - trackProgress)));
   const activeStepIdx = ETA_STEPS.filter(s => trackProgress >= s.min).length - 1;
 
-  // Auto-advance order status from rider progress + auto notifications (self-sufficient customer demo)
+  // Auto-advance order status from rider progress + auto notifications (self-sufficient customer temporary)
   const ordersRef = useRef(orders);
   ordersRef.current = orders;
   const driversRef = useRef(liveDrivers);
@@ -4416,7 +4416,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         maxLength={5}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-center tracking-[0.5em] font-mono outline-none focus:border-emerald-500"
                       />
-                      <p className="text-[10px] text-gray-400 mt-1">Demo PIN: <b className="text-gray-600 font-mono">{(paymentMethods.find(p => p.type === 'bKash')?.pin) || '12345'}</b></p>
+                      <p className="text-[10px] text-gray-400 mt-1">temporary PIN: <b className="text-gray-600 font-mono">{(paymentMethods.find(p => p.type === 'bKash')?.pin) || '12345'}</b></p>
                     </div>
                   )}
                   <button
@@ -4440,7 +4440,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Cardholder Name</label>
-                  <input type="text" value={cardInfo.name} onChange={(e) => setCardInfo({ ...cardInfo, name: e.target.value })} placeholder="RAHIM KHAN" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono uppercase outline-none focus:border-emerald-500" />
+                  <input type="text" value={cardInfo.name} onChange={(e) => setCardInfo({ ...cardInfo, name: e.target.value })} placeholder="Customer Name" className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono uppercase outline-none focus:border-emerald-500" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>

@@ -43,16 +43,7 @@ export const KNOWN_LOCATIONS: Record<string, LocationCoords> = {
   'central hub': { lat: 23.7800, lng: 90.3900, x: 230, y: 180 }
 };
 
-// Known driver base locations if not explicitly configured
-export const DRIVER_DEFAULT_LOCATIONS: Record<string, LocationCoords> = {
-  'DRV123456': { lat: 23.7470, lng: 90.3750, x: 95, y: 305 },  // Rahim Uddin - Dhanmondi
-  'DRV123457': { lat: 23.7920, lng: 90.4060, x: 340, y: 115 }, // Al-Amin - Gulshan
-  'DRV123458': { lat: 23.8075, lng: 90.3695, x: 105, y: 175 }, // Kamal Hossain - Mirpur
-  'DRV123459': { lat: 23.7940, lng: 90.4070, x: 215, y: 215 }, // Babul Akter - Banani
-  'DRV123460': { lat: 23.8720, lng: 90.3810, x: 475, y: 85 },  // Tanvir Ahmed - Uttara
-  'DRV123461': { lat: 23.7640, lng: 90.3590, x: 145, y: 255 }, // Shamim - Mohammadpur
-  'DRV123462': { lat: 23.8180, lng: 90.4310, x: 405, y: 165 }, // Moniruzzaman - Bashundhara
-};
+export const DRIVER_DEFAULT_LOCATIONS: Record<string, LocationCoords> = {};
 
 /**
  * Get coordinates for an Order / Store location

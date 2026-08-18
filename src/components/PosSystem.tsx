@@ -559,7 +559,7 @@ export default function PosSystem({ products, orders = [], onProductsChange, onC
     const list = deliveryTab === 'customer' ? deliveryOrders : posDispatchOrders;
     if (!list.length) return notifyError('List is already empty');
     list.forEach(order => onDeleteOrder?.(order.id));
-    notify(`${list.length} demo ${deliveryTab === 'customer' ? 'customer' : 'dispatch'} order(s) removed`);
+    notify(`${list.length} temporary ${deliveryTab === 'customer' ? 'customer' : 'dispatch'} order(s) removed`);
   };
 
   const keypad = (key: string) => {

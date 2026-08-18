@@ -18,9 +18,9 @@ export default function VehiclesView(){
   const [cids,setCids]=useState<string[]>([]);const [rid,setRid]=useState<string|null>(null);const [nd,setNd]=useState('');const [verr,setVerr]=useState('');
   const [sel,setSel]=useState<Set<string>>(new Set());
   const [vf,setVf]=useState({regNo:'',type:'Motorcycle',brand:'',model:'',year:2024,driverName:'',fuelType:'Octane',status:'Active'as any});
-  const [ff,setFf]=useState({vehicleId:'V001',liters:0,cost:0,odoReading:0});
-  const [mf,setMf]=useState({vehicleId:'V001',type:'Oil Change',cost:0,nextDue:''});
-  const [dv,setDv]=useState('V001');const [dt,setDt]=useState('Registration');const [df,setDf]=useState('');const [sd,setSd]=useState<string|null>(null);const [sp,setSp]=useState<Vehicle|null>(null);const [preview,setPreview]=useState<DocRecord|null>(null);const [showDocs,setShowDocs]=useState<string|null>(null);
+  const [ff,setFf]=useState({vehicleId:'',liters:0,cost:0,odoReading:0});
+  const [mf,setMf]=useState({vehicleId:'',type:'Oil Change',cost:0,nextDue:''});
+  const [dv,setDv]=useState('');const [dt,setDt]=useState('Registration');const [df,setDf]=useState('');const [sd,setSd]=useState<string|null>(null);const [sp,setSp]=useState<Vehicle|null>(null);const [preview,setPreview]=useState<DocRecord|null>(null);const [showDocs,setShowDocs]=useState<string|null>(null);
 
   const [veh,setVeh]=useState<Vehicle[]>([]);
   const[fl,setFl]=useState<FuelLog[]>([]);

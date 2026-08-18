@@ -89,7 +89,7 @@ export default function DriverPortal() {
   const docInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Read a selected photo (camera or gallery) as a base64 data URL and save it
-  // permanently into uploadedDocs — the actual image is stored, not a fake name.
+  // permanently into uploadedDocs — the actual image is stored, not a invalid name.
   const handleDocFile = (key: string, file: File | null | undefined) => {
     if (!file) return;
     const reader = new FileReader();
@@ -192,7 +192,7 @@ export default function DriverPortal() {
   };
 
   // Signup: register a real driver account with documents, then require admin
-  // approval. No demo/bypass button — the pending screen only leads to login.
+  // approval. No temporary/bypass button — the pending screen only leads to login.
   // Every driver gets a permanent numeric ID (e.g. 3667463854); once the admin
   // approves (App.tsx handleUpdateDriver) a random password is generated into
   // sd_driver_creds and the driver logs in with ID + that password.
@@ -753,7 +753,7 @@ export default function DriverPortal() {
                     <User className="w-3 h-3 text-brand-orange" /><span>Personal Information</span>
                   </p>
                   {[
-                    { label: 'Full Name (Bangla/English)', val: signupName, set: setSignupName, type: 'text', icon: User, ph: 'e.g. Rahim Khan' },
+                    { label: 'Full Name (Bangla/English)', val: signupName, set: setSignupName, type: 'text', icon: User, ph: 'Enter full name' },
                     { label: 'Mobile Phone', val: signupPhone, set: setSignupPhone, type: 'tel', icon: Phone, ph: 'e.g. 01712345678' },
                     { label: 'Gmail Address', val: signupGmail, set: setSignupGmail, type: 'email', icon: Mail, ph: 'name@gmail.com' },
                   ].map(f => (

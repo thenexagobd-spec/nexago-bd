@@ -547,7 +547,7 @@ export default function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Shakib Al Hasan"
+                  placeholder="Enter full name"
                   className="w-full px-3 py-2 bg-brand-dark text-xs text-white border border-brand-border rounded-lg outline-none focus:border-brand-orange"
                 />
               </div>
