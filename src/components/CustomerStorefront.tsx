@@ -5827,7 +5827,7 @@ const CustomerAuthScreen: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto" style={{
+    <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center px-3 py-5 sm:p-4 overflow-y-auto" style={{
       background: 'radial-gradient(1200px 600px at 20% -10%, rgba(16,185,129,0.25), transparent 60%), radial-gradient(1000px 500px at 90% 10%, rgba(45,212,191,0.18), transparent 55%), radial-gradient(900px 600px at 50% 110%, rgba(59,130,246,0.18), transparent 60%), #050a14',
     }}>
       <style>{`
@@ -5838,7 +5838,7 @@ const CustomerAuthScreen: React.FC<{
         .cs-auth-input option { background:#0b1220; color:#fff; }
       `}</style>
 
-      <div className="cs-auth-card cs-auth-glow relative w-full max-w-md rounded-3xl p-6 sm:p-8 text-white overflow-hidden">
+      <div className="cs-auth-card cs-auth-glow relative w-full max-w-md rounded-3xl p-5 sm:p-8 text-white max-h-[92dvh] overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
         <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
 
