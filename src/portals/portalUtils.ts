@@ -277,19 +277,25 @@ export function useCloudSync() {
         if (e && e.data && e.data.nexago === 'sync') { pull(); }
       };
     }
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
     let ws: WebSocket | null = null;
-    try {
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => ws?.send(JSON.stringify({ type: 'state-subscribe', key }));
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(String(event.data || '{}'));
-          if (msg.type === 'state-updated' && (!msg.key || msg.key === key)) pull();
-        } catch { /* ignore non-json ws messages */ }
-      };
-    } catch { /* websocket is optional; polling remains active */ }
+    const wsEnabled =
+      import.meta.env.VITE_ENABLE_WEBSOCKET_SYNC === 'true' ||
+      new URLSearchParams(window.location.search).get('ws') === '1';
+    if (wsEnabled) {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => ws?.send(JSON.stringify({ type: 'state-subscribe', key }));
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(String(event.data || '{}'));
+            if (msg.type === 'state-updated' && (!msg.key || msg.key === key)) pull();
+          } catch { /* ignore non-json ws messages */ }
+        };
+        ws.onerror = () => { try { ws?.close(); } catch { /* noop */ } };
+      } catch { /* websocket is optional; polling remains active */ }
+    }
 
     (async () => {
       const ok = await pull();

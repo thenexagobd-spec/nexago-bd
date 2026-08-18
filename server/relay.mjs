@@ -1005,8 +1005,9 @@ const server = http.createServer((req, res) => {
     }
   }
   // Built front-end static assets (from vite build)
-  if (url.pathname.startsWith('/assets/') || url.pathname === '/icon.svg' || url.pathname === '/vite.svg') {
-    if (serveDistFile(res, url.pathname)) return;
+  if (url.pathname.startsWith('/assets/') || url.pathname === '/icon.svg' || url.pathname === '/favicon.ico' || url.pathname === '/vite.svg') {
+    const assetPath = url.pathname === '/favicon.ico' ? '/icon.svg' : url.pathname;
+    if (serveDistFile(res, assetPath)) return;
   }
 
   // ---- Live store REST API ----
