@@ -231,6 +231,11 @@ const SUPABASE_TABLE = {
   walletTxns: 'nexago_wallet_txns',
   auditLog: 'nexago_audit_log',
   files: 'nexago_files',
+  products: 'nexago_products',
+  coupons: 'nexago_coupons',
+  branches: 'nexago_branches',
+  staff: 'nexago_staff',
+  payments: 'nexago_payments',
 };
 
 function supabaseWrite(table, row) {
@@ -250,6 +255,130 @@ function supabaseStoreWrite(key, value) {
   if (!supabaseReady || !supabaseConfigured) return;
   supabaseStoreMirror.set(key, value);
   supabaseWrite(SUPABASE_TABLE.stores, { key, payload: value, updated_at: new Date().toISOString() });
+  supabaseMirrorNormalizedState(key, value && value.state).catch((e) => console.error('[supabase] normalized mirror failed:', e.message));
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function boolActive(value, fallback = true) {
+  const text = String(value ?? '').toLowerCase();
+  if (['false', 'inactive', 'suspended', 'rejected', 'archived', 'deleted', 'out of stock'].includes(text)) return false;
+  if (['true', 'active', 'approved', 'in stock', 'pending verification'].includes(text)) return true;
+  return fallback;
+}
+
+async function upsertNormalized(table, rows, onConflict) {
+  if (!supabaseConfigured || !serviceClient || !Array.isArray(rows) || rows.length === 0) return;
+  const { error } = await serviceClient.from(table).upsert(rows, { onConflict });
+  if (error) throw error;
+}
+
+async function supabaseMirrorNormalizedState(key, state = {}) {
+  if (!supabaseConfigured || !serviceClient || !state || typeof state !== 'object') return;
+  const platformKey = safeKey(key);
+  const now = new Date().toISOString();
+  const defaultStoreId = firstText(state.profile?.storeId, state.profile?.id, platformKey);
+
+  const branches = (Array.isArray(state.branches) ? state.branches : [])
+    .map((b) => ({
+      branch_id: firstText(b.id, b.branchId),
+      platform_key: platformKey,
+      store_id: firstText(b.storeId, b.ownerStoreId, defaultStoreId),
+      name: firstText(b.name, b.branchName, 'Branch'),
+      address: firstText(b.address, b.location),
+      is_active: boolActive(b.status ?? b.isActive, true),
+      payload: b,
+      created_at: b.createdAt || now,
+      updated_at: b.updatedAt || now,
+    }))
+    .filter((b) => b.branch_id && b.store_id);
+
+  const products = (Array.isArray(state.products) ? state.products : [])
+    .map((p) => ({
+      product_id: firstText(p.id, p.productId, p.sku),
+      platform_key: platformKey,
+      store_id: firstText(p.storeId, p.ownerStoreId, defaultStoreId),
+      branch_id: firstText(p.branchId),
+      name: firstText(p.name, p.title, 'Product'),
+      sku: firstText(p.sku, p.barcode),
+      category: firstText(p.category),
+      price: Number(p.price || 0),
+      promo_price: p.promoPrice || p.salePrice ? Number(p.promoPrice || p.salePrice || 0) : null,
+      stock_qty: Number(p.stock ?? p.stockQty ?? p.quantity ?? 0),
+      is_active: boolActive(p.status ?? p.isActive, Number(p.stock ?? 0) > 0),
+      payload: p,
+      created_at: p.createdAt || now,
+      updated_at: p.updatedAt || now,
+    }))
+    .filter((p) => p.product_id && p.store_id && p.name);
+
+  const coupons = (Array.isArray(state.coupons) ? state.coupons : [])
+    .map((c) => ({
+      coupon_id: firstText(c.id, c.couponId),
+      code: firstText(c.code, c.couponCode, c.id),
+      platform_key: platformKey,
+      store_id: firstText(c.storeId, c.ownerStoreId),
+      branch_id: firstText(c.branchId),
+      discount_type: firstText(c.discountType, c.type, 'percentage'),
+      discount_value: Number(c.discountValue ?? c.discount ?? c.value ?? 0),
+      min_spend: Number(c.minSpend ?? c.minOrder ?? 0),
+      usage_limit: Number(c.usageLimit ?? c.limit ?? 100),
+      used_count: Number(c.usedCount ?? c.used ?? 0),
+      expires_at: c.expiresAt || c.endDate || null,
+      is_active: boolActive(c.status ?? c.isActive, true),
+      payload: c,
+      created_at: c.createdAt || now,
+      updated_at: c.updatedAt || now,
+    }))
+    .filter((c) => c.code);
+
+  const staff = (Array.isArray(state.staff) ? state.staff : [])
+    .map((s) => ({
+      staff_id: firstText(s.id, s.staffId, s.permanentNumber),
+      platform_key: platformKey,
+      store_id: firstText(s.storeId, s.ownerStoreId, defaultStoreId),
+      branch_id: firstText(s.branchId),
+      name: firstText(s.name, s.fullName, 'Staff'),
+      phone: firstText(s.phone, s.mobile, 'N/A'),
+      role: firstText(s.role, s.assignedRole, 'staff'),
+      is_active: boolActive(s.status ?? s.isActive, true),
+      payload: s,
+      created_at: s.createdAt || now,
+      updated_at: s.updatedAt || now,
+    }))
+    .filter((s) => s.staff_id && s.store_id);
+
+  const payments = (Array.isArray(state.payments) ? state.payments : [])
+    .map((p) => ({
+      payment_id: firstText(p.id, p.paymentId, p.trxId),
+      platform_key: platformKey,
+      order_id: firstText(p.orderId, p.order_id, p.orderNo, 'UNKNOWN'),
+      store_id: firstText(p.storeId, p.ownerStoreId),
+      branch_id: firstText(p.branchId),
+      gateway: firstText(p.gateway, p.method, p.paymentMethod, 'cash'),
+      amount: Number(p.amount || 0),
+      currency: firstText(p.currency, 'BDT'),
+      status: firstText(p.status, p.paymentStatus, 'pending').toLowerCase(),
+      gateway_response: p.gatewayResponse || p.gateway_response || {},
+      payload: p,
+      created_at: p.createdAt || p.time || now,
+      updated_at: p.updatedAt || now,
+    }))
+    .filter((p) => p.payment_id);
+
+  await Promise.all([
+    upsertNormalized(SUPABASE_TABLE.branches, branches, 'branch_id'),
+    upsertNormalized(SUPABASE_TABLE.products, products, 'product_id'),
+    upsertNormalized(SUPABASE_TABLE.coupons, coupons, 'code'),
+    upsertNormalized(SUPABASE_TABLE.staff, staff, 'staff_id'),
+    upsertNormalized(SUPABASE_TABLE.payments, payments, 'payment_id'),
+  ]);
 }
 
 function supabaseSecurityWrite(name, value) {
