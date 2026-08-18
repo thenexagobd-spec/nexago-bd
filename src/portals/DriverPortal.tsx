@@ -15,10 +15,10 @@ import {
   LayoutDashboard, Package, Wallet, User, MessageSquare, BarChart3, Phone, Navigation,
   CheckCircle2, Star, LogIn, Power, Send, RefreshCw, MapPin, FileText, AlertCircle,
     History, Inbox, Headphones, Settings, ShieldCheck, LogOut, ChevronRight, Copy, Eye, Truck,
-    X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays
+    X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays, MailCheck
   } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim } from './portalUtils';
+import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim, securityApi } from './portalUtils';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
@@ -66,6 +66,13 @@ export default function DriverPortal() {
   const [termsChecked, setTermsChecked] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
   const [pendingId, setPendingId] = useState<string>(() => lsGet('sd_driver_pending_id', ''));
+  // Gmail OTP signup verification (mirrors Store Admin flow): the driver verifies
+  // their Gmail with a 6-digit code before the application can be submitted.
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpStep, setOtpStep] = useState<'idle' | 'sent' | 'verified'>('idle');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpError, setOtpError] = useState('');
   const [checkStatusInput, setCheckStatusInput] = useState('');
   const [checkStatusQuery, setCheckStatusQuery] = useState('');
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
@@ -203,6 +210,10 @@ export default function DriverPortal() {
       showToast('Enter a valid Gmail address (name@gmail.com)');
       return;
     }
+    if (otpStep !== 'verified') {
+      showToast('Verify your Gmail with the OTP code first');
+      return;
+    }
     if (signupNid.replace(/[^0-9]/g, '').length < 10) {
       showToast('Enter a valid NID number (10+ digits)');
       return;
@@ -266,6 +277,36 @@ export default function DriverPortal() {
     setAuthView('pending');
     setSignupName(''); setSignupPhone(''); setSignupGmail(''); setSignupNid(''); setSignupLicense(''); setSignupLicenseExpiry('');
     setUploadedDocs({}); setTermsChecked(false);
+  };
+
+  // Gmail OTP signup verification (server-side, same endpoints as Store Admin).
+  const sendSignupOtp = () => {
+    const email = signupGmail.trim().toLowerCase();
+    if (!email || !/^[\w.+-]+@gmail\.com$/i.test(email)) { setOtpError('Enter a valid Gmail address first.'); return; }
+    setOtpBusy(true);
+    setOtpError('');
+    securityApi('/otp-signup-send', { email }).then(() => {
+      setOtpStep('sent');
+      setOtpError('');
+      showToast('Verification code sent to your Gmail');
+    }).catch((err) => {
+      setOtpError(String(err?.message || 'Could not send the code. Try again.'));
+    }).finally(() => setOtpBusy(false));
+  };
+
+  const verifySignupOtp = () => {
+    const email = signupGmail.trim().toLowerCase();
+    if (!otpCode.trim()) { setOtpError('Enter the 6-digit code from your email.'); return; }
+    setOtpBusy(true);
+    setOtpError('');
+    securityApi('/otp-signup-verify', { email, code: otpCode }).then(() => {
+      setOtpStep('verified');
+      setEmailVerified(true);
+      setOtpError('');
+      showToast('Gmail verified — you can now submit your application');
+    }).catch((err) => {
+      setOtpError(String(err?.message || 'Invalid or expired code.'));
+    }).finally(() => setOtpBusy(false));
   };
 
   const handleLogout = () => {
@@ -724,6 +765,32 @@ export default function DriverPortal() {
                       </div>
                     </div>
                   ))}
+
+                  <div className={`rounded-xl p-3 border ${otpStep === 'verified' ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-[#24395c] glass-soft'}`}>
+                    <div className="flex items-start space-x-2">
+                      <MailCheck className="w-3.5 h-3.5 text-brand-orange shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Verify Gmail with OTP</p>
+                        <p className="text-[8px] text-gray-500 mt-0.5">A 6-digit code is emailed to your Gmail. Your account is only created after this passes.</p>
+                        {otpStep === 'verified' ? (
+                          <p className="mt-2 text-[9px] font-bold text-emerald-400 flex items-center space-x-1"><CheckCircle2 className="w-3 h-3" /><span>Gmail verified — you can submit your application</span></p>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {otpStep === 'sent' && (
+                              <div className="flex items-center space-x-2">
+                                <input value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="6-digit code" className="flex-1 bg-[#0a1322] border border-[#1e3050] rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                                <button onClick={verifySignupOtp} disabled={otpBusy} className="rounded-lg bg-brand-orange px-3 py-2 text-[9px] font-black uppercase text-white disabled:opacity-60">Verify</button>
+                              </div>
+                            )}
+                            <button onClick={sendSignupOtp} disabled={otpBusy} className="w-full rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20 disabled:opacity-60">
+                              {otpStep === 'sent' ? 'Resend Code' : 'Send OTP to Gmail'}
+                            </button>
+                            {otpError && <p className="text-[8px] font-bold text-red-400">{otpError}</p>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div>

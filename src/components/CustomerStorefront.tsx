@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ShoppingBag, Search, MapPin, Bell, Heart, CreditCard, Wallet, Ticket,
   HelpCircle, Settings, ChevronDown, ChevronLeft, ChevronRight, Filter, Star,
-  Clock, Truck, Shield, Gift, Store, Plus, Minus, CheckCircle, X,
+  Clock, Truck, Shield, Gift, Store, Plus, Minus, CheckCircle, CheckCircle2, X,
   ShieldCheck, Home, Package, Map, Phone, Copy, Check, RefreshCw,
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
@@ -988,6 +988,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   useEffect(() => setStoredData(LS_KEYS.wtxn, walletTransactions), [walletTransactions]);
   const [splitPinInput, setSplitPinInput] = useState('');
 
+  // Customer instant OTP login/signup: a Gmail OTP is required before the first
+  // order (one-time). After verification the customer is marked verified so
+  // repeat orders on this device skip the step.
+  const [custVerifyOpen, setCustVerifyOpen] = useState(false);
+  const [custOtpStep, setCustOtpStep] = useState<'idle' | 'sent' | 'verified'>('idle');
+  const [custOtpCode, setCustOtpCode] = useState('');
+  const [custOtpBusy, setCustOtpBusy] = useState(false);
+  const [custOtpError, setCustOtpError] = useState('');
+  const [custVerified, setCustVerified] = useState<boolean>(() => { try { return localStorage.getItem('ss_cust_verified') === '1'; } catch { return false; } });
+
   // Customer directory (A-Z) — all customers + add to wallet
   const [customerDirOpen, setCustomerDirOpen] = useState(false);
   const [customerDirSearch, setCustomerDirSearch] = useState('');
@@ -1618,6 +1628,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast('Your cart is empty. Add items to order!', 'info');
       return;
     }
+    if (!custVerified) {
+      setCustVerifyOpen(true);
+      return;
+    }
+    proceedToPlaceOrder();
+  };
+
+  const proceedToPlaceOrder = () => {
     if (SEND_MONEY_METHODS.includes(paymentMethod as WalletKey)) {
       setPayModal(paymentMethod);
       setPinInput('');
@@ -1633,6 +1651,42 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     setPayModal('COD');
+  };
+
+  // Customer instant OTP verification (signup-verify endpoint: no session,
+  // no approval — one-time gate before the first order).
+  const sendCustOtp = () => {
+    const email = (customerProfile.email || '').trim().toLowerCase();
+    if (!email || !/^[\w.+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email)) {
+      setCustOtpError('Enter a valid email address in your profile first.');
+      return;
+    }
+    setCustOtpBusy(true);
+    setCustOtpError('');
+    securityApi('/otp-signup-send', { email }).then(() => {
+      setCustOtpStep('sent');
+      showToast('Verification code sent to your email');
+    }).catch((err) => {
+      setCustOtpError(String(err?.message || 'Could not send the code. Try again.'));
+    }).finally(() => setCustOtpBusy(false));
+  };
+
+  const verifyCustOtp = () => {
+    const email = (customerProfile.email || '').trim().toLowerCase();
+    if (!custOtpCode.trim()) { setCustOtpError('Enter the 6-digit code from your email.'); return; }
+    setCustOtpBusy(true);
+    setCustOtpError('');
+    securityApi('/otp-signup-verify', { email, code: custOtpCode }).then(() => {
+      setCustOtpStep('verified');
+      setCustVerified(true);
+      try { localStorage.setItem('ss_cust_verified', '1'); } catch { /* ignore */ }
+      setCustVerifyOpen(false);
+      setCustOtpCode('');
+      showToast('Email verified — you can now place your order');
+      setTimeout(proceedToPlaceOrder, 350);
+    }).catch((err) => {
+      setCustOtpError(String(err?.message || 'Invalid or expired code.'));
+    }).finally(() => setCustOtpBusy(false));
   };
 
   const confirmPayment = () => {
@@ -4079,6 +4133,55 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ CUSTOMER OTP VERIFY MODAL ============ */}
+      {custVerifyOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-black text-gray-900 text-sm flex items-center space-x-1.5"><ShieldCheck className="w-4 h-4 text-emerald-600" /><span>Verify Your Account</span></h3>
+                <p className="text-[10px] text-gray-500 mt-0.5">One-time Gmail OTP before your first order — instant, no approval needed.</p>
+              </div>
+              <button onClick={() => setCustVerifyOpen(false)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Email address</label>
+                <input
+                  value={customerProfile.email}
+                  onChange={(e) => setCustomerProfile({ ...customerProfile, email: e.target.value })}
+                  placeholder="name@gmail.com"
+                  className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500"
+                />
+              </div>
+              {custOtpStep === 'verified' ? (
+                <p className="text-[11px] font-bold text-emerald-600 flex items-center space-x-1"><CheckCircle2 className="w-4 h-4" /><span>Email verified — placing your order…</span></p>
+              ) : (
+                <div className="space-y-2">
+                  {custOtpStep === 'sent' && (
+                    <div className="flex items-center space-x-2">
+                      <input
+                        value={custOtpCode}
+                        onChange={(e) => setCustOtpCode(e.target.value)}
+                        placeholder="6-digit code"
+                        className="flex-1 p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500"
+                      />
+                      <button onClick={verifyCustOtp} disabled={custOtpBusy} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl font-black text-[11px] uppercase cursor-pointer">Verify</button>
+                    </div>
+                  )}
+                  <button onClick={sendCustOtp} disabled={custOtpBusy} className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl font-black text-[11px] uppercase cursor-pointer">
+                    {custOtpStep === 'sent' ? 'Resend Code' : 'Send OTP'}
+                  </button>
+                  {custOtpError && <p className="text-[10px] font-bold text-red-500">{custOtpError}</p>}
+                </div>
+              )}
+            </div>
+            <p className="text-[9px] text-gray-400">A single account rule applies — the same email/phone can only be used for one account. Your order proceeds as soon as the code is confirmed.</p>
           </div>
         </div>
       )}
