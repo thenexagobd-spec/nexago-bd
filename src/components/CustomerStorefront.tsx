@@ -7,11 +7,11 @@ import {
   Trash2, Navigation, Sparkles, Tag, Printer, Lock, Banknote, Zap, ArrowRight, Bike, Percent,
   RotateCcw, Languages, ShoppingCart, BadgePercent, Crown, Gem, Store as StoreIcon,
   MessageCircle, Share2, LocateFixed, CalendarClock, AlertCircle, Link2,
-  Camera, Send, Headphones, ScrollText, RefreshCcw, User, Mail, KeyRound, Wrench, QrCode
+  Camera, Send, Headphones, ScrollText, RefreshCcw, User, Mail, KeyRound, Wrench, QrCode, Eye, EyeOff
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, ReturnRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
-import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi, customerRegister, customerSync } from '../portals/portalUtils';
+import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi, customerRegister, customerSync, customerLogin, customerForgot } from '../portals/portalUtils';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -2229,10 +2229,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           email={customerProfile.email}
           name={customerProfile.name}
           phone={customerProfile.phone}
+          customerId={customerId}
           onUpdateProfile={(patch) => setCustomerProfile((p) => ({ ...p, ...patch }))}
-          onVerified={() => {
+          onVerified={(info) => {
             setCustVerified(true);
-            try { localStorage.setItem('ss_cust_verified', '1'); } catch { /* ignore */ }
+            try {
+              localStorage.setItem('ss_cust_verified', '1');
+              if (info?.customerId) localStorage.setItem('ss_cust_id', info.customerId);
+            } catch { /* ignore */ }
           }}
           showToast={showToast}
         />
@@ -5607,48 +5611,164 @@ const CustomerAuthScreen: React.FC<{
   email: string;
   name: string;
   phone: string;
+  customerId: string;
   onUpdateProfile: (patch: Partial<{ name: string; email: string; phone: string }>) => void;
-  onVerified: () => void;
+  onVerified: (info?: { customerId?: string; name?: string; email?: string; phone?: string; password?: string; pin?: string }) => void;
   showToast?: (msg: string, type?: string) => void;
-}> = ({ email, name, phone, onUpdateProfile, onVerified, showToast }) => {
+}> = ({ email, name, phone, customerId, onUpdateProfile, onVerified, showToast }) => {
+  const [mode, setMode] = useState<'login' | 'signup'>('signup');
+  const [step, setStep] = useState<'form' | 'otp' | 'done'>('form');
   const [emailField, setEmailField] = useState(email || '');
   const [nameField, setNameField] = useState(name || '');
   const [phoneField, setPhoneField] = useState(phone || '');
-  const [step, setStep] = useState<'form' | 'otp' | 'done'>('form');
+  const [passField, setPassField] = useState('');
+  const [passConfirm, setPassConfirm] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sentTo, setSentTo] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [doneCard, setDoneCard] = useState<{ customerId: string; email: string; phone: string; password: string; pin: string } | null>(null);
 
   const emailOk = () => /^[\w.+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(emailField.trim());
+  const phoneOk = () => !phoneField.trim() || /^\+?88?01\d{9}$/.test(phoneField.trim().replace(/[^0-9]/g, ''));
+  const genPin = () => String(Math.floor(100000 + Math.random() * 900000));
 
-  const sendOtp = () => {
+  // Password login.
+  const doLogin = () => {
     if (!emailOk()) { setError('Enter a valid email address.'); return; }
+    if (!passField) { setError('Enter your password.'); return; }
+    setBusy(true);
+    setError('');
+    customerLogin({ email: emailField.trim().toLowerCase(), password: passField })
+      .then((res) => {
+        if (!res || !res.customer) { setError('Wrong email or password. Try again, or use Forgot Password.'); return; }
+        onUpdateProfile({ name: res.customer.name || nameField, email: res.customer.email || emailField, phone: res.customer.phone || phoneField });
+        showToast?.('Welcome back! Logged in with password.', 'success');
+        onVerified({ customerId: res.customer.customerId, name: res.customer.name, email: res.customer.email, phone: res.customer.phone });
+      })
+      .catch((err) => setError(String(err?.message || 'Login failed. Try again.')))
+      .finally(() => setBusy(false));
+  };
+
+  // Signup: send OTP (mandatory before any account is created).
+  const sendOtp = () => {
+    if (!emailOk()) { setError('Enter a valid Gmail address.'); return; }
+    if (!nameField.trim()) { setError('Enter your full name.'); return; }
+    if (!phoneOk()) { setError('Enter a valid Bangladeshi phone number.'); return; }
+    if (passField.length < 6) { setError('Set a password of at least 6 characters.'); return; }
+    if (passField !== passConfirm) { setError('Passwords do not match.'); return; }
     setBusy(true);
     setError('');
     const target = emailField.trim().toLowerCase();
     setSentTo(target);
     securityApi('/otp-signup-send', { email: target })
-      .then(() => { setStep('otp'); })
+      .then(() => setStep('otp'))
       .catch((err) => setError(String(err?.message || 'Could not send the code. Try again.')))
       .finally(() => setBusy(false));
   };
 
-  const verifyOtp = () => {
+  // Verify OTP then register — the server links the permanent ID with the
+  // Gmail/phone (one ID per Gmail/phone, never duplicated).
+  const verifyOtp = async () => {
     if (!otpCode.trim()) { setError('Enter the 6-digit code from your email.'); return; }
     setBusy(true);
     setError('');
-    securityApi('/otp-signup-verify', { email: sentTo, code: otpCode })
-      .then(() => {
-        onUpdateProfile({ email: sentTo });
-        if (nameField.trim()) onUpdateProfile({ name: nameField.trim() });
-        if (phoneField.trim()) onUpdateProfile({ phone: phoneField.trim() });
-        setStep('done');
-        showToast?.('Welcome to Smart Shop! Your order is now unlocked.', 'success');
-        setTimeout(onVerified, 600);
-      })
-      .catch((err) => setError(String(err?.message || 'Invalid or expired code.')))
+    const target = sentTo;
+    try {
+      await securityApi('/otp-signup-verify', { email: target, code: otpCode });
+      // One-account rule: reject if the same Gmail/phone already belongs to
+      // another customer/driver/store-admin/staff identity.
+      const takenCheck = await identityCheck({ phone: phoneField.trim(), email: target, excludeId: customerId, excludeRole: 'customer' }).catch(() => null);
+      if (takenCheck && takenCheck.taken) {
+        setError('This Gmail or phone already belongs to another account. One account per Gmail/phone — please log in with your existing account.');
+        setStep('form');
+        return;
+      }
+      const res = await customerRegister({ name: nameField.trim(), phone: phoneField.trim(), email: target, customerId, password: passField, balance: 0 });
+      if (!res || !res.customer) { setError('Account could not be created. Please try again.'); setStep('form'); return; }
+      const newId = res.customer.customerId || customerId;
+      const pin = genPin();
+      onUpdateProfile({ name: nameField.trim(), email: target, phone: phoneField.trim() });
+      setDoneCard({ customerId: newId, email: target, phone: phoneField.trim(), password: passField, pin });
+      setStep('done');
+    } catch (err) {
+      setError(String((err as any)?.message || 'Invalid or expired code.'));
+      setStep('form');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Forgot password: OTP → set new password.
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotStep, setForgotStep] = useState<'ask' | 'otp'>('ask');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotPass, setForgotPass] = useState('');
+
+  const sendForgotOtp = () => {
+    if (!emailOk()) { setError('Enter the email address of your account.'); return; }
+    setBusy(true);
+    setError('');
+    const target = emailField.trim().toLowerCase();
+    setSentTo(target);
+    securityApi('/otp-signup-send', { email: target })
+      .then(() => setForgotStep('otp'))
+      .catch((err) => setError(String(err?.message || 'Could not send the code. Try again.')))
       .finally(() => setBusy(false));
+  };
+
+  const doForgot = () => {
+    if (!forgotOtp.trim()) { setError('Enter the 6-digit code from your email.'); return; }
+    if (forgotPass.length < 6) { setError('Set a new password of at least 6 characters.'); return; }
+    setBusy(true);
+    setError('');
+    customerForgot({ email: sentTo, code: forgotOtp, newPassword: forgotPass })
+      .then((ok) => {
+        if (!ok) { setError('Could not reset the password. Check the code and try again.'); return; }
+        showToast?.('Password reset successful — log in with your new password.', 'success');
+        setForgotMode(false);
+        setForgotStep('ask');
+        setForgotOtp('');
+        setForgotPass('');
+        setMode('login');
+        setPassField(forgotPass);
+        setPassConfirm('');
+        setError('');
+      })
+      .catch((err) => setError(String(err?.message || 'Reset failed. Try again.')))
+      .finally(() => setBusy(false));
+  };
+
+  const printCard = () => {
+    if (!doneCard) return;
+    const w = window.open('', '_blank', 'width=420,height=520');
+    if (!w) { showToast?.('Popup blocked — allow popups to print your credential card.', 'info'); return; }
+    w.document.write(`<!doctype html><html><head><title>Smart Shop — Customer Credential</title><style>
+      body{font-family:'Segoe UI',Arial,sans-serif;background:#0b1220;color:#e2e8f0;display:flex;justify-content:center;padding:40px 16px;}
+      .card{background:linear-gradient(145deg,#0e1a2b,#13233c);border:1px solid rgba(52,211,153,0.35);border-radius:20px;padding:28px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+      .brand{display:flex;align-items:center;gap:10px;margin-bottom:20px;}
+      .logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#10b981,#0d9488);display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;}
+      h2{margin:0;font-size:18px;}
+      .sub{font-size:10px;color:#6ee7b7;letter-spacing:2px;text-transform:uppercase;}
+      .row{margin-top:14px;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;}
+      .lbl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;font-weight:700;}
+      .val{font-size:15px;font-weight:700;color:#fff;word-break:break-all;margin-top:3px;font-family:'Courier New',monospace;}
+      .warn{margin-top:18px;font-size:10px;color:#fbbf24;line-height:1.5;}
+      @media print{body{padding:8px;background:#fff;color:#111;}.card{background:#fff;border:2px solid #10b981;box-shadow:none;}.val{color:#111;}.lbl{color:#555;}.sub{color:#059669;}.warn{color:#b45309;}}
+    </style></head><body>
+      <div class="card">
+        <div class="brand"><div class="logo">SS</div><div><h2>Smart Shop</h2><div class="sub">by NexaGo BD</div></div></div>
+        <div class="row"><div class="lbl">Permanent Customer ID</div><div class="val">${doneCard.customerId}</div></div>
+        <div class="row"><div class="lbl">Gmail (login)</div><div class="val">${doneCard.email}</div></div>
+        <div class="row"><div class="lbl">Phone</div><div class="val">${doneCard.phone || '—'}</div></div>
+        <div class="row"><div class="lbl">Password</div><div class="val">${doneCard.password}</div></div>
+        <div class="row"><div class="lbl">Account PIN</div><div class="val">${doneCard.pin}</div></div>
+        <div class="warn">Keep this card safe. Your permanent ID, Gmail and phone are linked — you can log in from any device with your Gmail + password and never lose your orders or wallet.</div>
+      </div>
+      <script>window.onload=function(){setTimeout(function(){window.print();},300);};</script>
+    </body></html>`);
+    w.document.close();
   };
 
   return (
@@ -5660,9 +5780,10 @@ const CustomerAuthScreen: React.FC<{
         .cs-auth-glow { box-shadow: 0 0 60px rgba(16,185,129,0.35), 0 0 0 1px rgba(16,185,129,0.25); }
         .cs-auth-input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); transition: all 0.2s; }
         .cs-auth-input:focus { border-color: rgba(52,211,153,0.7); box-shadow: 0 0 0 3px rgba(52,211,153,0.18); background: rgba(255,255,255,0.12); }
+        .cs-auth-input option { background:#0b1220; color:#fff; }
       `}</style>
 
-      <div className="cs-auth-card cs-auth-glow relative w-full max-w-md rounded-3xl p-7 sm:p-9 text-white overflow-hidden">
+      <div className="cs-auth-card cs-auth-glow relative w-full max-w-md rounded-3xl p-6 sm:p-8 text-white overflow-hidden">
         <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
 
@@ -5677,70 +5798,170 @@ const CustomerAuthScreen: React.FC<{
             </div>
           </div>
 
-          <h1 className="mt-6 text-xl font-black leading-tight">Welcome to Smart Shop</h1>
-          <p className="mt-1.5 text-[12px] text-gray-300 leading-relaxed">
-            {step === 'done'
-              ? 'Account created instantly — no approval needed. Enjoy shopping!'
-              : 'Sign in or create your account with a Gmail OTP. It takes less than a minute and unlocks ordering.'}
-          </p>
+          {!forgotMode && step === 'form' && (
+            <>
+              <h1 className="mt-5 text-xl font-black leading-tight">Welcome to Smart Shop</h1>
+              <p className="mt-1.5 text-[12px] text-gray-300 leading-relaxed">One permanent account for all your devices — Gmail + phone linked, order & wallet data never lost.</p>
 
-          {step === 'form' && (
-            <div className="mt-6 space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Full Name</label>
-                <input value={nameField} onChange={(e) => setNameField(e.target.value)} placeholder="e.g. Rahim Khan"
-                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+              <div className="mt-5 grid grid-cols-2 gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
+                <button onClick={() => { setMode('signup'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'signup' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Create Account</button>
+                <button onClick={() => { setMode('login'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'login' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Sign In</button>
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Phone (optional)</label>
-                <input value={phoneField} onChange={(e) => setPhoneField(e.target.value)} placeholder="e.g. 01712345678"
-                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+
+              <div className="mt-5 space-y-3">
+                {mode === 'signup' && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Full Name <span className="text-emerald-400">*</span></label>
+                      <input value={nameField} onChange={(e) => setNameField(e.target.value)} placeholder="e.g. Rahim Khan"
+                        className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Phone Number <span className="text-emerald-400">*</span></label>
+                      <input value={phoneField} onChange={(e) => setPhoneField(e.target.value)} placeholder="e.g. 01712345678"
+                        className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail Address <span className="text-emerald-400">*</span></label>
+                  <input value={emailField} onChange={(e) => { setEmailField(e.target.value); setError(''); }} placeholder="name@gmail.com"
+                    className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Password {mode === 'signup' ? '(min 6 chars)' : ''} <span className="text-emerald-400">*</span></label>
+                  <div className="relative">
+                    <input type={showPass ? 'text' : 'password'} value={passField} onChange={(e) => { setPassField(e.target.value); setError(''); }} placeholder={mode === 'signup' ? 'Set your password' : 'Your password'}
+                      className="cs-auth-input w-full rounded-xl px-4 py-3 pr-12 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-300 cursor-pointer">
+                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                {mode === 'signup' && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Confirm Password <span className="text-emerald-400">*</span></label>
+                    <input type={showPass ? 'text' : 'password'} value={passConfirm} onChange={(e) => { setPassConfirm(e.target.value); setError(''); }} placeholder="Re-type your password"
+                      className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                  </div>
+                )}
+                {mode === 'signup' ? (
+                  <button onClick={sendOtp} disabled={busy}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                    {busy ? 'Sending…' : 'Send OTP to Gmail'}
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={doLogin} disabled={busy}
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                      {busy ? 'Signing in…' : 'Sign In with Password'}
+                    </button>
+                    <button onClick={() => { setForgotMode(true); setError(''); }} className="w-full text-center text-[11px] font-bold text-emerald-300 hover:text-emerald-200 transition-colors cursor-pointer">
+                      Forgot Password?
+                    </button>
+                  </>
+                )}
+                {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail Address</label>
-                <input value={emailField} onChange={(e) => { setEmailField(e.target.value); setError(''); }} placeholder="name@gmail.com"
-                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
-              </div>
-              <button onClick={sendOtp} disabled={busy}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                {busy ? 'Sending…' : 'Send OTP to Gmail'}
-              </button>
-              {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
-            </div>
+            </>
           )}
 
-          {step === 'otp' && (
+          {!forgotMode && step === 'otp' && (
             <div className="mt-6 space-y-3">
               <div className="rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3 text-[11px] text-emerald-200">
-                A 6-digit code was sent to <b className="text-white">{sentTo}</b>. Enter it below to finish.
+                <b className="text-white">Step 2 of 2</b> — a 6-digit code was sent to <b className="text-white">{sentTo}</b>. Your account is only created after this OTP passes.
               </div>
               <input value={otpCode} onChange={(e) => { setOtpCode(e.target.value); setError(''); }} placeholder="6-digit code"
                 className="cs-auth-input w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:text-gray-500" />
               <button onClick={verifyOtp} disabled={busy}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                {busy ? 'Verifying…' : 'Verify & Continue'}
+                {busy ? 'Verifying…' : 'Verify & Create Account'}
               </button>
               <button onClick={sendOtp} disabled={busy}
                 className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
                 Resend Code
               </button>
+              <button onClick={() => setStep('form')} disabled={busy}
+                className="w-full py-2.5 rounded-xl text-[11px] font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">
+                ← Back
+              </button>
               {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
             </div>
           )}
 
-          {step === 'done' && (
-            <div className="mt-6 space-y-3 text-center">
-              <div className="w-14 h-14 mx-auto rounded-full bg-emerald-400/15 border border-emerald-400/30 flex items-center justify-center">
-                <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+          {!forgotMode && step === 'done' && doneCard && (
+            <div className="mt-6 space-y-3">
+              <div className="text-center">
+                <div className="w-14 h-14 mx-auto rounded-full bg-emerald-400/15 border border-emerald-400/30 flex items-center justify-center">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+                </div>
+                <h2 className="mt-3 text-lg font-black text-emerald-300">Account Created!</h2>
+                <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">Your permanent ID, Gmail and phone are now linked. You can log in from any device with your Gmail + password.</p>
               </div>
-              <p className="text-sm font-bold text-emerald-300">You're in! Preparing your storefront…</p>
+              <div className="rounded-2xl bg-white/5 border border-emerald-400/25 p-4 space-y-2 text-[11px]">
+                <div className="flex justify-between items-center"><span className="text-gray-400">Permanent ID</span><span className="font-mono font-black text-emerald-300">{doneCard.customerId}</span></div>
+                <div className="flex justify-between items-center"><span className="text-gray-400">Gmail</span><span className="font-mono font-bold text-white">{doneCard.email}</span></div>
+                <div className="flex justify-between items-center"><span className="text-gray-400">Phone</span><span className="font-mono font-bold text-white">{doneCard.phone || '—'}</span></div>
+                <div className="flex justify-between items-center"><span className="text-gray-400">Password</span><span className="font-mono font-bold text-white">{doneCard.password}</span></div>
+                <div className="flex justify-between items-center"><span className="text-gray-400">Account PIN</span><span className="font-mono font-black text-emerald-300">{doneCard.pin}</span></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button onClick={printCard}
+                  className="py-3 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 text-white text-[12px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center space-x-1.5">
+                  <Printer className="w-4 h-4" /><span>Print Credential</span>
+                </button>
+                <button onClick={() => onVerified({ customerId: doneCard.customerId, name: nameField, email: doneCard.email, phone: doneCard.phone, password: doneCard.password, pin: doneCard.pin })}
+                  className="py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[12px] font-black uppercase tracking-wider transition-all cursor-pointer">
+                  Start Shopping →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {forgotMode && (
+            <div className="mt-6 space-y-3">
+              <h2 className="text-lg font-black">Reset Password</h2>
+              <p className="text-[11px] text-gray-300">Enter your account Gmail, verify the OTP, then set a new password.</p>
+              {forgotStep === 'ask' ? (
+                <>
+                  <input value={emailField} onChange={(e) => { setEmailField(e.target.value); setError(''); }} placeholder="name@gmail.com"
+                    className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                  <button onClick={sendForgotOtp} disabled={busy}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                    {busy ? 'Sending…' : 'Send OTP'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3 text-[11px] text-emerald-200">
+                    Code sent to <b className="text-white">{sentTo}</b>
+                  </div>
+                  <input value={forgotOtp} onChange={(e) => { setForgotOtp(e.target.value); setError(''); }} placeholder="6-digit code"
+                    className="cs-auth-input w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:text-gray-500" />
+                  <input type={showPass ? 'text' : 'password'} value={forgotPass} onChange={(e) => { setForgotPass(e.target.value); setError(''); }} placeholder="New password (min 6 chars)"
+                    className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                  <button onClick={doForgot} disabled={busy}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                    {busy ? 'Resetting…' : 'Set New Password'}
+                  </button>
+                  <button onClick={sendForgotOtp} disabled={busy}
+                    className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
+                    Resend Code
+                  </button>
+                </>
+              )}
+              <button onClick={() => { setForgotMode(false); setForgotStep('ask'); setError(''); }} disabled={busy}
+                className="w-full py-2.5 rounded-xl text-[11px] font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">
+                ← Back to Sign In
+              </button>
+              {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
             </div>
           )}
 
           <div className="mt-6 pt-5 border-t border-white/10 text-center space-y-2">
             <p className="text-[10px] text-gray-400 flex items-center justify-center space-x-1.5">
               <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              <span>One account per Gmail · Secure OTP verification</span>
+              <span>One account per Gmail/phone · OTP mandatory · No data loss across devices</span>
             </p>
             <p className="text-[9px] text-gray-500">By continuing you agree to our Terms & Privacy Policy.</p>
           </div>

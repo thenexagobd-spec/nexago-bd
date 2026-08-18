@@ -1265,20 +1265,27 @@ const server = http.createServer((req, res) => {
   }
 
   // ---- Unified ID + Permanent Cloud ----
-  // POST /api/security/customer/register { name?, phone?, email?, customerId? }
+  // POST /api/security/customer/register { name?, phone?, email?, customerId?, password? }
   //   → returns the permanent customer record. If the phone or Gmail is already
   //     registered, the EXISTING customerId is adopted (device-independent ID);
   //     otherwise a new record is created (or the provided customerId is used).
   //     Includes wallet balance + recent transactions so the client restores
-  //     itself on any device.
+  //     itself on any device. A password (min 6 chars) is hashed server-side so
+  //     the customer can also log in with email + password on any device.
   // GET  /api/security/customer/me?customerId=... → customer + wallet + txns.
   // POST /api/security/customer/sync { customerId, balance, txns[] } → pushes
   //   wallet balance + new wallet transactions to the permanent cloud store.
+  // POST /api/security/customer/login { email, password } → verifies password,
+  //   returns customer + wallet + txns.
+  // POST /api/security/customer/forgot { email, code, newPassword } → verifies
+  //   the OTP then sets a new password.
   if (req.method === 'POST' && url.pathname === '/api/security/customer/register') {
     if (!rateLimit(req, 'customer-register', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then(async (body) => {
       const phone = String(body.phone || '').trim();
       const email = normalizeEmailForIdentity(body.email);
+      const password = String(body.password || '');
+      if (password && password.length < 6) { sendJson(res, 400, { ok: false, error: 'PASSWORD_TOO_SHORT' }); return; }
       const requestedId = String(body.customerId || '').trim();
       let customerId = requestedId && requestedId.startsWith('NEX') ? requestedId : '';
       let record = null;
@@ -1298,12 +1305,14 @@ const server = http.createServer((req, res) => {
           if (data && data[0]) { customerId = data[0].customer_id; record = { customerId, name: data[0].name, phone: data[0].phone, email: data[0].email, payload: data[0].payload }; }
         }
       }
+      const existingHash = record?.payload?.passwordHash || '';
+      const passwordHash = password ? hashPassword(password) : existingHash;
       const customer = {
         customerId,
         name: String(body.name || record?.name || 'Customer').slice(0, 200),
         phone,
         email,
-        payload: record?.payload || {},
+        payload: { ...(record?.payload || {}), ...(passwordHash ? { passwordHash } : {}) },
       };
       if (supabaseConfigured && serviceClient) {
         try {
@@ -1330,7 +1339,65 @@ const server = http.createServer((req, res) => {
       if (supabaseConfigured && serviceClient) await supabaseUpsertWallet(customerId, balance);
       const txns = (supabaseConfigured && serviceClient) ? await supabaseFetchTxns(customerId, 100) : [];
       appendAudit(key, { actor: customerId, role: 'customer', action: 'customer-registered', ip: clientIp(req), reason: phone || email || 'anonymous' });
-      sendJson(res, 200, { ok: true, customer, walletBalance: balance, txns });
+      sendJson(res, 200, { ok: true, customer: { customerId: customer.customerId, name: customer.name, phone: customer.phone, email: customer.email }, hasPassword: !!passwordHash, walletBalance: balance, txns });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/customer/login') {
+    if (!rateLimit(req, 'customer-login', 12, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const email = normalizeEmailForIdentity(body.email);
+      const password = String(body.password || '');
+      const found = findCustomerByPhoneOrEmail('', email);
+      if (!found || !found.payload?.passwordHash || !verifyPassword(password, found.payload.passwordHash)) {
+        appendAudit(key, { actor: email || 'unknown', role: 'customer', action: 'customer-login-failed', ip: clientIp(req), reason: 'invalid customer password' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_LOGIN' });
+        return;
+      }
+      const wallet = (supabaseConfigured && serviceClient) ? await supabaseFetchWallet(found.customerId) : null;
+      const txns = (supabaseConfigured && serviceClient) ? await supabaseFetchTxns(found.customerId, 100) : [];
+      appendAudit(key, { actor: found.customerId, role: 'customer', action: 'customer-login', ip: clientIp(req), reason: 'password login' });
+      sendJson(res, 200, {
+        ok: true,
+        customer: { customerId: found.customerId, name: found.name || '', phone: found.phone || '', email: found.email || '' },
+        walletBalance: wallet ? wallet.balance : 0,
+        txns,
+      });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/customer/forgot') {
+    if (!supabaseConfigured) { sendJson(res, 503, { ok: false, error: 'SUPABASE_NOT_CONFIGURED' }); return; }
+    if (!rateLimit(req, 'customer-forgot', 8, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const email = String(body.email || '').trim().toLowerCase();
+      const code = String(body.code || '').trim().replace(/\D/g, '');
+      const newPassword = String(body.newPassword || '');
+      if (!email || !code) { sendJson(res, 400, { ok: false, error: 'email and code required' }); return; }
+      if (!newPassword || newPassword.length < 6) { sendJson(res, 400, { ok: false, error: 'PASSWORD_TOO_SHORT' }); return; }
+      try {
+        await verifyEmailOtp(email, code);
+        const found = findCustomerByPhoneOrEmail('', normalizeEmailForIdentity(email));
+        if (!found) { sendJson(res, 404, { ok: false, error: 'CUSTOMER_NOT_FOUND' }); return; }
+        const passwordHash = hashPassword(newPassword);
+        const updated = { ...found, payload: { ...(found.payload || {}), passwordHash } };
+        const list = readCustomers();
+        const idx = list.findIndex((c) => c && c.customerId === found.customerId);
+        if (idx >= 0) list[idx] = { ...list[idx], ...updated }; else list.unshift(updated);
+        writeCustomers(list);
+        if (supabaseConfigured && serviceClient) {
+          try {
+            await serviceClient.from(SUPABASE_TABLE.customers).update({ payload: updated.payload, updated_at: new Date().toISOString() }).eq('customer_id', found.customerId);
+          } catch { /* ignore */ }
+        }
+        appendAudit(key, { actor: found.customerId, role: 'customer', action: 'customer-password-reset', ip: clientIp(req), reason: 'OTP verified' });
+        sendJson(res, 200, { ok: true });
+      } catch {
+        appendAudit(key, { actor: email, role: 'customer', action: 'customer-password-reset-failed', ip: clientIp(req), reason: 'invalid OTP' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_CODE' });
+      }
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }

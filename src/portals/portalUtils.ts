@@ -118,12 +118,30 @@ export async function identityClaim(opts: { role: string; identityId: string; na
 // Unified ID + Permanent Cloud helpers (Phase 3). Customer profile, wallet and
 // wallet history are persisted per permanent ID server-side so a wiped browser or
 // a new device restores the SAME customer ID and balance.
-export async function customerRegister(opts: { name?: string; phone?: string; email?: string; customerId?: string; balance?: number }): Promise<{ customer?: any; walletBalance?: number; txns?: any[] } | null> {
+export async function customerRegister(opts: { name?: string; phone?: string; email?: string; customerId?: string; balance?: number; password?: string }): Promise<{ customer?: any; walletBalance?: number; txns?: any[]; hasPassword?: boolean } | null> {
   try {
     const data = await securityApi('/customer/register', { ...opts });
+    return { customer: data.customer, walletBalance: data.walletBalance, txns: data.txns, hasPassword: data.hasPassword };
+  } catch {
+    return null;
+  }
+}
+
+export async function customerLogin(opts: { email: string; password: string }): Promise<{ customer?: any; walletBalance?: number; txns?: any[] } | null> {
+  try {
+    const data = await securityApi('/customer/login', { ...opts });
     return { customer: data.customer, walletBalance: data.walletBalance, txns: data.txns };
   } catch {
     return null;
+  }
+}
+
+export async function customerForgot(opts: { email: string; code: string; newPassword: string }): Promise<boolean> {
+  try {
+    await securityApi('/customer/forgot', { ...opts });
+    return true;
+  } catch {
+    return false;
   }
 }
 
