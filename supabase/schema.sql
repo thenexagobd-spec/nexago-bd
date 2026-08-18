@@ -149,3 +149,59 @@ create index if not exists nexago_files_store_branch_idx on nexago_files (store_
 alter table nexago_files enable row level security;
 drop policy if exists "service role only" on nexago_files;
 create policy "service role only" on nexago_files for all using (auth.role() = 'service_role');
+
+-- Optional normalized product catalog mirror. The live apps still save the full
+-- store state in nexago_stores.payload, and this table can be used later for
+-- fast product search, reporting and stock queries per store/branch.
+create table if not exists nexago_products (
+  id uuid primary key default gen_random_uuid(),
+  product_id text not null unique,
+  platform_key text not null default 'nexago-main',
+  store_id text not null,
+  branch_id text default '',
+  name text not null,
+  sku text default '',
+  category text default '',
+  price numeric(12, 2) not null default 0.00,
+  promo_price numeric(12, 2),
+  stock_qty int not null default 0,
+  is_active boolean not null default true,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists nexago_products_store_idx on nexago_products (store_id, branch_id, is_active);
+create index if not exists nexago_products_platform_idx on nexago_products (platform_key, updated_at desc);
+
+alter table nexago_products enable row level security;
+drop policy if exists "service role only" on nexago_products;
+create policy "service role only" on nexago_products for all using (auth.role() = 'service_role');
+
+-- Optional normalized coupons mirror. Coupon records are also preserved in the
+-- main state payload; this table is for permanent coupon reporting and lookup.
+create table if not exists nexago_coupons (
+  id uuid primary key default gen_random_uuid(),
+  coupon_id text default '',
+  code text not null unique,
+  platform_key text not null default 'nexago-main',
+  store_id text default '',
+  branch_id text default '',
+  discount_type text not null default 'percentage',
+  discount_value numeric(10, 2) not null default 0.00,
+  min_spend numeric(10, 2) default 0.00,
+  usage_limit int default 100,
+  used_count int default 0,
+  expires_at timestamptz,
+  is_active boolean not null default true,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists nexago_coupons_store_idx on nexago_coupons (store_id, branch_id, is_active);
+create index if not exists nexago_coupons_platform_idx on nexago_coupons (platform_key, updated_at desc);
+
+alter table nexago_coupons enable row level security;
+drop policy if exists "service role only" on nexago_coupons;
+create policy "service role only" on nexago_coupons for all using (auth.role() = 'service_role');
