@@ -205,3 +205,76 @@ create index if not exists nexago_coupons_platform_idx on nexago_coupons (platfo
 alter table nexago_coupons enable row level security;
 drop policy if exists "service role only" on nexago_coupons;
 create policy "service role only" on nexago_coupons for all using (auth.role() = 'service_role');
+
+-- Optional normalized branch mirror. Do not drop nexago_stores: the relay uses
+-- nexago_stores.key + payload as the main permanent state store.
+create table if not exists nexago_branches (
+  id uuid primary key default gen_random_uuid(),
+  branch_id text not null unique,
+  platform_key text not null default 'nexago-main',
+  store_id text not null,
+  name text not null,
+  address text default '',
+  is_active boolean not null default true,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists nexago_branches_store_idx on nexago_branches (store_id, is_active);
+create index if not exists nexago_branches_platform_idx on nexago_branches (platform_key, updated_at desc);
+
+alter table nexago_branches enable row level security;
+drop policy if exists "service role only" on nexago_branches;
+create policy "service role only" on nexago_branches for all using (auth.role() = 'service_role');
+
+-- Optional normalized staff mirror for store/admin/staff reporting. The full
+-- staff record remains permanently preserved in nexago_stores.payload.staff.
+create table if not exists nexago_staff (
+  id uuid primary key default gen_random_uuid(),
+  staff_id text not null unique,
+  platform_key text not null default 'nexago-main',
+  store_id text not null,
+  branch_id text default '',
+  name text not null,
+  phone text not null,
+  role text not null default 'cashier',
+  is_active boolean not null default true,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists nexago_staff_store_idx on nexago_staff (store_id, branch_id, is_active);
+create index if not exists nexago_staff_platform_idx on nexago_staff (platform_key, updated_at desc);
+
+alter table nexago_staff enable row level security;
+drop policy if exists "service role only" on nexago_staff;
+create policy "service role only" on nexago_staff for all using (auth.role() = 'service_role');
+
+-- Optional normalized payment mirror. Full order/payment history remains in the
+-- main payload; this table supports permanent payment reports and reconciliation.
+create table if not exists nexago_payments (
+  id uuid primary key default gen_random_uuid(),
+  payment_id text not null unique,
+  platform_key text not null default 'nexago-main',
+  order_id text not null,
+  store_id text default '',
+  branch_id text default '',
+  gateway text not null default 'cash',
+  amount numeric(12, 2) not null default 0.00,
+  currency text default 'BDT',
+  status text not null default 'pending',
+  gateway_response jsonb not null default '{}'::jsonb,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists nexago_payments_order_idx on nexago_payments (order_id);
+create index if not exists nexago_payments_store_idx on nexago_payments (store_id, branch_id, status);
+create index if not exists nexago_payments_platform_idx on nexago_payments (platform_key, updated_at desc);
+
+alter table nexago_payments enable row level security;
+drop policy if exists "service role only" on nexago_payments;
+create policy "service role only" on nexago_payments for all using (auth.role() = 'service_role');
