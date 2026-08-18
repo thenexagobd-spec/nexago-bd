@@ -22,14 +22,14 @@ export default function VehiclesView(){
   const [mf,setMf]=useState({vehicleId:'V001',type:'Oil Change',cost:0,nextDue:''});
   const [dv,setDv]=useState('V001');const [dt,setDt]=useState('Registration');const [df,setDf]=useState('');const [sd,setSd]=useState<string|null>(null);const [sp,setSp]=useState<Vehicle|null>(null);const [preview,setPreview]=useState<DocRecord|null>(null);const [showDocs,setShowDocs]=useState<string|null>(null);
 
-  const [veh,setVeh]=useState<Vehicle[]>([{id:'V001',regNo:'DHAKA METRO-HA-54-3210',type:'Motorcycle',brand:'Yamaha',model:'FZ-S FI V3',year:2023,driverName:'Rahim Khan',fuelType:'Octane',status:'Active',lastService:'2024-05-12',insuranceExpiry:'2026-12-15',fitnessExpiry:'2026-10-30',taxExpiry:'2026-09-15',fuelCost:12400,maintenanceCost:5800,deliveries:72,odoKm:28500,downtime:5,insurancePremium:2500,purchasePrice:285000},{id:'V002',regNo:'DHAKA METRO-LA-23-5678',type:'Motorcycle',brand:'Suzuki',model:'Gixxer 150 Fi',year:2024,driverName:'Shakib Hasan',fuelType:'Petrol',status:'Active',lastService:'2024-06-01',insuranceExpiry:'2024-08-20',fitnessExpiry:'2024-08-15',taxExpiry:'2025-07-10',fuelCost:9800,maintenanceCost:3200,deliveries:56,odoKm:19200,downtime:2,insurancePremium:2800,purchasePrice:320000},{id:'V003',regNo:'DHAKA METRO-CHA-11-9023',type:'Car',brand:'Toyota',model:'Probox 1.5',year:2022,driverName:'Hasan Mahmud',fuelType:'Octane',status:'Maintenance',lastService:'2024-04-20',insuranceExpiry:'2024-08-10',fitnessExpiry:'2024-06-30',taxExpiry:'2024-05-25',fuelCost:15600,maintenanceCost:12000,deliveries:68,odoKm:45200,downtime:15,insurancePremium:4500,purchasePrice:850000},{id:'V004',regNo:'DHAKA METRO-KA-78-3401',type:'Van',brand:'Tata',model:'Ace Mega',year:2021,driverName:'Arif Hossain',fuelType:'Diesel',status:'Idle',lastService:'2024-03-15',insuranceExpiry:'2024-09-30',fitnessExpiry:'2024-08-20',taxExpiry:'2024-07-15',fuelCost:22000,maintenanceCost:8500,deliveries:45,odoKm:68200,downtime:8,insurancePremium:6000,purchasePrice:1250000}]);
-  const[fl,setFl]=useState<FuelLog[]>([{id:'F001',vehicleId:'V001',date:'May 25',liters:3.5,cost:455},{id:'F002',vehicleId:'V001',date:'May 22',liters:2.8,cost:364}]);
-  const[ml,setMl]=useState<MaintLog[]>([{id:'M001',vehicleId:'V001',date:'May 12',type:'Oil Change',cost:800,nextDue:'Aug 12'},{id:'M002',vehicleId:'V003',date:'Apr 20',type:'Engine Repair',cost:12000,nextDue:'Jul 20'}]);
-  const[rl,setRl]=useState<RouteLog[]>([{id:'R001',vehicleId:'V001',date:'May 26',from:'Dhanmondi',to:'Gulshan',distance:12,time:'35m'},{id:'R002',vehicleId:'V002',date:'May 26',from:'Gulshan',to:'Banani',distance:5,time:'15m'}]);
-  const[dr,setDr]=useState<DocRecord[]>([{id:'D001',vehicleId:'V001',type:'Registration',fileName:'reg_v001.pdf',uploadedAt:'Jan 15',status:'Valid'},{id:'D002',vehicleId:'V002',type:'Insurance',fileName:'ins_v002.pdf',uploadedAt:'Feb 20',status:'Valid'}]);
-  const[timeline,setTimeline]=useState<TimelineEvent[]>([{id:'T001',vehicleId:'V001',date:'May 12',type:'Maint',detail:'Oil Change · ৳800'},{id:'T002',vehicleId:'V001',date:'May 15',type:'Route',detail:'Dhanmondi→Gulshan 12km'},{id:'T003',vehicleId:'V002',date:'May 20',type:'Fuel',detail:'3.5L · ৳455'}]);
+  const [veh,setVeh]=useState<Vehicle[]>([]);
+  const[fl,setFl]=useState<FuelLog[]>([]);
+  const[ml,setMl]=useState<MaintLog[]>([]);
+  const[rl,setRl]=useState<RouteLog[]>([]);
+  const[dr,setDr]=useState<DocRecord[]>([]);
+  const[timeline,setTimeline]=useState<TimelineEvent[]>([]);
 
-  const ft=[{month:'Jan',cost:3500},{month:'Feb',cost:4200},{month:'Mar',cost:3800},{month:'Apr',cost:4500},{month:'May',cost:5100},{month:'Jun',cost:4700}];
+  const ft: Array<{ month: string; cost: number }> = [];
   const fill=veh.filter(v=>{const m=v.regNo.toLowerCase().includes(s.toLowerCase())||v.driverName.toLowerCase().includes(s.toLowerCase());return m&&(sf==='All'||v.status===sf);});
   const tc=(id:string)=>setCids(p=>p.includes(id)?p.filter(x=>x!==id):p.length<2?[...p,id]:p);
   const statuses=['Active','On-Delivery','Maintenance','Idle']as const;

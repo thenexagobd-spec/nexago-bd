@@ -34,25 +34,9 @@ export interface AuditLog {
   operator: string;
 }
 
-const DEFAULT_INVENTORY_ITEMS: InventoryItem[] = [
-  { id: 'INV-301', name: 'Premium Fuji Apples', store: 'Fresh Mart', category: 'Fruits & Vegetables', stock: 4, maxCapacity: 100, unit: 'kg', price: 280, reorderPoint: 20, status: 'Low Stock', lastAudited: 'May 26, 2024 11:20 AM', supplier: 'Dhaka Agro Importers' },
-  { id: 'INV-302', name: 'Miniket Rice Premium', store: 'Daily Grocery', category: 'Rice & Grains', stock: 35, maxCapacity: 150, unit: 'kg', price: 76, reorderPoint: 30, status: 'Healthy', lastAudited: 'May 26, 2024 10:45 AM', supplier: 'Dinajpur Rice Mills' },
-  { id: 'INV-303', name: 'Organic Fresh Farm Eggs', store: 'Green Basket', category: 'Dairy & Eggs', stock: 80, maxCapacity: 200, unit: 'doz', price: 145, reorderPoint: 25, status: 'Healthy', lastAudited: 'May 26, 2024 09:10 AM', supplier: 'Tejgaon Egg Depot' },
-  { id: 'INV-304', name: 'Aarong Whole Milk 1L', store: 'Super Shop', category: 'Dairy & Eggs', stock: 0, maxCapacity: 120, unit: 'pcs', price: 95, reorderPoint: 15, status: 'Reorder Needed', lastAudited: 'May 25, 2024 06:15 PM', supplier: 'Brac Dairy Farm' },
-  { id: 'INV-305', name: 'Coca-Cola Can 250ml', store: 'Save Mart', category: 'Beverages', stock: 12, maxCapacity: 150, unit: 'pcs', price: 45, reorderPoint: 30, status: 'Low Stock', lastAudited: 'May 26, 2024 08:30 AM', supplier: 'Coke Bottling Bangladesh' },
-  { id: 'INV-306', name: 'Fresh Cavendish Bananas', store: 'Fresh Mart', category: 'Fruits & Vegetables', stock: 110, maxCapacity: 150, unit: 'pcs', price: 8, reorderPoint: 20, status: 'Healthy', lastAudited: 'May 26, 2024 07:15 AM', supplier: 'Narsingdi Fruit Market' },
-  { id: 'INV-307', name: 'Jasmine Rice Fragrant', store: 'Daily Grocery', category: 'Rice & Grains', stock: 8, maxCapacity: 80, unit: 'kg', price: 150, reorderPoint: 15, status: 'Low Stock', lastAudited: 'May 25, 2024 04:22 PM', supplier: 'Importers Ltd' },
-  { id: 'INV-308', name: 'Pran Mango Juice 1L', store: 'Green Basket', category: 'Beverages', stock: 45, maxCapacity: 100, unit: 'pcs', price: 120, reorderPoint: 15, status: 'Healthy', lastAudited: 'May 26, 2024 12:05 PM', supplier: 'PRAN Foods Corp' },
-  { id: 'INV-309', name: 'Brown Sliced Bread 400g', store: 'Super Shop', category: 'Bakery', stock: 18, maxCapacity: 50, unit: 'pcs', price: 65, reorderPoint: 10, status: 'Healthy', lastAudited: 'May 26, 2024 09:55 AM', supplier: 'Bun-O-King Bakery' },
-  { id: 'INV-310', name: 'Pure Clover Honey 500g', store: 'Save Mart', category: 'Bakery', stock: 2, maxCapacity: 40, unit: 'pcs', price: 480, reorderPoint: 8, status: 'Low Stock', lastAudited: 'May 24, 2024 03:40 PM', supplier: 'Sunderbans Honey Traders' },
-];
+const DEFAULT_INVENTORY_ITEMS: InventoryItem[] = [];
 
-const DEFAULT_AUDIT_LOGS: AuditLog[] = [
-  { id: 'LOG-901', timestamp: 'May 26, 11:45 AM', item: 'Aarong Whole Milk 1L', action: 'Requested Restock', change: 'Status set to Transit', operator: 'Auto-Trigger (System)' },
-  { id: 'LOG-902', timestamp: 'May 26, 10:30 AM', item: 'Premium Fuji Apples', action: 'Manual Inventory Edit', change: 'Stock decreased 25 -> 4', operator: 'Asif Rahman' },
-  { id: 'LOG-903', timestamp: 'May 26, 09:15 AM', item: 'Organic Fresh Farm Eggs', action: 'Audit Complete', change: 'Stock updated to 80', operator: 'Monirul Islam' },
-  { id: 'LOG-904', timestamp: 'May 25, 05:40 PM', item: 'Miniket Rice Premium', action: 'Batch Restock Delivery', change: 'Stock increased +50 units', operator: 'Nusrat Jahan' },
-];
+const DEFAULT_AUDIT_LOGS: AuditLog[] = [];
 
 interface InventoryViewProps {
   onAddNotification?: (notifData: { title: string; message: string; type: 'order' | 'system' | 'driver' | 'payment' }) => void;

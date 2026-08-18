@@ -50,21 +50,10 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
   useEffect(() => {
     if (custListRef.current) custListRef.current.scrollTop = 0;
   }, [custSearch]);
-  const seedCustomers = () => [
-    { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024', loyalty: 120, status: 'Active', custId: 'NEX4654646786' },
-    { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 80, status: 'Active', custId: 'NEX3829104756' },
-    { id: 'CUS-003', name: 'Tanvir Ahmed', phone: '01611-444555', email: 'tanvir.a@example.com', orders: 15, spent: 12400, zone: 'Uttara', joined: 'Feb 2024', loyalty: 240, status: 'Active', custId: 'NEX7712039485' },
-    { id: 'CUS-004', name: 'Sumaiya Jahan', phone: '01311-666777', email: 'sumaiya.j@example.com', orders: 5, spent: 3180, zone: 'Banani', joined: 'May 2024', loyalty: 45, status: 'Active', custId: 'NEX2938475610' },
-    { id: 'CUS-005', name: 'Farhan Hasan', phone: '01911-123456', email: 'farhan.h@example.com', orders: 20, spent: 18750, zone: 'Mirpur', joined: 'Jan 2024', loyalty: 310, status: 'Active', custId: 'NEX1102938475' },
-    { id: 'CUS-006', name: 'Nusrat Zaman', phone: '01511-654321', email: 'nusrat.z@example.com', orders: 3, spent: 2450, zone: 'Mohakhali', joined: 'Jun 2024', loyalty: 30, status: 'Active', custId: 'NEX8475610293' },
-    { id: 'CUS-007', name: 'Imran Kabir', phone: '01412-888999', email: 'imran.k@example.com', orders: 9, spent: 6740, zone: 'Bashundhara', joined: 'Apr 2024', loyalty: 95, status: 'Active', custId: 'NEX5566778899' },
-    { id: 'CUS-008', name: 'Sadia Rahman', phone: '01755-222333', email: 'sadia.r@example.com', orders: 6, spent: 3980, zone: 'Dhanmondi', joined: 'Feb 2024', loyalty: 60, status: 'Active', custId: 'NEX9988776655' },
-    { id: 'CUS-009', name: 'Mahmudul Islam', phone: '01877-444555', email: 'mahmudul.i@example.com', orders: 11, spent: 9020, zone: 'Gulshan', joined: 'Mar 2024', loyalty: 150, status: 'Active', custId: 'NEX3344556677' },
-    { id: 'CUS-010', name: 'Tasnim Akter', phone: '01933-777888', email: 'tasnim.a@example.com', orders: 2, spent: 1680, zone: 'Uttara', joined: 'Jul 2024', loyalty: 20, status: 'Active', custId: 'NEX6677889900' },
-  ];
+  const seedCustomers = () => [];
   const [customers, setCustomers] = useState<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string; loyalty: number; status: 'Active' | 'Blocked'; custId?: string }>>(() => {
     const stored = lsGet<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string; loyalty: number; status: 'Active' | 'Blocked'; custId?: string }>>('ss_admin_customers', []);
-    return stored.length ? stored : seedCustomers();
+    return stored.length ? stored.filter(c => !/^CUS-00\d$/.test(c.id)) : seedCustomers();
   });
   useEffect(() => lsSet('ss_admin_customers', customers), [customers]);
   const [custWallet, setCustWallet] = useState<Record<string, number>>(() => lsGet('ss_admin_cust_wallet', {}));

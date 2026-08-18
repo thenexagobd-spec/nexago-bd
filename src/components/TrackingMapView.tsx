@@ -40,20 +40,7 @@ export const TrackingMapView: React.FC<TrackingMapViewProps> = ({ orders, driver
   // Extract real ongoing orders
   const ongoingOrders = useMemo(() => orders.filter(o => o.status === 'Ongoing'), [orders]);
 
-  // Set up mock path data points on our 600x400 map
-  const mockStores = [
-    { name: 'Dhaka Agro Farm', x: 120, y: 150 },
-    { name: 'Sultans Dine - Gulshan', x: 280, y: 110 },
-    { name: 'Daily Shopping - Banani', x: 220, y: 220 },
-    { name: 'Bazaar Express - Baridhara', x: 410, y: 160 },
-  ];
-
-  const mockCustomers = [
-    { name: 'Tahmid Rahman', address: 'House 42, Road 11, Gulshan-2', x: 190, y: 80 },
-    { name: 'Nabila Islam', address: 'Flat B3, Lalmatia Block D', x: 80, y: 320 },
-    { name: 'Zayan Chowdhury', address: 'Road 5, Banani DOHS', x: 340, y: 280 },
-    { name: 'Rashedul Kabir', address: 'Plot 15, Sector 4, Uttara', x: 450, y: 60 },
-  ];
+  const liveFallbackPoint = { x: 300, y: 200 };
 
   // Helper to generate dynamic intermediate waypoints between start and end
   // to make the vehicle turn nicely on "streets"
@@ -143,40 +130,31 @@ export const TrackingMapView: React.FC<TrackingMapViewProps> = ({ orders, driver
     }
   }, [mapStyle]);
 
-  // Initial seeding of simulation routes using ongoing orders or fallbacks
+  // Build live route cards only from real ongoing orders.
   useEffect(() => {
     const initialRoutes: SimulatedRoute[] = [];
 
-    // Let's create beautiful simulations for up to 4 ongoing dispatches
-    const itemsToSimulate = ongoingOrders.length > 0 ? ongoingOrders : [
-      { id: 'ORD-001248', storeName: 'Sultans Dine - Gulshan', customerName: 'Tahmid Rahman', address: 'House 42, Road 11, Gulshan-2', driverId: 'Al-Amin' },
-      { id: 'ORD-001249', storeName: 'Dhaka Agro Farm', customerName: 'Nabila Islam', address: 'Flat B3, Lalmatia Block D', driverId: 'Kamal Hossain' },
-      { id: 'ORD-001250', storeName: 'Daily Shopping - Banani', customerName: 'Zayan Chowdhury', address: 'Road 5, Banani DOHS', driverId: 'Rahman' },
-      { id: 'ORD-001251', storeName: 'Bazaar Express - Baridhara', customerName: 'Rashedul Kabir', address: 'Plot 15, Sector 4, Uttara', driverId: 'Babul' },
-    ];
+    const itemsToSimulate = ongoingOrders;
 
     itemsToSimulate.forEach((order, idx) => {
-      const store = mockStores[idx % mockStores.length];
-      const customer = mockCustomers[idx % mockCustomers.length];
-      const assignedDriver = drivers.find(d => d.name === order.driverId) || drivers[idx % drivers.length] || {
-        name: order.driverId || 'Al-Amin',
-        phone: '01712-345678',
-        vehicleType: 'Bike'
-      };
+      const start = (order as any).storeLocation || (order as any).storePoint || liveFallbackPoint;
+      const end = (order as any).customerLocation || (order as any).deliveryPoint || liveFallbackPoint;
+      const assignedDriver = drivers.find(d => d.name === order.driverId) || drivers[idx % drivers.length];
+      if (!assignedDriver) return;
 
       initialRoutes.push({
         orderId: order.id,
         driverName: assignedDriver.name,
-        driverPhone: assignedDriver.phone || '01712-098765',
-        vehicleType: assignedDriver.vehicleType || 'Bike',
+        driverPhone: assignedDriver.phone || '',
+        vehicleType: assignedDriver.vehicleType || '',
         storeName: order.storeName,
         customerName: order.customerName,
-        customerAddress: order.address || customer.address,
-        start: { x: store.x, y: store.y },
-        end: { x: customer.x, y: customer.y },
-        progress: Math.floor(Math.random() * 60) + 10, // starts somewhere in transit
-        speed: Math.floor(Math.random() * 10) + 22, // 22-32 km/h
-        waypoints: generateWaypoints({ x: store.x, y: store.y }, { x: customer.x, y: customer.y }),
+        customerAddress: order.address || '',
+        start,
+        end,
+        progress: Number((order as any).progress ?? 0),
+        speed: Number((assignedDriver as any).speed ?? 0),
+        waypoints: generateWaypoints(start, end),
         completed: false
       });
     });
@@ -251,35 +229,10 @@ export const TrackingMapView: React.FC<TrackingMapViewProps> = ({ orders, driver
     return activeRoutes.find(r => r.orderId === selectedRouteId) || activeRoutes[0] || null;
   }, [activeRoutes, selectedRouteId]);
 
-  // Dispatch a brand new test order simulation instantly
+  // Real mode: never create fake routes. New routes must come from real orders.
   const handleSpawnTestOrder = () => {
-    const newId = `ORD-00${Math.floor(1000 + Math.random() * 9000)}`;
-    const randomStore = mockStores[Math.floor(Math.random() * mockStores.length)];
-    const randomCustomer = mockCustomers[Math.floor(Math.random() * mockCustomers.length)];
-    const randomDriver = drivers[Math.floor(Math.random() * drivers.length)] || {
-      name: 'Simulated Courier',
-      phone: '01888-776655',
-      vehicleType: 'Motorcycle'
-    };
-
-    const newRoute: SimulatedRoute = {
-      orderId: newId,
-      driverName: randomDriver.name,
-      driverPhone: randomDriver.phone || '01999-123456',
-      vehicleType: randomDriver.vehicleType || 'Motorcycle',
-      storeName: randomStore.name,
-      customerName: randomCustomer.name,
-      customerAddress: randomCustomer.address,
-      start: { x: randomStore.x, y: randomStore.y },
-      end: { x: randomCustomer.x, y: randomCustomer.y },
-      progress: 0,
-      speed: Math.floor(Math.random() * 12) + 20,
-      waypoints: generateWaypoints({ x: randomStore.x, y: randomStore.y }, { x: randomCustomer.x, y: randomCustomer.y }),
-      completed: false
-    };
-
-    setActiveRoutes(prev => [newRoute, ...prev]);
-    setSelectedRouteId(newId);
+    setActiveRoutes([]);
+    setSelectedRouteId(null);
   };
 
   // Reset all simulation routes

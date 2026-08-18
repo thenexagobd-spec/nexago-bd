@@ -589,12 +589,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
         if (Array.isArray(p)) return p;
       }
     } catch { /* ignore */ }
-    return [
-      { id: 'FR-101', order: 'ORDER-1031', customer: 'Rahim U.', amount: '৳ 1,240', reason: 'Refund requested 40 min after delivery', flag: 'Speed-of-claim', status: 'Queued' },
-      { id: 'FR-102', order: 'ORDER-1022', customer: 'Karim S.', amount: '৳ 3,600', reason: 'Same device flagged on 3 past disputes', flag: 'Device mismatch', status: 'Queued' },
-      { id: 'FR-103', order: 'ORDER-1036', customer: 'Nusrat J.', amount: '৳ 780', reason: 'COD+wallet split flagged as suspicious', flag: 'Suspicious pattern', status: 'Queued' },
-      { id: 'FR-104', order: 'ORDER-1017', customer: 'Tanim A.', amount: '৳ 2,100', reason: 'Duplicate claim — refund already issued', flag: 'Duplicate claim', status: 'Queued' }
-    ];
+    return [];
   });
   const [approvals, setApprovals] = useState<Array<{ id: string; type: string; subject: string; by: string; time: string; status: 'Pending' | 'Approved' | 'Rejected' }>>(() => {
     try {

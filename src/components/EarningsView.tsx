@@ -11,14 +11,7 @@ const COLORS = ['#f97316','#10b981','#3b82f6','#8b5cf6','#e2136e','#f59e0b','#06
 interface Settlement { id:string; driverName:string; amount:number; date:string; status:'Approved'|'Pending'|'Rejected'; payoutMethod:string; tax:number; scheduledDate?:string; commissionRate:number; incentiveBonus?:number; loanDeduct?:number; goalTarget?:number; referralBonus?:number; invoiceNo?:string; txnRef?:string; refNo?:string; authId?:string; }
 
 export default function EarningsView({ payments, drivers = [], orders = [] }: EarningsViewProps) {
-  const [settlements, setSettlements] = useState<Settlement[]>([
-    {id:'STL-001',driverName:'Rahim Khan',amount:12560,date:'May 26, 2024',status:'Approved',payoutMethod:'bKash Personal',tax:250,commissionRate:15,invoiceNo:'7536755375',txnRef:'64738647346',refNo:'9875397595',authId:'47756364'},
-    {id:'STL-002',driverName:'Shakib Hasan',amount:11230,date:'May 26, 2024',status:'Pending',payoutMethod:'bKash Personal',tax:220,commissionRate:15,invoiceNo:'7536755376',txnRef:'64738647347',refNo:'9875397596',authId:'47756365'},
-    {id:'STL-003',driverName:'Masrafe Mortaza',amount:8940,date:'May 25, 2024',status:'Pending',payoutMethod:'Nagad Personal',tax:175,commissionRate:15,invoiceNo:'7536755377',txnRef:'64738647348',refNo:'9875397597',authId:'47756366'},
-    {id:'STL-004',driverName:'Tamim Iqbal',amount:15670,date:'May 24, 2024',status:'Approved',payoutMethod:'Rocket Personal',tax:310,commissionRate:15,invoiceNo:'7536755378',txnRef:'64738647349',refNo:'9875397598',authId:'47756367'},
-    {id:'STL-005',driverName:'Arif Hossain',amount:11040,date:'May 25, 2024',status:'Pending',payoutMethod:'bKash Personal',tax:220,commissionRate:15,incentiveBonus:552,goalTarget:15000},
-    {id:'STL-006',driverName:'Sabbir Ahmed',amount:10800,date:'May 23, 2024',status:'Approved',payoutMethod:'bKash Personal',tax:215,commissionRate:12,loanDeduct:2000,goalTarget:12000}
-  ]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');

@@ -23,9 +23,13 @@ function useLocalState<T>(key: string, initial: T): [T, React.Dispatch<React.Set
   const [state, setState] = useState<T>(() => {
     try {
       const stored = localStorage.getItem(`mfs_${key}`);
-      return stored ? JSON.parse(stored) as T : initial;
+      if (!stored) return Array.isArray(initial) ? ([] as T) : initial;
+      const parsed = JSON.parse(stored) as T;
+      if (!Array.isArray(parsed)) return parsed;
+      const demoId = /^(TXN-900|AG-00|FLT-00|CUS-10|LN-200|SAV-300|CARD-400|NTF-00|RMT-00|MER-00|DSP-00|CB-00|INS-00|KEY-00|WH-00|AUD-00|SCH-00|FX-|TAX-00|BUD-00|ROL-00|NPSB-00|POS-00|BANK-00|API-00|CT-00)/i;
+      return parsed.filter((row: any) => !demoId.test(String(row?.id || ''))) as T;
     } catch {
-      return initial;
+      return Array.isArray(initial) ? ([] as T) : initial;
     }
   });
   useEffect(() => {

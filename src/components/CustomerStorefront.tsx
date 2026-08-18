@@ -939,29 +939,22 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; isFreeShip?: boolean } | null>(null);
   const [couponInput, setCouponInput] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad' | 'Upay' | 'Rocket' | 'Cash on Delivery' | 'Card' | 'Split (Wallet + bKash)'>('bKash');
-  const [deliveryAddress, setDeliveryAddress] = useState<string>('House 42, Road 8A, Dhanmondi, Dhaka');
-  const [customerPhone, setCustomerPhone] = useState<string>('01712-345678');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [customerPhone, setCustomerPhone] = useState<string>('');
 
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
-  const [addresses, setAddresses] = useState<SavedAddress[]>(() => getStoredData(LS_KEYS.addr, [
-    { id: 'ADDR-1', title: 'Home', address: 'House 42, Road 8A, Flat 4B', area: 'Dhanmondi, Dhaka 1209', phone: '01712-345678', isDefault: true },
-    { id: 'ADDR-2', title: 'Office', address: 'Level 7, Tower 14, Gulshan Avenue', area: 'Gulshan-1, Dhaka 1212', phone: '01819-987654', isDefault: false }
-  ]));
+  const [addresses, setAddresses] = useState<SavedAddress[]>(() => getStoredData(LS_KEYS.addr, []));
   useEffect(() => setStoredData(LS_KEYS.addr, addresses), [addresses]);
   const [isAddingAddress, setIsAddingAddress] = useState(false);
-  const [newAddrTitle, setNewAddrTitle] = useState('Home');
+  const [newAddrTitle, setNewAddrTitle] = useState('');
   const [newAddrStreet, setNewAddrStreet] = useState('');
-  const [newAddrArea, setNewAddrArea] = useState('Dhanmondi, Dhaka');
-  const [newAddrPhone, setNewAddrPhone] = useState('01712-345678');
+  const [newAddrArea, setNewAddrArea] = useState('');
+  const [newAddrPhone, setNewAddrPhone] = useState('');
 
-  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>(() => getStoredData(LS_KEYS.pays, [
-    { id: 'PAY-1', type: 'bKash', accountName: 'Rahim Khan', accountNumber: '01712-345678', isDefault: true, pin: '12345' },
-    { id: 'PAY-2', type: 'Nagad', accountName: 'Rahim Khan', accountNumber: '01819-987654', isDefault: false, pin: '24680' },
-    { id: 'PAY-3', type: 'Card', accountName: 'Rahim Khan (DBBL Visa)', accountNumber: '**** **** **** 4821', isDefault: false }
-  ]));
+  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>(() => getStoredData(LS_KEYS.pays, []));
   useEffect(() => setStoredData(LS_KEYS.pays, paymentMethods), [paymentMethods]);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [newPayType, setNewPayType] = useState<'bKash' | 'Nagad' | 'Card'>('bKash');
@@ -995,18 +988,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   // Customer directory (A-Z) — all customers + add to wallet
   const [customerDirOpen, setCustomerDirOpen] = useState(false);
   const [customerDirSearch, setCustomerDirSearch] = useState('');
-  const seedCustomers = useMemo<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string }>>(() => [
-    { id: 'CUS-001', name: 'Rahim Khan', phone: '01712-345678', email: 'rahim.khan@example.com', orders: 12, spent: 8450, zone: 'Dhanmondi', joined: 'Jan 2024' },
-    { id: 'CUS-002', name: 'Ayesha Siddika', phone: '01819-987654', email: 'ayesha.s@example.com', orders: 8, spent: 5230, zone: 'Gulshan', joined: 'Mar 2024' },
-    { id: 'CUS-003', name: 'Tanvir Ahmed', phone: '01611-444555', email: 'tanvir.a@example.com', orders: 15, spent: 12400, zone: 'Uttara', joined: 'Feb 2024' },
-    { id: 'CUS-004', name: 'Sumaiya Jahan', phone: '01311-666777', email: 'sumaiya.j@example.com', orders: 5, spent: 3180, zone: 'Banani', joined: 'May 2024' },
-    { id: 'CUS-005', name: 'Farhan Hasan', phone: '01911-123456', email: 'farhan.h@example.com', orders: 20, spent: 18750, zone: 'Mirpur', joined: 'Jan 2024' },
-    { id: 'CUS-006', name: 'Nusrat Zaman', phone: '01511-654321', email: 'nusrat.z@example.com', orders: 3, spent: 2450, zone: 'Mohakhali', joined: 'Jun 2024' },
-    { id: 'CUS-007', name: 'Imran Kabir', phone: '01412-888999', email: 'imran.k@example.com', orders: 9, spent: 6740, zone: 'Bashundhara', joined: 'Apr 2024' },
-    { id: 'CUS-008', name: 'Sadia Rahman', phone: '01755-222333', email: 'sadia.r@example.com', orders: 6, spent: 3980, zone: 'Dhanmondi', joined: 'Feb 2024' },
-    { id: 'CUS-009', name: 'Mahmudul Islam', phone: '01877-444555', email: 'mahmudul.i@example.com', orders: 11, spent: 9020, zone: 'Gulshan', joined: 'Mar 2024' },
-    { id: 'CUS-010', name: 'Tasnim Akter', phone: '01933-777888', email: 'tasnim.a@example.com', orders: 2, spent: 1680, zone: 'Uttara', joined: 'Jul 2024' },
-  ], []);
+  const seedCustomers = useMemo<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string }>>(() => [], []);
   const [customerWallet, setCustomerWallet] = useState<Record<string, number>>(() => getStoredData('ss_cust_wallet_alloc', {}));
   useEffect(() => setStoredData('ss_cust_wallet_alloc', customerWallet), [customerWallet]);
   const [tickets, setTickets] = useState<SupportTicketItem[]>(() => getStoredData(LS_KEYS.tickets, []));
@@ -1035,7 +1017,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     { id: 'FAQ-4', problem: 'How does Cash on Delivery work?', solution: 'Select Cash on Delivery at checkout. Pay the rider in cash when your order arrives — no online payment needed.' },
   ]));
 
-  const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: 'Rahim Khan', email: 'rahim.khan@example.com', phone: '01712-345678', sms: true, emailNotif: true, pushNotif: true, profilePic: '' }));
+  const [customerProfile, setCustomerProfile] = useState(() => getStoredData(LS_KEYS.profile, { name: '', email: '', phone: '', sms: true, emailNotif: true, pushNotif: true, profilePic: '' }));
   useEffect(() => setStoredData(LS_KEYS.profile, customerProfile), [customerProfile]);
 
   // Live-sync admin/platform notifications (sd_notifications) into this customer's inbox
