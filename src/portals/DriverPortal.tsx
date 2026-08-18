@@ -165,6 +165,10 @@ export default function DriverPortal() {
 
   // Authenticate the driver against the shared fleet (id / phone / name) AND a
   // stored password. Without a matching account + password there is no way in.
+  // Credentials are mirrored to the relay security registry by the admin at
+  // creation/approval, so we first try the server-side login for cross-device
+  // verification, then fall back to the local credential map when the relay is
+  // unreachable (offline mode).
   const handleLogin = () => {
     const id = loginId.trim().toLowerCase();
     if (!id) { showToast('Enter your driver ID or phone number'); return; }
@@ -182,13 +186,24 @@ export default function DriverPortal() {
     const creds = getCreds();
     const cred = creds[found.id];
     if (!cred) { showToast('No password set for this account — admin must approve first'); return; }
-    if (cred.password !== loginPass) { showToast('Incorrect password — try again'); return; }
-    setSessionId(found.id);
-    lsSet('sd_driver_session', found.id);
-    setLoginId('');
-    setLoginPass('');
-    setAuthView('dashboard');
-    showToast(`Welcome back, ${found.name.split(' ')[0]}!`);
+    const localOk = cred.password === loginPass;
+    const finishLogin = () => {
+      setSessionId(found.id);
+      lsSet('sd_driver_session', found.id);
+      setLoginId('');
+      setLoginPass('');
+      setAuthView('dashboard');
+      showToast(`Welcome back, ${found.name.split(' ')[0]}!`);
+    };
+    // Server-side verify first (cross-device + secure). If the relay responds,
+    // INVALID_LOGIN blocks the sign-in; only a network failure falls back to
+    // the local credential match so offline access keeps working.
+    securityApi('/login', { userId: found.id, password: loginPass }).then((data) => {
+      if (data && data.ok) { finishLogin(); return; }
+      if (localOk) finishLogin(); else showToast('Incorrect password — try again');
+    }).catch(() => {
+      if (localOk) finishLogin(); else showToast('Incorrect password — try again');
+    });
   };
 
   // Signup: register a real driver account with documents, then require admin

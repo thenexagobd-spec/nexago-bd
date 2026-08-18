@@ -40,7 +40,7 @@ import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
-import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit } from './portals/portalUtils';
+import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim } from './portals/portalUtils';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 import { 
@@ -1028,6 +1028,9 @@ export default function App() {
     try { creds = JSON.parse(localStorage.getItem('sd_driver_creds') || '{}'); } catch { creds = {}; }
     creds[newId] = { phone: driverData.phone || '', password: pwd };
     localStorage.setItem('sd_driver_creds', JSON.stringify(creds));
+    // Mirror the driver login credential to the relay security registry so the
+    // driver can sign in on any device (server-side /api/security/login).
+    securityApi('/admin-set-password', { userId: newId, password: pwd, role: 'driver', storeId: '', permissions: ['driver'] }).catch(() => {});
     showToast(`Driver ${driverData.name} registered! ID: ${newId} · Password: ${pwd}`, 'success');
   };
 
@@ -1046,6 +1049,9 @@ export default function App() {
       try { creds = JSON.parse(localStorage.getItem('sd_driver_creds') || '{}'); } catch { creds = {}; }
       creds[updatedDriver.id] = { phone: updatedDriver.phone || '', password: pwd };
       localStorage.setItem('sd_driver_creds', JSON.stringify(creds));
+      // Mirror the approved driver's login credential to the relay security
+      // registry for cross-device server-side login.
+      securityApi('/admin-set-password', { userId: updatedDriver.id, password: pwd, role: 'driver', storeId: '', permissions: ['driver'] }).catch(() => {});
       showToast(`Driver ${updatedDriver.name} approved! Password: ${pwd}`, 'success');
       return;
     }
@@ -1437,6 +1443,17 @@ export default function App() {
     };
     setStaff(prev => [member, ...prev]);
     setStaffKycBusy(false);
+    // Single Account Rule: claim the staff phone/Gmail in nexago_identities so
+    // the same real-world identity cannot be reused by a customer, driver,
+    // store admin or another staff member.
+    identityCheck({ phone: member.phone, email: member.email }).then((chk) => {
+      if (chk && chk.taken) {
+        const c = chk.conflict;
+        showToast(`Note: ${member.phone || member.email} already belongs to ${c?.name || c?.identityId || 'another account'} (${c?.role || 'account'}). This staff KYC is saved but the identity is shared.`, 'info');
+        return;
+      }
+      identityClaim({ role: 'staff', identityId: id, name: member.name, phone: member.phone, email: member.email }).catch(() => {});
+    }).catch(() => {});
     setStaffKycOpen(false);
     securityAudit('staff-record-created', { actor: 'super-admin', newValue: { staffId: id, name: member.name, role: member.role, documentStatus: member.documentStatus }, reason: 'super admin staff record created with required documents' });
     showToast(`Staff document record saved. ID: ${id}`, 'success');

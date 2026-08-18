@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync } from './portalUtils';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds } from './portalUtils';
 
 export default function StorePortal() {
   useCloudSync();
@@ -35,6 +35,12 @@ export default function StorePortal() {
   const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
   const [now, setNow] = useState(Date.now());
   const [returns, setReturns] = useState<any[]>(() => lsGet('sd_returns', []));
+  // Store Site access gate: only a verified store admin may open the portal.
+  // The session is stored under sd_store_site_session so the gate survives
+  // refreshes but a fresh browser (or another device) must sign in again.
+  const [storeAuthed, setStoreAuthed] = useState<boolean>(() => lsGet('sd_store_site_session', '') !== '');
+  const [authId, setAuthId] = useState('');
+  const [authPass, setAuthPass] = useState('');
 
   useEffect(() => {
     const onStorage = () => setReturns(lsGet('sd_returns', []));
@@ -54,6 +60,43 @@ export default function StorePortal() {
   const currentStore = stores.find((s: any) => s.id === storeId);
   const storeName = currentStore?.name || profile.storeName || 'Store';
   const mine = useMemo(() => orders.filter(o => ((o as any).storeId && (o as any).storeId === storeId) || o.storeName === storeName), [orders, storeId, storeName]);
+
+  // Store Site login gate — only a verified store admin's credentials unlock
+  // order control. Both the application record (sd_store_admin_apps) and the
+  // admin-created credential map (sd_store_admin_creds) are accepted, matching
+  // the Store Admin Portal login rules.
+  const [storeAdminApps] = useStoreAdminApps();
+  const [storeAdminCreds] = useStoreAdminCreds();
+  const [authMsg, setAuthMsg] = useState('');
+  const handleStoreAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = authId.trim();
+    const foundApp = (storeAdminApps as any[]).find((a: any) =>
+      (a.id === id || a.adminId === id || (a.email || '').toLowerCase() === id.toLowerCase() || (a.phone || '') === id) &&
+      a.status === 'Verified'
+    );
+    const credRecord = (storeAdminCreds as Record<string, { password?: string }>)[foundApp?.id || id] ||
+      (storeAdminCreds as Record<string, { password?: string }>)[id];
+    const storedPass = credRecord?.password || foundApp?.password || (foundApp as any)?.branchAdminPassword || '';
+    if (!foundApp || !storedPass) {
+      setAuthMsg('Store admin account not found or not verified yet.');
+      return;
+    }
+    if (storedPass !== authPass) {
+      setAuthMsg('Incorrect password — try again.');
+      return;
+    }
+    lsSet('sd_store_site_session', id);
+    setStoreAuthed(true);
+    setAuthId('');
+    setAuthPass('');
+    setAuthMsg('');
+  };
+  const handleStoreLogout = () => {
+    lsSet('sd_store_site_session', '');
+    setStoreAuthed(false);
+    setTab('receive');
+  };
 
   const incoming = mine.filter(o => o.status === 'Pending');
   const live = mine.find(o => o.status === 'Processing' || o.status === 'Ongoing' || (o.status === 'Confirmed' && o.driverId));
@@ -219,6 +262,58 @@ export default function StorePortal() {
   };
 
   const liveDriver = live ? drivers.find(d => d.id === live.driverId) : undefined;
+
+  if (!storeAuthed) {
+    return (
+      <div className="min-h-screen overflow-hidden bg-gradient-to-b from-[#060d17] via-[#0a1322] to-[#0a1322] text-gray-100 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          <div className="flex items-center justify-center space-x-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-base shadow-lg">N</div>
+            <div>
+              <p className="font-black tracking-widest text-base">NEXAGO</p>
+              <p className="text-[9px] text-gray-400 uppercase tracking-widest">Store Site — Secure Access</p>
+            </div>
+          </div>
+          <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center space-x-3 mb-5">
+              <div className="w-11 h-11 rounded-full bg-brand-orange/15 border border-brand-orange/30 flex items-center justify-center"><ShieldCheck className="w-5 h-5 text-brand-orange" /></div>
+              <div>
+                <h3 className="text-sm font-black text-white">Store Admin Sign In</h3>
+                <p className="text-[10px] text-gray-400">Only verified store admins can manage orders.</p>
+              </div>
+            </div>
+            <form onSubmit={handleStoreAuth} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 mb-1.5">Store Admin ID / Email</label>
+                <input
+                  value={authId}
+                  onChange={(e) => setAuthId(e.target.value)}
+                  placeholder="e.g. SA-XXXXXX"
+                  className="w-full bg-[#0a1626] border border-[#1e3050] rounded-xl px-3.5 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-orange/60"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 mb-1.5">Password</label>
+                <input
+                  type="password"
+                  value={authPass}
+                  onChange={(e) => setAuthPass(e.target.value)}
+                  placeholder="Enter your store admin password"
+                  className="w-full bg-[#0a1626] border border-[#1e3050] rounded-xl px-3.5 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-orange/60"
+                />
+              </div>
+              {authMsg && <p className="text-[10px] font-bold text-red-400">{authMsg}</p>}
+              <button type="submit" className="w-full rounded-xl bg-gradient-to-r from-brand-orange to-orange-600 text-white text-xs font-black py-3.5 hover:opacity-90 transition-opacity cursor-pointer">
+                Unlock Store Portal
+              </button>
+            </form>
+            <button onClick={goBack} className="w-full mt-3 text-[10px] text-gray-500 hover:text-gray-300 py-2 cursor-pointer">← Back to roles</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <PortalShell role="Store Site" tagline={storeName} nav={nav} active={tab} onNav={setTab} onBack={goBack}>
@@ -752,6 +847,10 @@ export default function StorePortal() {
               <div className={`w-5 h-5 rounded-full bg-white transition-all shadow ${storeOnline ? 'ml-auto' : ''}`}></div>
             </button>
           </div>
+
+          <button onClick={handleStoreLogout} className="w-full rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-[10px] font-black py-3 hover:bg-red-500/20 transition-colors cursor-pointer">
+            Log Out of Store Site
+          </button>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
