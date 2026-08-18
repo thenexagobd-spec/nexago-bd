@@ -36,6 +36,16 @@ export interface LiveDriversApi {
   simTick: number;
 }
 
+const withOptionalRoutePair = (driver: any, pair: ReturnType<typeof pairPick>) => ({
+  ...driver,
+  restLat: pair.rest?.lat,
+  restLng: pair.rest?.lng,
+  restName: pair.rest?.name || '',
+  custLat: pair.cust?.lat,
+  custLng: pair.cust?.lng,
+  custName: pair.cust?.name || '',
+});
+
 /**
  * Shared live GPS driver simulation lifted from ZonesView so that both the
  * admin "Live Road Map" and the customer "Track Delivery" screens consume the
@@ -58,7 +68,7 @@ export function useLiveDrivers(drivers: { id: string; name: string; status: stri
       const s = roadStart();
       const p = s.path[s.vtx];
       const pr = pairPick();
-      return {
+      return withOptionalRoutePair({
         ...d,
         lx: 60 + Math.random() * 300,
         ly: 40 + Math.random() * 220,
@@ -66,12 +76,10 @@ export function useLiveDrivers(drivers: { id: string; name: string; status: stri
         ty: 40 + Math.random() * 220,
         lat: p[0], lng: p[1], tLat: p[0], tLng: p[1],
         roadName: s.road, path: s.path, vtx: s.vtx, dir: s.dir,
-        restLat: pr.rest.lat, restLng: pr.rest.lng, restName: pr.rest.name,
-        custLat: pr.cust.lat, custLng: pr.cust.lng, custName: pr.cust.name,
         dest,
         speed: 25 + Math.random() * 40,
         progress: 0,
-      };
+      }, pr);
     })
   );
 
@@ -84,14 +92,14 @@ export function useLiveDrivers(drivers: { id: string; name: string; status: stri
         if (!np) {
           const s = roadStart();
           const pr = pairPick();
-          return { ...d, path: s.path, vtx: s.vtx, dir: s.dir, roadName: s.road, lat: s.path[s.vtx][0], lng: s.path[s.vtx][1], tLat: s.path[s.vtx][0], tLng: s.path[s.vtx][1], dest: randDest(), restLat: pr.rest.lat, restLng: pr.rest.lng, restName: pr.rest.name, custLat: pr.cust.lat, custLng: pr.cust.lng, custName: pr.cust.name };
+          return withOptionalRoutePair({ ...d, path: s.path, vtx: s.vtx, dir: s.dir, roadName: s.road, lat: s.path[s.vtx][0], lng: s.path[s.vtx][1], tLat: s.path[s.vtx][0], tLng: s.path[s.vtx][1], dest: randDest() }, pr);
         }
         const cur = d.path[d.vtx];
         const nxt = d.path[d.vtx + d.dir];
         if (!nxt) {
           const s = roadStart();
           const pr = pairPick();
-          return { ...d, path: s.path, vtx: s.vtx, dir: s.dir, roadName: s.road, lat: s.path[s.vtx][0], lng: s.path[s.vtx][1], tLat: s.path[s.vtx][0], tLng: s.path[s.vtx][1], dest: randDest(), restLat: pr.rest.lat, restLng: pr.rest.lng, restName: pr.rest.name, custLat: pr.cust.lat, custLng: pr.cust.lng, custName: pr.cust.name };
+          return withOptionalRoutePair({ ...d, path: s.path, vtx: s.vtx, dir: s.dir, roadName: s.road, lat: s.path[s.vtx][0], lng: s.path[s.vtx][1], tLat: s.path[s.vtx][0], tLng: s.path[s.vtx][1], dest: randDest() }, pr);
         }
         const dLat = nxt[0] - d.lat, dLng = nxt[1] - d.lng;
         const dd = Math.sqrt(dLat * dLat + dLng * dLng);
