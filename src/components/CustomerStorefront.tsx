@@ -2482,6 +2482,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <Languages className="w-4 h-4 text-emerald-600" />
             </button>
 
+            {/* Visible logout button */}
+            <button
+              onClick={() => { setCustVerified(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast('Logged out — see you soon!', 'info'); }}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-xs font-bold text-red-500 transition-colors cursor-pointer"
+              title="Log Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Log Out</span>
+            </button>
+
             {/* Profile menu */}
             <div className="relative">
               <button
