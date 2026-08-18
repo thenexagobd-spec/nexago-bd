@@ -14,6 +14,7 @@ import { CustomerStorefront } from './components/CustomerStorefront';
 import { Order, Product } from './types';
 import { makeOrderId } from './types';
 import { useLiveDrivers } from './hooks/useLiveDrivers';
+import { useCloudSync } from './portals/portalUtils';
 import './index.css';
 
 const params = new URLSearchParams(window.location.search);
@@ -37,6 +38,7 @@ function PublicCustomerApp() {
   useEffect(() => { try { localStorage.setItem(CUST_ORDERS_KEY, JSON.stringify(orders)); } catch {} }, [orders]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const { liveDrivers } = useLiveDrivers(SEED_DRIVERS);
+  useCloudSync();
 
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });

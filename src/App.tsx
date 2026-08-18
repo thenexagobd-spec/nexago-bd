@@ -1237,11 +1237,11 @@ export default function App() {
         return {
           ...t,
           status: 'Resolved',
-          replies: [
-            ...t.replies,
+          messages: [
+            ...t.messages,
             {
-              sender: 'Support Desk',
-              message,
+              sender: 'admin',
+              text: message,
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }
           ]

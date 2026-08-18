@@ -76,7 +76,7 @@ export const DeliveryDashboardView: React.FC<DeliveryDashboardViewProps> = ({
       onUpdateOrderStatus({
         ...orderToUpdate,
         status: 'Ongoing',
-        driverId: driver.name
+        driverId: driver.id
       });
 
       // Update driver duty status if online
@@ -119,7 +119,7 @@ export const DeliveryDashboardView: React.FC<DeliveryDashboardViewProps> = ({
     onUpdateOrderStatus({
       ...order,
       status: 'Ongoing',
-      driverId: driver.name
+      driverId: driver.id
     });
 
     if (onUpdateDriver) {
@@ -162,7 +162,7 @@ export const DeliveryDashboardView: React.FC<DeliveryDashboardViewProps> = ({
       onUpdateOrderStatus({
         ...order,
         status: 'Ongoing',
-        driverId: driver.name
+        driverId: driver.id
       });
 
       if (onUpdateDriver) {

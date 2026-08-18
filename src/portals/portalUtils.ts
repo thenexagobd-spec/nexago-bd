@@ -59,6 +59,9 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_marketing: 'marketing',
   sd_banners: 'banners',
   sd_stock_ledger: 'stockLedger',
+  ss_tickets_v2: 'customerTickets',
+  nexago_pos_sales: 'posSales',
+  nexago_pos_holds: 'posHolds',
 };
 
 // Every approved role writes its own store-scoped records. Server-side merge is
