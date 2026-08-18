@@ -7,7 +7,7 @@
  * localStorage keys as the admin panel.
  */
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip, History } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim } from './portalUtils';
 
@@ -69,6 +69,20 @@ export default function StoreAdminPortal() {
   const branchSession = branches.find((b: any) => b.branchAdminId === sessionAdminId && b.status === 'Active');
   const activeApplication = storeAdminApps.find((a: any) => ((a.adminId === sessionAdminId) || (branchSession && a.storeId === branchSession.storeId)) && a.status === 'Verified');
   const activeStoreId = branchSession?.storeId || activeApplication?.storeId || '';
+  // Store activity log (Phase 4): every staff/order/security action for this
+  // store is fetched from the server audit trail (store-scoped server-side).
+  const [storeAudit, setStoreAudit] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  useEffect(() => {
+    if (!activeStoreId) { setStoreAudit([]); return; }
+    let cancelled = false;
+    setAuditLoading(true);
+    securityApi(`/audit?storeId=${encodeURIComponent(activeStoreId)}&limit=200`).then((d) => {
+      if (!cancelled) setStoreAudit(Array.isArray(d.audit) ? d.audit : []);
+    }).catch(() => { if (!cancelled) setStoreAudit([]); }).finally(() => { if (!cancelled) setAuditLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStoreId]);
   const activeStore = stores.find((s: any) => s.id === activeStoreId);
   const storeAccessBlocked = ['Suspended', 'Blacklisted'].includes(activeStore?.status || '') || ['suspend', 'blacklist'].includes(activeStore?.adminRiskStatus || '');
   const activeStoreName = activeApplication?.storeName || 'Approved Store';
@@ -1012,6 +1026,30 @@ export default function StoreAdminPortal() {
                 </div>
               </div>
             ))}
+          </div>
+          <div className="bg-[#101d30] border border-[#1e3050] rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e3050]">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white flex items-center space-x-2"><History className="w-3.5 h-3.5 text-brand-orange" /><span>Store Activity Log</span></p>
+              <button onClick={() => { setAuditLoading(true); securityApi(`/audit?storeId=${encodeURIComponent(activeStoreId)}&limit=200`).then((d) => setStoreAudit(Array.isArray(d.audit) ? d.audit : [])).catch(() => {}).finally(() => setAuditLoading(false)); }} className="text-[9px] font-black text-brand-orange uppercase hover:underline">Refresh</button>
+            </div>
+            {auditLoading ? (
+              <div className="p-6 text-center text-[10px] text-gray-500">Loading activity log…</div>
+            ) : storeAudit.length === 0 ? (
+              <div className="p-6 text-center text-[10px] text-gray-500">No audited actions yet for this store.</div>
+            ) : (
+              <div className="max-h-[380px] overflow-y-auto divide-y divide-[#1e3050]">
+                {storeAudit.slice(0, 120).map((a: any) => (
+                  <div key={a.id} className="px-4 py-2.5 flex items-start justify-between gap-3 hover:bg-[#132238] transition-colors">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-gray-200 truncate">{a.action}</p>
+                      <p className="text-[9px] text-gray-500 truncate">{a.actor ? `by ${a.actor}` : ''}{a.reason ? ` · ${a.reason}` : ''}</p>
+                      {a.newValue && <p className="text-[8px] font-mono text-gray-600 truncate">{JSON.stringify(a.newValue).slice(0, 160)}</p>}
+                    </div>
+                    <span className="text-[8px] text-gray-500 whitespace-nowrap">{a.time ? new Date(a.time).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

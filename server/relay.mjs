@@ -143,6 +143,17 @@ function hasStateWriteAccess(req, key) {
   return !!(STATE_WRITE_TOKEN && req.headers['x-nexago-agent'] === STATE_WRITE_TOKEN);
 }
 
+// RBAC: does the current session hold a permission? Super-admin and owners of the
+// 'all' permission always pass. Used to gate sensitive security endpoints the
+// same way the client gates UI actions.
+function hasPermission(req, key, permission) {
+  const session = requireSession(req, key);
+  if (!session) return false;
+  if (session.role === 'super-admin') return true;
+  const perms = Array.isArray(session.permissions) ? session.permissions.map((p) => String(p).toLowerCase()) : [];
+  return perms.includes('all') || perms.includes(String(permission).toLowerCase());
+}
+
 function rateLimit(req, bucket = 'default', limit = 60, windowMs = 60_000) {
   if (isTrustedAutomation(req)) return true;
   const key = `${bucket}:${clientIp(req)}`;
@@ -1037,6 +1048,7 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/security/register') {
     if (!rateLimit(req, 'security-register', 10, 60_000)) { sendSecurityAlert('register-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '' }); sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    if (!hasPermission(req, key, 'users') && !isTrustedAutomation(req)) { sendJson(res, 403, { ok: false, error: 'FORBIDDEN' }); return; }
     readBody(req).then((body) => {
       const role = String(body.role || '').trim();
       const userId = String(body.userId || '').trim();
@@ -1502,8 +1514,26 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/security/audit') {
     if (!requireSession(req, key) && !isTrustedAutomation(req)) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
-    const audit = readSecurity(`audit-${safeKey(key)}`, []);
-    sendJson(res, 200, { ok: true, key, audit: audit.slice().reverse().slice(0, 500) });
+    const session = requireSession(req, key);
+    let audit = readSecurity(`audit-${safeKey(key)}`, []);
+    // Role-based scoping: super-admin sees everything; everyone else sees only
+    // their own store's log entries (storeId match) unless they act globally.
+    if (session && session.role !== 'super-admin') {
+      const myStore = String(session.storeId || '');
+      audit = audit.filter((a) => a && (!myStore || String(a.storeId || '') === myStore || String(a.actor || '') === String(session.userId || '')));
+    }
+    const actor = String(url.searchParams.get('actor') || '').trim().toLowerCase();
+    const action = String(url.searchParams.get('action') || '').trim().toLowerCase();
+    const storeId = String(url.searchParams.get('storeId') || '').trim();
+    const role = String(url.searchParams.get('role') || '').trim().toLowerCase();
+    const since = url.searchParams.get('since') ? Number(url.searchParams.get('since')) : 0;
+    const limit = Math.min(Number(url.searchParams.get('limit') || 500), 2000);
+    if (actor) audit = audit.filter((a) => a && String(a.actor || '').toLowerCase().includes(actor));
+    if (action) audit = audit.filter((a) => a && String(a.action || '').toLowerCase().includes(action));
+    if (storeId) audit = audit.filter((a) => a && String(a.storeId || '') === storeId);
+    if (role) audit = audit.filter((a) => a && String(a.role || '').toLowerCase() === role);
+    if (since) audit = audit.filter((a) => a && (a.time ? Date.parse(a.time) : 0) >= since);
+    sendJson(res, 200, { ok: true, key, count: audit.length, audit: audit.slice().reverse().slice(0, limit) });
     return;
   }
 

@@ -167,15 +167,28 @@ export default function StaffPortal() {
 
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
 
-  const updateStatus = (id: string, status: string) => setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: status as any } : o)));
+  const updateStatus = (id: string, status: string) => {
+    setOrders(prev => prev.map(o => (o.id === id ? { ...o, status: status as any } : o)));
+    securityAudit('staff-order-status-changed', { actor: session.user?.userId || 'staff', role: session.user?.role || 'staff', storeId: orders.find(o => o.id === id)?.storeId || '', newValue: { orderId: id, status }, reason: 'staff updated order status' });
+  };
   const approveTopUp = (tx: any, ok: boolean) => {
     const next = txns.map(t => (t.id === tx.id ? { ...t, status: ok ? 'Completed' : 'Rejected' } : t));
     setTxns(next);
     if (ok) setWalletBal(walletBal + tx.amount);
+    securityAudit(ok ? 'staff-topup-approved' : 'staff-topup-rejected', { actor: session.user?.userId || 'staff', role: session.user?.role || 'staff', newValue: { txnId: tx.id, amount: tx.amount, status: ok ? 'Completed' : 'Rejected' }, reason: 'staff verified wallet top-up' });
   };
-  const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  const closeTicket = (id: string) => setTickets(prev => prev.map(t => (t.id === id ? { ...t, status: 'Closed' } : t)));
-  const closeCustTicket = (id: string) => setCustTickets(prev => prev.map(t => (t.id === id ? { ...t, status: 'Resolved' } : t)));
+  const markAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    securityAudit('staff-notifications-read', { actor: session.user?.userId || 'staff', role: session.user?.role || 'staff', reason: 'staff marked notifications read' });
+  };
+  const closeTicket = (id: string) => {
+    setTickets(prev => prev.map(t => (t.id === id ? { ...t, status: 'Closed' } : t)));
+    securityAudit('staff-ticket-closed', { actor: session.user?.userId || 'staff', role: session.user?.role || 'staff', newValue: { ticketId: id }, reason: 'staff closed support ticket' });
+  };
+  const closeCustTicket = (id: string) => {
+    setCustTickets(prev => prev.map(t => (t.id === id ? { ...t, status: 'Resolved' } : t)));
+    securityAudit('staff-customer-ticket-resolved', { actor: session.user?.userId || 'staff', role: session.user?.role || 'staff', newValue: { ticketId: id }, reason: 'staff resolved customer ticket' });
+  };
   const ownStaff = staffRecords.find((s: any) => s.id === session.user?.userId) || session.user || {};
   const ownCardHtml = () => `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Arial}.card{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:5mm;padding:5mm;color:white;background:linear-gradient(135deg,#07111f,#102138 60%,#f97316);position:relative;overflow:hidden}.brand{font-size:9px;font-weight:900;letter-spacing:2px}.logo{position:absolute;right:5mm;top:5mm;background:white;color:#0b1220;border-radius:3mm;padding:3mm;font-weight:900;font-size:10px}.main{position:absolute;left:5mm;right:5mm;bottom:9mm;display:flex;gap:4mm;align-items:end}.photo{width:18mm;height:24mm;border:1px solid rgba(255,255,255,.35);border-radius:3mm;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:22px;font-weight:900}.name{font-size:13px;font-weight:900;text-transform:uppercase}.meta{font-size:7px;font-weight:700;color:#ffedd5;margin-top:1mm}.id{font-family:monospace;font-size:8px;font-weight:900;margin-top:1mm}.foot{position:absolute;left:5mm;right:5mm;bottom:3mm;border-top:1px solid rgba(255,255,255,.2);padding-top:1mm;display:flex;justify-content:space-between;font-size:6px;font-weight:700;color:rgba(255,255,255,.75)}@media print{body{background:white}@page{size:85.6mm 54mm;margin:0}}</style></head><body><div class="card"><div class="brand">THE NEXAGO BD</div><div style="font-size:7px;color:rgba(255,255,255,.75);font-weight:700">SUPER ADMIN STAFF</div><div class="logo">NXG</div><div class="main"><div class="photo">${String(ownStaff.name || 'S').slice(0,1).toUpperCase()}</div><div><div class="name">${ownStaff.name || ownStaff.userId || 'Staff'}</div><div class="meta">${ownStaff.role || 'Staff'} · ${ownStaff.shift || ''}</div><div class="id">${ownStaff.permanentNumber || ownStaff.id || ownStaff.userId}</div><div class="meta">Phone: ${ownStaff.phone || 'N/A'}</div></div></div><div class="foot"><span>THE NEXAGO BD</span><span>${ownStaff.status || 'Active'}</span><span>Official Staff ID</span></div></div></body></html>`;
   const downloadOwnCard = () => { const url = URL.createObjectURL(new Blob([ownCardHtml()], { type: 'text/html' })); const a = document.createElement('a'); a.href = url; a.download = `${ownStaff.permanentNumber || ownStaff.id || 'staff'}-id-card.html`; a.click(); URL.revokeObjectURL(url); };
