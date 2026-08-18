@@ -45,8 +45,9 @@ function PublicCustomerApp() {
 
   useEffect(() => {
     let cancelled = false;
+    const customerId = (() => { try { return localStorage.getItem('ss_cust_id') || ''; } catch { return ''; } })();
     const pullLive = () => {
-      fetch(`${API_BASE}/api/storefront?key=${encodeURIComponent(KEY)}`)
+      fetch(`${API_BASE}/api/storefront?key=${encodeURIComponent(KEY)}&customerId=${encodeURIComponent(customerId)}`)
         .then(r => (r.ok ? r.json() : Promise.reject(new Error('storefront fetch failed'))))
         .then(d => {
           if (cancelled) return;
@@ -60,16 +61,10 @@ function PublicCustomerApp() {
             status: Number(p.stock || 0) <= 0 ? 'Out of Stock' : Number(p.stock || 0) <= 10 ? 'Low Stock' : 'In Stock',
             image: p.image || ''
           })));
-        })
-        .catch(() => {});
-      fetch(`${API_BASE}/api/state?key=${encodeURIComponent(KEY)}`)
-        .then(r => (r.ok ? r.json() : Promise.reject(new Error('state fetch failed'))))
-        .then(d => {
-          if (cancelled) return;
-          if (d && d.state && Array.isArray(d.state.stores)) {
-            setStores(KEY.startsWith('STR-') ? d.state.stores.filter((s: any) => s.id === KEY) : d.state.stores);
+          if (d && d.stores && Array.isArray(d.stores)) {
+            setStores(KEY.startsWith('STR-') ? d.stores.filter((s: any) => s.id === KEY) : d.stores);
           }
-          if (d && Array.isArray(d.state && d.state.orders) && d.state.orders.length) setOrders(d.state.orders);
+          if (d && Array.isArray(d.orders)) setOrders(d.orders);
         })
         .catch(() => {});
     };

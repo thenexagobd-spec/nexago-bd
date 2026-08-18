@@ -53,9 +53,7 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_store_online: 'storeOnline',
   sd_store_profile: 'profile',
   sd_notifications: 'notifications',
-  sd_driver_creds: 'driverCreds',
   sd_store_admin_apps: 'storeAdminApps',
-  sd_store_admin_creds: 'storeAdminCreds',
   sd_staff: 'staff',
   sd_reviews: 'reviews',
   sd_marketing: 'marketing',
@@ -177,7 +175,10 @@ export function useCloudSync() {
           const val = lsGet<any>(localKey, null);
           if (val !== null) payload[cloudKey] = val;
         }
-        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const sessionToken = localStorage.getItem('sd_security_session') || '';
+        if (sessionToken) headers['X-Session-Token'] = sessionToken;
+        await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
         return true;
       } catch {
         return false;

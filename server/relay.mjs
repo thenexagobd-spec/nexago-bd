@@ -123,10 +123,23 @@ function isTrustedAutomation(req) {
 }
 
 function hasStateWriteAccess(req, key) {
-  if (!STRICT_SECURITY) return true;
   if (isTrustedAutomation(req)) return true;
   const session = requireSession(req, key);
-  if (session && ['super-admin', 'store-admin', 'branch-admin', 'driver', 'customer', 'staff'].includes(session.role)) return true;
+  if (session) {
+    if (session.role === 'super-admin') return true;
+    if (['store-admin', 'branch-admin', 'driver', 'customer', 'staff'].includes(session.role)) {
+      const safeKeyValue = safeKey(key);
+      const sessionStoreId = String(session.storeId || '');
+      const allowedMain = safeKeyValue === 'nexago-main' && (session.role === 'store-admin' || session.role === 'branch-admin' || session.role === 'staff');
+      if (allowedMain) return true;
+      if (!sessionStoreId) return false;
+      if (safeKeyValue === sessionStoreId) return true;
+      if (safeKeyValue.startsWith(`${sessionStoreId}-`)) return true;
+      return false;
+    }
+    return true;
+  }
+  if (!STRICT_SECURITY) return true;
   return !!(STATE_WRITE_TOKEN && req.headers['x-nexago-agent'] === STATE_WRITE_TOKEN);
 }
 
@@ -471,7 +484,7 @@ function mergeState(stored, incoming) {
   return { version: 1, updatedAt: new Date().toISOString(), state: merged };
 }
 
-function storefrontView(state) {
+function storefrontView(state, customerId = '') {
   const now = new Date().toISOString().slice(0, 10);
   const profile = Object.assign(
     { storeName: '', storeSub: '', whatsapp: '' },
@@ -498,6 +511,7 @@ function storefrontView(state) {
       id: p.id,
       name: p.name,
       sku: p.sku || '',
+      storeId: p.storeId || '',
       category: p.category || '',
       unit: p.unit || 'pcs',
       price: Number(p.price || 0),
@@ -509,7 +523,25 @@ function storefrontView(state) {
       tags: Array.isArray(p.tags) ? p.tags.filter(Boolean) : []
     }))
     .filter((p) => p.name);
-  return { profile, banners, products };
+  const stores = (Array.isArray(state.stores) ? state.stores : [])
+    .filter((s) => s && s.id)
+    .map((s) => ({ id: s.id, name: s.name || s.storeName || '', status: s.status || 'Active' }));
+  const orders = (Array.isArray(state.orders) ? state.orders : [])
+    .filter((o) => o && (!customerId || String(o.customerId || o.customer || '') === customerId))
+    .map((o) => ({
+      id: o.id,
+      status: o.status || 'Pending',
+      amount: Number(o.amount || 0),
+      customerName: o.customerName || '',
+      customerId: o.customerId || '',
+      customerPhone: o.customerPhone || '',
+      storeName: o.storeName || '',
+      items: Array.isArray(o.items) ? o.items : [],
+      date: o.date || '',
+      time: o.time || '',
+      placedAt: o.placedAt || 0,
+    }));
+  return { profile, banners, products, stores, orders };
 }
 
 function readBody(req) {
@@ -635,7 +667,8 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/storefront') {
     const store = loadStore(key);
-    sendJson(res, 200, { ok: true, key, updatedAt: store.updatedAt, ...storefrontView(store.state) });
+    const customerId = (url.searchParams.get('customerId') || '').trim();
+    sendJson(res, 200, { ok: true, key, updatedAt: store.updatedAt, ...storefrontView(store.state, customerId) });
     return;
   }
 
@@ -732,11 +765,13 @@ const server = http.createServer((req, res) => {
       const canonicalUserId = found.userId;
       const token = crypto.randomBytes(32).toString('hex');
       const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+      const sessionPermissions = Array.isArray(user.permissions) ? user.permissions : [];
       sessions[token] = {
         userId: canonicalUserId,
         role: user.role,
         storeId: user.storeId || '',
         branchId: user.branchId || '',
+        permissions: sessionPermissions,
         createdAt: Date.now(),
         expiresAt: Date.now() + 1000 * 60 * 60 * 12,
         ip: clientIp(req),
@@ -745,7 +780,7 @@ const server = http.createServer((req, res) => {
       };
       writeSecurity(`sessions-${safeKey(key)}`, sessions);
       appendAudit(key, { actor: canonicalUserId, role: user.role, action: 'otp-login-success', storeId: user.storeId, branchId: user.branchId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Gmail OTP verified' });
-      sendJson(res, 200, { ok: true, token, expiresAt: sessions[token].expiresAt, user: { userId: canonicalUserId, role: user.role, storeId: user.storeId || '', branchId: user.branchId || '' } });
+      sendJson(res, 200, { ok: true, token, expiresAt: sessions[token].expiresAt, user: { userId: canonicalUserId, role: user.role, storeId: user.storeId || '', branchId: user.branchId || '', permissions: sessionPermissions } });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
   };
 
@@ -864,11 +899,13 @@ const server = http.createServer((req, res) => {
       const canonicalUserId = found.userId;
       const token = crypto.randomBytes(32).toString('hex');
       const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+      const sessionPermissions = Array.isArray(user.permissions) ? user.permissions : [];
       sessions[token] = {
         userId: canonicalUserId,
         role: user.role,
         storeId: user.storeId || '',
         branchId: user.branchId || '',
+        permissions: sessionPermissions,
         createdAt: Date.now(),
         expiresAt: Date.now() + 1000 * 60 * 60 * 12,
         ip: clientIp(req),
@@ -876,7 +913,7 @@ const server = http.createServer((req, res) => {
       };
       writeSecurity(`sessions-${safeKey(key)}`, sessions);
       appendAudit(key, { actor: canonicalUserId, role: user.role, action: 'login-success', storeId: user.storeId, branchId: user.branchId, ip: clientIp(req), device: req.headers['user-agent'] || '' });
-      sendJson(res, 200, { ok: true, token, expiresAt: sessions[token].expiresAt, user: { userId: canonicalUserId, role: user.role, storeId: user.storeId || '', branchId: user.branchId || '' } });
+      sendJson(res, 200, { ok: true, token, expiresAt: sessions[token].expiresAt, user: { userId: canonicalUserId, role: user.role, storeId: user.storeId || '', branchId: user.branchId || '', permissions: sessionPermissions } });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
