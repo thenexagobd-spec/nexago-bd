@@ -18,6 +18,8 @@ alter table nexago_stores enable row level security;
 alter table nexago_security enable row level security;
 
 -- Only the service role (server-side) reads/writes these tables.
+drop policy if exists "service role only" on nexago_stores;
+drop policy if exists "service role only" on nexago_security;
 create policy "service role only" on nexago_stores for all using (auth.role() = 'service_role');
 create policy "service role only" on nexago_security for all using (auth.role() = 'service_role');
 
@@ -42,6 +44,7 @@ create table if not exists nexago_identities (
 );
 
 alter table nexago_identities enable row level security;
+drop policy if exists "service role only" on nexago_identities;
 create policy "service role only" on nexago_identities for all using (auth.role() = 'service_role');
 
 -- A role account may only exist once.
@@ -113,6 +116,10 @@ alter table nexago_wallets enable row level security;
 alter table nexago_wallet_txns enable row level security;
 alter table nexago_audit_log enable row level security;
 
+drop policy if exists "service role only" on nexago_customers;
+drop policy if exists "service role only" on nexago_wallets;
+drop policy if exists "service role only" on nexago_wallet_txns;
+drop policy if exists "service role only" on nexago_audit_log;
 create policy "service role only" on nexago_customers for all using (auth.role() = 'service_role');
 create policy "service role only" on nexago_wallets for all using (auth.role() = 'service_role');
 create policy "service role only" on nexago_wallet_txns for all using (auth.role() = 'service_role');
@@ -140,4 +147,5 @@ create index if not exists nexago_files_platform_idx on nexago_files (platform_k
 create index if not exists nexago_files_store_branch_idx on nexago_files (store_id, branch_id, created_at desc);
 
 alter table nexago_files enable row level security;
+drop policy if exists "service role only" on nexago_files;
 create policy "service role only" on nexago_files for all using (auth.role() = 'service_role');
