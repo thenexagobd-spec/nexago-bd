@@ -93,6 +93,28 @@ export async function securityAudit(action: string, detail: Record<string, any> 
   try { await securityApi('/audit', { action, ...detail }); } catch { /* old flow stays working if security API is offline */ }
 }
 
+// Single Account Rule helpers (Phase 2). Every signup / registration calls
+// identityCheck before submitting; identityClaim registers the account atomically
+// (unique phone + unique Gmail across all roles and stores). These fail safe —
+// if the security API is unreachable the caller decides whether to block.
+export async function identityCheck(opts: { phone?: string; email?: string; excludeId?: string; excludeRole?: string }): Promise<{ taken: boolean; conflict?: { role?: string; identityId?: string; name?: string; phone?: string; email?: string } | null }> {
+  try {
+    const data = await securityApi('/identity/check', { ...opts });
+    return { taken: !!data.taken, conflict: data.conflict || null };
+  } catch {
+    return { taken: false, conflict: null };
+  }
+}
+
+export async function identityClaim(opts: { role: string; identityId: string; name?: string; phone?: string; email?: string; status?: string }): Promise<{ ok: boolean; error?: string; conflict?: any }> {
+  try {
+    const data = await securityApi('/identity/claim', { ...opts });
+    return { ok: true, ...data };
+  } catch (err: any) {
+    return { ok: false, error: String(err?.message || 'IDENTITY_CLAIM_FAILED'), conflict: err?.conflict };
+  }
+}
+
 export async function secureFileUpload(file: { name: string; type?: string; dataUrl: string }, detail: Record<string, any> = {}) {
   try {
     const data = await securityApi('/file', { name: file.name, type: file.type, dataUrl: file.dataUrl, ...detail });

@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet, secureFileUpload, securityApi, securityAudit } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim } from './portalUtils';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
@@ -156,13 +156,20 @@ export default function StoreAdminPortal() {
     reader.readAsDataURL(file);
   };
 
-  const submitSignup = () => {
+  const submitSignup = async () => {
     const missing = storeDocMeta.find(d => d.required && !uploadedDocs[d.key]);
     if (!signup.ownerName || !signup.phone || !signup.email || !signup.storeName || !signup.storeAddress || !signup.tradeLicenseNo || !signup.tinBin) return;
     if (otpStep !== 'verified') return;
     if (!signup.password || signup.password.length < 8) return;
     if (signup.password !== signup.confirmPassword) return;
     if (missing) return;
+    const idConflict = await identityCheck({ phone: signup.phone, email: signup.email });
+    if (idConflict.taken) {
+      const c = idConflict.conflict;
+      setOtpError(`This phone or Gmail already belongs to ${c?.name || c?.identityId || 'an existing account'} (${c?.role || 'account'}). One account per phone/Gmail.`);
+      setSignupReview(false);
+      return;
+    }
     if (!signupReview) { setSignupReview(true); return; }
     const docData = (key: string) => typeof uploadedDocs[key] === 'string' ? uploadedDocs[key] : uploadedDocs[key]?.dataUrl || '';
     const usedFingerprints = new Set(storeAdminApps.flatMap((app: any) => (app.documents || []).map((d: any) => d.fingerprint).filter(Boolean)));
@@ -194,6 +201,7 @@ export default function StoreAdminPortal() {
     delete (app as any).confirmPassword;
     setStoreAdminApps(prev => [app, ...prev]);
     securityAudit('store-admin-signup-submitted', { actor: adminId, storeId, reason: 'new store admin application (email verified, password set by owner)' });
+    identityClaim({ role: 'store-admin', identityId: adminId, name: signup.ownerName, phone: signup.phone, email: signup.email }).catch(() => {});
     setSubmittedAppId(adminId);
     setTrackId(adminId);
     setAuthView('track');

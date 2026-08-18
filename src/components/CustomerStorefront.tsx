@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, ReturnRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
-import { handoffPayloadOf, handoffCodeOf } from '../portals/portalUtils';
+import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi } from '../portals/portalUtils';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -1097,6 +1097,29 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId, customerProfile.name, customerProfile.phone, customerProfile.email]);
 
+  // Claim the permanent identity server-side so the phone/Gmail cannot be reused
+  // by a different account (customer, driver, store admin or staff) anywhere.
+  useEffect(() => {
+    let cancelled = false;
+    const phone = customerProfile.phone || '';
+    const email = customerProfile.email || '';
+    if (!phone && !email) return;
+    identityCheck({ phone, email, excludeId: customerId, excludeRole: 'customer' })
+      .then(({ taken }) => {
+        if (cancelled || taken) return;
+        return securityApi('/identity/claim', {
+          role: 'customer',
+          identityId: customerId,
+          name: customerProfile.name || 'Customer',
+          phone,
+          email,
+        }).catch(() => null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId, customerProfile.name, customerProfile.phone, customerProfile.email]);
+
   const [custIdCopy, setCustIdCopy] = useState(false);
 
   // Duplicate prevention: one phone + one Gmail = one account. When the customer
@@ -1110,6 +1133,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     const byEmail = accounts.find(a => a.customerId !== customerId && e && normEmail(a.email) === e);
     if (byEmail) return byEmail;
     return null;
+  };
+
+  // Server-side Single Account check: phone/Gmail must not belong to ANY account
+  // on the platform (customer, driver, store admin, staff). Local registry + cloud
+  // both checked; cloud wins when it reports a conflict.
+  const checkIdentityConflict = async (phone: string, email: string) => {
+    const local = findAccountDuplicate(phone, email);
+    const cloud = await identityCheck({ phone, email, excludeId: customerId, excludeRole: 'customer' });
+    const conflict = cloud.taken ? cloud.conflict : (local ? { name: local.name, identityId: local.customerId, role: 'customer', phone: local.phone, email: local.email } : null);
+    return conflict;
   };
 
   const [pwd, setPwd] = useState({ old: '', fresh: '', confirm: '' });
@@ -3581,7 +3614,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showAccountForm ? 'rotate-180' : ''}`} />
                 </button>
                 {showAccountForm && (
-                  <form onSubmit={(e) => { e.preventDefault(); const dup = findAccountDuplicate(customerProfile.phone, customerProfile.email); if (dup) { showToast(`This phone or Gmail already belongs to account ${dup.name} (ID ${dup.customerId}). One account per phone/Gmail — please use your existing login.`, 'info'); return; } showToast('Account settings updated successfully!', 'success'); }} className="px-6 pb-6 pt-4 border-t border-gray-100 space-y-4 text-xs">
+                  <form onSubmit={async (e) => { e.preventDefault(); const dup = findAccountDuplicate(customerProfile.phone, customerProfile.email); if (dup) { showToast(`This phone or Gmail already belongs to account ${dup.name} (ID ${dup.customerId}). One account per phone/Gmail — please use your existing login.`, 'info'); return; } const conflict = await checkIdentityConflict(customerProfile.phone, customerProfile.email); if (conflict) { showToast(`This phone or Gmail already belongs to ${conflict.name || conflict.identityId} (${conflict.role || 'account'}). One account per phone/Gmail — please use your existing login.`, 'info'); return; } showToast('Account settings updated successfully!', 'success'); }} className="px-6 pb-6 pt-4 border-t border-gray-100 space-y-4 text-xs">
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{T.fullName || 'Full Name'}</label>
                       <input type="text" value={customerProfile.name} onChange={(e) => setCustomerProfile({ ...customerProfile, name: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />

@@ -18,7 +18,7 @@ import {
     X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays
   } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync } from './portalUtils';
+import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim } from './portalUtils';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
@@ -189,7 +189,7 @@ export default function DriverPortal() {
   // Every driver gets a permanent numeric ID (e.g. 3667463854); once the admin
   // approves (App.tsx handleUpdateDriver) a random password is generated into
   // sd_driver_creds and the driver logs in with ID + that password.
-  const submitSignup = () => {
+  const submitSignup = async () => {
     const missing = requiredDocs.find(k => !uploadedDocs[k]);
     if (!signupName.trim() || !signupPhone.trim() || !signupGmail.trim() || !signupNid.trim() || !signupLicense.trim()) {
       showToast('Fill in your name, phone, gmail, NID and driving license');
@@ -226,6 +226,12 @@ export default function DriverPortal() {
       showToast('This phone / gmail / NID / license is already registered — you can only register once');
       return;
     }
+    const idConflict = await identityCheck({ phone: signupPhone, email: signupGmail });
+    if (idConflict.taken) {
+      const c = idConflict.conflict;
+      showToast(`This phone or Gmail already belongs to ${c?.name || c?.identityId || 'an existing account'} (${c?.role || 'account'}). One account per phone/Gmail.`);
+      return;
+    }
     let newId = '';
     do { newId = `3${Math.floor(100000000 + Math.random() * 899999999)}`.slice(0, 10); }
     while (drivers.some(d => d.id === newId));
@@ -254,6 +260,7 @@ export default function DriverPortal() {
         })),
     };
     setDrivers(prev => [newDriver, ...prev]);
+    identityClaim({ role: 'driver', identityId: newId, name: signupName.trim(), phone: signupPhone, email: signupGmail.trim() }).catch(() => {});
     setPendingId(newId);
     lsSet('sd_driver_pending_id', newId);
     setAuthView('pending');

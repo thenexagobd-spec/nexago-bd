@@ -214,6 +214,7 @@ let supabaseReady = false;
 const SUPABASE_TABLE = {
   stores: 'nexago_stores',
   security: 'nexago_security',
+  identities: 'nexago_identities',
 };
 
 function supabaseWrite(table, row) {
@@ -290,6 +291,87 @@ function appendAudit(key, entry) {
   audit.push(item);
   writeSecurity(`audit-${safeKey(key)}`, audit.slice(-5000));
   return item;
+}
+
+// ---- Single Account Rule (Phase 2) ----
+// Every real-world identity (phone / Gmail) may belong to exactly ONE platform
+// account across ALL stores. Identity claims are stored in Supabase
+// (nexago_identities) with unique indexes on phone_norm and email_norm, and are
+// also mirrored into the local security file as a fallback so uniqueness works
+// even when Supabase is briefly unreachable.
+const IDENTITY_FILE = 'identities';
+const IDENTITY_ROLES = ['customer', 'driver', 'store-admin', 'branch-admin', 'staff'];
+
+function normalizePhoneForIdentity(value) {
+  return String(value || '').replace(/[^0-9]/g, '');
+}
+
+function normalizeEmailForIdentity(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function readIdentities() {
+  const list = readSecurity(IDENTITY_FILE, []);
+  return Array.isArray(list) ? list : [];
+}
+
+function writeIdentities(list) {
+  writeSecurity(IDENTITY_FILE, list.slice(0, 20000));
+  return list;
+}
+
+// Find any existing account that already claims this phone or email.
+function findIdentityConflict({ phone = '', email = '', excludeId = '', excludeRole = '' }) {
+  const p = normalizePhoneForIdentity(phone);
+  const e = normalizeEmailForIdentity(email);
+  if (!p && !e) return null;
+  return readIdentities().find((it) => it
+    && !(it.identity_id === excludeId && it.role === excludeRole)
+    && ((p && normalizePhoneForIdentity(it.phone) === p) || (e && normalizeEmailForIdentity(it.email) === e)));
+}
+
+// Upsert one identity claim into Supabase + local mirror. Returns { ok, conflict? }
+async function claimIdentity({ role, identityId, name = '', phone = '', email = '', platformKey = '', status = 'Active' }) {
+  if (!IDENTITY_ROLES.includes(role) || !identityId) return { ok: false, error: 'INVALID_IDENTITY' };
+  const p = normalizePhoneForIdentity(phone);
+  const e = normalizeEmailForIdentity(email);
+  const localConflict = findIdentityConflict({ phone: p, email: e, excludeId: identityId, excludeRole: role });
+  if (localConflict) {
+    return { ok: false, error: 'IDENTITY_CLAIMED', conflict: { role: localConflict.role, identityId: localConflict.identity_id, name: localConflict.name, phone: localConflict.phone, email: localConflict.email } };
+  }
+  const row = {
+    role,
+    platform_key: platformKey || 'nexago-main',
+    identity_id: identityId,
+    name: String(name || ''),
+    phone: p ? `+${p}` : '',
+    phone_norm: p,
+    email: e,
+    email_norm: e,
+    status,
+    updated_at: new Date().toISOString(),
+  };
+  const list = readIdentities();
+  const idx = list.findIndex((it) => it && it.role === role && it.identity_id === identityId);
+  if (idx >= 0) list[idx] = { ...list[idx], ...row, created_at: list[idx].created_at }; else list.push(row);
+  writeIdentities(list);
+  if (supabaseConfigured && serviceClient) {
+    const { error } = await serviceClient.from(SUPABASE_TABLE.identities).upsert(row, { onConflict: 'role,identity_id' });
+    if (error) {
+      // Re-read what Supabase actually holds so the local mirror stays truthful.
+      if (String(error.message).includes('duplicate')) {
+        const { data } = await serviceClient.from(SUPABASE_TABLE.identities)
+          .select('role,identity_id,name,phone,email')
+          .or(`phone_norm.eq.${p},email_norm.eq.${e}`)
+          .limit(5);
+        const dbConflict = (data || []).find((it) => !(it.identity_id === identityId && it.role === role));
+        if (dbConflict) {
+          return { ok: false, error: 'IDENTITY_CLAIMED', conflict: dbConflict };
+        }
+      }
+    }
+  }
+  return { ok: true, identity: row };
 }
 
 async function sendSecurityAlert(kind, detail = {}) {
@@ -853,6 +935,56 @@ const server = http.createServer((req, res) => {
       writeSecurity(`users-${safeKey(key)}`, users);
       appendAudit(key, { actor: userId, role, action: 'security-user-registered', storeId, branchId, ip: clientIp(req), reason: body.reason || 'initial registration' });
       sendJson(res, 200, { ok: true, userId, role, storeId, branchId });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  // ---- Single Account Rule ----
+  // POST /api/security/identity/check { phone, email, excludeId, excludeRole }
+  //   → { ok, taken: bool, conflict? } — used by every signup/registration form
+  //     (customer, driver, store admin, staff) BEFORE submitting, so a phone or
+  //     Gmail that already belongs to ANY account is rejected up front.
+  // POST /api/security/identity/claim { role, identityId, name, phone, email }
+  //   → registers the identity atomically (unique phone + unique email across
+  //     all roles/stores). 409 IDENTITY_CLAIMED with the existing account when
+  //     the phone or Gmail is already taken.
+  if (req.method === 'POST' && url.pathname === '/api/security/identity/check') {
+    if (!rateLimit(req, 'identity-check', 60, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then((body) => {
+      const conflict = findIdentityConflict({
+        phone: String(body.phone || ''),
+        email: String(body.email || ''),
+        excludeId: String(body.excludeId || ''),
+        excludeRole: String(body.excludeRole || ''),
+      });
+      sendJson(res, 200, { ok: true, taken: !!conflict, conflict: conflict ? { role: conflict.role, identityId: conflict.identity_id, name: conflict.name, phone: conflict.phone, email: conflict.email } : null });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/identity/claim') {
+    if (!rateLimit(req, 'identity-claim', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const result = await claimIdentity({
+        role: String(body.role || '').trim(),
+        identityId: String(body.identityId || '').trim(),
+        name: String(body.name || ''),
+        phone: String(body.phone || ''),
+        email: String(body.email || ''),
+        platformKey: safeKey(key),
+        status: String(body.status || 'Active'),
+      });
+      if (!result.ok) {
+        if (result.error === 'IDENTITY_CLAIMED') {
+          appendAudit(key, { actor: body.identityId || 'unknown', role: body.role, action: 'identity-claim-rejected', ip: clientIp(req), reason: `phone/Gmail already claimed by ${result.conflict?.role} ${result.conflict?.identityId}` });
+          sendJson(res, 409, { ok: false, error: 'IDENTITY_CLAIMED', conflict: result.conflict });
+          return;
+        }
+        sendJson(res, 400, { ok: false, error: result.error });
+        return;
+      }
+      appendAudit(key, { actor: result.identity.identity_id, role: result.identity.role, action: 'identity-claimed', ip: clientIp(req), reason: 'single account registration' });
+      sendJson(res, 200, { ok: true, identity: result.identity });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
