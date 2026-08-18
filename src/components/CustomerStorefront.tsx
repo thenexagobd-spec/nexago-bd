@@ -12,6 +12,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, ReturnRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
 import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi, customerRegister, customerSync, customerLogin, customerForgot } from '../portals/portalUtils';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -5599,12 +5600,70 @@ const CustomerAuthScreen: React.FC<{
   showToast?: (msg: string, type?: string) => void;
 }> = ({ email, name, phone, customerId, onUpdateProfile, onVerified, showToast }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('signup');
-  const [step, setStep] = useState<'form' | 'otp' | 'done'>('form');
+  const [step, setStep] = useState<'form' | 'otp' | 'details' | 'done'>('form');
   const [emailField, setEmailField] = useState(email || '');
   const [nameField, setNameField] = useState(name || '');
   const [phoneField, setPhoneField] = useState(phone || '');
   const [passField, setPassField] = useState('');
   const [passConfirm, setPassConfirm] = useState('');
+
+  // Google account chooser (Supabase OAuth). After the user picks a Gmail on
+  // Google, we read the chosen email and auto-register/auto-login the customer
+  // (permanent ID linked to that Gmail — no password needed on this device).
+  const sbUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+  const sbAnon = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const supabase: SupabaseClient | null = sbUrl && sbAnon ? createClient(sbUrl, sbAnon, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
+  const supabaseRef = useRef(supabase);
+  supabaseRef.current = supabase;
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  // Google OAuth callback: #access_token in URL → read session → get chosen
+  // Gmail → auto-register the customer (adopts permanent ID).
+  useEffect(() => {
+    const sb = supabaseRef.current;
+    if (!sb) return;
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (!params.get('access_token')) return;
+    (async () => {
+      try {
+        const { data, error } = await sb.auth.getSession();
+        if (error || !data.session) throw error || new Error('no session');
+        const gmail = String(data.session.user.email || '').trim().toLowerCase();
+        if (!gmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gmail)) throw new Error('no email');
+        const taken = await identityCheck({ email: gmail, excludeId: customerId, excludeRole: 'customer' }).catch(() => null);
+        if (taken && taken.taken) {
+          showToast?.('This Gmail already belongs to another account. Log in with that account instead.', 'info');
+          return;
+        }
+        const res = await customerRegister({ name: nameField.trim() || gmail.split('@')[0], email: gmail, phone: phoneField.trim(), customerId, balance: 0 });
+        if (!res || !res.customer) throw new Error('register failed');
+        onUpdateProfile({ name: (res.customer.name || gmail.split('@')[0]), email: gmail, phone: res.customer.phone || phoneField });
+        showToast?.('Signed in with Google — welcome!', 'success');
+        onVerified({ customerId: res.customer.customerId, name: res.customer.name, email: gmail, phone: res.customer.phone || phoneField });
+      } catch {
+        showToast?.('Google sign-in could not be completed. Try again or use the form below.', 'info');
+      } finally {
+        setGoogleBusy(false);
+      }
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const doGoogleLogin = () => {
+    if (!supabase) {
+      showToast?.('Google sign-in is not configured on this server yet. Use the form below.', 'info');
+      return;
+    }
+    setGoogleBusy(true);
+    const redirectTo = window.location.origin + window.location.pathname + window.location.search;
+    supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
+      .catch(() => {
+        setGoogleBusy(false);
+        showToast?.('Google sign-in unavailable right now. Try again or use the form below.', 'info');
+      });
+  };
+
   const [otpCode, setOtpCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -5633,13 +5692,10 @@ const CustomerAuthScreen: React.FC<{
       .finally(() => setBusy(false));
   };
 
-  // Signup: send OTP (mandatory before any account is created).
+  // Signup step 1: only the Gmail + OTP. Name/phone/password come on the next
+  // page after the email is verified.
   const sendOtp = () => {
     if (!emailOk()) { setError('Enter a valid Gmail address.'); return; }
-    if (!nameField.trim()) { setError('Enter your full name.'); return; }
-    if (!phoneOk()) { setError('Enter a valid Bangladeshi phone number.'); return; }
-    if (passField.length < 6) { setError('Set a password of at least 6 characters.'); return; }
-    if (passField !== passConfirm) { setError('Passwords do not match.'); return; }
     setBusy(true);
     setError('');
     const target = emailField.trim().toLowerCase();
@@ -5650,33 +5706,50 @@ const CustomerAuthScreen: React.FC<{
       .finally(() => setBusy(false));
   };
 
-  // Verify OTP then register — the server links the permanent ID with the
-  // Gmail/phone (one ID per Gmail/phone, never duplicated).
-  const verifyOtp = async () => {
+  // Verify the OTP, then move to the details page (name/phone/password).
+  const verifyOtp = () => {
     if (!otpCode.trim()) { setError('Enter the 6-digit code from your email.'); return; }
     setBusy(true);
     setError('');
     const target = sentTo;
+    securityApi('/otp-signup-verify', { email: target, code: otpCode })
+      .then(() => {
+        setOtpCode('');
+        setStep('details');
+        showToast?.('Gmail verified — now set up your account details.', 'success');
+      })
+      .catch((err) => setError(String(err?.message || 'Invalid or expired code.')))
+      .finally(() => setBusy(false));
+  };
+
+  // Signup step 2: details page after OTP passed. Creates the account — the
+  // server links the permanent ID with the Gmail/phone (one ID per Gmail/phone,
+  // never duplicated).
+  const createAccount = async () => {
+    if (!nameField.trim()) { setError('Enter your full name.'); return; }
+    if (!phoneOk()) { setError('Enter a valid Bangladeshi phone number.'); return; }
+    if (passField.length < 6) { setError('Set a password of at least 6 characters.'); return; }
+    if (passField !== passConfirm) { setError('Passwords do not match.'); return; }
+    setBusy(true);
+    setError('');
+    const target = sentTo;
     try {
-      await securityApi('/otp-signup-verify', { email: target, code: otpCode });
       // One-account rule: reject if the same Gmail/phone already belongs to
       // another customer/driver/store-admin/staff identity.
       const takenCheck = await identityCheck({ phone: phoneField.trim(), email: target, excludeId: customerId, excludeRole: 'customer' }).catch(() => null);
       if (takenCheck && takenCheck.taken) {
         setError('This Gmail or phone already belongs to another account. One account per Gmail/phone — please log in with your existing account.');
-        setStep('form');
         return;
       }
       const res = await customerRegister({ name: nameField.trim(), phone: phoneField.trim(), email: target, customerId, password: passField, balance: 0 });
-      if (!res || !res.customer) { setError('Account could not be created. Please try again.'); setStep('form'); return; }
+      if (!res || !res.customer) { setError('Account could not be created. Please try again.'); return; }
       const newId = res.customer.customerId || customerId;
       const pin = genPin();
       onUpdateProfile({ name: nameField.trim(), email: target, phone: phoneField.trim() });
       setDoneCard({ customerId: newId, email: target, phone: phoneField.trim(), password: passField, pin });
       setStep('done');
     } catch (err) {
-      setError(String((err as any)?.message || 'Invalid or expired code.'));
-      setStep('form');
+      setError(String((err as any)?.message || 'Account could not be created. Try again.'));
     } finally {
       setBusy(false);
     }
@@ -5790,41 +5863,48 @@ const CustomerAuthScreen: React.FC<{
                 <button onClick={() => { setMode('login'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'login' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Sign In</button>
               </div>
 
-              <div className="mt-5 space-y-3">
+              <button
+                onClick={doGoogleLogin}
+                disabled={googleBusy}
+                className="mt-4 w-full py-3 rounded-xl bg-white hover:bg-gray-100 text-gray-800 text-[13px] font-bold shadow-lg transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center space-x-2.5 border border-white/60"
+              >
+                <svg width="18" height="18" viewBox="0 0 48 48">
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                <span>{googleBusy ? 'Connecting to Google…' : 'Continue with Google'}</span>
+              </button>
+
+              <div className="flex items-center space-x-3 my-4">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">or</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+
+              <div className="space-y-3">
                 {mode === 'signup' && (
-                  <>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Full Name <span className="text-emerald-400">*</span></label>
-                      <input value={nameField} onChange={(e) => setNameField(e.target.value)} placeholder="e.g. Rahim Khan"
-                        className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Phone Number <span className="text-emerald-400">*</span></label>
-                      <input value={phoneField} onChange={(e) => setPhoneField(e.target.value)} placeholder="e.g. 01712345678"
-                        className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
-                    </div>
-                  </>
+                  <p className="text-[11px] text-gray-400 flex items-center space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Step 1 of 2 — first verify your Gmail with an OTP. Name, phone & password come next.</span>
+                  </p>
                 )}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail Address <span className="text-emerald-400">*</span></label>
                   <input value={emailField} onChange={(e) => { setEmailField(e.target.value); setError(''); }} placeholder="name@gmail.com"
                     className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Password {mode === 'signup' ? '(min 6 chars)' : ''} <span className="text-emerald-400">*</span></label>
-                  <div className="relative">
-                    <input type={showPass ? 'text' : 'password'} value={passField} onChange={(e) => { setPassField(e.target.value); setError(''); }} placeholder={mode === 'signup' ? 'Set your password' : 'Your password'}
-                      className="cs-auth-input w-full rounded-xl px-4 py-3 pr-12 text-[13px] text-white outline-none placeholder:text-gray-500" />
-                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-300 cursor-pointer">
-                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                {mode === 'signup' && (
+                {mode === 'login' && (
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Confirm Password <span className="text-emerald-400">*</span></label>
-                    <input type={showPass ? 'text' : 'password'} value={passConfirm} onChange={(e) => { setPassConfirm(e.target.value); setError(''); }} placeholder="Re-type your password"
-                      className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Password <span className="text-emerald-400">*</span></label>
+                    <div className="relative">
+                      <input type={showPass ? 'text' : 'password'} value={passField} onChange={(e) => { setPassField(e.target.value); setError(''); }} placeholder="Your password"
+                        className="cs-auth-input w-full rounded-xl px-4 py-3 pr-12 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                      <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-300 cursor-pointer">
+                        {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 )}
                 {mode === 'signup' ? (
@@ -5851,17 +5931,59 @@ const CustomerAuthScreen: React.FC<{
           {!forgotMode && step === 'otp' && (
             <div className="mt-6 space-y-3">
               <div className="rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3 text-[11px] text-emerald-200">
-                <b className="text-white">Step 2 of 2</b> — a 6-digit code was sent to <b className="text-white">{sentTo}</b>. Your account is only created after this OTP passes.
+                <b className="text-white">Step 1 of 2</b> — a 6-digit code was sent to <b className="text-white">{sentTo}</b>. After verifying, you'll set up your account details.
               </div>
               <input value={otpCode} onChange={(e) => { setOtpCode(e.target.value); setError(''); }} placeholder="6-digit code"
                 className="cs-auth-input w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:text-gray-500" />
               <button onClick={verifyOtp} disabled={busy}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                {busy ? 'Verifying…' : 'Verify & Create Account'}
+                {busy ? 'Verifying…' : 'Verify Gmail'}
               </button>
               <button onClick={sendOtp} disabled={busy}
                 className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
                 Resend Code
+              </button>
+              <button onClick={() => setStep('form')} disabled={busy}
+                className="w-full py-2.5 rounded-xl text-[11px] font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">
+                ← Back
+              </button>
+              {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
+            </div>
+          )}
+
+          {!forgotMode && step === 'details' && (
+            <div className="mt-6 space-y-3">
+              <div className="rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3 text-[11px] text-emerald-200">
+                <b className="text-white">Step 2 of 2</b> — Gmail <b className="text-white">{sentTo}</b> is verified. Now set up your account details.
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Full Name <span className="text-emerald-400">*</span></label>
+                <input value={nameField} onChange={(e) => { setNameField(e.target.value); setError(''); }} placeholder="e.g. Rahim Khan"
+                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Phone Number <span className="text-emerald-400">*</span></label>
+                <input value={phoneField} onChange={(e) => { setPhoneField(e.target.value); setError(''); }} placeholder="e.g. 01712345678"
+                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Password (min 6 chars) <span className="text-emerald-400">*</span></label>
+                <div className="relative">
+                  <input type={showPass ? 'text' : 'password'} value={passField} onChange={(e) => { setPassField(e.target.value); setError(''); }} placeholder="Set your password"
+                    className="cs-auth-input w-full rounded-xl px-4 py-3 pr-12 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                  <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-300 cursor-pointer">
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Confirm Password <span className="text-emerald-400">*</span></label>
+                <input type={showPass ? 'text' : 'password'} value={passConfirm} onChange={(e) => { setPassConfirm(e.target.value); setError(''); }} placeholder="Re-type your password"
+                  className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+              </div>
+              <button onClick={createAccount} disabled={busy}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                {busy ? 'Creating…' : 'Create My Account'}
               </button>
               <button onClick={() => setStep('form')} disabled={busy}
                 className="w-full py-2.5 rounded-xl text-[11px] font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">
