@@ -85,7 +85,12 @@ export async function securityApi(path: string, body?: Record<string, any>, toke
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ok === false) throw new Error(data.error || `Security API failed: ${path}`);
+  if (!res.ok || data.ok === false) {
+    const error = new Error(data.error || `Security API failed: ${path}`) as Error & { status?: number; data?: any };
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
   return data;
 }
 

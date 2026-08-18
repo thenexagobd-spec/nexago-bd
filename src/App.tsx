@@ -254,7 +254,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('Dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const isSuperAdminRoute = window.location.pathname.includes('super-admin') || window.location.pathname.endsWith('/admin') || window.location.pathname.endsWith('/index.html');
-  const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(() => localStorage.getItem('sd_super_admin_login') === 'verified');
+  const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(() => {
+    const token = localStorage.getItem('sd_security_session') || '';
+    return !!token && localStorage.getItem('sd_super_admin_login') === 'verified';
+  });
   const [superAdminLogin, setSuperAdminLogin] = useState({ user: '', password: '', secretCode: '' });
   const [superAdminLoginError, setSuperAdminLoginError] = useState('');
   const [superAdminLoginStep, setSuperAdminLoginStep] = useState<'credentials' | 'secret' | 'otp'>('credentials');
@@ -6089,7 +6092,17 @@ export default function App() {
     securityApi('/sessions').then((data) => {
       setSuperAdminSessions(Array.isArray(data.sessions) ? data.sessions : []);
       setSuperAdminSessionsError('');
-    }).catch(() => setSuperAdminSessionsError('Device sessions could not load.'));
+    }).catch((err) => {
+      if (err?.status === 401 || err?.status === 403) {
+        localStorage.removeItem('sd_security_session');
+        localStorage.removeItem('sd_super_admin_login');
+        setIsSuperAdminLoggedIn(false);
+        setSuperAdminSessions([]);
+        setSuperAdminSessionsError('');
+        return;
+      }
+      setSuperAdminSessionsError('Device sessions could not load.');
+    });
   };
 
   const updateSuperAdminSession = (tokenId: string, action: 'inactive' | 'block') => {
@@ -6100,20 +6113,26 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!isSuperAdminLoggedIn) return;
+    if (!isSuperAdminLoggedIn || !localStorage.getItem('sd_security_session')) return;
     refreshSuperAdminSessions();
     const timer = window.setInterval(refreshSuperAdminSessions, 10_000);
     return () => window.clearInterval(timer);
   }, [isSuperAdminLoggedIn]);
 
   useEffect(() => {
-    if (!isSuperAdminLoggedIn || !navigator.geolocation) return;
+    if (!isSuperAdminLoggedIn || !localStorage.getItem('sd_security_session') || !navigator.geolocation) return;
     const sendLocation = (pos: GeolocationPosition) => {
       securityApi('/session-location', {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
         accuracy: pos.coords.accuracy,
-      }).catch(() => {});
+      }).catch((err) => {
+        if (err?.status === 401 || err?.status === 403) {
+          localStorage.removeItem('sd_security_session');
+          localStorage.removeItem('sd_super_admin_login');
+          setIsSuperAdminLoggedIn(false);
+        }
+      });
     };
     navigator.geolocation.getCurrentPosition(sendLocation, () => {}, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 });
     const watchId = navigator.geolocation.watchPosition(sendLocation, () => {}, { enableHighAccuracy: true, timeout: 20_000, maximumAge: 15_000 });
