@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, ReturnRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
-import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi } from '../portals/portalUtils';
+import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi, customerRegister, customerSync } from '../portals/portalUtils';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -1119,6 +1119,42 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId, customerProfile.name, customerProfile.phone, customerProfile.email]);
+
+  // Register the permanent customer server-side and restore the wallet. If the
+  // phone/Gmail was already registered on another device, the server returns the
+  // EXISTING customerId (device-independent ID) and we adopt it here.
+  useEffect(() => {
+    let cancelled = false;
+    const phone = customerProfile.phone || '';
+    const email = customerProfile.email || '';
+    customerRegister({ name: customerProfile.name || 'Customer', phone, email, customerId, balance: walletBalance }).then((res) => {
+      if (cancelled || !res || !res.customer) return;
+      const serverId = res.customer.customerId || customerId;
+      if (serverId && serverId !== customerId) {
+        setStoredData('ss_cust_id', serverId);
+      }
+      if (res.customer.phone && !phone) setCustomerProfile((p) => ({ ...p, phone: res.customer.phone }));
+      if (res.customer.email && !email) setCustomerProfile((p) => ({ ...p, email: res.customer.email }));
+      if (res.customer.name && !customerProfile.name) setCustomerProfile((p) => ({ ...p, name: res.customer.name }));
+      if (typeof res.walletBalance === 'number') setWalletBalance((prev) => Math.max(prev, res.walletBalance || 0));
+      if (Array.isArray(res.txns) && res.txns.length) setWalletTransactions((prev) => {
+        const known = new Set(prev.map((t) => t.id));
+        const fresh = res.txns.filter((t) => !known.has(t.id));
+        return fresh.length ? [...fresh, ...prev] : prev;
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId]);
+
+  // Keep the permanent wallet cloud store in sync as the balance / history moves.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      customerSync(customerId, walletBalance, walletTransactions).catch(() => {});
+    }, 800);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId, walletBalance, walletTransactions]);
 
   const [custIdCopy, setCustIdCopy] = useState(false);
 

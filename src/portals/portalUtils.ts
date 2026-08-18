@@ -115,6 +115,36 @@ export async function identityClaim(opts: { role: string; identityId: string; na
   }
 }
 
+// Unified ID + Permanent Cloud helpers (Phase 3). Customer profile, wallet and
+// wallet history are persisted per permanent ID server-side so a wiped browser or
+// a new device restores the SAME customer ID and balance.
+export async function customerRegister(opts: { name?: string; phone?: string; email?: string; customerId?: string; balance?: number }): Promise<{ customer?: any; walletBalance?: number; txns?: any[] } | null> {
+  try {
+    const data = await securityApi('/customer/register', { ...opts });
+    return { customer: data.customer, walletBalance: data.walletBalance, txns: data.txns };
+  } catch {
+    return null;
+  }
+}
+
+export async function customerMe(customerId: string): Promise<{ customer?: any; walletBalance?: number; txns?: any[] } | null> {
+  try {
+    const data = await securityApi(`/customer/me?customerId=${encodeURIComponent(customerId)}`);
+    return { customer: data.customer, walletBalance: data.walletBalance, txns: data.txns };
+  } catch {
+    return null;
+  }
+}
+
+export async function customerSync(customerId: string, balance: number, txns: any[] = []): Promise<boolean> {
+  try {
+    await securityApi('/customer/sync', { customerId, balance, txns });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function secureFileUpload(file: { name: string; type?: string; dataUrl: string }, detail: Record<string, any> = {}) {
   try {
     const data = await securityApi('/file', { name: file.name, type: file.type, dataUrl: file.dataUrl, ...detail });

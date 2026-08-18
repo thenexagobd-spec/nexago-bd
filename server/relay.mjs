@@ -215,6 +215,10 @@ const SUPABASE_TABLE = {
   stores: 'nexago_stores',
   security: 'nexago_security',
   identities: 'nexago_identities',
+  customers: 'nexago_customers',
+  wallets: 'nexago_wallets',
+  walletTxns: 'nexago_wallet_txns',
+  auditLog: 'nexago_audit_log',
 };
 
 function supabaseWrite(table, row) {
@@ -290,6 +294,33 @@ function appendAudit(key, entry) {
   };
   audit.push(item);
   writeSecurity(`audit-${safeKey(key)}`, audit.slice(-5000));
+  // Permanent append-only mirror: every audit row is inserted once into
+  // nexago_audit_log (never updated or deleted) so the full history survives in
+  // PostgreSQL even though the local JSON file rotates at 5000 entries.
+  if (supabaseConfigured && serviceClient) {
+    try {
+      serviceClient.from(SUPABASE_TABLE.auditLog).insert({
+        platform_key: safeKey(key),
+        audit_id: item.id,
+        actor: String(entry.actor || 'system').slice(0, 200),
+        role: String(entry.role || '').slice(0, 60),
+        action: String(entry.action || 'event').slice(0, 120),
+        store_id: String(entry.storeId || '').slice(0, 100),
+        branch_id: String(entry.branchId || '').slice(0, 100),
+        ip: String(entry.ip || '').slice(0, 100),
+        device: String(entry.device || '').slice(0, 300),
+        reason: String(entry.reason || '').slice(0, 2000),
+        payload: {
+          oldValue: entry.oldValue ?? null,
+          newValue: entry.newValue ?? null,
+          time: item.time,
+        },
+        created_at: item.time,
+      }).then(({ error }) => {
+        if (error && !String(error.message).includes('duplicate')) console.error('[supabase] audit insert failed:', error.message);
+      }).catch((e) => { /* non-fatal */ });
+    } catch { /* ignore */ }
+  }
   return item;
 }
 
@@ -372,6 +403,99 @@ async function claimIdentity({ role, identityId, name = '', phone = '', email = 
     }
   }
   return { ok: true, identity: row };
+}
+
+// ---- Unified ID + Permanent Cloud (Phase 3) ----
+// The customer's permanent NEX... ID, profile, wallet balance and wallet history
+// live in Supabase (nexago_customers / nexago_wallets / nexago_wallet_txns) keyed
+// by customerId, with the local security file as a fallback. Registering adopts
+// the existing customerId when the phone or Gmail is already known, so a wiped
+// browser / new device gets the SAME ID and wallet back.
+const CUSTOMER_FILE = 'customers';
+
+function readCustomers() {
+  const list = readSecurity(CUSTOMER_FILE, []);
+  return Array.isArray(list) ? list : [];
+}
+
+function writeCustomers(list) {
+  writeSecurity(CUSTOMER_FILE, list.slice(0, 50000));
+  return list;
+}
+
+function findCustomerByPhoneOrEmail(phone = '', email = '') {
+  const p = normalizePhoneForIdentity(phone);
+  const e = normalizeEmailForIdentity(email);
+  if (!p && !e) return null;
+  return readCustomers().find((c) => c && ((p && normalizePhoneForIdentity(c.phone) === p) || (e && normalizeEmailForIdentity(c.email) === e)));
+}
+
+async function supabaseFetchCustomer(customerId) {
+  if (!supabaseConfigured || !serviceClient || !customerId) return null;
+  const { data, error } = await serviceClient.from(SUPABASE_TABLE.customers).select('*').eq('customer_id', customerId).maybeSingle();
+  if (error || !data) return null;
+  return {
+    customerId: data.customer_id,
+    name: data.name || '',
+    phone: data.phone || '',
+    email: data.email || '',
+    payload: data.payload || {},
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+}
+
+async function supabaseFetchWallet(customerId) {
+  if (!supabaseConfigured || !serviceClient || !customerId) return null;
+  const { data, error } = await serviceClient.from(SUPABASE_TABLE.wallets).select('*').eq('customer_id', customerId).maybeSingle();
+  if (error || !data) return null;
+  return { customerId: data.customer_id, balance: Number(data.balance || 0), updatedAt: data.updated_at };
+}
+
+async function supabaseFetchTxns(customerId, limit = 100) {
+  if (!supabaseConfigured || !serviceClient || !customerId) return [];
+  const { data, error } = await serviceClient.from(SUPABASE_TABLE.walletTxns)
+    .select('*').eq('customer_id', customerId).order('created_at', { ascending: false }).limit(limit);
+  if (error || !data) return [];
+  return data.map((t) => ({ id: t.txn_ref || `TXN-${t.id}`, customerId: t.customer_id, type: t.type, amount: Number(t.amount || 0), status: t.status || 'Completed', date: t.created_at, meta: t.meta || {} }));
+}
+
+async function supabaseUpsertCustomer(customer) {
+  if (!supabaseConfigured || !serviceClient || !customer || !customer.customerId) return;
+  try {
+    await serviceClient.from(SUPABASE_TABLE.customers).upsert({
+      customer_id: customer.customerId,
+      name: String(customer.name || '').slice(0, 200),
+      phone: String(customer.phone || '').slice(0, 30),
+      phone_norm: normalizePhoneForIdentity(customer.phone),
+      email: normalizeEmailForIdentity(customer.email).slice(0, 200),
+      email_norm: normalizeEmailForIdentity(customer.email),
+      payload: customer.payload || {},
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'customer_id' });
+  } catch { /* ignore */ }
+}
+
+async function supabaseUpsertWallet(customerId, balance) {
+  if (!supabaseConfigured || !serviceClient || !customerId) return;
+  try {
+    await serviceClient.from(SUPABASE_TABLE.wallets).upsert({ customer_id: customerId, balance: Number(balance || 0), updated_at: new Date().toISOString() }, { onConflict: 'customer_id' });
+  } catch { /* ignore */ }
+}
+
+async function supabaseInsertWalletTxn(customerId, txn) {
+  if (!supabaseConfigured || !serviceClient || !customerId) return;
+  try {
+    await serviceClient.from(SUPABASE_TABLE.walletTxns).insert({
+      customer_id: customerId,
+      txn_ref: String(txn.id || '').slice(0, 100),
+      type: String(txn.type || '').slice(0, 60),
+      amount: Number(txn.amount || 0),
+      status: String(txn.status || 'Completed').slice(0, 40),
+      meta: { date: txn.date || '', ...(txn.meta || {}) },
+      created_at: new Date().toISOString(),
+    });
+  } catch { /* ignore */ }
 }
 
 async function sendSecurityAlert(kind, detail = {}) {
@@ -985,6 +1109,114 @@ const server = http.createServer((req, res) => {
       }
       appendAudit(key, { actor: result.identity.identity_id, role: result.identity.role, action: 'identity-claimed', ip: clientIp(req), reason: 'single account registration' });
       sendJson(res, 200, { ok: true, identity: result.identity });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  // ---- Unified ID + Permanent Cloud ----
+  // POST /api/security/customer/register { name?, phone?, email?, customerId? }
+  //   → returns the permanent customer record. If the phone or Gmail is already
+  //     registered, the EXISTING customerId is adopted (device-independent ID);
+  //     otherwise a new record is created (or the provided customerId is used).
+  //     Includes wallet balance + recent transactions so the client restores
+  //     itself on any device.
+  // GET  /api/security/customer/me?customerId=... → customer + wallet + txns.
+  // POST /api/security/customer/sync { customerId, balance, txns[] } → pushes
+  //   wallet balance + new wallet transactions to the permanent cloud store.
+  if (req.method === 'POST' && url.pathname === '/api/security/customer/register') {
+    if (!rateLimit(req, 'customer-register', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const phone = String(body.phone || '').trim();
+      const email = normalizeEmailForIdentity(body.email);
+      const requestedId = String(body.customerId || '').trim();
+      let customerId = requestedId && requestedId.startsWith('NEX') ? requestedId : '';
+      let record = null;
+      // Adopt the existing ID when the phone/Gmail is already registered.
+      if (!customerId) {
+        const found = findCustomerByPhoneOrEmail(phone, email);
+        if (found) { customerId = found.customerId; record = found; }
+      }
+      if (!customerId) {
+        customerId = 'NEX' + Math.floor(1000000000 + Math.random() * 9000000000).toString();
+      }
+      if (supabaseConfigured && serviceClient && !record) {
+        record = await supabaseFetchCustomer(customerId);
+        if (!record && (phone || email)) {
+          const { data } = await serviceClient.from(SUPABASE_TABLE.customers)
+            .select('*').or(`phone_norm.eq.${normalizePhoneForIdentity(phone)},email_norm.eq.${email}`).limit(1);
+          if (data && data[0]) { customerId = data[0].customer_id; record = { customerId, name: data[0].name, phone: data[0].phone, email: data[0].email, payload: data[0].payload }; }
+        }
+      }
+      const customer = {
+        customerId,
+        name: String(body.name || record?.name || 'Customer').slice(0, 200),
+        phone,
+        email,
+        payload: record?.payload || {},
+      };
+      if (supabaseConfigured && serviceClient) {
+        try {
+          const upserted = {
+            customer_id: customerId,
+            name: customer.name,
+            phone,
+            phone_norm: normalizePhoneForIdentity(phone),
+            email,
+            email_norm: email,
+            payload: customer.payload,
+            updated_at: new Date().toISOString(),
+          };
+          await serviceClient.from(SUPABASE_TABLE.customers).upsert(upserted, { onConflict: 'customer_id' });
+        } catch { /* ignore */ }
+      }
+      const list = readCustomers();
+      const idx = list.findIndex((c) => c && c.customerId === customerId);
+      const localRow = { ...customer, updatedAt: new Date().toISOString(), createdAt: record?.createdAt || new Date().toISOString() };
+      if (idx >= 0) list[idx] = { ...list[idx], ...localRow }; else list.unshift(localRow);
+      writeCustomers(list);
+      const wallet = (supabaseConfigured && serviceClient) ? await supabaseFetchWallet(customerId) : null;
+      const balance = wallet ? wallet.balance : Number(body.balance || 0);
+      if (supabaseConfigured && serviceClient) await supabaseUpsertWallet(customerId, balance);
+      const txns = (supabaseConfigured && serviceClient) ? await supabaseFetchTxns(customerId, 100) : [];
+      appendAudit(key, { actor: customerId, role: 'customer', action: 'customer-registered', ip: clientIp(req), reason: phone || email || 'anonymous' });
+      sendJson(res, 200, { ok: true, customer, walletBalance: balance, txns });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/security/customer/me') {
+    if (!rateLimit(req, 'customer-me', 60, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    const customerId = String(url.searchParams.get('customerId') || '').trim();
+    if (!customerId || !customerId.startsWith('NEX')) { sendJson(res, 400, { ok: false, error: 'INVALID_CUSTOMER_ID' }); return; }
+    (async () => {
+      const found = readCustomers().find((c) => c && c.customerId === customerId);
+      const record = found || (supabaseConfigured && serviceClient ? await supabaseFetchCustomer(customerId) : null);
+      if (!record) { sendJson(res, 404, { ok: false, error: 'CUSTOMER_NOT_FOUND' }); return; }
+      const wallet = supabaseConfigured && serviceClient ? await supabaseFetchWallet(customerId) : null;
+      const txns = supabaseConfigured && serviceClient ? await supabaseFetchTxns(customerId, 100) : [];
+      sendJson(res, 200, {
+        ok: true,
+        customer: { customerId: record.customerId, name: record.name || '', phone: record.phone || '', email: record.email || '' },
+        walletBalance: wallet ? wallet.balance : 0,
+        txns,
+      });
+    })();
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/customer/sync') {
+    if (!rateLimit(req, 'customer-sync', 60, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const customerId = String(body.customerId || '').trim();
+      if (!customerId || !customerId.startsWith('NEX')) { sendJson(res, 400, { ok: false, error: 'INVALID_CUSTOMER_ID' }); return; }
+      if (supabaseConfigured && serviceClient) {
+        await supabaseUpsertWallet(customerId, Number(body.balance || 0));
+        const txns = Array.isArray(body.txns) ? body.txns.slice(0, 50) : [];
+        for (const txn of txns) {
+          if (txn && (txn.id || txn.type)) await supabaseInsertWalletTxn(customerId, txn);
+        }
+      }
+      sendJson(res, 200, { ok: true });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
