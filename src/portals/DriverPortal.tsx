@@ -1043,59 +1043,82 @@ export default function DriverPortal() {
           {/* ---- SIGNUP (Step A: verify account with Google or Gmail OTP first) ---- */}
           {authView === 'signup' && signupStage === 'account' && (
             <>
-              <div className="relative text-center space-y-2">
-                <p className="text-[9px] tracking-[0.35em] uppercase text-brand-orange font-semibold">NexaGo BD · Delivery Network</p>
-                <h4 className="text-xl font-bold text-white tracking-tight">Create Your Account</h4>
-                <p className="text-[11px] text-gray-400 leading-relaxed">Verify with Google or your Gmail first — then complete driver registration.</p>
-              </div>
-              <div className="relative rounded-3xl bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] shadow-2xl shadow-black/40 p-5 space-y-3.5">
-                <button onClick={continueWithGoogle} disabled={googleBusy} className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-white text-[#1f1f1f] text-xs font-bold shadow-lg hover:bg-gray-100 transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer">
-                  <span className="flex items-center justify-center w-4 h-4">
-                    <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.77.43 3.45 1.18 4.94l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
-                  </span>
-                  {googleBusy ? 'Connecting to Google…' : 'Continue with Google'}
-                </button>
-                {googleError && <p className="text-[9px] font-bold text-red-400 text-center">{googleError}</p>}
-                <div className="relative flex items-center gap-3 text-[8px] text-gray-500 font-bold uppercase tracking-widest">
-                  <span className="flex-1 h-px bg-gradient-to-r from-transparent to-[#24395c]"></span>
-                  <span>or with Gmail</span>
-                  <span className="flex-1 h-px bg-gradient-to-l from-transparent to-[#24395c]"></span>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Gmail Address</label>
-                  <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
-                    <Mail className="w-4 h-4 text-brand-orange/70 shrink-0" />
-                    <input value={signupGmail} onChange={e => setSignupGmail(e.target.value)} placeholder="name@gmail.com"
-                      className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
-                  </div>
-                </div>
-                <div className={`rounded-xl p-3 border ${otpStep === 'verified' ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-[#24395c] glass-soft'}`}>
-                  <div className="flex items-start space-x-2">
-                    <MailCheck className="w-3.5 h-3.5 text-brand-orange shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Verify Gmail with OTP</p>
-                      <p className="text-[8px] text-gray-500 mt-0.5">A 6-digit code is emailed to your Gmail. Your account is only created after this passes.</p>
-                      {otpStep === 'verified' ? (
-                        <p className="mt-2 text-[9px] font-bold text-emerald-400 flex items-center space-x-1"><CheckCircle2 className="w-3 h-3" /><span>Gmail verified — proceeding to registration…</span></p>
-                      ) : (
-                        <div className="mt-2 space-y-2">
-                          {otpStep === 'sent' && (
-                            <div className="flex items-center space-x-2">
-                              <input value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="6-digit code" className="flex-1 bg-[#0a1322] border border-[#1e3050] rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:border-brand-orange placeholder:text-gray-600" />
-                              <button onClick={verifySignupOtp} disabled={otpBusy} className="rounded-lg bg-brand-orange px-3 py-2 text-[9px] font-black uppercase text-white disabled:opacity-60">Verify</button>
-                            </div>
-                          )}
-                          <button onClick={sendSignupOtp} disabled={otpBusy} className="w-full rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20 disabled:opacity-60">
-                            {otpStep === 'sent' ? 'Resend Code' : 'Send OTP to Gmail'}
-                          </button>
-                          {otpError && <p className="text-[8px] font-bold text-red-400">{otpError}</p>}
-                        </div>
-                      )}
+              <div className="relative rounded-3xl p-1" style={{
+                background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14',
+              }}>
+                <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-7 text-white overflow-hidden">
+                  <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
+
+                  <div className="relative">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg">
+                        <MailCheck className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-black tracking-tight leading-none">NexaGo Driver</p>
+                        <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mt-1">Create Your Account</p>
+                      </div>
+                    </div>
+
+                    <h1 className="mt-5 text-xl font-black leading-tight">Create Your Account</h1>
+                    <p className="mt-1.5 text-[12px] text-gray-300 leading-relaxed">Verify with Google or your Gmail first — then complete driver registration.</p>
+
+                    <div className="mt-5 space-y-3">
+                      <button onClick={continueWithGoogle} disabled={googleBusy}
+                        className="w-full py-3 rounded-xl bg-white hover:bg-gray-100 text-gray-800 text-[13px] font-bold shadow-lg transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center space-x-2.5 border border-white/60">
+                        <svg width="18" height="18" viewBox="0 0 48 48">
+                          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                        </svg>
+                        <span>{googleBusy ? 'Connecting to Google…' : 'Continue with Google'}</span>
+                      </button>
+                      {googleError && <p className="text-[11px] font-bold text-red-400">{googleError}</p>}
+
+                      <div className="flex items-center space-x-3 my-2">
+                        <div className="flex-1 h-px bg-white/10" />
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">or with Gmail</span>
+                        <div className="flex-1 h-px bg-white/10" />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail Address <span className="text-emerald-400">*</span></label>
+                        <input value={signupGmail} onChange={e => { setSignupGmail(e.target.value); setOtpError(''); }} placeholder="name@gmail.com"
+                          className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                      </div>
+
+                      <div className={`rounded-xl px-4 py-3 ${otpStep === 'verified' ? 'bg-emerald-400/10 border border-emerald-400/25' : 'bg-white/5 border border-white/10'}`}>
+                        <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Verify Gmail with OTP</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">A 6-digit code is emailed to your Gmail. Your account is only created after this passes.</p>
+                        {otpStep === 'verified' ? (
+                          <p className="mt-2 text-[11px] font-bold text-emerald-300 flex items-center space-x-1.5"><CheckCircle2 className="w-4 h-4" /><span>Gmail verified — proceeding to registration…</span></p>
+                        ) : (
+                          <div className="mt-2.5 space-y-2">
+                            {otpStep === 'sent' && (
+                              <div className="flex items-center space-x-2">
+                                <input value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="6-digit code"
+                                  className="drv-auth-input flex-1 rounded-xl px-4 py-2.5 text-center text-lg tracking-[0.4em] text-white outline-none placeholder:text-gray-500" />
+                                <button onClick={verifySignupOtp} disabled={otpBusy}
+                                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-[11px] font-black uppercase text-white disabled:opacity-60 cursor-pointer">
+                                  {otpBusy ? '…' : 'Verify'}
+                                </button>
+                              </div>
+                            )}
+                            <button onClick={sendSignupOtp} disabled={otpBusy}
+                              className="w-full py-3 rounded-xl border border-white/15 text-[11px] font-bold text-gray-200 hover:bg-white/5 transition-colors disabled:opacity-60 cursor-pointer">
+                              {otpBusy ? 'Please wait…' : otpStep === 'sent' ? 'Resend Code' : 'Send OTP to Gmail'}
+                            </button>
+                            {otpError && <p className="text-[11px] font-bold text-red-400">{otpError}</p>}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <button onClick={() => setAuthView('login')} className="relative w-full text-center text-[9px] text-brand-orange hover:underline font-bold cursor-pointer">
+              <button onClick={() => setAuthView('login')} className="relative w-full text-center text-[11px] font-bold text-emerald-300 hover:text-emerald-200 transition-colors cursor-pointer">
                 Already have an account? Sign in →
               </button>
             </>
@@ -1105,181 +1128,188 @@ export default function DriverPortal() {
                account is verified with Google or the Gmail OTP) ---- */}
           {authView === 'signup' && signupStage === 'details' && (
             <>
-              <div className="relative">
-                <div className="flex items-center justify-between">
-                  <button onClick={() => setSignupStage('account')} className="text-gray-400 hover:text-white transition-colors" title="Change Gmail"><ArrowLeft className="w-4 h-4" /></button>
-                  <div className="text-center flex-1">
-                    <h4 className="text-sm font-bold text-white tracking-tight">Driver Registration</h4>
-                    <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">Join the NexaGo Delivery Network</p>
-                  </div>
-                  <span className="w-4" />
-                </div>
-                <div className="mt-3 h-1.5 rounded-full bg-[#132238] border border-[#1e3050] overflow-hidden">
-                  <div className="h-full w-1/2 bg-gradient-to-r from-brand-orange to-orange-500 rounded-full" />
-                </div>
-                <div className="mt-1.5 flex items-center justify-between text-[8px] font-bold uppercase tracking-widest">
-                  <span className="text-brand-orange">Step 1 · Personal Details</span>
-                  <span className="text-gray-500">Step 2 · Documents</span>
-                </div>
-              </div>
+              <div className="relative rounded-3xl p-1" style={{
+                background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14',
+              }}>
+                <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-7 text-white overflow-hidden">
+                  <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
 
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5 flex items-center space-x-1.5">
-                    <User className="w-3 h-3 text-brand-orange" /><span>Personal Information</span>
-                  </p>
-                  <div className="glass-soft rounded-xl p-3 mb-2 border border-emerald-500/30 bg-emerald-500/5">
+                  <div className="relative">
                     <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">Verified Gmail</label>
-                        <p className="text-[11px] text-emerald-300 font-mono mt-0.5 truncate">{signupGmail || '—'}</p>
+                      <button onClick={() => setSignupStage('account')} className="text-gray-400 hover:text-white transition-colors cursor-pointer" title="Change Gmail"><ArrowLeft className="w-4 h-4" /></button>
+                      <div className="text-center flex-1">
+                        <h4 className="text-sm font-bold text-white tracking-tight">Driver Registration</h4>
+                        <p className="text-[8px] text-gray-400 uppercase tracking-widest mt-0.5">Join the NexaGo Delivery Network</p>
                       </div>
-                      <span className="flex items-center space-x-1 text-[9px] font-black text-emerald-400 shrink-0"><CheckCircle2 className="w-3 h-3" /><span>Verified</span></span>
+                      <span className="w-4" />
                     </div>
-                  </div>
-                  {[
-                    { label: 'Full Name (Bangla/English)', val: signupName, set: setSignupName, type: 'text', icon: User, ph: 'Enter full name' },
-                    { label: 'Mobile Phone', val: signupPhone, set: setSignupPhone, type: 'tel', icon: Phone, ph: 'e.g. 01712345678' },
-                  ].map(f => (
-                    <div key={f.label} className="glass-soft rounded-xl p-3 mb-2 last:mb-0 border-[#24395c]">
-                      <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">{f.label} <span className="text-brand-orange">*</span></label>
-                      <div className="flex items-center space-x-2 mt-1.5">
-                        <f.icon className="w-3.5 h-3.5 text-brand-orange/70 shrink-0" />
-                        <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} className="bg-transparent text-xs text-white outline-none w-full placeholder:text-gray-600" />
+                    <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full w-1/2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full" />
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-[8px] font-bold uppercase tracking-widest">
+                      <span className="text-emerald-400">Step 1 · Personal Details</span>
+                      <span className="text-gray-500">Step 2 · Documents</span>
+                    </div>
+
+                    <div className="mt-5 space-y-4">
+                      <div className="flex items-center justify-between rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-bold text-gray-300 uppercase tracking-wider">Verified Gmail</p>
+                          <p className="text-[12px] text-emerald-300 font-mono mt-0.5 truncate">{signupGmail || '—'}</p>
+                        </div>
+                        <span className="flex items-center space-x-1.5 text-[10px] font-black text-emerald-300 shrink-0"><CheckCircle2 className="w-4 h-4" /><span>Verified</span></span>
                       </div>
-                    </div>
-                  ))}
-                </div>
 
-                <div>
-                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5 flex items-center space-x-1.5">
-                    <ShieldCheck className="w-3 h-3 text-brand-orange" /><span>Verification Documents</span>
-                  </p>
-                  {[
-                    { label: 'NID Number', val: signupNid, set: setSignupNid, type: 'text', icon: FileText, ph: '10+ digit national ID' },
-                    { label: 'Driving License Number', val: signupLicense, set: setSignupLicense, type: 'text', icon: Truck, ph: 'e.g. DK-DL-2024-XXXXX' },
-                  ].map(f => (
-                    <div key={f.label} className="glass-soft rounded-xl p-3 mb-2 last:mb-0 border-[#24395c]">
-                      <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">{f.label} <span className="text-brand-orange">*</span></label>
-                      <div className="flex items-center space-x-2 mt-1.5">
-                        <f.icon className="w-3.5 h-3.5 text-brand-orange/70 shrink-0" />
-                        <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} className="bg-transparent text-xs text-white outline-none w-full placeholder:text-gray-600" />
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                          <User className="w-3.5 h-3.5 text-emerald-400" /><span>Personal Information</span>
+                        </p>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Full Name (Bangla/English) <span className="text-emerald-400">*</span></label>
+                            <input value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="Enter full name"
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Mobile Phone <span className="text-emerald-400">*</span></label>
+                            <input value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="e.g. 01712345678"
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                          </div>
+                        </div>
                       </div>
+
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /><span>Verification Documents</span>
+                        </p>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">NID Number <span className="text-emerald-400">*</span></label>
+                            <input value={signupNid} onChange={e => setSignupNid(e.target.value)} placeholder="10+ digit national ID"
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Driving License Number <span className="text-emerald-400">*</span></label>
+                            <input value={signupLicense} onChange={e => setSignupLicense(e.target.value)} placeholder="e.g. DK-DL-2024-XXXXX"
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Driving License Expiry Date <span className="text-emerald-400">*</span></label>
+                            <input type="date" value={signupLicenseExpiry} onChange={e => setSignupLicenseExpiry(e.target.value)}
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none [color-scheme:dark]" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                          <Navigation className="w-3.5 h-3.5 text-emerald-400" /><span>Vehicle</span>
+                        </p>
+                        <select value={signupVehicle} onChange={e => setSignupVehicle(e.target.value)}
+                          className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none cursor-pointer">
+                          {['Motorcycle (150cc)', 'Electric Scooter / EV', 'Bicycle Courier', 'Covered Van / Car'].map(v => (
+                            <option key={v} value={v} className="text-white">{v}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3">
+                        <p className="text-[10px] font-black text-emerald-300 uppercase tracking-wider flex items-center space-x-1.5"><Lock className="w-3.5 h-3.5" /><span>Your Permanent Driver ID</span></p>
+                        <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">Auto-generated after admin approval (e.g. 3667463854). You will also receive a <b className="text-white">random secure password</b> to log in.</p>
+                      </div>
+
+                      <label className="flex items-start space-x-2.5 text-[11px] text-gray-300 cursor-pointer rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+                        <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)} className="mt-0.5 rounded border-white/20 text-emerald-500 accent-emerald-500" />
+                        <span className="leading-relaxed">I agree to the <button onClick={() => setAuthView('terms')} className="text-emerald-300 underline hover:opacity-80 cursor-pointer">Terms & Safety Guidelines</button> and confirm the above information is accurate.</span>
+                      </label>
                     </div>
-                  ))}
-                  <div className="glass-soft rounded-xl p-3 border-[#24395c]">
-                    <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">Driving License Expiry Date <span className="text-brand-orange">*</span></label>
-                    <div className="flex items-center space-x-2 mt-1.5">
-                      <CalendarDays className="w-3.5 h-3.5 text-brand-orange/70 shrink-0" />
-                      <input type="date" value={signupLicenseExpiry} onChange={e => setSignupLicenseExpiry(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full [color-scheme:dark]" />
-                    </div>
+                    <button onClick={() => {
+                      if (!signupName.trim() || !signupPhone.trim() || !signupGmail.trim() || !signupNid.trim() || !signupLicense.trim()) {
+                        showToast('Fill in your name, phone, gmail, NID and driving license first');
+                        return;
+                      }
+                      if (!/^\+?88?01\d{9}$/.test(signupPhone.replace(/[^0-9]/g, ''))) { showToast('Enter a valid Bangladeshi phone number (e.g. 01712345678)'); return; }
+                      if (!/^[\w.+-]+@gmail\.com$/i.test(signupGmail.trim())) { showToast('Enter a valid Gmail address (name@gmail.com)'); return; }
+                      if (signupNid.replace(/[^0-9]/g, '').length < 10) { showToast('Enter a valid NID number (10+ digits)'); return; }
+                      if (signupLicense.trim().length < 5) { showToast('Enter a valid driving license number'); return; }
+                      if (!signupLicenseExpiry) { showToast('Enter your driving license expiry date'); return; }
+                      if (new Date(signupLicenseExpiry) <= new Date()) { showToast('Your driving license has expired — upload a valid one'); return; }
+                      if (!termsChecked) { showToast('Accept the Terms & Safety Guidelines first'); return; }
+                      setAuthView('docs');
+                    }} className="mt-4 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] cursor-pointer">
+                      Continue to Document Upload →
+                    </button>
                   </div>
                 </div>
-
-                <div>
-                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5 flex items-center space-x-1.5">
-                    <Navigation className="w-3 h-3 text-brand-orange" /><span>Vehicle</span>
-                  </p>
-                  <div className="glass-soft rounded-xl p-3 border-[#24395c]">
-                    <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">Vehicle Type <span className="text-brand-orange">*</span></label>
-                    <div className="flex items-center space-x-2 mt-1.5">
-                      <Truck className="w-3.5 h-3.5 text-brand-orange/70 shrink-0" />
-                      <select value={signupVehicle} onChange={e => setSignupVehicle(e.target.value)} className="bg-transparent text-xs text-white outline-none w-full cursor-pointer">
-                        {['Motorcycle (150cc)', 'Electric Scooter / EV', 'Bicycle Courier', 'Covered Van / Car'].map(v => (
-                          <option key={v} value={v} className="glass-soft text-white">{v}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl p-3 border border-emerald-500/25 bg-gradient-to-r from-emerald-500/10 to-transparent">
-                  <div className="flex items-start space-x-2">
-                    <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-[9px] font-black text-emerald-300 uppercase tracking-widest">Your Permanent Driver ID</p>
-                      <p className="text-[9px] text-gray-400 mt-1 leading-relaxed">Auto-generated after admin approval (e.g. 3667463854). You will also receive a <b className="text-white">random secure password</b> to log in.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <label className="flex items-start space-x-2.5 text-[9px] text-gray-300 cursor-pointer glass-soft rounded-xl p-3 border-[#24395c]">
-                  <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)} className="mt-0.5 rounded border-white/20 text-brand-orange accent-brand-orange" />
-                  <span className="leading-relaxed">I agree to the <button onClick={() => setAuthView('terms')} className="text-brand-orange underline hover:opacity-80">Terms & Safety Guidelines</button> and confirm the above information is accurate.</span>
-                </label>
               </div>
-              <button onClick={() => {
-                if (!signupName.trim() || !signupPhone.trim() || !signupGmail.trim() || !signupNid.trim() || !signupLicense.trim()) {
-                  showToast('Fill in your name, phone, gmail, NID and driving license first');
-                  return;
-                }
-                if (!/^\+?88?01\d{9}$/.test(signupPhone.replace(/[^0-9]/g, ''))) { showToast('Enter a valid Bangladeshi phone number (e.g. 01712345678)'); return; }
-                if (!/^[\w.+-]+@gmail\.com$/i.test(signupGmail.trim())) { showToast('Enter a valid Gmail address (name@gmail.com)'); return; }
-                if (signupNid.replace(/[^0-9]/g, '').length < 10) { showToast('Enter a valid NID number (10+ digits)'); return; }
-                if (signupLicense.trim().length < 5) { showToast('Enter a valid driving license number'); return; }
-                if (!signupLicenseExpiry) { showToast('Enter your driving license expiry date'); return; }
-                if (new Date(signupLicenseExpiry) <= new Date()) { showToast('Your driving license has expired — upload a valid one'); return; }
-                if (!termsChecked) { showToast('Accept the Terms & Safety Guidelines first'); return; }
-                setAuthView('docs');
-              }} className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-black uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99]">
-                Continue to Document Upload →
-              </button>
             </>
           )}
 
           {/* ---- DOCS (Step 2) ---- */}
           {authView === 'docs' && (
             <>
-              <div className="flex items-center justify-between border-b border-[#1e3050] pb-2">
-                <button onClick={() => setAuthView('signup')} className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
-                <h4 className="text-xs font-bold text-white">Document Verification</h4>
-                <span className="text-[9px] text-brand-orange font-bold">Step 2 of 2</span>
-              </div>
-              <p className="text-[10px] text-gray-400">Upload clear photos or PDFs of your official documents for dispatch approval. Any photo size works — it is auto-compressed.</p>
-              <div className="space-y-2">
-                {docMeta.map(docItem => (
-                  <div key={docItem.key} className="glass-soft rounded-xl p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[11px] text-white font-bold">{docItem.label}</p>
-                        <p className="text-[8px] text-gray-400">{uploadedDocs[docItem.key] ? 'File saved & locked — replace to change' : (docItem.required ? 'Required — Camera, Gallery or PDF' : 'Optional — Camera, Gallery or PDF')}</p>
-                      </div>
-                      {uploadedDocs[docItem.key] && (
-                        <button onClick={() => setUploadedDocs(prev => { const n = { ...prev }; delete n[docItem.key]; return n; })} className="text-[8px] text-red-400 hover:underline font-bold">Remove</button>
-                      )}
+              <div className="relative rounded-3xl p-1" style={{
+                background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14',
+              }}>
+                <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-7 text-white overflow-hidden">
+                  <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
+
+                  <div className="relative">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <button onClick={() => setAuthView('signup')} className="text-gray-400 hover:text-white cursor-pointer"><ArrowLeft className="w-4 h-4" /></button>
+                      <h4 className="text-xs font-bold text-white">Document Verification</h4>
+                      <span className="text-[9px] text-emerald-400 font-bold">Step 2 of 2</span>
                     </div>
-                    {uploadedDocs[docItem.key] ? (
-                      uploadedDocs[docItem.key].startsWith('data:application/pdf') ? (
-                        <iframe title={docItem.label} src={uploadedDocs[docItem.key]} className="mt-2 w-full h-32 rounded-lg border border-emerald-500/40 bg-white" />
-                      ) : (
-                        <img src={uploadedDocs[docItem.key]} alt={docItem.label} className="mt-2 w-full h-32 object-cover rounded-lg border border-emerald-500/40" />
-                      )
-                    ) : null}
-                    <div className="flex items-center space-x-2 mt-2">
-                      <button onClick={() => triggerDocInput(docItem.key, 'camera')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-brand-orange/10 text-brand-orange border-brand-orange/30 hover:bg-brand-orange hover:text-white">
-                        📷 Camera
-                      </button>
-                      <button onClick={() => triggerDocInput(docItem.key, 'gallery')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-sky-500/10 text-sky-300 border-sky-500/30 hover:bg-sky-500 hover:text-white">
-                        🖼️ Gallery
-                      </button>
-                      <button onClick={() => triggerDocInput(docItem.key, 'gallery')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-red-500/10 text-red-300 border-red-500/30 hover:bg-red-500 hover:text-white">
-                        📄 PDF
-                      </button>
-                      <input
-                        ref={el => { docInputRefs.current[docItem.key] = el; }}
-                        type="file"
-                        accept="image/*,application/pdf,.pdf"
-                        capture="environment"
-                        className="hidden"
-                        onChange={e => { handleDocFile(docItem.key, e.target.files?.[0]); e.target.value = ''; }}
-                      />
+                    <p className="text-[11px] text-gray-400 mt-2">Upload clear photos or PDFs of your official documents for dispatch approval. Any photo size works — it is auto-compressed.</p>
+                    <div className="space-y-2.5 mt-3">
+                      {docMeta.map(docItem => (
+                        <div key={docItem.key} className="rounded-xl bg-white/5 border border-white/10 p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[12px] text-white font-bold">{docItem.label}</p>
+                              <p className="text-[9px] text-gray-400">{uploadedDocs[docItem.key] ? 'File saved & locked — replace to change' : (docItem.required ? 'Required — Camera, Gallery or PDF' : 'Optional — Camera, Gallery or PDF')}</p>
+                            </div>
+                            {uploadedDocs[docItem.key] && (
+                              <button onClick={() => setUploadedDocs(prev => { const n = { ...prev }; delete n[docItem.key]; return n; })} className="text-[9px] text-red-400 hover:underline font-bold cursor-pointer">Remove</button>
+                            )}
+                          </div>
+                          {uploadedDocs[docItem.key] ? (
+                            uploadedDocs[docItem.key].startsWith('data:application/pdf') ? (
+                              <iframe title={docItem.label} src={uploadedDocs[docItem.key]} className="mt-2 w-full h-32 rounded-lg border border-emerald-400/40 bg-white" />
+                            ) : (
+                              <img src={uploadedDocs[docItem.key]} alt={docItem.label} className="mt-2 w-full h-32 object-cover rounded-lg border border-emerald-400/40" />
+                            )
+                          ) : null}
+                          <div className="flex items-center space-x-2 mt-2">
+                            <button onClick={() => triggerDocInput(docItem.key, 'camera')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-white/5 text-gray-200 border-white/15 hover:bg-emerald-500 hover:text-white hover:border-emerald-500">
+                              📷 Camera
+                            </button>
+                            <button onClick={() => triggerDocInput(docItem.key, 'gallery')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-white/5 text-gray-200 border-white/15 hover:bg-emerald-500 hover:text-white hover:border-emerald-500">
+                              🖼️ Gallery
+                            </button>
+                            <button onClick={() => triggerDocInput(docItem.key, 'gallery')} className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-wide cursor-pointer transition-all border bg-white/5 text-gray-200 border-white/15 hover:bg-emerald-500 hover:text-white hover:border-emerald-500">
+                              📄 PDF
+                            </button>
+                            <input
+                              ref={el => { docInputRefs.current[docItem.key] = el; }}
+                              type="file"
+                              accept="image/*,application/pdf,.pdf"
+                              capture="environment"
+                              className="hidden"
+                              onChange={e => { handleDocFile(docItem.key, e.target.files?.[0]); e.target.value = ''; }}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
+                    <button onClick={submitSignup} className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] mt-4 cursor-pointer">
+                      Submit Application for Approval
+                    </button>
                   </div>
-                ))}
+                </div>
               </div>
-              <button onClick={submitSignup} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-xl shadow-lg mt-3">
-                Submit Application for Approval
-              </button>
             </>
           )}
 
@@ -1300,45 +1330,55 @@ export default function DriverPortal() {
             const pendingCred = pendingDriver ? getCreds()[pendingDriver.id] : undefined;
             if (!pendingDriver) {
               return (
-                <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-brand-orange/20 border border-brand-orange/40 flex items-center justify-center text-brand-orange">
-                    <Search className="w-8 h-8" />
+                <div className="relative rounded-3xl p-1" style={{ background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14' }}>
+                  <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-7 text-white overflow-hidden">
+                    <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-emerald-400/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400">
+                        <Search className="w-8 h-8" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Check Your Registration Status</h4>
+                        <p className="text-[10px] text-gray-400 mt-1 max-w-[280px] mx-auto">
+                          Enter the permanent Driver ID, phone number or Gmail you registered with to see your application from any device.
+                        </p>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-3 w-full">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Driver ID / Phone / Gmail</label>
+                        <input
+                          type="text"
+                          value={checkStatusInput}
+                          onChange={e => setCheckStatusInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') setCheckStatusQuery(checkStatusInput.trim()); }}
+                          placeholder="Your permanent Driver ID, phone or Gmail"
+                          className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none mt-1.5"
+                        />
+                      </div>
+                      {checkStatusQuery.trim() && (
+                        <p className="text-[10px] text-red-400 font-bold">No registration found with that ID / phone / Gmail — please check and try again.</p>
+                      )}
+                      <button
+                        onClick={() => setCheckStatusQuery(checkStatusInput.trim())}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[12px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] cursor-pointer"
+                      >
+                        Check Status →
+                      </button>
+                      <button onClick={() => setAuthView('login')} className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
+                        ← Back to Login
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">Check Your Registration Status</h4>
-                    <p className="text-[10px] text-gray-400 mt-1 max-w-[280px] mx-auto">
-                      Enter the permanent Driver ID, phone number or Gmail you registered with to see your application from any device.
-                    </p>
-                  </div>
-                  <div className="glass-soft rounded-xl p-3 w-full">
-                    <label className="text-[7.5px] text-gray-400 uppercase block font-bold">Driver ID / Phone / Gmail</label>
-                    <input
-                      type="text"
-                      value={checkStatusInput}
-                      onChange={e => setCheckStatusInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') setCheckStatusQuery(checkStatusInput.trim()); }}
-                      placeholder="Your permanent Driver ID, phone or Gmail"
-                      className="bg-transparent text-xs text-white outline-none w-full mt-1"
-                    />
-                  </div>
-                  {checkStatusQuery.trim() && (
-                    <p className="text-[10px] text-red-400 font-bold">No registration found with that ID / phone / Gmail — please check and try again.</p>
-                  )}
-                  <button
-                    onClick={() => setCheckStatusQuery(checkStatusInput.trim())}
-                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-xl shadow-lg"
-                  >
-                    Check Status →
-                  </button>
-                  <button onClick={() => setAuthView('login')} className="w-full py-2.5 glass-soft hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
-                    ← Back to Login
-                  </button>
                 </div>
               );
             }
             return (
-            <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${approved ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400' : 'bg-amber-500/20 border border-amber-500/40 text-amber-400 animate-pulse'}`}>
+            <div className="relative rounded-3xl p-1" style={{ background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14' }}>
+              <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-7 text-white overflow-hidden">
+                <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
+                <div className="flex flex-col items-center text-center space-y-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${approved ? 'bg-emerald-400/20 border border-emerald-400/40 text-emerald-400' : 'bg-amber-400/20 border border-amber-400/40 text-amber-300 animate-pulse'}`}>
                 {approved ? <CheckCircle2 className="w-8 h-8" /> : <Clock className="w-8 h-8" />}
               </div>
               <div>
@@ -1353,7 +1393,7 @@ export default function DriverPortal() {
                     : 'Our dispatch team is verifying your Driving License & NID details. Check back soon from this link.'}
                 </p>
               </div>
-              <div className="glass-soft rounded-xl p-3 text-left text-[10px] space-y-1.5 w-full">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-left text-[10px] space-y-1.5 w-full">
                 <div className="flex justify-between"><span className="text-gray-400">Permanent Driver ID:</span>
                   {approved
                     ? <span className="text-white font-mono font-bold">{pendingDriver?.id || '—'}</span>
@@ -1366,19 +1406,21 @@ export default function DriverPortal() {
                 <div className="flex justify-between"><span className="text-gray-400">Driving License:</span><span className="text-white font-mono">{pendingDriver?.licenseNumber || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">License Expiry:</span><span className="text-white font-mono">{pendingDriver?.licenseExpiry || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Verification:</span>
-                  <span className={approved ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>{approved ? 'Verified' : 'Pending Review'}</span>
+                  <span className={approved ? 'text-emerald-400 font-bold' : 'text-amber-300 font-bold'}>{approved ? 'Verified' : 'Pending Review'}</span>
                 </div>
                 {approved && pendingCred?.password && (
-                  <div className="flex justify-between items-center border-t border-[#1e3050] pt-1.5 mt-1">
+                  <div className="flex justify-between items-center border-t border-white/10 pt-1.5 mt-1">
                     <span className="text-gray-400">Random Password:</span>
-                    <span className="text-brand-orange font-mono font-black tracking-widest cursor-pointer" onClick={() => { navigator.clipboard?.writeText(pendingCred.password); showToast('Password copied'); }}>{pendingCred.password}</span>
+                    <span className="text-emerald-300 font-mono font-black tracking-widest cursor-pointer" onClick={() => { navigator.clipboard?.writeText(pendingCred.password); showToast('Password copied'); }}>{pendingCred.password}</span>
                   </div>
                 )}
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full">
-                <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg">
+                <button onClick={() => setAuthView('login')} className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[12px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] cursor-pointer">
                   {approved ? 'Login with this Password →' : 'Back to Login →'}
                 </button>
+              </div>
+                </div>
               </div>
             </div>
             );
@@ -1387,48 +1429,70 @@ export default function DriverPortal() {
           {/* ---- FORGOT PASSWORD ---- */}
           {authView === 'forgot' && (
             <>
-              <div className="flex items-center justify-between border-b border-[#1e3050] pb-2">
-                <button onClick={() => setAuthView('login')} className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
-                <h4 className="text-xs font-bold text-white">Reset Driver Password</h4>
-                <span className="w-4" />
+              <div className="relative rounded-3xl p-1" style={{
+                background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14',
+              }}>
+                <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-7 text-white overflow-hidden">
+                  <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
+
+                  <div className="relative">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <button onClick={() => setAuthView('login')} className="text-gray-400 hover:text-white cursor-pointer"><ArrowLeft className="w-4 h-4" /></button>
+                      <h4 className="text-xs font-bold text-white">Reset Driver Password</h4>
+                      <span className="w-4" />
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-3">Enter your registered mobile phone number to receive a 6-digit OTP verification code.</p>
+                    <div className="mt-3">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Registered Phone Number</label>
+                      <input type="tel" defaultValue="+880 1234-567890" className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none" />
+                    </div>
+                    <button onClick={() => setAuthView('login')} className="mt-4 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] cursor-pointer">
+                      Send OTP Verification Code
+                    </button>
+                  </div>
+                </div>
               </div>
-              <p className="text-[10px] text-gray-400">Enter your registered mobile phone number to receive a 6-digit OTP verification code.</p>
-              <div className="glass-soft rounded-xl p-3">
-                <label className="text-[8px] text-gray-400 uppercase block font-black">Registered Phone Number</label>
-                <input type="tel" defaultValue="+880 1234-567890" className="bg-transparent text-xs text-white font-mono outline-none w-full mt-1" />
-              </div>
-              <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl">
-                Send OTP Verification Code
-              </button>
             </>
           )}
 
           {/* ---- TERMS ---- */}
           {authView === 'terms' && (
             <>
-              <div className="flex items-center justify-between border-b border-[#1e3050] pb-2">
-                <button onClick={() => setAuthView('signup')} className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
-                <h4 className="text-xs font-bold text-white">Terms & Safety Guidelines</h4>
-                <span className="w-4" />
-              </div>
-              <div className="space-y-2 text-[10px] text-gray-300">
-                {[
-                  { id: 't1', title: '1. Courier Safety & Helmet Rule', desc: 'All riders must wear a certified helmet and follow traffic regulations across Dhaka city.' },
-                  { id: 't2', title: '2. Payout & Commission Rates', desc: 'Standard commission is 15% per fulfilled delivery. Weekly settlement happens every Sunday.' },
-                  { id: 't3', title: '3. Order Cancellation Policy', desc: 'Unauthorized order cancellation will lead to temporary account freeze.' },
-                ].map(term => (
-                  <div key={term.id} className="glass-soft rounded-xl p-3">
-                    <button onClick={() => setExpandedTerm(expandedTerm === term.id ? null : term.id)} className="w-full text-left flex justify-between items-center font-bold text-white cursor-pointer">
-                      <span>{term.title}</span>
-                      <span className="text-brand-orange">{expandedTerm === term.id ? '−' : '+'}</span>
+              <div className="relative rounded-3xl p-1" style={{
+                background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14',
+              }}>
+                <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-7 text-white overflow-hidden">
+                  <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
+
+                  <div className="relative">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <button onClick={() => setAuthView('signup')} className="text-gray-400 hover:text-white cursor-pointer"><ArrowLeft className="w-4 h-4" /></button>
+                      <h4 className="text-xs font-bold text-white">Terms & Safety Guidelines</h4>
+                      <span className="w-4" />
+                    </div>
+                    <div className="space-y-2 text-[11px] text-gray-300 mt-3">
+                      {[
+                        { id: 't1', title: '1. Courier Safety & Helmet Rule', desc: 'All riders must wear a certified helmet and follow traffic regulations across Dhaka city.' },
+                        { id: 't2', title: '2. Payout & Commission Rates', desc: 'Standard commission is 15% per fulfilled delivery. Weekly settlement happens every Sunday.' },
+                        { id: 't3', title: '3. Order Cancellation Policy', desc: 'Unauthorized order cancellation will lead to temporary account freeze.' },
+                      ].map(term => (
+                        <div key={term.id} className="bg-white/5 border border-white/10 rounded-xl p-3">
+                          <button onClick={() => setExpandedTerm(expandedTerm === term.id ? null : term.id)} className="w-full text-left flex justify-between items-center font-bold text-white cursor-pointer">
+                            <span>{term.title}</span>
+                            <span className="text-emerald-400">{expandedTerm === term.id ? '−' : '+'}</span>
+                          </button>
+                          {expandedTerm === term.id && <p className="text-gray-400 text-[10px] mt-1.5 pt-1.5 border-t border-white/10">{term.desc}</p>}
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={() => { setTermsChecked(true); setAuthView('signup'); }} className="mt-4 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] cursor-pointer">
+                      I Accept Terms
                     </button>
-                    {expandedTerm === term.id && <p className="text-gray-400 text-[9px] mt-1.5 pt-1.5 border-t border-white/5">{term.desc}</p>}
                   </div>
-                ))}
+                </div>
               </div>
-              <button onClick={() => { setTermsChecked(true); setAuthView('signup'); }} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl mt-3">
-                I Accept Terms
-              </button>
             </>
           )}
         </div>
