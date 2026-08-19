@@ -172,6 +172,8 @@ const CLOUD_DYNAMIC_PREFIXES = [
 ];
 
 const DYNAMIC_CLOUD_PREFIX = 'dynamic:';
+const OFFLINE_ORDER_QUEUE_KEY = 'nexago_offline_order_queue_v1';
+const OFFLINE_STATE_QUEUE_KEY = 'nexago_offline_state_queue_v1';
 
 const isCloudDynamicLocalKey = (key: string) =>
   CLOUD_DYNAMIC_PREFIXES.some(prefix => key.startsWith(prefix));
@@ -188,6 +190,37 @@ const dynamicCloudEntries = (): Array<[string, any]> => {
     /* ignore */
   }
   return entries.sort(([a], [b]) => a.localeCompare(b));
+};
+
+const readOfflineQueue = <T,>(key: string): T[] => {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeOfflineQueue = <T,>(key: string, rows: T[]) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(rows));
+    window.dispatchEvent(new Event('nexago-local-write'));
+  } catch {
+    /* ignore */
+  }
+};
+
+const queueOfflineOrder = (key: string, order: any) => {
+  const rows = readOfflineQueue<any>(OFFLINE_ORDER_QUEUE_KEY);
+  const next = [{ key, order, queuedAt: Date.now() }, ...rows.filter(row => !(row.key === key && row.order?.id === order.id))].slice(0, 500);
+  writeOfflineQueue(OFFLINE_ORDER_QUEUE_KEY, next);
+};
+
+const queueOfflineState = (key: string, payload: Record<string, any>) => {
+  const rows = readOfflineQueue<any>(OFFLINE_STATE_QUEUE_KEY);
+  const next = [{ key, payload, queuedAt: Date.now() }, ...rows].slice(0, 50);
+  writeOfflineQueue(OFFLINE_STATE_QUEUE_KEY, next);
 };
 
 const configuredApiBase = ((import.meta.env.VITE_RELAY_BASE as string) || '').replace(/\/+$/, '');
@@ -225,17 +258,59 @@ export async function securityAudit(action: string, detail: Record<string, any> 
 
 export async function persistOrderToCloud(order: any): Promise<boolean> {
   if (!order || !order.id) return false;
+  const key = currentCloudKey();
   try {
-    const key = currentCloudKey();
     const res = await fetch(`${API_BASE}/api/order?key=${encodeURIComponent(key)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order }),
     });
-    return res.ok;
+    if (res.ok) return true;
+    queueOfflineOrder(key, order);
+    return false;
   } catch {
+    queueOfflineOrder(key, order);
     return false;
   }
+}
+
+export async function flushOfflineSyncQueue(): Promise<{ orders: number; states: number }> {
+  let ordersFlushed = 0;
+  let statesFlushed = 0;
+  const orderRows = readOfflineQueue<any>(OFFLINE_ORDER_QUEUE_KEY);
+  const remainingOrders: any[] = [];
+  for (const row of orderRows.reverse()) {
+    try {
+      const res = await fetch(`${API_BASE}/api/order?key=${encodeURIComponent(row.key || currentCloudKey())}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: row.order }),
+      });
+      if (res.ok) ordersFlushed += 1;
+      else remainingOrders.push(row);
+    } catch {
+      remainingOrders.push(row);
+    }
+  }
+  writeOfflineQueue(OFFLINE_ORDER_QUEUE_KEY, remainingOrders.reverse());
+
+  const stateRows = readOfflineQueue<any>(OFFLINE_STATE_QUEUE_KEY);
+  const remainingStates: any[] = [];
+  for (const row of stateRows.reverse()) {
+    try {
+      const res = await fetch(`${API_BASE}/api/state?key=${encodeURIComponent(row.key || currentCloudKey())}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row.payload || {}),
+      });
+      if (res.ok) statesFlushed += 1;
+      else remainingStates.push(row);
+    } catch {
+      remainingStates.push(row);
+    }
+  }
+  writeOfflineQueue(OFFLINE_STATE_QUEUE_KEY, remainingStates.reverse());
+  return { orders: ordersFlushed, states: statesFlushed };
 }
 
 // Single Account Rule helpers (Phase 2). Every signup / registration calls
@@ -438,12 +513,28 @@ export function useCloudSync() {
         const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
         if (res.status === 429) {
           syncBackoffUntil = Date.now() + 15_000;
+          queueOfflineState(key, payload);
           return false;
         }
-        if (!res.ok) return false;
+        if (!res.ok) {
+          queueOfflineState(key, payload);
+          return false;
+        }
         lastPushedSig = currentSig;
         return true;
       } catch {
+        queueOfflineState(key, (() => {
+          const payload: Record<string, any> = {};
+          for (const [localKey, cloudKey] of Object.entries(CLOUD_KEY_MAP)) {
+            if (CLOUD_PUSH_EXCLUDE.has(localKey)) continue;
+            const val = lsGet<any>(localKey, null);
+            if (val !== null) payload[cloudKey] = val;
+          }
+          for (const [cloudKey, val] of dynamicCloudEntries()) {
+            if (val !== null) payload[cloudKey] = val;
+          }
+          return payload;
+        })());
         return false;
       } finally {
         pushInFlight = false;
@@ -457,6 +548,15 @@ export function useCloudSync() {
     const isVisible = () => typeof document === 'undefined' || !document.hidden;
     const flushPush = () => {
       if (isVisible() && !applyingRemoteState) push();
+    };
+    const flushOffline = async () => {
+      if (!isVisible()) return;
+      const result = await flushOfflineSyncQueue();
+      if ((result.orders || result.states) && !cancelled) {
+        await pull();
+        await push();
+        if (!cancelled) setSyncState('online');
+      }
     };
     const onLocalChange = () => {
       if (bc) bc.postMessage({ nexago: 'sync' });
@@ -512,18 +612,23 @@ export function useCloudSync() {
       if (!cancelled) setSyncState(ok ? 'online' : 'offline');
     }, 5000);
     const pushTimer = setInterval(flushPush, 3000);
-    const onVisible = () => { if (isVisible()) pull(); };
+    const offlineTimer = setInterval(flushOffline, 8000);
+    const onVisible = () => { if (isVisible()) { pull(); flushOffline(); } };
+    const onOnline = () => { flushOffline(); flushPush(); };
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onOnline);
 
     return () => {
       cancelled = true;
       window.removeEventListener('storage', onLocalChange);
       window.removeEventListener('nexago-local-write', onLocalChange);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onOnline);
       if (bc) bc.close();
       if (ws) ws.close();
       clearInterval(pullTimer);
       clearInterval(pushTimer);
+      clearInterval(offlineTimer);
     };
   }, []);
   return syncState;
