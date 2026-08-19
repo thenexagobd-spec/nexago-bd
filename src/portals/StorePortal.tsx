@@ -63,6 +63,8 @@ export default function StorePortal() {
   const storeId = new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || '';
   const currentStore = stores.find((s: any) => s.id === storeId);
   const storeName = currentStore?.name || profile.storeName || 'Store';
+  const deliveryProviderMode = currentStore?.deliveryProviderMode || 'platform';
+  const usesPersonalDriver = deliveryProviderMode === 'personal';
   const mine = useMemo(() => orders.filter(o => ((o as any).storeId && (o as any).storeId === storeId) || o.storeName === storeName), [orders, storeId, storeName]);
   const storeProducts = useMemo(() => products.filter((p: any) => !p.storeId || p.storeId === storeId || p.storeName === storeName), [products, storeId, storeName]);
 
@@ -139,7 +141,7 @@ export default function StorePortal() {
 
   const acceptOrder = (id: string) => {
     const onlineDrivers = drivers.filter(d => d.status !== 'Offline');
-    if (onlineDrivers.length === 0) {
+    if (!usesPersonalDriver && onlineDrivers.length === 0) {
       setNotifications(prev => [
         makeNotif('Driver unavailable', `Order #${id} is accepted by store, but no real driver is online yet.`, 'order', { audience: 'all' }),
         ...prev,
@@ -148,15 +150,28 @@ export default function StorePortal() {
     }
     const pickupPin = String(Math.floor(1000 + Math.random() * 9000));
     const order = orders.find(o => o.id === id);
-    const broadcast = order ? newOfferRound(order, drivers) : {};
-    setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
-      ...o,
+    const broadcast = order && !usesPersonalDriver ? newOfferRound(order, drivers) : {};
+    const updated = order ? appendTimeline({
+      ...order,
       status: 'Confirmed' as any,
       driverId: undefined,
-      ...broadcast,
-      placedAt: o.placedAt || Date.now(),
+      ...(usesPersonalDriver ? { offeredDriverIds: undefined, offerRound: undefined, driverDeadline: undefined } : broadcast),
+      deliveryProvider: usesPersonalDriver ? 'personal' : deliveryProviderMode,
+      requiresStorePersonalDriver: usesPersonalDriver,
+      storePersonalDriverNote: usesPersonalDriver ? 'Store will deliver with its own personal driver. NexaGo driver broadcast disabled by Super Admin setting.' : undefined,
+      placedAt: order.placedAt || Date.now(),
       pickupPin,
-    }, 'accepted', 'store', `Store accepted — offered to ${(broadcast.offeredDriverIds || []).length} nearby riders`) : o)));
+    }, 'accepted', 'store', usesPersonalDriver ? 'Store accepted — delivery will be handled by store personal driver' : `Store accepted — offered to ${(broadcast.offeredDriverIds || []).length} nearby riders`) : null;
+    if (!updated) return;
+    setOrders(prev => prev.map(o => (o.id === id ? updated : o)));
+    persistOrderToCloud(updated);
+    if (usesPersonalDriver) {
+      setNotifications(prev => [
+        makeNotif('Store personal delivery #' + id, `Store accepted order #${id}. Delivery will be completed by the store's own driver.`, 'order', { audience: 'all', storeId }),
+        ...prev,
+      ]);
+      return;
+    }
     const offeredNames = onlineDrivers.slice(0, 10).map(d => d.name).join(', ');
     setNotifications(prev => [
       makeNotif('🚚 Order Confirmed', `Store accepted order #${id} — broadcast to riders: ${offeredNames}.`, 'order', { audience: 'driver' }),

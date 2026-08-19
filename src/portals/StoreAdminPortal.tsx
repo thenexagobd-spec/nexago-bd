@@ -86,6 +86,8 @@ export default function StoreAdminPortal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStoreId]);
   const activeStore = stores.find((s: any) => s.id === activeStoreId);
+  const deliveryProviderMode = activeStore?.deliveryProviderMode || 'platform';
+  const usesPersonalDriver = deliveryProviderMode === 'personal';
   const storeAccessBlocked = ['Suspended', 'Blacklisted'].includes(activeStore?.status || '') || ['suspend', 'blacklist'].includes(activeStore?.adminRiskStatus || '');
   const activeStoreName = activeApplication?.storeName || 'Approved Store';
   const myBranches = branches.filter((b: any) => b.storeId === activeStoreId);
@@ -355,7 +357,7 @@ export default function StoreAdminPortal() {
   const acceptOrder = (id: string) => {
     if (!myOrderIds.has(id)) return;
     const onlineDrivers = drivers.filter(d => d.status !== 'Offline');
-    if (onlineDrivers.length === 0) {
+    if (!usesPersonalDriver && onlineDrivers.length === 0) {
       setNotifications(prev => [
         makeNotif('Driver unavailable', `Order #${id} cannot be dispatched until a real driver is online.`, 'order', { audience: 'store-admin', storeId: activeStoreId }),
         ...prev,
@@ -363,14 +365,27 @@ export default function StoreAdminPortal() {
       return;
     }
     const order = orders.find(o => o.id === id);
-    const broadcast = order ? newOfferRound(order, drivers) : {};
-    setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
-      ...o,
+    const broadcast = order && !usesPersonalDriver ? newOfferRound(order, drivers) : {};
+    const updated = order ? appendTimeline({
+      ...order,
       status: 'Confirmed' as any,
       driverId: undefined,
-      ...broadcast,
-      placedAt: o.placedAt || Date.now(),
-    }, 'accepted', 'store', `Store admin accepted — offered to ${(broadcast.offeredDriverIds || []).length} riders`) : o)));
+      ...(usesPersonalDriver ? { offeredDriverIds: undefined, offerRound: undefined, driverDeadline: undefined } : broadcast),
+      deliveryProvider: usesPersonalDriver ? 'personal' : deliveryProviderMode,
+      requiresStorePersonalDriver: usesPersonalDriver,
+      storePersonalDriverNote: usesPersonalDriver ? 'Store will deliver with its own personal driver. NexaGo driver broadcast disabled by Super Admin setting.' : undefined,
+      placedAt: order.placedAt || Date.now(),
+    }, 'accepted', 'store', usesPersonalDriver ? 'Store admin accepted — delivery will be handled by store personal driver' : `Store admin accepted — offered to ${(broadcast.offeredDriverIds || []).length} riders`) : null;
+    if (!updated) return;
+    setOrders(prev => prev.map(o => (o.id === id ? updated : o)));
+    persistOrderToCloud(updated);
+    if (usesPersonalDriver) {
+      setNotifications(prev => [
+        makeNotif('Store personal delivery #' + id, `Store accepted order #${id}. Delivery will be completed by the store's own driver.`, 'order', { audience: 'all', storeId: activeStoreId }),
+        ...prev,
+      ]);
+      return;
+    }
     setNotifications(prev => [
       makeNotif('🚚 Order Accepted & Dispatched', `Store accepted order #${id} — broadcast to ${(broadcast.offeredDriverIds || []).length} nearby riders.`, 'order', { audience: 'driver' }),
       makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — dispatched to ${(broadcast.offeredDriverIds || []).length} nearby riders.`, 'order', { audience: 'all' }),

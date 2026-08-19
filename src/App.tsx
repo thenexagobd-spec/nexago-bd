@@ -223,6 +223,7 @@ const STORE_ADMIN_PAGE_OPTIONS = [
   { id: 'products', label: 'Products' },
   { id: 'categories', label: 'Categories' },
   { id: 'inventory', label: 'Inventory' },
+  { id: 'pos', label: 'POS' },
   { id: 'reviews', label: 'Reviews' },
   { id: 'coupons', label: 'Coupons' },
   { id: 'tools', label: 'Order Tools' },
@@ -2628,6 +2629,57 @@ export default function App() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 font-medium mb-2">{s.address}</p>
+                      <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2.5">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-wider text-emerald-300">Delivery Driver Permission</p>
+                            <p className="text-[8px] text-gray-500">Super Admin controls if this store can deliver with their own personal drivers.</p>
+                          </div>
+                          <span className="rounded-md bg-[#080e17] px-2 py-1 text-[8px] font-black uppercase text-white">
+                            {(s.deliveryProviderMode || 'platform') === 'personal' ? 'Store Driver' : (s.deliveryProviderMode || 'platform') === 'both' ? 'Both' : 'NexaGo'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { id: 'platform', label: 'NexaGo Driver' },
+                            { id: 'personal', label: 'Store Driver' },
+                            { id: 'both', label: 'Both' },
+                          ].map(mode => {
+                            const active = (s.deliveryProviderMode || 'platform') === mode.id;
+                            return (
+                              <button
+                                key={mode.id}
+                                type="button"
+                                onClick={() => {
+                                  const reason = window.prompt('Reason for delivery permission change', `${s.name} delivery mode set to ${mode.label}`);
+                                  if (!reason?.trim()) {
+                                    showToast('Reason required before changing delivery permission.', 'info');
+                                    return;
+                                  }
+                                  setStores(prev => prev.map((store: any) => store.id === s.id ? {
+                                    ...store,
+                                    deliveryProviderMode: mode.id,
+                                    deliveryPermissionUpdatedAt: new Date().toISOString(),
+                                    deliveryPermissionReason: reason.trim(),
+                                    deliveryPermissionLog: [
+                                      ...(store.deliveryPermissionLog || []),
+                                      { mode: mode.id, label: mode.label, reason: reason.trim(), at: new Date().toISOString(), by: 'super-admin' },
+                                    ],
+                                  } : store));
+                                  securityAudit('store-delivery-provider-updated', { storeId: s.id, storeName: s.name, mode: mode.id, reason: reason.trim() });
+                                  showToast(`${s.name} delivery mode updated to ${mode.label}`, 'success');
+                                }}
+                                className={`rounded-lg border px-2 py-1.5 text-[8px] font-black uppercase transition-all ${active ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' : 'border-brand-border bg-[#080e17] text-gray-400 hover:border-emerald-500/30 hover:text-emerald-300'}`}
+                              >
+                                {mode.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {(s.deliveryPermissionLog || []).length > 0 && (
+                          <p className="mt-2 text-[8px] text-gray-500">Last: {(s.deliveryPermissionLog || []).slice(-1)[0]?.label} · {(s.deliveryPermissionLog || []).slice(-1)[0]?.reason}</p>
+                        )}
+                      </div>
                       <div className="mb-3 flex flex-wrap gap-2">
                         <span className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[9px] font-black uppercase text-sky-300">{storeBranches.length} Branches</span>
                         <button onClick={() => {
