@@ -215,6 +215,18 @@ export default function SystemHealthLog() {
     }
   };
 
+  const runSystemAction = async (action: string, reason: string) => {
+    try {
+      const result = await systemApi('/api/system/action', { action, reason });
+      setActionMsg(`${action} completed: ${result.result?.status || 'saved'}`);
+      if (result.result?.checklist) setScanReport({ scanId: 'RECOVERY-CHECKLIST', dependencyMissing: [], integrity: { score: 100 }, conflicts: 0, backupCount: 0, checklist: result.result.checklist });
+      if (result.result?.dependencies) setScanReport({ scanId: 'DEPENDENCY-RECHECK', dependencyMissing: result.result.dependencies.filter((d: any) => !d.ok).map((d: any) => d.name), integrity: { score: 100 }, conflicts: 0, backupCount: 0 });
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || `${action} failed`));
+    }
+  };
+
   const reviewConflict = async (conflict: { group: string; id: string; reason: string }) => {
     try {
       await systemApi('/api/system/conflict/review', conflict);
@@ -332,6 +344,14 @@ export default function SystemHealthLog() {
         <button onClick={() => void createIncident('Manual System Health Incident', 'Super Admin created incident from System Health panel')} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-3 text-[10px] font-black text-red-200 hover:bg-red-500/15 flex items-center justify-center gap-2"><AlertTriangle className="w-4 h-4" /> Create Incident</button>
         <button onClick={exportReport} className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-3 text-[10px] font-black text-cyan-200 hover:bg-cyan-500/15 flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Export Report</button>
         <button onClick={() => void testAlert()} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-3 text-[10px] font-black text-sky-200 hover:bg-sky-500/15 flex items-center justify-center gap-2"><BellRing className="w-4 h-4" /> Send Alert Test</button>
+        <button onClick={() => void runSystemAction('maintenance-on', 'Super Admin enabled maintenance mode')} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-[10px] font-black text-amber-200 hover:bg-amber-500/15 flex items-center justify-center gap-2"><Clock className="w-4 h-4" /> Maintenance On</button>
+        <button onClick={() => void runSystemAction('maintenance-off', 'Super Admin disabled maintenance mode')} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-3 text-[10px] font-black text-emerald-200 hover:bg-emerald-500/15 flex items-center justify-center gap-2"><CheckCircle2 className="w-4 h-4" /> Maintenance Off</button>
+        <button onClick={() => void runSystemAction('restart-request', 'Super Admin requested controlled server restart')} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-3 text-[10px] font-black text-violet-200 hover:bg-violet-500/15 flex items-center justify-center gap-2"><Server className="w-4 h-4" /> Restart Request</button>
+        <button onClick={() => void runSystemAction('dependency-recheck', 'Manual dependency recheck from System Health')} className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-3 text-[10px] font-black text-blue-200 hover:bg-blue-500/15 flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4" /> Dependency Recheck</button>
+        <button onClick={() => void runSystemAction('sync-broadcast', 'Manual sync broadcast to live clients')} className="rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-3 text-[10px] font-black text-teal-200 hover:bg-teal-500/15 flex items-center justify-center gap-2"><Activity className="w-4 h-4" /> Sync Broadcast</button>
+        <button onClick={() => void runSystemAction('data-repair-dry-run', 'Create dry-run data repair ticket')} className="rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-3 text-[10px] font-black text-orange-200 hover:bg-orange-500/15 flex items-center justify-center gap-2"><ShieldCheck className="w-4 h-4" /> Repair Dry Run</button>
+        <button onClick={() => void runSystemAction('backup-drill-ticket', 'Create backup drill ticket')} className="rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-3 text-[10px] font-black text-fuchsia-200 hover:bg-fuchsia-500/15 flex items-center justify-center gap-2"><Database className="w-4 h-4" /> Backup Drill</button>
+        <button onClick={() => void runSystemAction('recovery-checklist', 'Generate recovery checklist')} className="rounded-lg border border-lime-500/30 bg-lime-500/10 px-3 py-3 text-[10px] font-black text-lime-200 hover:bg-lime-500/15 flex items-center justify-center gap-2"><ShieldCheck className="w-4 h-4" /> Recovery Checklist</button>
       </div>
       {scanReport && (
         <div className="mb-3 rounded-lg border border-brand-orange/25 bg-brand-orange/5 p-3">
