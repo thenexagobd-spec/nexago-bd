@@ -12,6 +12,7 @@ import {
 import { Order, Driver, Zone, SystemNotification } from '../types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import TrackingMapView from './TrackingMapView';
+import SystemHealthLog from './SystemHealthLog';
 
 interface DashboardViewProps {
   orders: Order[];
@@ -160,6 +161,8 @@ export default function DashboardView({
         <TrackingMapView orders={orders} drivers={drivers} zones={zones} />
       ) : (
         <>
+          <SystemHealthLog />
+
           {/* Original 5 Stats Cards Row */}
           <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 ${isTightMode ? 'gap-2.5' : 'gap-4'}`}>
         {/* Total Orders */}

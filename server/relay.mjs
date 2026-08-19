@@ -105,7 +105,49 @@ for (const dir of [SECURITY_DIR, FILES_DIR]) if (!fs.existsSync(dir)) fs.mkdirSy
 const rateBuckets = new Map();
 const alertBuckets = new Map();
 const stateSubscribers = new Map();
+const requestActivity = new Map();
 let supabaseBackupRunning = false;
+let lastSupabaseBackup = null;
+let nextSupabaseBackupAt = null;
+
+function bytesLabel(bytes) {
+  const n = Number(bytes || 0);
+  if (n >= 1024 * 1024 * 1024) return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(2)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(2)} KB`;
+  return `${n} B`;
+}
+
+function directorySize(dir, depth = 3) {
+  try {
+    if (!fs.existsSync(dir) || depth < 0) return 0;
+    return fs.readdirSync(dir, { withFileTypes: true }).reduce((sum, ent) => {
+      const p = path.join(dir, ent.name);
+      if (ent.isDirectory()) return sum + directorySize(p, depth - 1);
+      if (ent.isFile()) return sum + fs.statSync(p).size;
+      return sum;
+    }, 0);
+  } catch {
+    return 0;
+  }
+}
+
+function latestSupabaseBackupFile() {
+  try {
+    if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return null;
+    const files = fs.readdirSync(SUPABASE_BACKUP_DIR)
+      .filter((name) => /^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name))
+      .map((name) => {
+        const full = path.join(SUPABASE_BACKUP_DIR, name);
+        const stat = fs.statSync(full);
+        return { name, path: full, size: stat.size, sizeLabel: bytesLabel(stat.size), createdAt: stat.mtime.toISOString() };
+      })
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    return files[0] || null;
+  } catch {
+    return null;
+  }
+}
 
 function pruneSupabaseBackups() {
   try {
@@ -119,6 +161,24 @@ function pruneSupabaseBackups() {
     }
   } catch (err) {
     console.warn('[backup] retention cleanup failed:', err.message);
+  }
+}
+
+function recordRequestActivity(key, req) {
+  try {
+    if (!req.url || !req.url.startsWith('/api/')) return;
+    const safe = safeKey(key || 'default');
+    const current = requestActivity.get(safe) || { key: safe, count: 0, lastAt: '', lastPath: '', ip: '', device: '' };
+    requestActivity.set(safe, {
+      ...current,
+      count: current.count + 1,
+      lastAt: new Date().toISOString(),
+      lastPath: req.url.split('?')[0],
+      ip: clientIp(req),
+      device: String(req.headers['user-agent'] || '').slice(0, 120),
+    });
+  } catch {
+    /* ignore activity failure */
   }
 }
 
@@ -153,11 +213,13 @@ function runSupabaseBackup(reason = 'scheduled') {
       console.warn(`[backup] Supabase backup failed (${reason}) code=${dumpExitCode}: ${stderr.trim() || 'unknown error'}`);
       return;
     }
-    try {
-      fs.renameSync(tempTarget, target);
-      pruneSupabaseBackups();
-      console.log(`[backup] Supabase backup saved (${reason}): ${target}`);
-    } catch (err) {
+      try {
+        fs.renameSync(tempTarget, target);
+        const stat = fs.statSync(target);
+        lastSupabaseBackup = { name: path.basename(target), path: target, size: stat.size, sizeLabel: bytesLabel(stat.size), createdAt: new Date().toISOString(), status: 'Success', reason };
+        pruneSupabaseBackups();
+        console.log(`[backup] Supabase backup saved (${reason}): ${target}`);
+      } catch (err) {
       try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
       console.warn('[backup] finalize failed:', err.message);
     }
@@ -192,8 +254,15 @@ function startAutomaticSupabaseBackups() {
     return;
   }
   console.log(`[backup] automatic Supabase backup enabled every ${Math.round(SUPABASE_BACKUP_INTERVAL_MS / 60000)} minutes.`);
-  setTimeout(() => runSupabaseBackup('startup'), 30_000).unref();
-  setInterval(() => runSupabaseBackup('scheduled'), SUPABASE_BACKUP_INTERVAL_MS).unref();
+  nextSupabaseBackupAt = new Date(Date.now() + 30_000).toISOString();
+  setTimeout(() => {
+    runSupabaseBackup('startup');
+    nextSupabaseBackupAt = new Date(Date.now() + SUPABASE_BACKUP_INTERVAL_MS).toISOString();
+  }, 30_000).unref();
+  setInterval(() => {
+    runSupabaseBackup('scheduled');
+    nextSupabaseBackupAt = new Date(Date.now() + SUPABASE_BACKUP_INTERVAL_MS).toISOString();
+  }, SUPABASE_BACKUP_INTERVAL_MS).unref();
 }
 
 function notifyStateSubscribers(key, detail = {}) {
@@ -1122,8 +1191,63 @@ const server = http.createServer((req, res) => {
     sendJson(res, 400, { ok: false, error: 'INVALID_KEY' });
     return;
   }
+  recordRequestActivity(key, req);
 
   if (req.method === 'OPTIONS') { res.writeHead(204, corsHeaders); res.end(); return; }
+
+  if (req.method === 'GET' && url.pathname === '/api/system/health') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    const latestBackup = lastSupabaseBackup || latestSupabaseBackupFile();
+    const localBackupDir = path.join(BACKUP_DIR, safeKey(key));
+    const localBackupCount = fs.existsSync(localBackupDir) ? fs.readdirSync(localBackupDir).filter((name) => name.endsWith('.json')).length : 0;
+    const audit = readSecurity(`audit-${safeKey(key)}`, []);
+    const memory = process.memoryUsage();
+    const load = os.loadavg();
+    const cpuCount = Math.max(1, os.cpus().length);
+    const cpuLoadPercent = Math.min(100, Math.round((load[0] / cpuCount) * 100));
+    const dataBytes = directorySize(DATA_DIR, 4);
+    const backupBytes = directorySize(SUPABASE_BACKUP_DIR, 2);
+    sendJson(res, 200, {
+      ok: true,
+      key: safeKey(key),
+      checkedAt: new Date().toISOString(),
+      backup: {
+        automaticEnabled: AUTO_SUPABASE_BACKUP,
+        running: supabaseBackupRunning,
+        status: latestBackup ? 'Success' : (AUTO_SUPABASE_BACKUP ? 'Pending' : 'Disabled'),
+        latest: latestBackup,
+        nextRunAt: nextSupabaseBackupAt,
+        intervalMinutes: Math.round(SUPABASE_BACKUP_INTERVAL_MS / 60000),
+        retention: SUPABASE_BACKUP_RETENTION,
+        localJsonBackupCount: localBackupCount,
+      },
+      storage: {
+        databaseConfigured: supabaseConfigured,
+        databaseSizeEstimate: latestBackup?.sizeLabel || 'No backup yet',
+        localDataSize: bytesLabel(dataBytes),
+        backupStorageSize: bytesLabel(backupBytes),
+      },
+      server: {
+        uptimeSeconds: Math.round(process.uptime()),
+        cpuLoadPercent,
+        loadAverage: load.map((x) => Number(x.toFixed(2))),
+        memoryUsed: bytesLabel(memory.rss),
+        heapUsed: bytesLabel(memory.heapUsed),
+        heapTotal: bytesLabel(memory.heapTotal),
+        freeSystemMemory: bytesLabel(os.freemem()),
+        totalSystemMemory: bytesLabel(os.totalmem()),
+        platform: `${os.platform()} ${os.arch()}`,
+      },
+      activity: {
+        activeKeys: Array.from(requestActivity.values()).sort((a, b) => Date.parse(b.lastAt || '0') - Date.parse(a.lastAt || '0')).slice(0, 20),
+        auditTail: audit.slice(-12).reverse(),
+        auditCount: audit.length,
+        websocketSubscribers: Array.from(stateSubscribers.entries()).map(([stateKey, sockets]) => ({ key: stateKey, subscribers: sockets.size })),
+      },
+    });
+    return;
+  }
 
   if (req.method === 'GET' && url.pathname === '/api/storefront') {
     const store = loadStore(key);
