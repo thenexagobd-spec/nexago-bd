@@ -135,7 +135,17 @@ function directorySize(dir, depth = 3) {
 function latestSupabaseBackupFile() {
   try {
     if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return null;
-    const files = fs.readdirSync(SUPABASE_BACKUP_DIR)
+    const files = listSupabaseBackupFiles();
+    return files[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+function listSupabaseBackupFiles() {
+  try {
+    if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return [];
+    return fs.readdirSync(SUPABASE_BACKUP_DIR)
       .filter((name) => /^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name))
       .map((name) => {
         const full = path.join(SUPABASE_BACKUP_DIR, name);
@@ -143,9 +153,8 @@ function latestSupabaseBackupFile() {
         return { name, path: full, size: stat.size, sizeLabel: bytesLabel(stat.size), createdAt: stat.mtime.toISOString() };
       })
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-    return files[0] || null;
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -211,6 +220,7 @@ function runSupabaseBackup(reason = 'scheduled') {
     if (dumpExitCode !== 0) {
       try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
       console.warn(`[backup] Supabase backup failed (${reason}) code=${dumpExitCode}: ${stderr.trim() || 'unknown error'}`);
+      void sendSecurityAlert('supabase-backup-failed', { reason: `${reason} code=${dumpExitCode} ${stderr.trim() || 'unknown error'}` });
       return;
     }
       try {
@@ -219,9 +229,10 @@ function runSupabaseBackup(reason = 'scheduled') {
         lastSupabaseBackup = { name: path.basename(target), path: target, size: stat.size, sizeLabel: bytesLabel(stat.size), createdAt: new Date().toISOString(), status: 'Success', reason };
         pruneSupabaseBackups();
         console.log(`[backup] Supabase backup saved (${reason}): ${target}`);
-      } catch (err) {
+    } catch (err) {
       try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
       console.warn('[backup] finalize failed:', err.message);
+      void sendSecurityAlert('supabase-backup-finalize-failed', { reason: err.message });
     }
   };
 
@@ -230,12 +241,14 @@ function runSupabaseBackup(reason = 'scheduled') {
     supabaseBackupRunning = false;
     try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
     console.warn('[backup] pg_dump failed to start:', err.message);
+    void sendSecurityAlert('supabase-backup-start-failed', { reason: err.message });
   });
   out.on('error', (err) => {
     supabaseBackupRunning = false;
     try { dump.kill(); } catch { /* ignore */ }
     try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
     console.warn('[backup] write failed:', err.message);
+    void sendSecurityAlert('supabase-backup-write-failed', { reason: err.message });
   });
   dump.stdout.pipe(gzip).pipe(out);
   dump.on('close', (code) => {
@@ -1202,6 +1215,32 @@ const server = http.createServer((req, res) => {
     const localBackupDir = path.join(BACKUP_DIR, safeKey(key));
     const localBackupCount = fs.existsSync(localBackupDir) ? fs.readdirSync(localBackupDir).filter((name) => name.endsWith('.json')).length : 0;
     const audit = readSecurity(`audit-${safeKey(key)}`, []);
+    const storeState = loadStore(key).state || {};
+    const branchMap = new Map();
+    const bumpBranch = (branchKey, patch = {}) => {
+      const current = branchMap.get(branchKey) || { key: branchKey, orders: 0, completed: 0, revenue: 0, posSales: 0, printerStatus: 'Unknown', lastOrderAt: '' };
+      branchMap.set(branchKey, { ...current, ...patch });
+      return branchMap.get(branchKey);
+    };
+    for (const order of Array.isArray(storeState.orders) ? storeState.orders : []) {
+      const branchKey = String(order.branchId || order.storeId || order.storeName || 'unassigned');
+      const row = bumpBranch(branchKey);
+      row.orders += 1;
+      if (String(order.status || '').toLowerCase() === 'completed') row.completed += 1;
+      row.revenue += Number(order.amount || order.total || order.grandTotal || 0);
+      row.lastOrderAt = order.updatedAt || order.createdAt || order.date || row.lastOrderAt;
+    }
+    for (const sale of Array.isArray(storeState.posSales) ? storeState.posSales : []) {
+      const branchKey = String(sale.branchId || sale.storeId || sale.storeName || 'pos');
+      const row = bumpBranch(branchKey);
+      row.posSales += 1;
+      row.revenue += Number(sale.total || sale.netTotal || sale.amount || 0);
+      row.lastOrderAt = sale.createdAt || sale.time || row.lastOrderAt;
+    }
+    for (const device of Array.isArray(storeState.devices) ? storeState.devices : []) {
+      const branchKey = String(device.branchId || device.storeId || device.name || 'device');
+      bumpBranch(branchKey, { printerStatus: device.printerStatus || device.status || 'Online' });
+    }
     const memory = process.memoryUsage();
     const load = os.loadavg();
     const cpuCount = Math.max(1, os.cpus().length);
@@ -1217,6 +1256,7 @@ const server = http.createServer((req, res) => {
         running: supabaseBackupRunning,
         status: latestBackup ? 'Success' : (AUTO_SUPABASE_BACKUP ? 'Pending' : 'Disabled'),
         latest: latestBackup,
+        files: listSupabaseBackupFiles().slice(0, 10).map(({ name, sizeLabel, createdAt }) => ({ name, sizeLabel, createdAt })),
         nextRunAt: nextSupabaseBackupAt,
         intervalMinutes: Math.round(SUPABASE_BACKUP_INTERVAL_MS / 60000),
         retention: SUPABASE_BACKUP_RETENTION,
@@ -1241,11 +1281,63 @@ const server = http.createServer((req, res) => {
       },
       activity: {
         activeKeys: Array.from(requestActivity.values()).sort((a, b) => Date.parse(b.lastAt || '0') - Date.parse(a.lastAt || '0')).slice(0, 20),
+        branches: Array.from(branchMap.values()).sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0)).slice(0, 20),
         auditTail: audit.slice(-12).reverse(),
         auditCount: audit.length,
         websocketSubscribers: Array.from(stateSubscribers.entries()).map(([stateKey, sockets]) => ({ key: stateKey, subscribers: sockets.size })),
       },
     });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/backup/run') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    if (supabaseBackupRunning) { sendJson(res, 409, { ok: false, error: 'BACKUP_ALREADY_RUNNING' }); return; }
+    appendAudit(key, { actor: session.userId, role: session.role, action: 'manual-supabase-backup-triggered', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Super Admin dashboard backup button' });
+    runSupabaseBackup(`manual:${session.userId}`);
+    sendJson(res, 202, { ok: true, status: 'started', message: 'Backup started in background' });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/system/backups') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    sendJson(res, 200, { ok: true, backups: listSupabaseBackupFiles().map(({ name, sizeLabel, createdAt }) => ({ name, sizeLabel, createdAt })) });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/system/backup/download') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    const name = String(url.searchParams.get('name') || '').trim();
+    if (!/^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name)) { sendJson(res, 400, { ok: false, error: 'INVALID_BACKUP_NAME' }); return; }
+    const file = path.join(SUPABASE_BACKUP_DIR, name);
+    if (!file.startsWith(SUPABASE_BACKUP_DIR) || !fs.existsSync(file)) { sendJson(res, 404, { ok: false, error: 'BACKUP_NOT_FOUND' }); return; }
+    appendAudit(key, { actor: session.userId, role: session.role, action: 'supabase-backup-downloaded', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: name });
+    res.writeHead(200, {
+      ...securityHeaders,
+      'Content-Type': 'application/gzip',
+      'Content-Disposition': `attachment; filename="${name}"`,
+      'Cache-Control': 'no-store',
+    });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/backup/restore-request') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    readBody(req).then(async (body) => {
+      const name = String(body.name || '').trim();
+      const reason = String(body.reason || '').trim();
+      const confirmText = String(body.confirmText || '').trim();
+      if (!/^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name)) { sendJson(res, 400, { ok: false, error: 'INVALID_BACKUP_NAME' }); return; }
+      if (confirmText !== 'RESTORE REQUEST') { sendJson(res, 400, { ok: false, error: 'CONFIRM_TEXT_REQUIRED' }); return; }
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'supabase-restore-requested', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: reason || 'restore requested from Super Admin dashboard', newValue: { backup: name } });
+      await sendSecurityAlert('supabase-restore-requested', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: `${name} :: ${reason || 'no reason'}` });
+      sendJson(res, 200, { ok: true, status: 'audit-saved', message: 'Restore request saved and alerted. Run restore only during maintenance window.' });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
 
