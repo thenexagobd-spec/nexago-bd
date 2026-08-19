@@ -226,15 +226,27 @@ export function useCloudSync() {
     const key = cloudKeyOf();
     const url = `${API_BASE}/api/state?key=${encodeURIComponent(key)}`;
     const sig = () => JSON.stringify(Object.keys(CLOUD_KEY_MAP).map(k => lsGet(k, null)));
+    let lastPushedSig = '';
+    let pullInFlight = false;
+    let pushInFlight = false;
+    let syncBackoffUntil = 0;
+    let applyingRemoteState = false;
 
     const pull = async () => {
+      if (pullInFlight || Date.now() < syncBackoffUntil) return false;
+      pullInFlight = true;
       try {
         const res = await fetch(url);
+        if (res.status === 429) {
+          syncBackoffUntil = Date.now() + 15_000;
+          return false;
+        }
         if (!res.ok) return false;
         const data = await res.json();
         const state = data && data.state;
         if (!state || typeof state !== 'object') return false;
         let changed = false;
+        applyingRemoteState = true;
         for (const [localKey, cloudKey] of Object.entries(CLOUD_KEY_MAP)) {
           const cloudVal = (state as any)[cloudKey];
           if (cloudVal === undefined) continue;
@@ -249,16 +261,25 @@ export function useCloudSync() {
           }
           const a = JSON.stringify(next);
           const b = JSON.stringify(localVal);
-          if (a !== b) { applying = true; lsSet(localKey, next); applying = false; changed = true; }
+          if (a !== b) { lsSet(localKey, next); changed = true; }
         }
+        applyingRemoteState = false;
+        lastPushedSig = sig();
         if (changed) window.dispatchEvent(new Event('storage'));
         return true;
       } catch {
         return false;
+      } finally {
+        applyingRemoteState = false;
+        pullInFlight = false;
       }
     };
 
     const push = async () => {
+      if (pushInFlight || applyingRemoteState || Date.now() < syncBackoffUntil) return false;
+      const currentSig = sig();
+      if (currentSig === lastPushedSig) return true;
+      pushInFlight = true;
       try {
         const payload: Record<string, any> = {};
         for (const [localKey, cloudKey] of Object.entries(CLOUD_KEY_MAP)) {
@@ -269,10 +290,18 @@ export function useCloudSync() {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         const sessionToken = localStorage.getItem('sd_security_session') || '';
         if (sessionToken) headers['X-Session-Token'] = sessionToken;
-        await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+        if (res.status === 429) {
+          syncBackoffUntil = Date.now() + 15_000;
+          return false;
+        }
+        if (!res.ok) return false;
+        lastPushedSig = currentSig;
         return true;
       } catch {
         return false;
+      } finally {
+        pushInFlight = false;
       }
     };
 
@@ -280,14 +309,9 @@ export function useCloudSync() {
     // for every other role site to see live. A content signature is used so only
     // genuine changes are pushed — echo writes that just mirror a cloud pull skip
     // silently, keeping request volume tiny even with many tabs open.
-    let applying = false;
-    const stateSig = () => JSON.stringify(Object.keys(CLOUD_KEY_MAP).map(k => lsGet(k, null)));
-    let lastPushed = '';
+    const isVisible = () => typeof document === 'undefined' || !document.hidden;
     const flushPush = () => {
-      if (isVisible() && !applying) {
-        const s = stateSig();
-        if (s !== lastPushed) { lastPushed = s; push(); }
-      }
+      if (isVisible() && !applyingRemoteState) push();
     };
     const onLocalChange = () => {
       if (bc) bc.postMessage({ nexago: 'sync' });
@@ -337,7 +361,6 @@ export function useCloudSync() {
     // role sites open at once) used to hammer the relay every second, which
     // looked bot-like to edge proxies and triggered 429s. The visible tab stays
     // live, and hidden tabs catch up instantly when the user switches to them.
-    const isVisible = () => typeof document === 'undefined' || !document.hidden;
     const pullTimer = setInterval(async () => {
       if (!isVisible()) return;
       const ok = await pull();
