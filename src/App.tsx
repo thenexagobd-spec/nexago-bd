@@ -40,7 +40,7 @@ import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
-import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, supabaseClient } from './portals/portalUtils';
+import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, supabaseClient, persistOrderToCloud } from './portals/portalUtils';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
@@ -968,6 +968,7 @@ export default function App() {
     }
 
     setOrders([newOrder, ...orders]);
+    persistOrderToCloud(newOrder);
 
     if (newOrder.deliveryCoords || newOrder.pickupCoords) {
       handleAddNotification({
@@ -1024,6 +1025,7 @@ export default function App() {
     }
 
     setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+    persistOrderToCloud(updatedOrder);
 
     // Update payment
     setPayments(payments.map(p => p.orderId === updatedOrder.id ? {

@@ -10,7 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip, History, ShoppingCart } from 'lucide-react';
 import PortalShell from './PortalShell';
 import PosSystem from '../components/PosSystem';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsGet, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsGet, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, persistOrderToCloud } from './portalUtils';
 import { newOfferRound } from '../utils/autoAssign';
 
 interface Staff {
@@ -151,6 +151,7 @@ export default function StoreAdminPortal() {
       time: order.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }, 'created', 'admin', 'Created from Store Admin POS');
     setOrders([next, ...orders]);
+    persistOrderToCloud(next);
     setPayments([{
       id: `PAY-${Date.now().toString().slice(-10)}`,
       orderId: next.id,
@@ -168,6 +169,7 @@ export default function StoreAdminPortal() {
   const updatePosOrder = (order: any) => {
     const next = appendTimeline({ ...order, storeId: activeStoreId, branchId: activeBranchId, storeName: activeStoreName }, 'updated', 'admin', 'Updated from Store Admin POS');
     setOrders(orders.map(o => o.id === next.id ? next : o));
+    persistOrderToCloud(next);
     setPayments(payments.map(p => p.orderId === next.id ? { ...p, amount: next.amount || p.amount, method: next.paymentMethod || p.method, status: next.status === 'Completed' ? 'Paid' : next.status === 'Cancelled' ? 'Failed' : p.status } : p));
   };
 

@@ -2071,17 +2071,20 @@ const server = http.createServer((req, res) => {
         }
       }
       const idx = orders.findIndex((o) => o && o.id === order.id);
+      const isNewOrder = idx < 0;
       if (idx >= 0) orders[idx] = order; else orders.unshift(order);
       store.state.orders = orders;
       const notifs = Array.isArray(store.state.notifications) ? store.state.notifications : [];
-      notifs.unshift({
-        id: 'NOTIF-' + Date.now(),
-        title: 'New Customer Order #' + order.id,
-        message: (order.customerName || 'Customer') + ' ordered from ' + (order.storeName || 'a store') + ' (৳' + Number(order.amount || 0).toLocaleString('en-IN') + ')',
-        type: 'order',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        read: false
-      });
+      if (isNewOrder) {
+        notifs.unshift({
+          id: 'NOTIF-' + Date.now(),
+          title: (order.source === 'pos-dispatch' || String(order.id || '').startsWith('POS-')) ? 'New POS Order #' + order.id : 'New Customer Order #' + order.id,
+          message: (order.customerName || 'Customer') + ' ordered from ' + (order.storeName || 'a store') + ' (৳' + Number(order.amount || 0).toLocaleString('en-IN') + ')',
+          type: 'order',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          read: false
+        });
+      }
       store.state.notifications = notifs.slice(0, 100);
       store.updatedAt = new Date().toISOString();
       await saveStorePermanent(key, store);

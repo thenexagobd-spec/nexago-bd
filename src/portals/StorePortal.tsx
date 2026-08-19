@@ -20,7 +20,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import PortalShell from './PortalShell';
 import PosSystem from '../components/PosSystem';
-import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, useProducts, usePayments, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds } from './portalUtils';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, useProducts, usePayments, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds, persistOrderToCloud } from './portalUtils';
 import { newOfferRound } from '../utils/autoAssign';
 
 export default function StorePortal() {
@@ -188,6 +188,7 @@ export default function StorePortal() {
       time: order.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }, 'created', 'store', 'Created from Store Site POS');
     setOrders([next, ...orders]);
+    persistOrderToCloud(next);
     setPayments([{
       id: `PAY-${Date.now().toString().slice(-10)}`,
       orderId: next.id,
@@ -205,6 +206,7 @@ export default function StorePortal() {
   const updatePosOrder = (order: any) => {
     const next = appendTimeline(order, 'updated', 'store', 'Updated from Store Site POS');
     setOrders(orders.map(o => o.id === next.id ? next : o));
+    persistOrderToCloud(next);
     setPayments(payments.map(p => p.orderId === next.id ? { ...p, amount: next.amount || p.amount, method: next.paymentMethod || p.method, status: next.status === 'Completed' ? 'Paid' : next.status === 'Cancelled' ? 'Failed' : p.status } : p));
   };
 

@@ -223,6 +223,21 @@ export async function securityAudit(action: string, detail: Record<string, any> 
   try { await securityApi('/audit', { action, ...detail }); } catch { /* old flow stays working if security API is offline */ }
 }
 
+export async function persistOrderToCloud(order: any): Promise<boolean> {
+  if (!order || !order.id) return false;
+  try {
+    const key = currentCloudKey();
+    const res = await fetch(`${API_BASE}/api/order?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Single Account Rule helpers (Phase 2). Every signup / registration calls
 // identityCheck before submitting; identityClaim registers the account atomically
 // (unique phone + unique Gmail across all roles and stores). These fail safe —
