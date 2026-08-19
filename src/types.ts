@@ -112,6 +112,7 @@ export interface Driver {
   statusHistory?: DriverStatusLog[];
   locationCoords?: { lat: number; lng: number };
   currentZone?: string;
+  updatedAt?: string;
 }
 
 export interface Zone {

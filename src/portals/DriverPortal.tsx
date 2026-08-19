@@ -717,14 +717,17 @@ export default function DriverPortal() {
     if (online && activeOrder) { showToast('Finish the active delivery before going offline'); return; }
     const next = online ? 'Offline' : 'Online';
     setOnline(!online);
-    setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: next as any } : d)));
+    // updatedAt timestamp makes this the newest record in cloud merges, so the
+    // status can never be reverted to Offline by an older snapshot from another
+    // site/device (unionByIdArr / relay latestRecord pick the newer record).
+    setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: next as any, updatedAt: new Date().toISOString() } : d)));
   };
 
   const acceptOffer = (id: string) => {
     const o = orders.find(x => x.id === id);
     if (!o) return;
     setOrders(prev => prev.map(x => (x.id === id ? { ...x, status: 'Processing' as any, driverStage: 'to_store' } : x)));
-    if (me) setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: 'On-Delivery' as any } : d)));
+    if (me) setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: 'On-Delivery' as any, updatedAt: new Date().toISOString() } : d)));
     setPickupProofName(null);
     setDeliveryProofName(null);
   };
@@ -787,7 +790,7 @@ export default function DriverPortal() {
     setOrders(prev => prev.map(x => (x.id === activeOrder.id ? appendTimeline({ ...x, status: 'Completed' as any, driverStage: 'delivered', deliveryProof: deliveryProofName, codSettled: codSettled || undefined }, 'delivered', 'driver', 'Delivery completed') : x)));
     if (me) {
       const fee = activeOrder.deliveryCharge || 60;
-      setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: 'Online' as any, completedOrders: (d.completedOrders || 0) + 1, earnings: (d.earnings || 0) + fee } : d)));
+      setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: 'Online' as any, completedOrders: (d.completedOrders || 0) + 1, earnings: (d.earnings || 0) + fee, updatedAt: new Date().toISOString() } : d)));
     }
     setPickupProofName(null);
     setDeliveryProofName(null);
