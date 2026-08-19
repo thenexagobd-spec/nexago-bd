@@ -284,11 +284,10 @@ export function useCloudSync() {
     const stateSig = () => JSON.stringify(Object.keys(CLOUD_KEY_MAP).map(k => lsGet(k, null)));
     let lastPushed = '';
     const flushPush = () => {
-      if (applying) return;
-      const s = stateSig();
-      if (s === lastPushed) return;
-      lastPushed = s;
-      push();
+      if (isVisible() && !applying) {
+        const s = stateSig();
+        if (s !== lastPushed) { lastPushed = s; push(); }
+      }
     };
     const onLocalChange = () => {
       if (bc) bc.postMessage({ nexago: 'sync' });
@@ -305,7 +304,7 @@ export function useCloudSync() {
       typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('nexago-cloud-sync') : undefined;
     if (bc) {
       bc.onmessage = (e: MessageEvent) => {
-        if (e && e.data && e.data.nexago === 'sync') { pull(); }
+        if (e && e.data && e.data.nexago === 'sync') { if (isVisible()) pull(); }
       };
     }
     let ws: WebSocket | null = null;
@@ -321,7 +320,7 @@ export function useCloudSync() {
         ws.onmessage = (event) => {
           try {
             const msg = JSON.parse(String(event.data || '{}'));
-            if (msg.type === 'state-updated' && (!msg.key || msg.key === key)) pull();
+            if (msg.type === 'state-updated' && (!msg.key || msg.key === key)) { if (isVisible()) pull(); }
           } catch { /* ignore non-json ws messages */ }
         };
         ws.onerror = () => { try { ws?.close(); } catch { /* noop */ } };
@@ -334,13 +333,25 @@ export function useCloudSync() {
       await push();
       if (!cancelled) setSyncState('online');
     })();
-    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 4000);
+    // Only poll while the tab is actually visible. Hidden background tabs (many
+    // role sites open at once) used to hammer the relay every second, which
+    // looked bot-like to edge proxies and triggered 429s. The visible tab stays
+    // live, and hidden tabs catch up instantly when the user switches to them.
+    const isVisible = () => typeof document === 'undefined' || !document.hidden;
+    const pullTimer = setInterval(async () => {
+      if (!isVisible()) return;
+      const ok = await pull();
+      if (!cancelled) setSyncState(ok ? 'online' : 'offline');
+    }, 5000);
     const pushTimer = setInterval(flushPush, 3000);
+    const onVisible = () => { if (isVisible()) pull(); };
+    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
       cancelled = true;
       window.removeEventListener('storage', onLocalChange);
       window.removeEventListener('nexago-local-write', onLocalChange);
+      document.removeEventListener('visibilitychange', onVisible);
       if (bc) bc.close();
       if (ws) ws.close();
       clearInterval(pullTimer);
