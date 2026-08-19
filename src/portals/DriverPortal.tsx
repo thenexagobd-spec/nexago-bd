@@ -1582,15 +1582,11 @@ export default function DriverPortal() {
                   <div>
                     <p className="text-[9px] text-gray-400 uppercase tracking-widest">Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'},</p>
                     <p className="text-lg font-black text-white">{me?.name || 'Driver'}</p>
-                    <p className="text-[10px] text-gray-400">{me?.id || '—'} · {me?.vehicleType || '—'} · {me?.currentZone || 'Unassigned Zone'}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button onClick={toggleDuty} className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-colors ${online ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-gray-500/20 border-gray-500/40 text-gray-300'}`}>
                     <Power className="w-3.5 h-3.5" /><span>{online ? (activeOrder ? 'On-Delivery' : 'Online') : 'Offline'}</span>
-                  </button>
-                  <button onClick={handleLogout} title="Logout" className="flex items-center space-x-2 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-[10px] font-black uppercase tracking-wider hover:bg-red-500 hover:text-white transition-colors">
-                    <LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Logout</span>
                   </button>
                 </div>
               </div>
@@ -2320,7 +2316,6 @@ export default function DriverPortal() {
                 {me?.photo ? <img src={me.photo} alt={me.name} className="w-20 h-20 rounded-2xl object-cover border border-brand-orange/40" /> : <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-2xl">{me?.name?.charAt(0).toUpperCase() || 'D'}</div>}
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-black text-white">{me?.name || 'Driver'}</p>
-                  <p className="text-[10px] text-gray-400 font-mono">{me?.id || '—'} · {me?.vehicleType || '—'} · {me?.currentZone || 'Unassigned Zone'}</p>
                   <div className="flex items-center space-x-2 mt-2 flex-wrap">
                     <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">★ {(me?.rating ?? 0).toFixed(1)} Rating</span>
                     <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/30">{me?.verificationStatus || 'Pending Audit'}</span>
