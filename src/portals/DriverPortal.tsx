@@ -892,140 +892,149 @@ export default function DriverPortal() {
       {/* ============ AUTH / ONBOARDING SCREENS ============ */}
       {authView !== 'dashboard' && (
         <div className="max-w-lg mx-auto space-y-4 fade-in min-h-[calc(100vh-3.5rem)] flex flex-col justify-center py-6">
-          {/* ---- LOGIN ---- */}
+          {/* ---- LOGIN (premium glass, mirrors the customer auth screen) ---- */}
           {authView === 'login' && (
             <>
-              {/* Ambient glow */}
-              <div className="absolute top-24 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-brand-orange/10 blur-3xl pointer-events-none"></div>
-              <div className="relative text-center space-y-3">
-                <div className="relative w-20 h-20 mx-auto">
-                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-tr from-brand-orange to-amber-400 opacity-40 blur-xl"></div>
-                  <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-brand-orange via-orange-500 to-amber-500 text-white flex items-center justify-center text-3xl font-black shadow-2xl shadow-brand-orange/30 border border-white/20">
-                    <Truck className="w-9 h-9" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-[9px] tracking-[0.35em] uppercase text-brand-orange font-semibold">NexaGo BD · Delivery Network</p>
-                  <h4 className="text-xl font-bold text-white tracking-tight">Driver Dispatch Portal</h4>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">Sign in with password, Google, Gmail OTP or fingerprint to receive and complete delivery orders.</p>
-                </div>
-              </div>
-              <div className="relative rounded-3xl bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] shadow-2xl shadow-black/40 p-5 space-y-3.5">
-                {/* Sign-in method selector */}
-                <div className="grid grid-cols-4 gap-1.5 rounded-xl bg-[#0a1322] border border-[#1e3050] p-1.5">
-                  {([
-                    { id: 'password', label: 'Password', icon: Lock },
-                    { id: 'google', label: 'Google', icon: Mail },
-                    { id: 'otp', label: 'OTP', icon: ShieldCheck },
-                    { id: 'fingerprint', label: 'Fingerprint', icon: Fingerprint },
-                  ] as const).map(m => (
-                    <button key={m.id} onClick={() => setLoginMode(m.id)}
-                      className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer ${loginMode === m.id ? 'bg-gradient-to-b from-brand-orange/90 to-orange-500/90 text-white shadow-lg shadow-brand-orange/20' : 'text-gray-400 hover:text-white hover:bg-[#132238]'}`}>
-                      <m.icon className="w-3.5 h-3.5" />
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
+              <style>{`
+                .drv-auth-card { background: rgba(255,255,255,0.06); backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 24px 80px rgba(2,44,34,0.5), inset 0 1px 0 rgba(255,255,255,0.18); }
+                .drv-auth-glow { box-shadow: 0 0 60px rgba(16,185,129,0.35), 0 0 0 1px rgba(16,185,129,0.25); }
+                .drv-auth-input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); transition: all 0.2s; }
+                .drv-auth-input:focus { border-color: rgba(52,211,153,0.7); box-shadow: 0 0 0 3px rgba(52,211,153,0.18); background: rgba(255,255,255,0.12); }
+                .drv-auth-input option { background:#0b1220; color:#fff; }
+              `}</style>
+              <div className="relative rounded-3xl p-1" style={{
+                background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14',
+              }}>
+                <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-7 text-white overflow-hidden">
+                  <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
 
-                {loginMode === 'password' && (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Driver ID / Phone</label>
-                      <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
-                        <User className="w-4 h-4 text-brand-orange/70 shrink-0" />
-                        <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="e.g. 3667463854"
-                          className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
+                  <div className="relative">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg">
+                        <Truck className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-black tracking-tight leading-none">NexaGo Driver</p>
+                        <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mt-1">Dispatch Portal · by NexaGo BD</p>
                       </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Password</label>
-                      <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
-                        <Lock className="w-4 h-4 text-brand-orange/70 shrink-0" />
-                        <input type={showPassword ? 'text' : 'password'} value={loginPass} onChange={e => setLoginPass(e.target.value)}
-                          placeholder="••••••••" className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
-                        <button onClick={() => setShowPassword(!showPassword)} className="text-gray-400 hover:text-white cursor-pointer">
-                          <Eye className="w-3.5 h-3.5" />
+
+                    <h1 className="mt-5 text-xl font-black leading-tight">Driver Dispatch Portal</h1>
+                    <p className="mt-1.5 text-[12px] text-gray-300 leading-relaxed">Sign in with password, Google, Gmail OTP or fingerprint to receive and complete delivery orders.</p>
+
+                    <div className="mt-5 grid grid-cols-4 gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
+                      {([
+                        { id: 'password', label: 'Password', icon: Lock },
+                        { id: 'google', label: 'Google', icon: Mail },
+                        { id: 'otp', label: 'OTP', icon: ShieldCheck },
+                        { id: 'fingerprint', label: 'Fingerprint', icon: Fingerprint },
+                      ] as const).map(m => (
+                        <button key={m.id} onClick={() => { setLoginMode(m.id); setLoginGoogleError(''); setLoginOtpError(''); setBioError(''); }}
+                          className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wide transition-colors cursor-pointer ${loginMode === m.id ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25' : 'text-gray-400 hover:text-white'}`}>
+                          <m.icon className="w-4 h-4" />
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {loginMode === 'password' && (
+                      <div className="mt-4 space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Driver ID / Phone <span className="text-emerald-400">*</span></label>
+                          <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="e.g. 3667463854"
+                            className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Password <span className="text-emerald-400">*</span></label>
+                          <div className="relative">
+                            <input type={showPassword ? 'text' : 'password'} value={loginPass} onChange={e => setLoginPass(e.target.value)} placeholder="Your password"
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 pr-12 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-300 cursor-pointer">
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] pt-0.5">
+                          <label className="flex items-center space-x-1.5 cursor-pointer text-gray-300">
+                            <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="rounded border-white/20 text-emerald-500 focus:ring-0 accent-emerald-500" />
+                            <span>Remember Me</span>
+                          </label>
+                          <button onClick={() => setAuthView('forgot')} className="font-bold text-emerald-300 hover:text-emerald-200 transition-colors cursor-pointer">Forgot Password?</button>
+                        </div>
+                        <button onClick={handleLogin}
+                          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] cursor-pointer">
+                          Sign In Securely
                         </button>
                       </div>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] pt-0.5">
-                      <label className="flex items-center space-x-1.5 cursor-pointer text-gray-300">
-                        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="rounded border-white/20 text-brand-orange focus:ring-0" />
-                        <span>Remember Me</span>
-                      </label>
-                      <button onClick={() => setAuthView('forgot')} className="text-brand-orange hover:underline font-bold">Forgot Password?</button>
-                    </div>
-                    <button onClick={handleLogin} className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-bold uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99]">
-                      Sign In Securely
-                    </button>
-                  </>
-                )}
+                    )}
 
-                {loginMode === 'google' && (
-                  <div className="space-y-2.5">
-                    <p className="text-[9px] text-gray-400 leading-relaxed text-center">Sign in with the Google account linked to your driver profile.</p>
-                    <button onClick={loginWithGoogle} disabled={loginGoogleBusy} className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-white text-[#1f1f1f] text-xs font-bold shadow-lg hover:bg-gray-100 transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer">
-                      <span className="flex items-center justify-center w-4 h-4">
-                        <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.77.43 3.45 1.18 4.94l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
-                      </span>
-                      {loginGoogleBusy ? 'Connecting to Google…' : 'Continue with Google'}
-                    </button>
-                    {loginGoogleError && <p className="text-[9px] font-bold text-red-400 text-center">{loginGoogleError}</p>}
-                  </div>
-                )}
-
-                {loginMode === 'otp' && (
-                  <div className="space-y-2.5">
-                    <p className="text-[9px] text-gray-400 leading-relaxed text-center">A one-time code is emailed to your Gmail. Enter it to sign in — no password needed.</p>
-                    <div className="space-y-1.5">
-                      <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Gmail Address</label>
-                      <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
-                        <Mail className="w-4 h-4 text-brand-orange/70 shrink-0" />
-                        <input value={loginOtpEmail} onChange={e => setLoginOtpEmail(e.target.value)} placeholder="name@gmail.com"
-                          className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
-                      </div>
-                    </div>
-                    {loginOtpStep === 'sent' && (
-                      <div className="space-y-1.5">
-                        <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">6-Digit Code</label>
-                        <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
-                          <ShieldCheck className="w-4 h-4 text-brand-orange/70 shrink-0" />
-                          <input value={loginOtpCode} onChange={e => setLoginOtpCode(e.target.value)} placeholder="••••••"
-                            className="flex-1 bg-transparent text-[11px] font-mono tracking-[0.3em] outline-none text-white placeholder:text-gray-600" />
-                        </div>
+                    {loginMode === 'google' && (
+                      <div className="mt-4 space-y-3">
+                        <p className="text-[11px] text-gray-300 leading-relaxed">Sign in with the Google account linked to your driver profile — no password needed.</p>
+                        <button onClick={loginWithGoogle} disabled={loginGoogleBusy}
+                          className="w-full py-3 rounded-xl bg-white hover:bg-gray-100 text-gray-800 text-[13px] font-bold shadow-lg transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center space-x-2.5 border border-white/60">
+                          <svg width="18" height="18" viewBox="0 0 48 48">
+                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                          </svg>
+                          <span>{loginGoogleBusy ? 'Connecting to Google…' : 'Continue with Google'}</span>
+                        </button>
+                        {loginGoogleError && <p className="text-[11px] font-bold text-red-400">{loginGoogleError}</p>}
                       </div>
                     )}
-                    {loginOtpError && <p className="text-[9px] font-bold text-red-400 text-center">{loginOtpError}</p>}
-                    <button onClick={loginOtpStep === 'sent' ? loginOtpVerify : loginOtpSend} disabled={loginOtpBusy}
-                      className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-bold uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99] disabled:opacity-60">
-                      {loginOtpBusy ? 'Please wait…' : loginOtpStep === 'sent' ? 'Verify & Sign In' : 'Send Code to Gmail'}
-                    </button>
-                  </div>
-                )}
 
-                {loginMode === 'fingerprint' && (
-                  <div className="space-y-2.5">
-                    <p className="text-[9px] text-gray-400 leading-relaxed text-center">Unlock with your device fingerprint, Face ID or Windows Hello — quick and secure.</p>
-                    <button onClick={fingerprintLogin} disabled={bioBusy}
-                      className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border border-[#24395c] bg-[#0a1322] hover:border-brand-orange/60 hover:bg-[#132238] text-white transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer">
-                      <Fingerprint className={`w-10 h-10 ${bioBusy ? 'animate-pulse text-brand-orange' : 'text-brand-orange'}`} />
-                      <span className="text-xs font-bold uppercase">{bioBusy ? 'Waiting for fingerprint…' : 'Scan Fingerprint'}</span>
-                    </button>
-                    {bioError && <p className="text-[9px] font-bold text-red-400 text-center">{bioError}</p>}
-                    <p className="text-[9px] text-gray-500 text-center">No fingerprint set up yet? Log in with your ID + password, then enable it from Settings.</p>
+                    {loginMode === 'otp' && (
+                      <div className="mt-4 space-y-3">
+                        <p className="text-[11px] text-gray-300 leading-relaxed">A one-time code is emailed to your Gmail. Enter it to sign in — no password needed.</p>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail Address <span className="text-emerald-400">*</span></label>
+                          <input value={loginOtpEmail} onChange={e => { setLoginOtpEmail(e.target.value); setLoginOtpError(''); }} placeholder="name@gmail.com"
+                            className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                        </div>
+                        {loginOtpStep === 'sent' && (
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">6-Digit Code <span className="text-emerald-400">*</span></label>
+                            <input value={loginOtpCode} onChange={e => { setLoginOtpCode(e.target.value); setLoginOtpError(''); }} placeholder="••••••"
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:text-gray-500" />
+                          </div>
+                        )}
+                        {loginOtpError && <p className="text-[11px] font-bold text-red-400">{loginOtpError}</p>}
+                        <button onClick={loginOtpStep === 'sent' ? loginOtpVerify : loginOtpSend} disabled={loginOtpBusy}
+                          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all active:scale-[0.99] cursor-pointer">
+                          {loginOtpBusy ? 'Please wait…' : loginOtpStep === 'sent' ? 'Verify & Sign In' : 'Send Code to Gmail'}
+                        </button>
+                        {loginOtpStep === 'sent' && (
+                          <button onClick={loginOtpSend} disabled={loginOtpBusy}
+                            className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
+                            Resend Code
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {loginMode === 'fingerprint' && (
+                      <div className="mt-4 space-y-3">
+                        <p className="text-[11px] text-gray-300 leading-relaxed">Unlock with your device fingerprint, Face ID or Windows Hello — quick and secure.</p>
+                        <button onClick={fingerprintLogin} disabled={bioBusy}
+                          className="w-full flex flex-col items-center justify-center gap-2 py-7 rounded-2xl drv-auth-input hover:bg-white/10 transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer">
+                          <Fingerprint className={`w-11 h-11 ${bioBusy ? 'animate-pulse text-emerald-300' : 'text-emerald-300'}`} />
+                          <span className="text-xs font-black uppercase tracking-wider text-white">{bioBusy ? 'Waiting for fingerprint…' : 'Scan Fingerprint'}</span>
+                        </button>
+                        {bioError && <p className="text-[11px] font-bold text-red-400">{bioError}</p>}
+                        <p className="text-[10px] text-gray-500 leading-relaxed">No fingerprint set up yet? Log in with your ID + password, then enable it from Settings.</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
-              <div className="relative flex items-center gap-3 text-[8px] text-gray-500 font-bold uppercase tracking-widest">
-                <span className="flex-1 h-px bg-gradient-to-r from-transparent to-[#24395c]"></span>
-                <span>New to NexaGo?</span>
-                <span className="flex-1 h-px bg-gradient-to-l from-transparent to-[#24395c]"></span>
-              </div>
-              <button onClick={() => { setSignupStage('account'); setOtpStep('idle'); setOtpCode(''); setOtpError(''); setGoogleError(''); setAuthView('signup'); }} className="w-full py-3 bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] hover:border-brand-orange/50 hover:from-[#1b2f4d] hover:to-brand-card text-gray-200 hover:text-white text-[11px] font-bold rounded-xl cursor-pointer transition-all">
+              <button onClick={() => { setSignupStage('account'); setOtpStep('idle'); setOtpCode(''); setOtpError(''); setGoogleError(''); setAuthView('signup'); }} className="relative w-full py-3 rounded-2xl border border-white/15 text-[12px] font-bold text-gray-200 hover:bg-white/5 transition-colors cursor-pointer">
                 Create Driver Account
               </button>
-              <p className="relative text-center text-[9px] text-gray-500">Access with your permanent Driver ID + password, Google, Gmail OTP or fingerprint.</p>
-              <button onClick={() => { setCheckStatusInput(''); setCheckStatusQuery(''); setAuthView('pending'); }} className="relative w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
+              <p className="relative text-center text-[9px] text-gray-500">New to NexaGo? Register above — approval takes a few minutes.</p>
+              <button onClick={() => { setCheckStatusInput(''); setCheckStatusQuery(''); setAuthView('pending'); }} className="relative w-full text-center text-[10px] text-emerald-400 hover:underline font-bold cursor-pointer">
                 Check my application status (any device) →
               </button>
             </>
