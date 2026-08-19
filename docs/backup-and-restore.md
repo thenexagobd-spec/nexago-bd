@@ -23,7 +23,25 @@ $env:SUPABASE_DB_URL="postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:
 .\scripts\backup-supabase.ps1
 ```
 
+Or from npm on Windows:
+
+```powershell
+$env:SUPABASE_DB_URL="postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:6543/postgres?sslmode=require"
+npm run backup:supabase
+```
+
 Backups are written to `./backups/` and are ignored by git.
+
+## Offline Queue Coverage
+
+The web app keeps working locally if the network drops:
+
+- POS/order writes are queued in `nexago_offline_order_queue_v1`.
+- Full shared state snapshots are queued in `nexago_offline_state_queue_v1`.
+- When the browser comes online, when the tab becomes visible, and every retry interval, the queue is pushed back to `/api/order` and `/api/state`.
+- The server merges orders/products/stores/payments/staff records by ID, so queued updates do not replace unrelated store data.
+
+Do not clear browser storage while offline unless the queue has already synced.
 
 ## Restore
 
