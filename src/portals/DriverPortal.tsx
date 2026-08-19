@@ -90,6 +90,12 @@ export default function DriverPortal() {
   const [loginOtpError, setLoginOtpError] = useState('');
   const [bioBusy, setBioBusy] = useState(false);
   const [bioError, setBioError] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStep, setForgotStep] = useState<'idle' | 'sent'>('idle');
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotNewPass, setForgotNewPass] = useState('');
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotError, setForgotError] = useState('');
   const [checkStatusInput, setCheckStatusInput] = useState('');
   const [checkStatusQuery, setCheckStatusQuery] = useState('');
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
@@ -430,6 +436,46 @@ export default function DriverPortal() {
       setLoginGoogleError(String(err?.message || 'Google sign-in failed — try again.'));
       setLoginGoogleBusy(false);
     }
+  };
+
+  // Forgot password — Gmail OTP: a code is emailed, verified server-side, then
+  // the driver picks a new password which is written to the same security
+  // registry the login flow checks (so it works on any device).
+  const forgotSendOtp = () => {
+    const email = forgotEmail.trim().toLowerCase();
+    if (!email || !/^[\w.+-]+@gmail\.com$/i.test(email)) { setForgotError('Enter your registered Gmail address first.'); return; }
+    if (!drivers.some(d => (d.email || '').toLowerCase() === email)) { setForgotError('No driver account found with this Gmail — register first.'); return; }
+    setForgotBusy(true);
+    setForgotError('');
+    securityApi('/otp-signup-send', { email }).then(() => {
+      setForgotStep('sent');
+      setForgotError('');
+      showToast('Verification code sent to your Gmail');
+    }).catch((err) => {
+      setForgotError(String(err?.message || 'Could not send the code. Try again.'));
+    }).finally(() => setForgotBusy(false));
+  };
+
+  const forgotReset = () => {
+    const email = forgotEmail.trim().toLowerCase();
+    if (!forgotCode.trim()) { setForgotError('Enter the 6-digit code from your email.'); return; }
+    if (forgotNewPass.length < 6) { setForgotError('New password must be at least 6 characters.'); return; }
+    setForgotBusy(true);
+    setForgotError('');
+    securityApi('/driver/forgot', { email, code: forgotCode, newPassword: forgotNewPass }).then((data) => {
+      const driver = drivers.find(d => (d.email || '').toLowerCase() === email);
+      if (driver) {
+        const creds = getCreds();
+        creds[driver.id] = { phone: driver.phone || '', password: forgotNewPass };
+        saveCreds(creds);
+      }
+      showToast('Password reset successfully — login with your new password');
+      setForgotEmail(''); setForgotCode(''); setForgotNewPass(''); setForgotStep('idle');
+      setLoginId(driver?.id || '');
+      setAuthView('login');
+    }).catch((err) => {
+      setForgotError(String(err?.message || 'Invalid or expired code.'));
+    }).finally(() => setForgotBusy(false));
   };
 
   // Login method 3 — Gmail OTP: a 6-digit code is emailed, then verified with
@@ -1442,14 +1488,39 @@ export default function DriverPortal() {
                       <h4 className="text-xs font-bold text-white">Reset Driver Password</h4>
                       <span className="w-4" />
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-3">Enter your registered mobile phone number to receive a 6-digit OTP verification code.</p>
-                    <div className="mt-3">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Registered Phone Number</label>
-                      <input type="tel" defaultValue="+880 1234-567890" className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none" />
+                    <p className="text-[11px] text-gray-400 mt-3">Enter your registered Gmail address — a 6-digit verification code will be emailed to you.</p>
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail Address <span className="text-emerald-400">*</span></label>
+                        <input value={forgotEmail} onChange={e => { setForgotEmail(e.target.value); setForgotError(''); }} placeholder="name@gmail.com"
+                          className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                      </div>
+                      {forgotStep === 'sent' && (
+                        <>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">6-Digit Code <span className="text-emerald-400">*</span></label>
+                            <input value={forgotCode} onChange={e => { setForgotCode(e.target.value); setForgotError(''); }} placeholder="••••••"
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:text-gray-500" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">New Password <span className="text-emerald-400">*</span></label>
+                            <input value={forgotNewPass} onChange={e => { setForgotNewPass(e.target.value); setForgotError(''); }} placeholder="Min 6 characters" type="password"
+                              className="drv-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
+                          </div>
+                        </>
+                      )}
+                      {forgotError && <p className="text-[11px] font-bold text-red-400">{forgotError}</p>}
+                      <button onClick={forgotStep === 'sent' ? forgotReset : forgotSendOtp} disabled={forgotBusy}
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all active:scale-[0.99] cursor-pointer">
+                        {forgotBusy ? 'Please wait…' : forgotStep === 'sent' ? 'Verify & Reset Password' : 'Send Code to Gmail'}
+                      </button>
+                      {forgotStep === 'sent' && (
+                        <button onClick={forgotSendOtp} disabled={forgotBusy}
+                          className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
+                          Resend Code
+                        </button>
+                      )}
                     </div>
-                    <button onClick={() => setAuthView('login')} className="mt-4 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] cursor-pointer">
-                      Send OTP Verification Code
-                    </button>
                   </div>
                 </div>
               </div>

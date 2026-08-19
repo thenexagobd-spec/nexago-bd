@@ -1194,6 +1194,49 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Driver forgot password: the driver enters their Gmail, we email a 6-digit
+  // OTP (reuses the signup OTP endpoints), then they choose a new password.
+  // The OTP is verified server-side with the same Supabase email verification
+  // the signup flow uses; the new password is written into the same security
+  // registry the driver login checks (/api/security/login).
+  if (req.method === 'POST' && url.pathname === '/api/security/driver/forgot') {
+    if (!supabaseConfigured) { sendJson(res, 503, { ok: false, error: 'SUPABASE_NOT_CONFIGURED' }); return; }
+    if (!rateLimit(req, 'driver-forgot', 8, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const email = String(body.email || '').trim().toLowerCase();
+      const code = String(body.code || '').trim().replace(/\D/g, '');
+      const newPassword = String(body.newPassword || '');
+      if (!email || !code) { sendJson(res, 400, { ok: false, error: 'email and code required' }); return; }
+      if (!newPassword || newPassword.length < 6) { sendJson(res, 400, { ok: false, error: 'PASSWORD_TOO_SHORT' }); return; }
+      try {
+        await verifyEmailOtp(email, code);
+        const store = await loadStoreLatest(key);
+        const drivers = Array.isArray(store.state && store.state.drivers) ? store.state.drivers : [];
+        const driver = drivers.find((d) => d && (d.email || '').toLowerCase() === email);
+        if (!driver || !driver.id) { sendJson(res, 404, { ok: false, error: 'DRIVER_NOT_FOUND' }); return; }
+        const users = readSecurity(`users-${safeKey(key)}`, {});
+        const existing = users[driver.id];
+        if (!existing || existing.role !== 'driver') { sendJson(res, 404, { ok: false, error: 'DRIVER_NOT_FOUND' }); return; }
+        users[driver.id] = {
+          ...existing,
+          userId: driver.id,
+          role: 'driver',
+          status: 'Active',
+          password: hashPassword(newPassword),
+          lastPasswordChangeAt: new Date().toISOString(),
+          passwordChangedBy: 'driver-self',
+        };
+        writeSecurity(`users-${safeKey(key)}`, users);
+        appendAudit(key, { actor: driver.id, role: 'driver', action: 'driver-password-reset', ip: clientIp(req), reason: 'Gmail OTP verified' });
+        sendJson(res, 200, { ok: true, driverId: driver.id });
+      } catch (e) {
+        appendAudit(key, { actor: email, role: 'driver', action: 'driver-password-reset-failed', ip: clientIp(req), reason: 'invalid OTP or driver lookup failed' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_CODE' });
+      }
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/security/register') {
     if (!rateLimit(req, 'security-register', 10, 60_000)) { sendSecurityAlert('register-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '' }); sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     if (!hasPermission(req, key, 'users') && !isTrustedAutomation(req)) { sendJson(res, 403, { ok: false, error: 'FORBIDDEN' }); return; }
