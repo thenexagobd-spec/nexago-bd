@@ -11,8 +11,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, ReturnRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
-import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi, customerRegister, customerSync, customerLogin, customerForgot } from '../portals/portalUtils';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi, customerRegister, customerSync, customerLogin, customerForgot, supabaseClient } from '../portals/portalUtils';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -5610,9 +5609,7 @@ const CustomerAuthScreen: React.FC<{
   // Google account chooser (Supabase OAuth). After the user picks a Gmail on
   // Google, we read the chosen email and auto-register/auto-login the customer
   // (permanent ID linked to that Gmail — no password needed on this device).
-  const sbUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
-  const sbAnon = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-  const supabase: SupabaseClient | null = sbUrl && sbAnon ? createClient(sbUrl, sbAnon, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
+  const supabase = supabaseClient();
   const supabaseRef = useRef(supabase);
   supabaseRef.current = supabase;
   const [googleBusy, setGoogleBusy] = useState(false);

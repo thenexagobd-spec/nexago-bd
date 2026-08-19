@@ -40,8 +40,7 @@ import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
-import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim } from './portals/portalUtils';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, supabaseClient } from './portals/portalUtils';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
@@ -266,11 +265,9 @@ export default function App() {
   const [legalPopup, setLegalPopup] = useState<'privacy' | 'terms' | null>(null);
 
   // Supabase Google OAuth account chooser. The anon key is safe for browsers.
-  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-  const supabase = supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
-    : null;
+  // Uses the app-wide shared singleton so only ONE GoTrueClient exists (the
+  // auth-js warning + undefined behavior come from creating several clients).
+  const supabase = supabaseClient();
   const supabaseRef = useRef(supabase);
   supabaseRef.current = supabase;
 

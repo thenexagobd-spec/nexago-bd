@@ -7,6 +7,7 @@
  * sync across sites in the same browser.
  */
 import { useEffect, useRef, useState } from 'react';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Order, Driver, Product, Payment, SupportTicket, SystemNotification, User } from '../types';
 
 export const lsGet = <T,>(key: string, d: T): T => {
@@ -17,6 +18,18 @@ export const lsGet = <T,>(key: string, d: T): T => {
     return d;
   }
 };
+
+// Single shared Supabase client for the whole app (App super-admin Google OAuth
+// + CustomerStorefront Google sign-in). Creating it once avoids the auth-js
+// "Multiple GoTrueClient instances detected" warning and undefined behavior.
+let _supabaseClient: SupabaseClient | null | undefined;
+export function supabaseClient(): SupabaseClient | null {
+  if (_supabaseClient !== undefined) return _supabaseClient;
+  const url = ((import.meta.env.VITE_SUPABASE_URL as string) || '').replace(/\/+$/, '');
+  const anon = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
+  _supabaseClient = url && anon ? createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
+  return _supabaseClient;
+}
 
 export const lsSet = <T,>(key: string, v: T) => {
   try {
