@@ -15,17 +15,20 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Inbox, History, CheckCircle2, Package, Send, User, Phone, Power, WifiOff,
   Printer, X, Headphones, MessageSquare, HelpCircle, ShoppingBag, Clock,
-  Check, Store, Bell, Banknote, RotateCcw, ScanLine, ShieldCheck
+  Check, Store, Bell, Banknote, RotateCcw, ScanLine, ShieldCheck, ShoppingCart
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds } from './portalUtils';
+import PosSystem from '../components/PosSystem';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, useProducts, usePayments, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds } from './portalUtils';
 import { newOfferRound } from '../utils/autoAssign';
 
 export default function StorePortal() {
   useCloudSync();
   const [orders, setOrders] = useOrders();
   const [drivers, setDrivers] = useDrivers();
+  const [products, setProducts] = useProducts();
+  const [payments, setPayments] = usePayments();
   const [profile] = useStoreProfile();
   const [stores] = useStores();
   const [notifications, setNotifications] = useNotifications();
@@ -61,6 +64,7 @@ export default function StorePortal() {
   const currentStore = stores.find((s: any) => s.id === storeId);
   const storeName = currentStore?.name || profile.storeName || 'Store';
   const mine = useMemo(() => orders.filter(o => ((o as any).storeId && (o as any).storeId === storeId) || o.storeName === storeName), [orders, storeId, storeName]);
+  const storeProducts = useMemo(() => products.filter((p: any) => !p.storeId || p.storeId === storeId || p.storeName === storeName), [products, storeId, storeName]);
 
   // Store Site login gate — only a verified store admin's credentials unlock
   // order control. Both the application record (sd_store_admin_apps) and the
@@ -124,6 +128,7 @@ export default function StorePortal() {
   const nav = [
     { id: 'receive', label: 'Receive Orders', icon: Inbox, badge: incoming.length },
     { id: 'live', label: 'Live Order', icon: Package, badge: live ? 1 : 0 },
+    { id: 'pos', label: 'POS', icon: ShoppingCart },
     { id: 'returns', label: 'Returns', icon: RotateCcw, badge: pendingReturns.length },
     { id: 'history', label: 'Order History', icon: History },
     { id: 'alerts', label: 'Alerts', icon: Bell, badge: storeUnread },
@@ -166,6 +171,62 @@ export default function StorePortal() {
       makeNotif('🚫 Order Rejected', `Store declined order #${id} — no rider assigned.`, 'order', { audience: 'all' }),
       ...prev,
     ]);
+  };
+
+  const syncPosProducts = (nextStoreProducts: any[]) => {
+    const nextById = new Map(nextStoreProducts.map((p: any) => [p.id, { ...p, storeId: p.storeId || storeId, storeName: p.storeName || storeName }]));
+    setProducts(products.map((p: any) => nextById.get(p.id) || p));
+  };
+
+  const createPosOrder = (order: any) => {
+    const next = appendTimeline({
+      ...order,
+      storeId,
+      storeName,
+      pickupLocation: storeName,
+      date: order.date || new Date().toLocaleDateString(),
+      time: order.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }, 'created', 'store', 'Created from Store Site POS');
+    setOrders([next, ...orders]);
+    setPayments([{
+      id: `PAY-${Date.now().toString().slice(-10)}`,
+      orderId: next.id,
+      amount: next.amount || 0,
+      method: next.paymentMethod || 'CASH',
+      status: next.status === 'Completed' ? 'Paid' : 'Pending',
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+    }, ...payments]);
+    setNotifications(prev => [
+      makeNotif('POS order saved', `Store POS saved order #${next.id}.`, 'order', { audience: 'store-admin', storeId }),
+      ...prev,
+    ]);
+  };
+
+  const updatePosOrder = (order: any) => {
+    const next = appendTimeline(order, 'updated', 'store', 'Updated from Store Site POS');
+    setOrders(orders.map(o => o.id === next.id ? next : o));
+    setPayments(payments.map(p => p.orderId === next.id ? { ...p, amount: next.amount || p.amount, method: next.paymentMethod || p.method, status: next.status === 'Completed' ? 'Paid' : next.status === 'Cancelled' ? 'Failed' : p.status } : p));
+  };
+
+  const posSaleRecorded = (items: { productId: string; name: string; qty: number; price: number }[], source: 'counter' | 'delivery') => {
+    if (!items.length) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const ledger = lsGet<any[]>('sd_stock_ledger', []);
+    const entries = items.map(it => ({
+      id: `LED-${Date.now()}-${it.productId}`,
+      productId: it.productId,
+      productName: it.name,
+      storeId,
+      storeName,
+      type: 'Sale',
+      qty: -Math.abs(it.qty),
+      reason: source === 'delivery' ? 'Store POS delivery dispatch' : 'Store POS counter sale',
+      by: 'Store POS',
+      date: today,
+      time,
+    }));
+    lsSet('sd_stock_ledger', [...entries, ...ledger]);
   };
 
   const decideReturn = (rid: string, approve: boolean) => {
@@ -630,6 +691,22 @@ export default function StorePortal() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {tab === 'pos' && (
+        <div className="min-h-[calc(100vh-120px)] overflow-hidden rounded-2xl border border-brand-border bg-brand-dark">
+          <PosSystem
+            products={storeProducts}
+            orders={mine}
+            onProductsChange={syncPosProducts}
+            onCreateOrder={createPosOrder}
+            onUpdateOrder={updatePosOrder}
+            onSendToDriver={() => undefined}
+            onDeleteOrder={(id) => setOrders(orders.map(o => o.id === id ? appendTimeline({ ...o, status: 'Cancelled' as any }, 'cancelled', 'store', 'Cancelled from Store Site POS') : o))}
+            onNavigate={setTab}
+            onSaleRecorded={posSaleRecorded}
+          />
         </div>
       )}
 

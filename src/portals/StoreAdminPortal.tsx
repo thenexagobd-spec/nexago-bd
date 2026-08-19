@@ -7,9 +7,10 @@
  * localStorage keys as the admin panel.
  */
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip, History } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip, History, ShoppingCart } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim } from './portalUtils';
+import PosSystem from '../components/PosSystem';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsGet, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim } from './portalUtils';
 import { newOfferRound } from '../utils/autoAssign';
 
 interface Staff {
@@ -25,7 +26,7 @@ const storeDocMeta = [
   { key: 'foodSafety', label: 'BSTI/Food Safety Certificate (if food)', required: false },
 ];
 
-const DEFAULT_STORE_ADMIN_PAGES = ['dashboard', 'orders', 'branches', 'products', 'categories', 'inventory', 'reviews', 'coupons', 'tools', 'staff', 'payments', 'alerts', 'support'];
+const DEFAULT_STORE_ADMIN_PAGES = ['dashboard', 'orders', 'branches', 'products', 'categories', 'inventory', 'pos', 'reviews', 'coupons', 'tools', 'staff', 'payments', 'alerts', 'support'];
 
 const makeStoreId = () => `STR-${String(Date.now()).slice(-7)}`;
 const makeStoreAdminId = () => `SA-${String(Date.now()).slice(-8)}`;
@@ -134,6 +135,68 @@ export default function StoreAdminPortal() {
   const lowStock = myProducts.filter(p => p.stock > 0 && p.stock <= 10);
   const outStock = myProducts.filter(p => p.stock <= 0);
 
+  const syncPosProducts = (nextStoreProducts: any[]) => {
+    const nextById = new Map(nextStoreProducts.map((p: any) => [p.id, { ...p, storeId: p.storeId || activeStoreId, branchId: p.branchId || activeBranchId, storeName: activeStoreName }]));
+    setProducts(products.map((p: any) => nextById.get(p.id) || p));
+  };
+
+  const createPosOrder = (order: any) => {
+    const next = appendTimeline({
+      ...order,
+      storeId: activeStoreId,
+      branchId: activeBranchId,
+      storeName: activeStoreName,
+      pickupLocation: activeBranch?.name || activeStoreName,
+      date: order.date || new Date().toLocaleDateString(),
+      time: order.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }, 'created', 'admin', 'Created from Store Admin POS');
+    setOrders([next, ...orders]);
+    setPayments([{
+      id: `PAY-${Date.now().toString().slice(-10)}`,
+      orderId: next.id,
+      amount: next.amount || 0,
+      method: next.paymentMethod || 'CASH',
+      status: next.status === 'Completed' ? 'Paid' : 'Pending',
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+    }, ...payments]);
+    setNotifications([
+      makeNotif('POS order saved', `Store Admin POS saved order #${next.id}.`, 'order', { audience: 'store', storeId: activeStoreId }),
+      ...notifications,
+    ]);
+  };
+
+  const updatePosOrder = (order: any) => {
+    const next = appendTimeline({ ...order, storeId: activeStoreId, branchId: activeBranchId, storeName: activeStoreName }, 'updated', 'admin', 'Updated from Store Admin POS');
+    setOrders(orders.map(o => o.id === next.id ? next : o));
+    setPayments(payments.map(p => p.orderId === next.id ? { ...p, amount: next.amount || p.amount, method: next.paymentMethod || p.method, status: next.status === 'Completed' ? 'Paid' : next.status === 'Cancelled' ? 'Failed' : p.status } : p));
+  };
+
+  const posSaleRecorded = (items: { productId: string; name: string; qty: number; price: number }[], source: 'counter' | 'delivery') => {
+    if (!items.length) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const ledger = lsGet<any[]>('sd_stock_ledger', []);
+    const entries = items.map(it => ({
+      id: `LED-${Date.now()}-${it.productId}`,
+      productId: it.productId,
+      productName: it.name,
+      storeId: activeStoreId,
+      branchId: activeBranchId,
+      storeName: activeStoreName,
+      type: 'Sale',
+      qty: -Math.abs(it.qty),
+      reason: source === 'delivery' ? 'Store Admin POS delivery dispatch' : 'Store Admin POS counter sale',
+      by: sessionAdminId || 'Store Admin POS',
+      date: today,
+      time,
+    }));
+    lsSet('sd_stock_ledger', [...entries, ...ledger]);
+    setNotifications([
+      makeNotif('POS stock updated', `${items.length} POS item(s) deducted from ${activeBranch?.name || activeStoreName}.`, 'system', { audience: 'store-admin', storeId: activeStoreId }),
+      ...notifications,
+    ]);
+  };
+
   const myNotifs = notifications.filter(n => n.audience === 'all' || n.storeId === activeStoreId || (!n.storeId && (n.audience === 'store' || n.audience === 'store-admin')));
   const unreadCount = myNotifs.filter(n => !n.read).length;
 
@@ -145,6 +208,7 @@ export default function StoreAdminPortal() {
     { id: 'products', label: 'Products', icon: Box, badge: outStock.length },
     { id: 'categories', label: 'Categories', icon: FolderOpen },
     { id: 'inventory', label: 'Inventory', icon: Package, badge: lowStock.length },
+    { id: 'pos', label: 'POS', icon: ShoppingCart },
     { id: 'reviews', label: 'Reviews', icon: Star },
     { id: 'coupons', label: 'Coupons', icon: Ticket },
     { id: 'tools', label: 'Order Tools', icon: Wrench, badge: pending.length },
@@ -875,6 +939,22 @@ export default function StoreAdminPortal() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === 'pos' && (
+        <div className="min-h-[calc(100vh-120px)] overflow-hidden rounded-2xl border border-brand-border bg-brand-dark">
+          <PosSystem
+            products={myProducts}
+            orders={myOrders}
+            onProductsChange={syncPosProducts}
+            onCreateOrder={createPosOrder}
+            onUpdateOrder={updatePosOrder}
+            onSendToDriver={() => undefined}
+            onDeleteOrder={(id) => setOrders(orders.map(o => o.id === id ? appendTimeline({ ...o, status: 'Cancelled' as any }, 'cancelled', 'admin', 'Cancelled from Store Admin POS') : o))}
+            onNavigate={setTab}
+            onSaleRecorded={posSaleRecorded}
+          />
         </div>
       )}
 
