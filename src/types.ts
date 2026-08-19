@@ -22,6 +22,8 @@ export interface Order {
   customerPhone?: string; // e.g. "01712-345678"
   customerId?: string;    // permanent unique customer ID (NEX...) linking to profile, wallet & tickets
   driverId?: string;
+  offeredDriverIds?: string[];  // current broadcast batch (up to 10) — any may accept
+  offerRound?: number;          // 0-based batch round: 0=first 10 drivers, 1=next 10, ...
   paymentMethod: string;
   pickupCoords?: { lat: number; lng: number };
   deliveryCoords?: { lat: number; lng: number };

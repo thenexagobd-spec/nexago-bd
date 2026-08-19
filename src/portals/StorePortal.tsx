@@ -20,6 +20,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds } from './portalUtils';
+import { newOfferRound } from '../utils/autoAssign';
 
 export default function StorePortal() {
   useCloudSync();
@@ -132,8 +133,8 @@ export default function StorePortal() {
   const goBack = () => { window.open(`${window.location.origin}/roles.html`, '_self'); };
 
   const acceptOrder = (id: string) => {
-    const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
-    if (!rider) {
+    const onlineDrivers = drivers.filter(d => d.status !== 'Offline');
+    if (onlineDrivers.length === 0) {
       setNotifications(prev => [
         makeNotif('Driver unavailable', `Order #${id} is accepted by store, but no real driver is online yet.`, 'order', { audience: 'all' }),
         ...prev,
@@ -141,17 +142,20 @@ export default function StorePortal() {
       return;
     }
     const pickupPin = String(Math.floor(1000 + Math.random() * 9000));
+    const order = orders.find(o => o.id === id);
+    const broadcast = order ? newOfferRound(order, drivers) : {};
     setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
       ...o,
       status: 'Confirmed' as any,
-      driverId: rider.id,
-      driverDeadline: Date.now() + 60 * 1000,
+      driverId: undefined,
+      ...broadcast,
       placedAt: o.placedAt || Date.now(),
       pickupPin,
-    }, 'accepted', 'store', `Store accepted — rider ${rider.name} assigned`) : o)));
+    }, 'accepted', 'store', `Store accepted — offered to ${(broadcast.offeredDriverIds || []).length} nearby riders`) : o)));
+    const offeredNames = onlineDrivers.slice(0, 10).map(d => d.name).join(', ');
     setNotifications(prev => [
-      makeNotif('🚚 Order Confirmed', `Store accepted order #${id} — assigned to ${rider.name}.`, 'order', { audience: 'driver', driverId: rider.id }),
-      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — rider ${rider.name} on the way.`, 'order', { audience: 'all' }),
+      makeNotif('🚚 Order Confirmed', `Store accepted order #${id} — broadcast to riders: ${offeredNames}.`, 'order', { audience: 'driver' }),
+      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — dispatched to ${(broadcast.offeredDriverIds || []).length} nearby riders.`, 'order', { audience: 'all' }),
       ...prev,
     ]);
   };

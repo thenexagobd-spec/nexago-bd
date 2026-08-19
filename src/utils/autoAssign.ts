@@ -5,6 +5,37 @@
 
 import { Order, Driver } from '../types';
 
+// Broadcast offer batching: each order is offered to up to 10 drivers at once.
+// If nobody accepts before the deadline, the order advances to the NEXT 10
+// drivers (offerRound + 1). Accepting locks the order to that driver.
+export const OFFER_BATCH_SIZE = 10;
+export const OFFER_WINDOW_MS = 60 * 1000;
+
+/**
+ * Compute the driver-id batch for a given offer round: up to 10 online drivers.
+ * Round 0 = first 10 online drivers, round 1 = the next 10, etc.
+ */
+export function computeOfferBatch(drivers: Driver[], round: number, exclude: string[] = []): string[] {
+  const online = drivers
+    .filter(d => d.status === 'Online' && !d.dispatchLocked)
+    .map(d => d.id)
+    .filter(id => !exclude.includes(id));
+  const start = round * OFFER_BATCH_SIZE;
+  return online.slice(start, start + OFFER_BATCH_SIZE);
+}
+
+/**
+ * Build the broadcast fields for a freshly dispatched order (round 0).
+ */
+export function newOfferRound(order: Order, drivers: Driver[], round: number = 0): Partial<Order> {
+  const offered = computeOfferBatch(drivers, round);
+  return {
+    offeredDriverIds: offered,
+    offerRound: round,
+    driverDeadline: Date.now() + OFFER_WINDOW_MS,
+  };
+}
+
 export interface LocationCoords {
   lat: number;
   lng: number;

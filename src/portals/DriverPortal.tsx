@@ -19,6 +19,7 @@ import {
   } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim, securityApi, supabaseClient } from './portalUtils';
+import { computeOfferBatch, OFFER_WINDOW_MS } from '../utils/autoAssign';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
@@ -641,7 +642,16 @@ export default function DriverPortal() {
     [orders, me]
   );
 
-  const offers = myOrders.filter(o => o.status === 'Confirmed' && !o.pickedUp);
+  // Broadcast offers: this driver is in the current offer batch (offeredDriverIds)
+  // and nobody has accepted yet (driverId unset). The order is offered to up to
+  // 10 riders at once; the first to accept locks it in.
+  const offeredToMe = useMemo(
+    () => orders.filter(o => o.offeredDriverIds?.includes(me?.id || '')),
+    [orders, me]
+  );
+  const offers = offeredToMe.filter(o => o.status === 'Confirmed' && !o.pickedUp && !o.driverId);
+  // Orders this driver was offered but another rider already accepted.
+  const takenOffers = offeredToMe.filter(o => o.status === 'Confirmed' && !o.pickedUp && o.driverId && o.driverId !== me?.id);
   const active = myOrders.filter(o => o.status === 'Processing' || o.status === 'Ongoing');  const activeOrder = active[0];
   const done = myOrders.filter(o => o.status === 'Completed');
   const cancelled = myOrders.filter(o => o.status === 'Cancelled');
@@ -726,14 +736,20 @@ export default function DriverPortal() {
   const acceptOffer = (id: string) => {
     const o = orders.find(x => x.id === id);
     if (!o) return;
-    setOrders(prev => prev.map(x => (x.id === id ? { ...x, status: 'Processing' as any, driverStage: 'to_store' } : x)));
-    if (me) setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: 'On-Delivery' as any, updatedAt: new Date().toISOString() } : d)));
+    if (!me) return;
+    // Someone else already accepted — block this driver's accept.
+    if (o.driverId && o.driverId !== me.id) { showToast('Already accepted by another rider'); return; }
+    setOrders(prev => prev.map(x => (x.id === id ? { ...x, status: 'Processing' as any, driverStage: 'to_store', driverId: me.id, offeredDriverIds: undefined, offerRound: undefined, updatedAt: new Date().toISOString() } : x)));
+    setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: 'On-Delivery' as any, updatedAt: new Date().toISOString() } : d)));
     setPickupProofName(null);
     setDeliveryProofName(null);
   };
 
   const rejectOffer = (id: string) => {
-    setOrders(prev => prev.map(x => (x.id === id ? { ...x, status: 'Cancelled' as any } : x)));
+    if (!me) return;
+    // Driver declines — remove them from the current batch so a future round
+    // does not re-offer this order to them.
+    setOrders(prev => prev.map(x => (x.id === id ? { ...x, offeredDriverIds: (x.offeredDriverIds || []).filter(did => did !== me.id), updatedAt: new Date().toISOString() } : x)));
   };
 
   const updateStage = (id: string, stage: string, extra: Partial<typeof orders[0]> = {}) => {
@@ -887,13 +903,22 @@ export default function DriverPortal() {
     return 'New Order';
   };
 
-  // When an offer expires (1 min window), auto-cancel it
+  // When an offer round expires (1 min window) and nobody accepted yet, advance
+  // to the NEXT batch of up to 10 riders (offerRound + 1) instead of cancelling.
+  // Scans ALL confirmed broadcast orders so the pipeline keeps moving even if
+  // every rider in the current batch rejected or went offline. Deterministic
+  // computeOfferBatch means concurrent drivers all compute the same next batch.
   useEffect(() => {
-    offers.forEach(o => {
-      if (o.driverDeadline && now > o.driverDeadline) rejectOffer(o.id);
+    orders.filter(o => o.status === 'Confirmed' && !o.pickedUp && !o.driverId && o.offeredDriverIds).forEach(o => {
+      if (o.driverDeadline && now > o.driverDeadline) {
+        const nextRound = (o.offerRound ?? 0) + 1;
+        const batch = computeOfferBatch(drivers, nextRound, o.offeredDriverIds || []);
+        if (batch.length === 0) return; // no more riders left — order stays queued
+        setOrders(prev => prev.map(x => (x.id === o.id ? { ...x, offeredDriverIds: batch, offerRound: nextRound, driverDeadline: Date.now() + OFFER_WINDOW_MS, updatedAt: new Date().toISOString() } : x)));
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [now, offers.length]);
+  }, [now, orders.length]);
 
   const authNav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -1649,7 +1674,7 @@ export default function DriverPortal() {
             <div className="space-y-3">
               <div>
                 <h3 className="text-sm font-black text-white flex items-center space-x-2"><Bell className="w-4 h-4 text-brand-orange" /><span>New Orders</span></h3>
-                <p className="text-[10px] text-gray-400">Store accepted these orders and dispatched them to you — accept within 1 minute or it auto-cancels.</p>
+                <p className="text-[10px] text-gray-400">Store accepted these orders and broadcast them to up to 10 nearby riders — accept within 1 minute or it moves to the next riders.</p>
               </div>
               {!online ? (
                 <div className="rounded-2xl p-6 glass-soft text-center">
@@ -1657,7 +1682,7 @@ export default function DriverPortal() {
                   <p className="text-[10px] text-gray-400 mt-1">Go online to receive order requests.</p>
                   <button onClick={toggleDuty} className="mt-3 px-5 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[10px] font-black uppercase rounded-xl">Start Working</button>
                 </div>
-              ) : offers.length === 0 ? (
+              ) : offers.length === 0 && takenOffers.length === 0 ? (
                 <div className="rounded-2xl p-8 glass-soft text-center space-y-2">
                   <RefreshCw className="w-8 h-8 text-gray-600 mx-auto" />
                   <p className="text-[11px] text-white font-bold">No new orders right now</p>
@@ -1718,6 +1743,41 @@ export default function DriverPortal() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+              {/* Already-accepted-by-another-rider broadcasts: this order was offered
+                  to this driver's batch but a different rider took it first. */}
+              {takenOffers.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Taken by another rider</p>
+                  {takenOffers.map(o => (
+                    <div key={o.id} className="glass-soft border border-gray-500/30 rounded-2xl p-4 space-y-3 opacity-70">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center space-x-2">
+                          <p className="text-[12px] font-mono text-gray-300 font-black">#{o.id}</p>
+                          <span className="px-2 py-0.5 rounded-lg border text-[8px] font-black bg-gray-500/20 border-gray-500/40 text-gray-300">{o.status}</span>
+                        </div>
+                        <span className="text-[8px] font-black uppercase px-2 py-1 rounded-lg bg-amber-500/15 text-amber-300">Already accepted by another rider</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] gap-3">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-gray-500/20 text-gray-400 flex items-center justify-center font-bold shrink-0">🍴</div>
+                          <div className="min-w-0">
+                            <p className="text-gray-400 text-[8px] uppercase font-bold">Restaurant</p>
+                            <p className="text-white font-bold truncate">{o.storeName}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-gray-500/20 text-gray-400 flex items-center justify-center font-bold shrink-0">👤</div>
+                          <div className="min-w-0">
+                            <p className="text-gray-400 text-[8px] uppercase font-bold">Customer</p>
+                            <p className="text-white font-bold truncate">{o.customerName}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[9px] text-gray-400 flex items-center space-x-1"><Lock className="w-3 h-3" /><span>Order locked to rider #{o.driverId} — it's no longer available.</span></p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip, History } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim } from './portalUtils';
+import { newOfferRound } from '../utils/autoAssign';
 
 interface Staff {
   id: string; name: string; role: string; shift: string; status: string; phone: string;
@@ -287,24 +288,26 @@ export default function StoreAdminPortal() {
   // Store admin accepts a pending customer order → dispatch to the first available driver
   const acceptOrder = (id: string) => {
     if (!myOrderIds.has(id)) return;
-    const rider = drivers.find(d => d.status !== 'Offline') || drivers[0];
-    if (!rider) {
+    const onlineDrivers = drivers.filter(d => d.status !== 'Offline');
+    if (onlineDrivers.length === 0) {
       setNotifications(prev => [
         makeNotif('Driver unavailable', `Order #${id} cannot be dispatched until a real driver is online.`, 'order', { audience: 'store-admin', storeId: activeStoreId }),
         ...prev,
       ]);
       return;
     }
+    const order = orders.find(o => o.id === id);
+    const broadcast = order ? newOfferRound(order, drivers) : {};
     setOrders(prev => prev.map(o => (o.id === id ? appendTimeline({
       ...o,
       status: 'Confirmed' as any,
-      driverId: rider.id,
-      driverDeadline: Date.now() + 60 * 1000,
+      driverId: undefined,
+      ...broadcast,
       placedAt: o.placedAt || Date.now(),
-    }, 'accepted', 'store', `Store admin accepted — rider ${rider.name} assigned`) : o)));
+    }, 'accepted', 'store', `Store admin accepted — offered to ${(broadcast.offeredDriverIds || []).length} riders`) : o)));
     setNotifications(prev => [
-      makeNotif('🚚 Order Accepted & Dispatched', `Store accepted order #${id} — assigned to ${rider.name}.`, 'order', { audience: 'driver', driverId: rider.id }),
-      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — rider ${rider.name} is on the way to the store.`, 'order', { audience: 'all' }),
+      makeNotif('🚚 Order Accepted & Dispatched', `Store accepted order #${id} — broadcast to ${(broadcast.offeredDriverIds || []).length} nearby riders.`, 'order', { audience: 'driver' }),
+      makeNotif('🚚 Store Accepted #' + id, `Order #${id} accepted — dispatched to ${(broadcast.offeredDriverIds || []).length} nearby riders.`, 'order', { audience: 'all' }),
       ...prev,
     ]);
   };
