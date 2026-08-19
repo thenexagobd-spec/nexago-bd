@@ -10,4 +10,7 @@ cloudflared.exe
 server/.public-url
 server/*.log
 server/data/
+backups/
+*.dump
+*.sql.gz
 ws-*.cjs
