@@ -236,7 +236,7 @@ export function useCloudSync() {
           }
           const a = JSON.stringify(next);
           const b = JSON.stringify(localVal);
-          if (a !== b) { lsSet(localKey, next); changed = true; }
+          if (a !== b) { applying = true; lsSet(localKey, next); applying = false; changed = true; }
         }
         if (changed) window.dispatchEvent(new Event('storage'));
         return true;
@@ -265,8 +265,11 @@ export function useCloudSync() {
 
     // Subscribe to storage changes from any tab/site of this browser so local
     // edits (orders accepted, drivers toggled online, refunds approved, ...) are
-    // pushed to the cloud for every other role site to see live.
-    const onStorage = () => { push(); };
+    // pushed to the cloud for every other role site to see live. Push only when
+    // the local change did NOT come from a cloud pull (avoids echo pushes).
+    let dirty = false;
+    let applying = false;
+    const onStorage = () => { if (!applying) dirty = true; };
     window.addEventListener('storage', onStorage);
 
     // Instant cross-tab delivery for the same browser: any tab that writes shared
@@ -306,13 +309,14 @@ export function useCloudSync() {
       await push();
       if (!cancelled) setSyncState('online');
     })();
-    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 1000);
-    const pushTimer = setInterval(() => { push(); }, 1000);
+    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 3000);
+    const flushPush = () => { if (dirty && !applying) { dirty = false; push(); } };
+    const pushTimer = setInterval(flushPush, 2000);
 
     // Broadcast changes made in THIS tab so sibling tabs (driver site, admin, ...)
     // trigger an immediate pull instead of waiting for the poll timer.
     const onBroadcast = () => {
-      push();
+      dirty = true;
       if (bc) bc.postMessage({ nexago: 'sync' });
     };
     window.addEventListener('nexago-local-write', onBroadcast);

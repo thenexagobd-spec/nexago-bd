@@ -943,8 +943,15 @@ const server = http.createServer((req, res) => {
     sendJson(res, 403, { ok: false, error: 'blocked' });
     return;
   }
-  if (url.pathname.startsWith('/api/') && !rateLimit(req, 'api-global', 240, 60_000)) {
+  const isStateSync = url.pathname === '/api/state' || url.pathname === '/api/push';
+  if (url.pathname.startsWith('/api/') && !isStateSync && !rateLimit(req, 'api-global', 480, 60_000)) {
     sendSecurityAlert('api-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '', reason: req.url });
+    sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' });
+    return;
+  }
+  // Cloud-sync polling is the live backbone shared by every role site, so it
+  // gets its own generous bucket instead of draining the global API budget.
+  if (isStateSync && !rateLimit(req, 'state-sync', 300, 60_000)) {
     sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' });
     return;
   }
