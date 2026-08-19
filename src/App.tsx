@@ -39,6 +39,7 @@ import PosSystem from './components/PosSystem';
 import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
+import SystemHealthLog from './components/SystemHealthLog';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
 import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, supabaseClient, persistOrderToCloud } from './portals/portalUtils';
 
@@ -49,7 +50,7 @@ import {
   BarChart3, ShieldCheck, MapPin, Star, Megaphone, ShieldAlert, Award, Download,
   Copy, ExternalLink, Plus, Link, Search, Mail, Trash2, Edit, MessageSquare, CheckCircle, XCircle, Clock, ArrowRight, Sparkles, TrendingUp, Printer, Globe, ShoppingBag,
   Camera, QrCode, Smartphone, Wallet, CloudUpload,
-  Wrench
+  Wrench, Database
 } from 'lucide-react';
 
 const storeDocMeta = [
@@ -2066,6 +2067,7 @@ export default function App() {
       { name: 'Notifications', icon: Bell, badgeCount: unreadNotifCount },
       { name: 'Reports & Analytics', icon: BarChart3 },
       { name: 'Security Control', icon: ShieldCheck },
+      { name: 'System Health', icon: Database },
       { name: 'Settings', icon: Settings },
     ];
 
@@ -2077,7 +2079,7 @@ export default function App() {
           'Dashboard', 'Mobile App Simulator', 'Users Management', 'Drivers Management', 'Orders Management', 
           'Earnings & Payouts', 'Zones & Areas', 'Vehicles Management', 'Promotions & Banners', 'KPI Dashboard',
           'Order Tools Dashboard',
-          'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'Settings'
+          'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Settings'
         ].includes(item.name)
       ).map((item) => {
         if (item.name === 'Dashboard') {
@@ -2093,7 +2095,7 @@ export default function App() {
         [
           'Store Dashboard', 'Products', 'Categories', 'Inventory', 
           'Stores & Merchants', 'Staff Management', 'Reviews', 'Coupons', 'Customer Storefront', 'Live Store Sync',
-          'Payments', 'MFS Business & Settlement', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'Settings'
+          'Payments', 'MFS Business & Settlement', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Settings'
         ].includes(item.name)
       ).map((item) => {
         if (item.name === 'Store Dashboard') {
@@ -7144,6 +7146,10 @@ export default function App() {
             </div>
           )}
 
+          {activeTab === 'System Health' && (
+            <SystemHealthLog />
+          )}
+
           {activeTab === 'Dashboard' && activePanelMode === 'delivery' && (
             <DeliveryDashboardView 
               orders={orders}
@@ -7329,7 +7335,7 @@ export default function App() {
           )}
 
           {/* Render high-fidelity dynamic panel for other active tabs */}
-          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator'].includes(activeTab) && (
+          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator', 'System Health'].includes(activeTab) && (
             renderGenericView(activeTab)
           )}
         </main>
