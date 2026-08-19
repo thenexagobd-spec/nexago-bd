@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, BellRing, CheckCircle2, Clock, Database, Download, HardDrive, PlayCircle, RefreshCw, RotateCcw, Server, ShieldCheck, WifiOff } from 'lucide-react';
+import { Activity, AlertTriangle, BellRing, CheckCircle2, Clock, Database, Download, HardDrive, Lock, PlayCircle, RefreshCw, RotateCcw, Server, ShieldCheck, WifiOff } from 'lucide-react';
 
 type HealthPayload = {
   ok?: boolean;
@@ -14,6 +14,7 @@ type HealthPayload = {
     retention?: number;
     localJsonBackupCount?: number;
     files?: Array<{ name: string; sizeLabel: string; createdAt: string }>;
+    integrity?: { score: number; status: string; warnings: string[] };
   };
   storage?: {
     databaseConfigured?: boolean;
@@ -38,11 +39,19 @@ type HealthPayload = {
     auditTail?: Array<{ id?: string; action?: string; actor?: string; role?: string; time?: string; reason?: string }>;
     auditCount?: number;
     websocketSubscribers?: Array<{ key: string; subscribers: number }>;
+    conflicts?: Array<{ group: string; id: string; reason: string }>;
+    incidents?: Array<{ id?: string; action?: string; actor?: string; time?: string; reason?: string }>;
   };
   protection?: {
     score?: number;
     total?: number;
     checks?: Array<{ key: string; label: string; ok: boolean }>;
+  };
+  recovery?: {
+    rpoMinutes?: number | null;
+    rtoEstimateMinutes?: number | null;
+    lockdown?: { active?: boolean; reason?: string; actor?: string; revoked?: number; updatedAt?: string };
+    dependencies?: Array<{ name: string; status: string }>;
   };
 };
 
@@ -86,6 +95,7 @@ export default function SystemHealthLog() {
   const [restoreTarget, setRestoreTarget] = useState('');
   const [restoreReason, setRestoreReason] = useState('');
   const [restoreConfirm, setRestoreConfirm] = useState('');
+  const [simulationResult, setSimulationResult] = useState<any>(null);
 
   const key = useMemo(() => new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main', []);
 
@@ -155,6 +165,30 @@ export default function SystemHealthLog() {
     } catch (err: any) {
       setActionMsg(String(err?.message || err || 'Backup verify failed'));
       void loadHealth();
+    }
+  };
+
+  const simulateRestore = async (name: string) => {
+    try {
+      setActionMsg(`Running restore simulation for ${name}...`);
+      const result = await systemApi('/api/system/backup/simulate-restore', { name });
+      setSimulationResult(result);
+      setActionMsg(`Restore simulation completed: ${result.tables?.length || 0} tables detected.`);
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Restore simulation failed'));
+      void loadHealth();
+    }
+  };
+
+  const toggleLockdown = async (active: boolean) => {
+    const reason = active ? 'Emergency lockdown from System Health' : 'Emergency lockdown released from System Health';
+    try {
+      const result = await systemApi('/api/system/emergency-lockdown', { active, reason });
+      setActionMsg(active ? `Lockdown enabled. Revoked ${result.lockdown?.revoked || 0} sessions.` : 'Lockdown disabled.');
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Lockdown action failed'));
     }
   };
 
@@ -237,6 +271,10 @@ export default function SystemHealthLog() {
           <button onClick={() => void testAlert()} className="h-8 px-3 rounded-lg bg-sky-600/15 border border-sky-500/35 text-sky-300 hover:bg-sky-600/25 text-[10px] font-bold flex items-center gap-1.5">
             <BellRing className="w-3.5 h-3.5" />
             Test Alert
+          </button>
+          <button onClick={() => void toggleLockdown(!health?.recovery?.lockdown?.active)} className={`h-8 px-3 rounded-lg border text-[10px] font-bold flex items-center gap-1.5 ${health?.recovery?.lockdown?.active ? 'bg-red-600/25 border-red-500/50 text-red-200' : 'bg-red-600/10 border-red-500/30 text-red-300 hover:bg-red-600/20'}`}>
+            <Lock className="w-3.5 h-3.5" />
+            {health?.recovery?.lockdown?.active ? 'Release Lockdown' : 'Emergency Lockdown'}
           </button>
         </div>
       </div>
@@ -336,6 +374,62 @@ export default function SystemHealthLog() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 mt-3">
+        <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
+          <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-brand-orange" /> Backup Integrity Score</p>
+          <div className="flex items-end justify-between gap-3 mt-2">
+            <p className={`text-3xl font-black ${(health?.backup?.integrity?.score || 0) >= 80 ? 'text-emerald-400' : 'text-amber-300'}`}>{health?.backup?.integrity?.score || 0}</p>
+            <span className="text-[10px] font-black text-white">{health?.backup?.integrity?.status || 'Checking'}</span>
+          </div>
+          <div className="mt-2 space-y-1">
+            {(health?.backup?.integrity?.warnings || []).length === 0 ? <p className="text-[10px] text-emerald-400">No integrity warning.</p> : health?.backup?.integrity?.warnings?.map((w) => <p key={w} className="text-[10px] text-amber-300">{w}</p>)}
+          </div>
+        </div>
+        <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
+          <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-cyan-400" /> RPO / RTO Recovery</p>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2"><p className="text-[8px] uppercase text-gray-500 font-black">RPO</p><p className="text-lg font-black text-white">{health?.recovery?.rpoMinutes ?? '-'}m</p></div>
+            <div className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2"><p className="text-[8px] uppercase text-gray-500 font-black">RTO Estimate</p><p className="text-lg font-black text-white">{health?.recovery?.rtoEstimateMinutes ?? '-'}m</p></div>
+          </div>
+          <p className={`mt-2 text-[10px] font-bold ${health?.recovery?.lockdown?.active ? 'text-red-300' : 'text-emerald-400'}`}>Lockdown: {health?.recovery?.lockdown?.active ? 'Active' : 'Off'}</p>
+        </div>
+        <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
+          <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Server className="w-3.5 h-3.5 text-violet-400" /> Dependency Monitor</p>
+          <div className="space-y-1.5 mt-2">
+            {(health?.recovery?.dependencies || []).map((dep) => (
+              <div key={dep.name} className="flex items-center justify-between gap-2 text-[10px]">
+                <span className="text-gray-300">{dep.name}</span>
+                <span className={dep.status === 'Configured' ? 'text-emerald-400 font-bold' : 'text-red-300 font-bold'}>{dep.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mt-3">
+        <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
+          <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Conflict Resolution Center</p>
+          <div className="space-y-1.5 mt-2 max-h-32 overflow-y-auto">
+            {(health?.activity?.conflicts || []).length === 0 ? <p className="text-[10px] text-emerald-400">No duplicate ID conflict detected.</p> : health?.activity?.conflicts?.slice(0, 8).map((c, idx) => (
+              <div key={`${c.group}-${c.id}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px]">
+                <span className="text-white font-bold">{c.group}</span><span className="text-amber-200 truncate">{c.id}</span><span className="text-amber-400">{c.reason}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
+          <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-red-400" /> Auto Incident Timeline</p>
+          <div className="space-y-1.5 mt-2 max-h-32 overflow-y-auto">
+            {(health?.activity?.incidents || []).length === 0 ? <p className="text-[10px] text-gray-500">No incident event detected.</p> : health?.activity?.incidents?.slice(0, 8).map((row, idx) => (
+              <div key={row.id || idx} className="border-b border-brand-border/40 last:border-0 pb-1 text-[10px]">
+                <p className="text-white font-bold truncate">{row.action || 'incident'}</p>
+                <p className="text-gray-500 truncate">{row.actor || 'system'} · {fmtTime(row.time)} · {row.reason || ''}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="mt-3 rounded-lg border border-brand-border bg-brand-dark/20 p-3">
         <div className="flex items-center justify-between gap-3 mb-2">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-emerald-400" /> Multi-Branch Live Tracking</p>
@@ -380,6 +474,9 @@ export default function SystemHealthLog() {
                 <button onClick={() => void verifyBackup(file.name)} className="h-7 px-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-[9px] font-bold flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" /> Verify
                 </button>
+                <button onClick={() => void simulateRestore(file.name)} className="h-7 px-2 rounded-md bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 text-[9px] font-bold flex items-center gap-1">
+                  <Server className="w-3 h-3" /> Simulate
+                </button>
                 <button onClick={() => { setRestoreTarget(file.name); setRestoreReason(''); setRestoreConfirm(''); }} className="h-7 px-2 rounded-md bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 text-[9px] font-bold flex items-center gap-1">
                   <RotateCcw className="w-3 h-3" /> Restore
                 </button>
@@ -401,6 +498,21 @@ export default function SystemHealthLog() {
               <input value={restoreConfirm} onChange={(e) => setRestoreConfirm(e.target.value)} placeholder="Type RESTORE REQUEST" className="h-9 rounded-lg bg-brand-dark border border-brand-border px-3 text-[11px] text-white outline-none focus:border-red-400" />
               <button onClick={() => void requestRestore()} disabled={restoreConfirm !== 'RESTORE REQUEST'} className="h-9 px-3 rounded-lg bg-red-600/20 border border-red-500/40 text-red-200 disabled:opacity-50 text-[10px] font-black">Save Request</button>
             </div>
+          </div>
+        )}
+        {simulationResult && (
+          <div className="mt-3 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black text-violet-200">Restore Simulation Report: {simulationResult.backup}</p>
+              <button onClick={() => setSimulationResult(null)} className="text-[10px] text-gray-400 hover:text-white font-bold">Close</button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-[10px]">
+              <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Verify: <b className={simulationResult.ok ? 'text-emerald-400' : 'text-red-300'}>{simulationResult.ok ? 'Pass' : 'Fail'}</b></span>
+              <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Tables: <b className="text-white">{simulationResult.tables?.length || 0}</b></span>
+              <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">COPY: <b className="text-white">{simulationResult.copySections || 0}</b></span>
+              <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Rows est: <b className="text-white">{simulationResult.estimatedRows || 0}</b></span>
+            </div>
+            <p className="mt-2 text-[9px] text-gray-500 truncate">Tables: {(simulationResult.tables || []).join(', ') || 'No table detected in first scan window'}</p>
           </div>
         )}
         <p className="mt-2 text-[9px] text-gray-600">Restore button saves a secured restore request, audit and alert. Actual database restore should be run in a maintenance window to avoid data loss.</p>
