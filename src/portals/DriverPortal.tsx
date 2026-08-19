@@ -73,6 +73,17 @@ export default function DriverPortal() {
       lsSet('sd_driver_loc_perm', 'unsupported');
       return false;
     }
+    // Ask the browser what the CURRENT permission state is (not the prompt) so
+    // callers can decide synchronously before toggling duty.
+    if ('permissions' in navigator && navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((st: PermissionStatus) => {
+        if (st.state === 'denied') {
+          setLocStatus('denied'); setLocError('Location permission is REQUIRED. Please allow Location access in your browser settings, then tap "Allow Location".');
+          lsSet('sd_driver_loc_perm', 'denied');
+        }
+        // 'prompt' / 'granted' — fall through to getCurrentPosition below.
+      }).catch(() => { /* permissions.query unsupported for geolocation — ignore */ });
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLocStatus('granted'); setLocError(''); setGpsOn(true);
@@ -89,6 +100,14 @@ export default function DriverPortal() {
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
     );
     return true;
+  };
+
+  // Synchronous, up-front permission state check (no prompt side effects).
+  const locPermissionState = (): 'granted' | 'denied' | 'prompt' | 'unsupported' => {
+    if (!('geolocation' in navigator)) return 'unsupported';
+    if (locStatus === 'granted') return 'granted';
+    if (locStatus === 'denied' || locStatus === 'unsupported') return locStatus === 'denied' ? 'denied' : 'unsupported';
+    return 'prompt';
   };
 
   const startLocWatch = () => {
@@ -800,10 +819,16 @@ export default function DriverPortal() {
     if (online && activeOrder) { showToast('Finish the active delivery before going offline'); return; }
     // Going online REQUIRES location permission — without it the app cannot
     // function (no live tracking, no order offers near the rider).
-    if (!online && locStatus !== 'granted') {
-      const ok = requestLocPermission();
-      if (!ok || locStatus === 'denied' || locStatus === 'unsupported') {
-        showToast('Location permission is required to go online');
+    if (!online) {
+      const perm = locPermissionState();
+      if (perm === 'denied' || perm === 'unsupported') {
+        showToast(perm === 'denied' ? 'Location permission is required to go online' : 'Your browser does not support location');
+        return;
+      }
+      if (perm === 'prompt') {
+        // Kick the async prompt; if it grants, we go online on the next tap.
+        requestLocPermission();
+        showToast('Please allow Location, then tap Start Working again');
         return;
       }
     }
@@ -1054,17 +1079,18 @@ export default function DriverPortal() {
     >
       {/* ============ AUTH / ONBOARDING SCREENS ============ */}
       {authView !== 'dashboard' && (
-        <div className="max-w-lg mx-auto space-y-4 fade-in min-h-[calc(100vh-3.5rem)] flex flex-col justify-center py-6">
+        <>
+          <style>{`
+            .drv-auth-card { background: rgba(255,255,255,0.06); backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 24px 80px rgba(2,44,34,0.5), inset 0 1px 0 rgba(255,255,255,0.18); }
+            .drv-auth-glow { box-shadow: 0 0 60px rgba(16,185,129,0.35), 0 0 0 1px rgba(16,185,129,0.25); }
+            .drv-auth-input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); transition: all 0.2s; }
+            .drv-auth-input:focus { border-color: rgba(52,211,153,0.7); box-shadow: 0 0 0 3px rgba(52,211,153,0.18); background: rgba(255,255,255,0.12); }
+            .drv-auth-input option { background:#0b1220; color:#fff; }
+          `}</style>
+          <div className="max-w-lg mx-auto space-y-4 fade-in min-h-[calc(100vh-3.5rem)] flex flex-col justify-center py-6">
           {/* ---- LOGIN (premium glass, mirrors the customer auth screen) ---- */}
           {authView === 'login' && (
             <>
-              <style>{`
-                .drv-auth-card { background: rgba(255,255,255,0.06); backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 24px 80px rgba(2,44,34,0.5), inset 0 1px 0 rgba(255,255,255,0.18); }
-                .drv-auth-glow { box-shadow: 0 0 60px rgba(16,185,129,0.35), 0 0 0 1px rgba(16,185,129,0.25); }
-                .drv-auth-input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); transition: all 0.2s; }
-                .drv-auth-input:focus { border-color: rgba(52,211,153,0.7); box-shadow: 0 0 0 3px rgba(52,211,153,0.18); background: rgba(255,255,255,0.12); }
-                .drv-auth-input option { background:#0b1220; color:#fff; }
-              `}</style>
               <div className="relative rounded-3xl p-1" style={{
                 background: 'radial-gradient(700px 380px at 15% -10%, rgba(16,185,129,0.28), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(45,212,191,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14',
               }}>
@@ -1683,7 +1709,8 @@ export default function DriverPortal() {
               </div>
             </>
           )}
-        </div>
+          </div>
+        </>
       )}
 
       {/* ============ MAIN PORTAL ============ */}
@@ -2387,6 +2414,17 @@ export default function DriverPortal() {
                     <p className="text-white font-bold text-[11px]">{s.value}</p>
                   </div>
                 ))}
+              </div>
+              <div className="glass-soft rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-white flex items-center space-x-1.5"><MapPin className={`w-3.5 h-3.5 ${gpsOn ? 'text-emerald-400' : 'text-amber-400'}`} /><span>Location (GPS)</span></p>
+                  <p className="text-[8px] text-gray-400">{locStatus === 'granted' && gpsOn ? 'ON — live tracking active' : locStatus === 'granted' ? 'ON — tracking starting…' : locStatus === 'denied' ? 'BLOCKED — required to use the app' : 'Required to receive orders'}</p>
+                </div>
+                {locStatus === 'granted' ? (
+                  <span className="px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase">Allowed</span>
+                ) : (
+                  <button onClick={requestLocPermission} className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-black uppercase cursor-pointer hover:bg-amber-500/25">Allow Now</button>
+                )}
               </div>
               <div className="glass-soft rounded-xl p-3 flex items-center justify-between">
                 <div>
