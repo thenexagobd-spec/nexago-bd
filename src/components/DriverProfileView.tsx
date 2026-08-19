@@ -19,6 +19,8 @@ import {
   Tooltip, PieChart, Pie, Cell, Legend, CartesianGrid 
 } from 'recharts';
 
+import LeafletMap, { LiveVeh } from './LeafletMap';
+
 interface DriverProfileViewProps {
   driver: Driver;
   orders: Order[];
@@ -393,6 +395,41 @@ export default function DriverProfileView({
   const ordKm = (o: Order) => o.pickupCoords && o.deliveryCoords ? Math.round(haversineKm(o.pickupCoords, o.deliveryCoords)) : 0;
   const ordFee = (o: Order) => (o.deliveryCharge || 60) + 20;
   const totalDistanceKm = doneOrders.reduce((s, o) => s + ordKm(o), 0);
+
+  // ---- Live tracking derived state (real GPS from the driver portal) ----
+  const liveLoc = driver.locationCoords || null;
+  const lastLocAt = driver.lastLocationAt || '';
+  const statusHistory = driver.statusHistory || [];
+  // Current online session: find the latest 'Online' event with no newer 'Offline'.
+  const liveOnlineStart = (() => {
+    for (const log of statusHistory) {
+      if (log.status === 'Online') return Date.parse(log.timestamp) || null;
+      if (log.status === 'Offline') return null;
+    }
+    return null;
+  })();
+  const onlineNow = driver.status === 'Online' || driver.status === 'On-Delivery';
+  const currentSessionMs = liveOnlineStart ? Date.now() - liveOnlineStart : 0;
+  const fmtDuration = (ms: number) => {
+    const mins = Math.floor(ms / 60000);
+    if (mins < 1) return '< 1 min';
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+  // Total online time across today (sum of Online->Offline spans + current).
+  const todayOnlineMs = (() => {
+    let total = 0; let openStart: number | null = null;
+    for (let i = statusHistory.length - 1; i >= 0; i--) {
+      const log = statusHistory[i];
+      const ts = Date.parse(log.timestamp);
+      if (isNaN(ts)) continue;
+      if (log.status === 'Online') { if (openStart == null) openStart = ts; }
+      if (log.status === 'Offline') { if (openStart != null) { total += openStart - ts; openStart = null; } }
+    }
+    if (openStart != null && onlineNow) total += Date.now() - openStart;
+    return total;
+  })();
+  const mapVeh: LiveVeh[] = liveLoc ? [{ id: driver.id, name: driver.name, status: driver.status, vehicleType: driver.vehicleType, lat: liveLoc.lat, lng: liveLoc.lng, tLat: liveLoc.lat, tLng: liveLoc.lng, phone: driver.phone }] : [];
   const settled = doneOrders.length + cancelledOrders.length;
   const completionRate = settled > 0 ? Math.round((doneOrders.length / settled) * 100) : 0;
   const cancelRate = settled > 0 ? Math.round((cancelledOrders.length / settled) * 100) : 0;
@@ -830,7 +867,83 @@ export default function DriverProfileView({
       {/* ========================================================= */}
       {activeTab === 'overview' && (
         <div className="space-y-6 fade-in">
-          
+
+          {/* Live Tracking — real GPS position + online/offline history from the driver portal */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+            <div className="lg:col-span-2 bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border/60">
+                <div className="flex items-center space-x-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    {onlineNow && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${onlineNow ? 'bg-emerald-400' : 'bg-gray-500'}`}></span>
+                  </span>
+                  <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Live Location {onlineNow && <span className="text-emerald-400 normal-case">· Online</span>}</h4>
+                </div>
+                <span className="text-[9px] text-gray-400 font-mono">{lastLocAt ? `Updated ${new Date(lastLocAt).toLocaleTimeString()}` : 'No GPS yet'}</span>
+              </div>
+              <div className="relative" style={{ height: 240 }}>
+                {liveLoc ? (
+                  <LeafletMap vehicles={mapVeh} zoomTo={14} trackingId={driver.id} marker={liveLoc} />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                    <MapPin className="w-8 h-8 text-gray-600 mb-2" />
+                    <p className="text-[11px] text-gray-400 font-bold">No live GPS signal</p>
+                    <p className="text-[9.5px] text-gray-500 mt-1">This rider has not shared their location yet. Ask them to allow Location in the driver app and go online.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3.5">
+              <div className="bg-brand-card border border-brand-border rounded-xl p-4 shadow-sm">
+                <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider mb-2 flex items-center space-x-1"><Activity className="w-3.5 h-3.5 text-emerald-400" /><span>Duty Status</span></p>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${onlineNow ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-gray-500/15 text-gray-400 border border-gray-500/30'}`}>{driver.status}</span>
+                  <span className="text-[10px] text-gray-400">{onlineNow ? 'On duty now' : 'Currently offline'}</span>
+                </div>
+                {onlineNow && currentSessionMs > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="bg-brand-dark/60 rounded-lg p-2.5 text-center">
+                      <p className="text-[8.5px] text-gray-400 uppercase font-black">Session</p>
+                      <p className="text-sm font-black text-emerald-400 mt-0.5">{fmtDuration(currentSessionMs)}</p>
+                    </div>
+                    <div className="bg-brand-dark/60 rounded-lg p-2.5 text-center">
+                      <p className="text-[8.5px] text-gray-400 uppercase font-black">Started</p>
+                      <p className="text-[11px] font-black text-white mt-1">{liveOnlineStart ? new Date(liveOnlineStart).toLocaleTimeString() : '—'}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-brand-card border border-brand-border rounded-xl p-4 shadow-sm">
+                <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider mb-2 flex items-center space-x-1"><Clock className="w-3.5 h-3.5 text-brand-orange" /><span>Today's Activity</span></p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-brand-dark/60 rounded-lg p-2.5 text-center">
+                    <p className="text-[8.5px] text-gray-400 uppercase font-black">Online Today</p>
+                    <p className="text-sm font-black text-brand-orange mt-0.5">{fmtDuration(todayOnlineMs)}</p>
+                  </div>
+                  <div className="bg-brand-dark/60 rounded-lg p-2.5 text-center">
+                    <p className="text-[8.5px] text-gray-400 uppercase font-black">Status Logs</p>
+                    <p className="text-sm font-black text-white mt-0.5">{statusHistory.length}</p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                  {statusHistory.slice(0, 6).map((log) => (
+                    <div key={log.id} className="flex items-center justify-between text-[9px]">
+                      <span className="flex items-center space-x-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'Online' ? 'bg-emerald-400' : log.status === 'On-Delivery' ? 'bg-brand-orange' : 'bg-gray-500'}`}></span>
+                        <span className={`font-black uppercase ${log.status === 'Online' ? 'text-emerald-400' : log.status === 'On-Delivery' ? 'text-brand-orange' : 'text-gray-400'}`}>{log.status}</span>
+                        {log.durationMinutes ? <span className="text-gray-500">({fmtDuration(log.durationMinutes * 60000)})</span> : null}
+                      </span>
+                      <span className="text-gray-500 font-mono">{log.formattedTime || new Date(log.timestamp).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  {statusHistory.length === 0 && <p className="text-[9px] text-gray-500">No status events recorded yet.</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* 5 Key Performance Indicator Cards with 7-Day Recent Trend Sparklines */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
             

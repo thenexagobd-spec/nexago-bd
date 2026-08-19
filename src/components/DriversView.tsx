@@ -481,6 +481,12 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   </h4>
                   <p className="text-[9px] text-gray-400 font-mono mt-0.5">{driver.id}</p>
                   <p className="text-[10px] text-gray-300 mt-0.5 truncate">{driver.vehicleType}</p>
+                  {driver.locationCoords && (
+                    <p className="text-[8.5px] text-emerald-400/80 font-mono mt-0.5 flex items-center space-x-1">
+                      <MapPin className="w-2.5 h-2.5" />
+                      <span>{driver.lastLocationAt ? `GPS · ${new Date(driver.lastLocationAt).toLocaleTimeString()}` : 'GPS live'}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 

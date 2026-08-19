@@ -20,6 +20,7 @@ import {
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim, securityApi, supabaseClient } from './portalUtils';
 import { computeOfferBatch, OFFER_WINDOW_MS } from '../utils/autoAssign';
+import type { DriverStatusLog } from '../types';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
@@ -51,6 +52,78 @@ export default function DriverPortal() {
   const [reportReason, setReportReason] = useState('Customer unreachable');
   const [reportDesc, setReportDesc] = useState('');
   const [now, setNow] = useState(Date.now());
+  // Location permission + live GPS tracking: mandatory before using the app.
+  // The driver must allow location or the dashboard stays locked ("App will not
+  // run"). While online we watch the position and stamp it onto the driver record
+  // so the Super Admin sees the rider's live spot + online/offline history.
+  const [locStatus, setLocStatus] = useState<'idle' | 'granted' | 'denied' | 'unsupported'>(() => {
+    const saved: string = lsGet('sd_driver_loc_perm', '');
+    return (saved === 'granted' || saved === 'denied' || saved === 'unsupported') ? saved as any : 'idle';
+  });
+  const [locError, setLocError] = useState('');
+  const [watchId, setWatchId] = useState<number | null>(null);
+  const onlineSinceRef = useRef<number | null>(null);
+  const lastSentRef = useRef<number>(0);
+  const locWatchRef = useRef<number | null>(null);
+  const [gpsOn, setGpsOn] = useState(false);
+
+  const requestLocPermission = () => {
+    if (!('geolocation' in navigator)) {
+      setLocStatus('unsupported'); setLocError('This browser does not support location. Please use Google Chrome on your phone.');
+      lsSet('sd_driver_loc_perm', 'unsupported');
+      return false;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocStatus('granted'); setLocError(''); setGpsOn(true);
+        lsSet('sd_driver_loc_perm', 'granted');
+        const coord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        if (me) setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, locationCoords: coord, lastLocationAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : d)));
+        startLocWatch();
+      },
+      (err) => {
+        setLocStatus('denied');
+        setLocError(err.code === 1 ? 'Location permission is REQUIRED. Please allow Location access in your browser settings, then tap "Allow Location".' : `Location error: ${err.message}`);
+        lsSet('sd_driver_loc_perm', 'denied');
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+    );
+    return true;
+  };
+
+  const startLocWatch = () => {
+    if (locWatchRef.current != null) return;
+    if (!('geolocation' in navigator)) return;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const coord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setGpsOn(true);
+        if (me) {
+          setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, locationCoords: coord, lastLocationAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : d)));
+          // Persist the last known spot even while offline so the admin map keeps the rider visible
+          try { localStorage.setItem('sd_driver_last_loc', JSON.stringify({ ...coord, at: Date.now() })); } catch { /* ignore */ }
+        }
+      },
+      () => { setGpsOn(false); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    );
+    locWatchRef.current = id;
+    setWatchId(id);
+  };
+
+  // Keep the driver record fresh every ~20s while this tab is open (drivers are
+  // cloud-synced, so the Super Admin map updates without a page reload).
+  useEffect(() => {
+    if (!me) return;
+    if (locStatus !== 'granted') return;
+    const t = setInterval(() => {
+      if (me.locationCoords) {
+        setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, updatedAt: new Date().toISOString() } : d)));
+      }
+    }, 20000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id, locStatus]);
 
   // Auth form state
   const [loginId, setLoginId] = useState('');
@@ -725,12 +798,30 @@ export default function DriverPortal() {
   const toggleDuty = () => {
     if (!me) return;
     if (online && activeOrder) { showToast('Finish the active delivery before going offline'); return; }
+    // Going online REQUIRES location permission — without it the app cannot
+    // function (no live tracking, no order offers near the rider).
+    if (!online && locStatus !== 'granted') {
+      const ok = requestLocPermission();
+      if (!ok || locStatus === 'denied' || locStatus === 'unsupported') {
+        showToast('Location permission is required to go online');
+        return;
+      }
+    }
     const next = online ? 'Offline' : 'Online';
     setOnline(!online);
-    // updatedAt timestamp makes this the newest record in cloud merges, so the
-    // status can never be reverted to Offline by an older snapshot from another
-    // site/device (unionByIdArr / relay latestRecord pick the newer record).
-    setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: next as any, updatedAt: new Date().toISOString() } : d)));
+    if (next === 'Online') onlineSinceRef.current = Date.now();
+    if (next === 'Offline') {
+      const started = onlineSinceRef.current;
+      onlineSinceRef.current = null;
+      const minutes = started ? Math.max(1, Math.round((Date.now() - started) / 60000)) : 0;
+      const log: DriverStatusLog = { id: `sl-${Date.now()}`, status: 'Offline', timestamp: new Date().toISOString(), formattedTime: new Date().toLocaleString('en-GB'), durationMinutes: minutes, location: me.locationCoords ? `${me.locationCoords.lat.toFixed(4)}, ${me.locationCoords.lng.toFixed(4)}` : undefined };
+      setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: next as any, updatedAt: new Date().toISOString(), statusHistory: [log, ...(d.statusHistory || [])] } : d)));
+      return;
+    }
+    // Online: record the online event too so the Super Admin has a full timeline.
+    const log: DriverStatusLog = { id: `sl-${Date.now()}`, status: 'Online', timestamp: new Date().toISOString(), formattedTime: new Date().toLocaleString('en-GB'), location: me.locationCoords ? `${me.locationCoords.lat.toFixed(4)}, ${me.locationCoords.lng.toFixed(4)}` : undefined };
+    setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: next as any, updatedAt: new Date().toISOString(), statusHistory: [log, ...(d.statusHistory || [])] } : d)));
+    if (locStatus === 'granted') startLocWatch();
   };
 
   const acceptOffer = (id: string) => {
@@ -1596,7 +1687,41 @@ export default function DriverPortal() {
       )}
 
       {/* ============ MAIN PORTAL ============ */}
-      {authView === 'dashboard' && (
+      {authView === 'dashboard' && locStatus !== 'granted' && (
+        <div className="relative rounded-3xl p-1" style={{ background: 'radial-gradient(700px 380px at 15% -10%, rgba(245,158,11,0.25), transparent 60%), radial-gradient(600px 380px at 92% 0%, rgba(239,68,68,0.20), transparent 55%), radial-gradient(700px 480px at 50% 115%, rgba(59,130,246,0.20), transparent 60%), #050a14' }}>
+          <div className="drv-auth-card drv-auth-glow relative rounded-3xl p-5 sm:p-8 text-white overflow-hidden">
+            <div className="flex flex-col items-center text-center space-y-4 py-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/30 to-red-500/30 border border-amber-400/40 flex items-center justify-center">
+                <MapPin className="w-8 h-8 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xl font-black">Location Permission Required</p>
+                <p className="text-[11px] text-gray-400 mt-1">NexaGo needs your device location to show nearby orders, track deliveries and keep the app working. The app <b className="text-white">cannot run</b> without it.</p>
+              </div>
+              <button onClick={requestLocPermission} className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-[12px] font-black uppercase tracking-wider shadow-lg shadow-amber-500/25 cursor-pointer">
+                Allow Location
+              </button>
+              <button onClick={() => { setAuthView('login'); setSessionId(''); lsSet('sd_driver_session', ''); }} className="text-[10px] text-gray-400 hover:text-white underline cursor-pointer">
+                Log out instead
+              </button>
+              {locStatus === 'denied' && (
+                <div className="w-full rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-[10px] text-red-300">
+                  <p className="font-black uppercase mb-1">Permission blocked</p>
+                  <p>{locError || 'Location was denied.'} Enable it: browser address bar → site settings → Location → Allow, then tap "Allow Location" again.</p>
+                </div>
+              )}
+              {locStatus === 'unsupported' && (
+                <div className="w-full rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-[10px] text-red-300">
+                  <p className="font-black uppercase mb-1">Location unsupported</p>
+                  <p>{locError || 'Your browser does not support location sharing. Use Chrome on a phone with GPS turned on.'}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {authView === 'dashboard' && locStatus === 'granted' && (
         <>
           {tab === 'dashboard' && (
             <div className="space-y-5">

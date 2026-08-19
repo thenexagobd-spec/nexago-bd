@@ -113,6 +113,7 @@ export interface Driver {
   documents?: DriverDocument[];
   statusHistory?: DriverStatusLog[];
   locationCoords?: { lat: number; lng: number };
+  lastLocationAt?: string;
   currentZone?: string;
   updatedAt?: string;
 }
