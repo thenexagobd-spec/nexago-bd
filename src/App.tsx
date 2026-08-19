@@ -544,6 +544,7 @@ export default function App() {
 
   // Merchant specific interactive states
   const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
+  const [expandedStoreOrderId, setExpandedStoreOrderId] = useState<string | null>(null);
   const [mProdName, setMProdName] = useState('');
   const [mProdCat, setMProdCat] = useState('Fruits & Vegetables');
   const [mProdPrice, setMProdPrice] = useState('');
@@ -2616,6 +2617,12 @@ export default function App() {
               {stores.map(s => {
                 const dashboardUrl = `${window.location.origin}${window.location.pathname}?storeId=${s.id}`;
                 const storeBranches = branches.filter((b: any) => b.storeId === s.id);
+                const storeOrders = orders.filter((o: any) => ((o.storeId && o.storeId === s.id) || String(o.storeName || '').toLowerCase() === String(s.name || '').toLowerCase()));
+                const storeRevenue = storeOrders.filter((o: any) => o.status !== 'Cancelled').reduce((sum, o: any) => sum + (Number(o.amount) || 0), 0);
+                const branchOrderRows = storeBranches.map((b: any) => {
+                  const rows = storeOrders.filter((o: any) => o.branchId === b.id);
+                  return { branch: b, rows, revenue: rows.filter((o: any) => o.status !== 'Cancelled').reduce((sum, o: any) => sum + (Number(o.amount) || 0), 0) };
+                });
                 return (
                   <div key={s.id} className="bg-brand-card border border-brand-border rounded-xl p-5 flex flex-col justify-between shadow-lg hover:border-brand-border-hover transition-all">
                     <div>
@@ -2629,6 +2636,73 @@ export default function App() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 font-medium mb-2">{s.address}</p>
+                      <div className="mb-3 rounded-lg border border-brand-orange/25 bg-brand-orange/10 p-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-wider text-brand-orange">All Order Information</p>
+                            <p className="text-[8px] text-gray-500">Super Admin view only. This store admin's orders stay separate from every other store.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedStoreOrderId(prev => prev === s.id ? null : s.id)}
+                            className="rounded-lg border border-brand-orange/35 bg-[#080e17] px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange"
+                          >
+                            {expandedStoreOrderId === s.id ? 'Hide Orders' : `Orders Info (${storeOrders.length})`}
+                          </button>
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
+                          <div className="rounded-lg bg-[#080e17] p-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Orders</p>
+                            <p className="text-sm font-black text-white">{storeOrders.length}</p>
+                          </div>
+                          <div className="rounded-lg bg-[#080e17] p-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Revenue</p>
+                            <p className="text-sm font-black text-emerald-300">৳{storeRevenue.toLocaleString()}</p>
+                          </div>
+                          <div className="rounded-lg bg-[#080e17] p-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Pending</p>
+                            <p className="text-sm font-black text-amber-300">{storeOrders.filter((o: any) => ['Pending', 'Confirmed', 'Processing', 'Ongoing'].includes(o.status)).length}</p>
+                          </div>
+                        </div>
+                        {expandedStoreOrderId === s.id && (
+                          <div className="mt-3 space-y-2">
+                            <div className="rounded-lg border border-brand-border/40 bg-[#080e17] p-2">
+                              <p className="mb-1.5 text-[8px] font-black uppercase text-gray-400">Branch Wise Order Split</p>
+                              {branchOrderRows.length === 0 && <p className="text-[8px] text-gray-500">No branch added. Orders belong to main store account.</p>}
+                              {branchOrderRows.map(({ branch, rows, revenue }: any) => (
+                                <div key={branch.id} className="mb-1 grid grid-cols-[1fr_auto_auto] gap-2 rounded-md bg-[#0c1624] px-2 py-1 text-[8px] last:mb-0">
+                                  <span className="truncate text-gray-300">{branch.name} <b className="font-mono text-gray-500">({branch.id})</b></span>
+                                  <span className="font-black text-white">{rows.length} orders</span>
+                                  <span className="font-black text-emerald-300">৳{revenue.toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="max-h-64 overflow-auto rounded-lg border border-brand-border/40 bg-[#080e17]">
+                              <table className="w-full min-w-[720px] text-left text-[8px]">
+                                <thead className="sticky top-0 bg-[#0c1624] text-gray-500 uppercase">
+                                  <tr><th className="px-2 py-1.5">Order</th><th className="px-2 py-1.5">Customer</th><th className="px-2 py-1.5">Branch</th><th className="px-2 py-1.5">Status</th><th className="px-2 py-1.5">Delivery</th><th className="px-2 py-1.5 text-right">Amount</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-brand-border/30">
+                                  {storeOrders.map((o: any) => {
+                                    const branch = storeBranches.find((b: any) => b.id === o.branchId);
+                                    return (
+                                      <tr key={o.id}>
+                                        <td className="px-2 py-1.5 font-mono font-black text-brand-orange">#{o.id}</td>
+                                        <td className="px-2 py-1.5 text-gray-300">{o.customerName || 'Customer'}{o.customerPhone ? ` · ${o.customerPhone}` : ''}</td>
+                                        <td className="px-2 py-1.5 text-gray-400">{branch?.name || o.branchId || 'Main Store'}</td>
+                                        <td className="px-2 py-1.5 text-white">{o.status}</td>
+                                        <td className="px-2 py-1.5 text-gray-300">{o.requiresStorePersonalDriver ? `Store Driver${o.personalDriverInfo?.phone ? ` · ${o.personalDriverInfo.phone}` : ''}` : 'NexaGo Driver'}</td>
+                                        <td className="px-2 py-1.5 text-right font-black text-emerald-300">৳{Number(o.amount || 0).toLocaleString()}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                  {storeOrders.length === 0 && <tr><td colSpan={6} className="px-2 py-8 text-center text-[9px] text-gray-500">No real orders yet for this store admin.</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2.5">
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <div>
