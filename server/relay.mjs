@@ -1515,6 +1515,69 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/system/full-scan') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    const storeState = loadStore(key).state || {};
+    const latestBackup = latestSupabaseBackupFile();
+    const conflicts = detectStateConflicts(storeState);
+    const files = listSupabaseBackupFiles();
+    const report = {
+      scanId: `SCAN-${Date.now()}`,
+      at: new Date().toISOString(),
+      backupCount: files.length,
+      latestBackup: latestBackup ? { name: latestBackup.name, sizeLabel: latestBackup.sizeLabel, createdAt: latestBackup.createdAt } : null,
+      integrity: backupIntegrity(files),
+      localCounts: localStateCounts(storeState),
+      conflicts: conflicts.length,
+      dependencyMissing: [
+        !supabaseConfigured ? 'Supabase API' : '',
+        !process.env.SUPABASE_DB_URL ? 'SUPABASE_DB_URL' : '',
+        !(SECURITY_ALERT_WEBHOOK || (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID)) ? 'Alert channel' : '',
+      ].filter(Boolean),
+    };
+    appendAudit(key, { actor: session.userId, role: session.role, action: 'system-health-full-scan', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'manual full scan from System Health', newValue: report });
+    sendJson(res, 200, { ok: true, report });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/conflict/review') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    readBody(req).then((body) => {
+      const conflict = { group: String(body.group || ''), id: String(body.id || ''), reason: String(body.reason || '') };
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'system-conflict-reviewed', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: `${conflict.group}:${conflict.id}`, newValue: conflict });
+      sendJson(res, 200, { ok: true, reviewed: conflict });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/incident/create') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    readBody(req).then(async (body) => {
+      const store = await loadStoreLatest(key);
+      const incident = {
+        id: `INC-${Date.now()}`,
+        subject: String(body.subject || 'System Health Incident').slice(0, 160),
+        message: String(body.message || 'Created from System Health').slice(0, 2000),
+        status: 'Open',
+        priority: String(body.priority || 'High'),
+        source: 'system-health',
+        createdAt: new Date().toISOString(),
+        actor: session.userId,
+      };
+      const tickets = Array.isArray(store.state.tickets) ? store.state.tickets : [];
+      store.state.tickets = [incident, ...tickets];
+      await saveStorePermanent(key, store);
+      notifyStateSubscribers(key, { reason: 'system-incident-created' });
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'system-incident-created', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: incident.subject, newValue: incident });
+      await sendSecurityAlert('system-incident-created', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: incident.subject });
+      sendJson(res, 200, { ok: true, incident });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/system/backup/download') {
     const session = requireSession(req, key);
     if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }

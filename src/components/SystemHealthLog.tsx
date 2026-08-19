@@ -96,6 +96,7 @@ export default function SystemHealthLog() {
   const [restoreReason, setRestoreReason] = useState('');
   const [restoreConfirm, setRestoreConfirm] = useState('');
   const [simulationResult, setSimulationResult] = useState<any>(null);
+  const [scanReport, setScanReport] = useState<any>(null);
 
   const key = useMemo(() => new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main', []);
 
@@ -192,6 +193,52 @@ export default function SystemHealthLog() {
     }
   };
 
+  const runFullScan = async () => {
+    try {
+      setActionMsg('Running full system scan...');
+      const result = await systemApi('/api/system/full-scan', {});
+      setScanReport(result.report);
+      setActionMsg(`Full scan complete: ${result.report.scanId}`);
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Full scan failed'));
+    }
+  };
+
+  const createIncident = async (subject = 'System Health Incident', message = 'Created from System Health') => {
+    try {
+      const result = await systemApi('/api/system/incident/create', { subject, message, priority: 'High' });
+      setActionMsg(`Incident created: ${result.incident?.id || subject}`);
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Incident create failed'));
+    }
+  };
+
+  const reviewConflict = async (conflict: { group: string; id: string; reason: string }) => {
+    try {
+      await systemApi('/api/system/conflict/review', conflict);
+      setActionMsg(`Conflict reviewed: ${conflict.group} ${conflict.id}`);
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Conflict review failed'));
+    }
+  };
+
+  const exportReport = () => {
+    const report = { exportedAt: new Date().toISOString(), health, localOfflineQueue: { orders: offlineOrders, states: offlineStates }, scanReport };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexago-system-health-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setActionMsg('System health report exported.');
+  };
+
   const downloadBackup = (name: string) => {
     const token = localStorage.getItem('sd_security_session') || '';
     const url = `${API_BASE}/api/system/backup/download?key=${encodeURIComponent(key)}&name=${encodeURIComponent(name)}`;
@@ -279,6 +326,28 @@ export default function SystemHealthLog() {
         </div>
       </div>
       {actionMsg && <p className="mb-3 text-[10px] font-bold text-brand-orange bg-brand-orange/10 border border-brand-orange/20 rounded-lg px-3 py-2">{actionMsg}</p>}
+
+      <div className="mb-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+        <button onClick={() => void runFullScan()} className="rounded-lg border border-brand-border bg-brand-dark px-3 py-3 text-[10px] font-black text-white hover:border-brand-orange/50 flex items-center justify-center gap-2"><Activity className="w-4 h-4 text-brand-orange" /> Run Full Scan</button>
+        <button onClick={() => void createIncident('Manual System Health Incident', 'Super Admin created incident from System Health panel')} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-3 text-[10px] font-black text-red-200 hover:bg-red-500/15 flex items-center justify-center gap-2"><AlertTriangle className="w-4 h-4" /> Create Incident</button>
+        <button onClick={exportReport} className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-3 text-[10px] font-black text-cyan-200 hover:bg-cyan-500/15 flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Export Report</button>
+        <button onClick={() => void testAlert()} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-3 text-[10px] font-black text-sky-200 hover:bg-sky-500/15 flex items-center justify-center gap-2"><BellRing className="w-4 h-4" /> Send Alert Test</button>
+      </div>
+      {scanReport && (
+        <div className="mb-3 rounded-lg border border-brand-orange/25 bg-brand-orange/5 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-black text-brand-orange">Full Scan Report: {scanReport.scanId}</p>
+            <button onClick={() => setScanReport(null)} className="text-[10px] text-gray-400 hover:text-white font-bold">Close</button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2 text-[10px]">
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Backups <b className="text-white">{scanReport.backupCount || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Integrity <b className="text-white">{scanReport.integrity?.score || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Conflicts <b className="text-white">{scanReport.conflicts || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Missing <b className="text-white">{scanReport.dependencyMissing?.length || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Latest <b className="text-white">{scanReport.latestBackup?.name ? 'Yes' : 'No'}</b></span>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="rounded-lg border border-brand-border bg-brand-dark/35 p-3">
@@ -413,6 +482,7 @@ export default function SystemHealthLog() {
             {(health?.activity?.conflicts || []).length === 0 ? <p className="text-[10px] text-emerald-400">No duplicate ID conflict detected.</p> : health?.activity?.conflicts?.slice(0, 8).map((c, idx) => (
               <div key={`${c.group}-${c.id}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px]">
                 <span className="text-white font-bold">{c.group}</span><span className="text-amber-200 truncate">{c.id}</span><span className="text-amber-400">{c.reason}</span>
+                <button onClick={() => void reviewConflict(c)} className="rounded-md border border-amber-500/30 px-2 py-1 text-[8px] font-black text-amber-200 hover:bg-amber-500/10">Review</button>
               </div>
             ))}
           </div>
