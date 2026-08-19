@@ -36,17 +36,51 @@ export default function StoreDashboardView({
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
-  // Hardcoded chart data based on the screenshot
-  const chartDays = ['May 20', 'May 21', 'May 22', 'May 23', 'May 24', 'May 25', 'May 26'];
-  const chartData = [
-    { completed: 250, ongoing: 100, cancelled: 25 },
-    { completed: 290, ongoing: 110, cancelled: 30 },
-    { completed: 370, ongoing: 120, cancelled: 25 },
-    { completed: 430, ongoing: 150, cancelled: 35 },
-    { completed: 390, ongoing: 130, cancelled: 20 },
-    { completed: 400, ongoing: 140, cancelled: 30 },
-    { completed: 350, ongoing: 120, cancelled: 28 },
-  ];
+  const completedOrders = orders.filter(o => o.status === 'Completed');
+  const pendingOrders = orders.filter(o => ['Pending', 'Confirmed', 'Processing', 'Ongoing'].includes(o.status));
+  const cancelledOrders = orders.filter(o => o.status === 'Cancelled');
+  const totalSales = completedOrders.reduce((sum, order) => sum + Number(order.amount || 0), 0);
+  const formatMoney = (value: number) => `৳ ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const percentOf = (value: number, total: number) => total > 0 ? `${((value / total) * 100).toFixed(1)}%` : '0.0%';
+  const parseOrderDate = (date: string) => {
+    const parsed = new Date(date);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+  const chartDataFor = () => {
+    const now = new Date();
+    const base = Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(now);
+      day.setDate(now.getDate() - (6 - index));
+      return {
+        day: day.toLocaleDateString('en-US', { weekday: 'short' }),
+        revenue: 0,
+        orders: 0,
+      };
+    });
+    orders.forEach(order => {
+      const date = parseOrderDate(order.date);
+      if (!date) return;
+      const diffDays = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()) / 86400000);
+      if (diffDays < 0 || diffDays > 6) return;
+      const slot = base[6 - diffDays];
+      slot.orders += 1;
+      if (order.status === 'Completed') slot.revenue += Number(order.amount || 0);
+    });
+    return base;
+  };
+  const realChartData = chartDataFor();
+  const topProducts = Array.from(orders.reduce((map, order) => {
+    (order.items || []).forEach(item => {
+      const key = item.productId || item.name;
+      const current = map.get(key) || { name: item.name || key, quantity: 0, revenue: 0 };
+      current.quantity += Number(item.quantity || 0);
+      current.revenue += Number(item.price || 0) * Number(item.quantity || 0);
+      map.set(key, current);
+    });
+    return map;
+  }, new Map<string, { name: string; quantity: number; revenue: number }>()).values())
+    .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+    .slice(0, 5);
 
   // SVG dimensions
   const width = 600;
@@ -55,7 +89,7 @@ export default function StoreDashboardView({
   const paddingY = 20;
 
   // Helper to map values to SVG coordinates
-  const getX = (index: number) => paddingX + (index * (width - paddingX * 2)) / (chartDays.length - 1);
+  const getX = (index: number) => paddingX + (index * (width - paddingX * 2)) / Math.max(realChartData.length - 1, 1);
   const getY = (val: number) => height - paddingY - (val * (height - paddingY * 2)) / 500;
 
   // Dynamic store overview counters synced with state additions
@@ -75,7 +109,7 @@ export default function StoreDashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Sales</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>৳ 125,430.00</h3>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{formatMoney(totalSales)}</h3>
             <div className="flex items-center text-[10px] text-gray-400 font-medium">
               <span className="text-gray-500">vs last 7 days</span>
             </div>
@@ -92,10 +126,9 @@ export default function StoreDashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Orders</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>1,248</h3>
-            <div className="flex items-center text-[10px] text-emerald-400 font-medium">
-              <TrendingUp className="w-2.5 shrink-0 mr-0.5" />
-              <span>12.5%</span>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{orders.length.toLocaleString()}</h3>
+            <div className="flex items-center text-[10px] text-gray-400 font-medium">
+              <span>Real orders</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 shrink-0`}>
@@ -110,10 +143,10 @@ export default function StoreDashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Completed</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>980</h3>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{completedOrders.length.toLocaleString()}</h3>
             <div className="flex items-center text-[10px] text-emerald-400 font-medium">
               <TrendingUp className="w-2.5 shrink-0 mr-0.5" />
-              <span>15.3%</span>
+              <span>{percentOf(completedOrders.length, orders.length)}</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0`}>
@@ -128,10 +161,10 @@ export default function StoreDashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Pending Orders</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>156</h3>
-            <div className="flex items-center text-[10px] text-red-400 font-medium">
-              <TrendingDown className="w-2.5 shrink-0 mr-0.5" />
-              <span>5.8%</span>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{pendingOrders.length.toLocaleString()}</h3>
+            <div className="flex items-center text-[10px] text-orange-400 font-medium">
+              <Clock className="w-2.5 shrink-0 mr-0.5" />
+              <span>{percentOf(pendingOrders.length, orders.length)}</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-orange-600/20 border border-orange-500/30 flex items-center justify-center text-brand-orange shrink-0`}>
@@ -146,10 +179,10 @@ export default function StoreDashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Cancelled</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>112</h3>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{cancelledOrders.length.toLocaleString()}</h3>
             <div className="flex items-center text-[10px] text-red-400 font-medium">
               <TrendingDown className="w-2.5 shrink-0 mr-0.5" />
-              <span>2.1%</span>
+              <span>{percentOf(cancelledOrders.length, orders.length)}</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 shrink-0`}>
@@ -197,11 +230,7 @@ export default function StoreDashboardView({
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={
-              chartPeriod==='Daily'?[{ day:'Mon', revenue:12500, orders:18 },{ day:'Tue', revenue:18900, orders:24 },{ day:'Wed', revenue:15200, orders:20 },{ day:'Thu', revenue:22400, orders:31 },{ day:'Fri', revenue:19800, orders:26 },{ day:'Sat', revenue:27100, orders:38 },{ day:'Sun', revenue:21500, orders:29 }]:
-              chartPeriod==='Monthly'?[{ day:'Jan', revenue:285000, orders:420 },{ day:'Feb', revenue:310000, orders:450 },{ day:'Mar', revenue:295000, orders:430 },{ day:'Apr', revenue:340000, orders:480 },{ day:'May', revenue:380000, orders:520 },{ day:'Jun', revenue:420000, orders:580 }]:
-              chartPeriod==='Yearly'?[{ day:'2020', revenue:2.8, orders:4200 },{ day:'2021', revenue:3.5, orders:5100 },{ day:'2022', revenue:4.2, orders:6200 },{ day:'2023', revenue:5.1, orders:7400 },{ day:'2024', revenue:6.0, orders:8500 },{ day:'2025', revenue:6.8, orders:9600 }]:
-              (customFrom&&customTo)?(()=>{const m=(new Date(customTo).getTime()-new Date(customFrom).getTime())/(86400000);const n=Math.min(12,Math.max(2,Math.ceil(Math.abs(m)/7)));return Array.from({length:n},(_,i)=>{const d=new Date(customFrom);d.setDate(d.getDate()+i*Math.ceil(Math.abs(m)/n));return {day:d.toLocaleDateString('en-US',{month:'short',day:'numeric'}),revenue:Math.round(15000+Math.random()*20000),orders:Math.round(15+Math.random()*25)};});})():
-              [{ day:'Q1', revenue:890000, orders:1250 },{ day:'Q2', revenue:1050000, orders:1480 },{ day:'Q3', revenue:980000, orders:1350 },{ day:'Q4', revenue:1200000, orders:1680 }]
+              realChartData
             }>
               <defs>
                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/><stop offset="95%" stopColor="#f97316" stopOpacity={0.0}/></linearGradient>
@@ -255,21 +284,20 @@ export default function StoreDashboardView({
           </div>
 
           <div className={isTightMode ? 'space-y-2' : 'space-y-3.5'}>
-            {[
-              { rank: 1, name: 'Chicken Burger', orders: '245 Orders', revenue: '৳ 24,500.00', color: 'text-amber-500 bg-amber-500/10 border-amber-500/35' },
-              { rank: 2, name: 'Beef Pizza', orders: '198 Orders', revenue: '৳ 19,800.00', color: 'text-slate-300 bg-slate-500/10 border-slate-500/25' },
-              { rank: 3, name: 'Cheese Sandwich', orders: '168 Orders', revenue: '৳ 16,800.00', color: 'text-orange-400 bg-orange-500/10 border-orange-500/25' },
-              { rank: 4, name: 'French Fries', orders: '154 Orders', revenue: '৳ 10,780.00', color: 'text-gray-400 bg-gray-500/10 border-gray-500/15' },
-              { rank: 5, name: 'Iced Coffee', orders: '142 Orders', revenue: '৳ 9,450.00', color: 'text-gray-400 bg-gray-500/10 border-gray-500/15' }
-            ].map((prod) => (
-              <div key={prod.rank} className="flex items-center justify-between p-2 rounded-lg hover:bg-brand-dark/20 transition-all border border-transparent hover:border-brand-border/40">
+            {topProducts.length === 0 && (
+              <div className="rounded-lg border border-brand-border/50 bg-brand-dark/30 p-4 text-center text-xs font-semibold text-gray-400">
+                No real product sales yet.
+              </div>
+            )}
+            {topProducts.map((prod, index) => (
+              <div key={`${prod.name}-${index}`} className="flex items-center justify-between p-2 rounded-lg hover:bg-brand-dark/20 transition-all border border-transparent hover:border-brand-border/40">
                 <div className="flex items-center space-x-3">
-                  <div className={`w-6 h-6 rounded-full border flex items-center justify-center font-bold text-xs ${prod.color}`}>
-                    {prod.rank}
+                  <div className="w-6 h-6 rounded-full border flex items-center justify-center font-bold text-xs text-amber-500 bg-amber-500/10 border-amber-500/35">
+                    {index + 1}
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-white leading-tight">{prod.name}</h4>
-                    <span className="text-[10px] text-emerald-400 font-semibold">{prod.orders}</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">{prod.quantity.toLocaleString()} Sold</span>
           </div>
           {chartPeriod==='Custom' && <div className="flex items-center flex-wrap gap-2 mt-2">
             <span className="text-[10px] text-gray-400">From:</span>
@@ -283,7 +311,7 @@ export default function StoreDashboardView({
           </div>}
         </div>
                 <div className="text-right">
-                  <span className="text-xs font-mono font-bold text-white">{prod.revenue}</span>
+                  <span className="text-xs font-mono font-bold text-white">{formatMoney(prod.revenue)}</span>
                 </div>
               </div>
             ))}
@@ -302,7 +330,7 @@ export default function StoreDashboardView({
                   {/* Background Gray Ring */}
                   <circle cx="60" cy="60" r="50" fill="transparent" stroke="#102030" strokeWidth="12" />
                   
-                  {/* Completed segment (Green) - 78.5% of circumference (2 * Math.PI * 50 = 314.16) */}
+                  {/* Completed segment */}
                   <circle 
                     cx="60" 
                     cy="60" 
@@ -310,12 +338,12 @@ export default function StoreDashboardView({
                     fill="transparent" 
                     stroke="#10b981" 
                     strokeWidth="12" 
-                    strokeDasharray="246.6 314.16"
+                    strokeDasharray={`${orders.length ? completedOrders.length / orders.length * 314.16 : 0} 314.16`}
                     strokeDashoffset="0"
                     strokeLinecap="round"
                   />
                   
-                  {/* Ongoing segment (Blue) - 12.5% of circumference (39.3) */}
+                  {/* Ongoing segment */}
                   <circle 
                     cx="60" 
                     cy="60" 
@@ -323,12 +351,12 @@ export default function StoreDashboardView({
                     fill="transparent" 
                     stroke="#3b82f6" 
                     strokeWidth="12" 
-                    strokeDasharray="39.3 314.16"
-                    strokeDashoffset="-246.6"
+                    strokeDasharray={`${orders.length ? pendingOrders.length / orders.length * 314.16 : 0} 314.16`}
+                    strokeDashoffset={`-${orders.length ? completedOrders.length / orders.length * 314.16 : 0}`}
                     strokeLinecap="round"
                   />
                   
-                  {/* Cancelled segment (Orange/Red) - 9% of circumference (28.3) */}
+                  {/* Cancelled segment */}
                   <circle 
                     cx="60" 
                     cy="60" 
@@ -336,14 +364,14 @@ export default function StoreDashboardView({
                     fill="transparent" 
                     stroke="#f97316" 
                     strokeWidth="12" 
-                    strokeDasharray="28.3 314.16"
-                    strokeDashoffset="-285.9"
+                    strokeDasharray={`${orders.length ? cancelledOrders.length / orders.length * 314.16 : 0} 314.16`}
+                    strokeDashoffset={`-${orders.length ? (completedOrders.length + pendingOrders.length) / orders.length * 314.16 : 0}`}
                     strokeLinecap="round"
                   />
                 </svg>
                 {/* Center text */}
                 <div className="absolute text-center">
-                  <div className="text-lg font-black text-white font-mono leading-none">1,248</div>
+                  <div className="text-lg font-black text-white font-mono leading-none">{orders.length.toLocaleString()}</div>
                   <div className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">Total</div>
                 </div>
               </div>
@@ -355,21 +383,21 @@ export default function StoreDashboardView({
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                     <span className="text-[10px] text-gray-300 font-semibold">Completed</span>
                   </div>
-                  <span className="text-[11px] font-bold text-white font-mono pl-4">980 (78.5%)</span>
+                  <span className="text-[11px] font-bold text-white font-mono pl-4">{completedOrders.length.toLocaleString()} ({percentOf(completedOrders.length, orders.length)})</span>
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center space-x-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                     <span className="text-[10px] text-gray-300 font-semibold">Ongoing</span>
                   </div>
-                  <span className="text-[11px] font-bold text-white font-mono pl-4">156 (12.5%)</span>
+                  <span className="text-[11px] font-bold text-white font-mono pl-4">{pendingOrders.length.toLocaleString()} ({percentOf(pendingOrders.length, orders.length)})</span>
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center space-x-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
                     <span className="text-[10px] text-gray-300 font-semibold">Cancelled</span>
                   </div>
-                  <span className="text-[11px] font-bold text-white font-mono pl-4">112 (9.0%)</span>
+                  <span className="text-[11px] font-bold text-white font-mono pl-4">{cancelledOrders.length.toLocaleString()} ({percentOf(cancelledOrders.length, orders.length)})</span>
                 </div>
               </div>
             </div>
@@ -461,7 +489,7 @@ export default function StoreDashboardView({
                 <span className="text-xs font-semibold text-gray-200 group-hover:text-white">Average Rating</span>
               </div>
               <div className="flex items-center space-x-1.5">
-                <span className="text-xs font-bold text-white font-mono">4.6 / 5</span>
+                <span className="text-xs font-bold text-white font-mono">{dispReviewsCount > 0 ? 'Real reviews' : 'No reviews yet'}</span>
                 <ChevronRight className="w-3.5 h-3.5 text-gray-500 group-hover:text-brand-orange" />
               </div>
             </div>

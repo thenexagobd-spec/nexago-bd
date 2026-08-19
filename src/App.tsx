@@ -3637,18 +3637,18 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Gross Platform Revenue</span>
-                <div className="text-2xl font-black text-white mt-1">৳ 125,430.00</div>
-                <span className="text-[10px] text-emerald-400 font-bold">+18.6% vs last week</span>
+                <div className="text-2xl font-black text-white mt-1">৳ {orders.filter(o => o.status === 'Completed').reduce((sum, order) => sum + Number(order.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <span className="text-[10px] text-gray-400 font-bold">Real completed order revenue</span>
               </div>
               <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Driver Earnings Dispatched</span>
-                <div className="text-2xl font-black text-brand-orange mt-1">৳ 68,200.00</div>
-                <span className="text-[10px] text-gray-400 font-semibold">Weekly cycle cleared</span>
+                <div className="text-2xl font-black text-brand-orange mt-1">৳ {drivers.reduce((sum, driver) => sum + Number(driver.earnings || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <span className="text-[10px] text-gray-400 font-semibold">Real driver earnings total</span>
               </div>
               <div className="bg-brand-card p-5 border border-brand-border rounded-xl">
                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Pending Payout Reserves</span>
-                <div className="text-2xl font-black text-emerald-400 mt-1">৳ 14,850.00</div>
-                <span className="text-[10px] text-emerald-400 font-semibold">Ready for Friday batch</span>
+                <div className="text-2xl font-black text-emerald-400 mt-1">৳ {drivers.filter(d => d.status !== 'Offline').reduce((sum, driver) => sum + Number(driver.earnings || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <span className="text-[10px] text-emerald-400 font-semibold">Active driver reserve</span>
               </div>
             </div>
             <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-xl">

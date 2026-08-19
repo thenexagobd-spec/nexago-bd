@@ -37,6 +37,12 @@ export default function DashboardView({
   const [chartPeriod, setChartPeriod] = useState<'Daily'|'Monthly'|'Yearly'|'Custom'>('Daily');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const completedOrders = orders.filter(o => o.status === 'Completed');
+  const ongoingOrders = orders.filter(o => ['Pending', 'Confirmed', 'Processing', 'Ongoing'].includes(o.status));
+  const cancelledOrders = orders.filter(o => o.status === 'Cancelled');
+  const totalEarnings = completedOrders.reduce((sum, order) => sum + Number(order.amount || 0), 0);
+  const percentOf = (value: number, total: number) => total > 0 ? `${((value / total) * 100).toFixed(1)}%` : '0.0%';
+  const formatMoney = (value: number) => `৳ ${Number(value || 0).toLocaleString()}`;
 
   // Parse an order date string ("May 26, 2024") into a Date
   const parseOrderDate = (date: string) => {
@@ -66,41 +72,14 @@ export default function DashboardView({
       data.push({ completed: 0, ongoing: 0, cancelled: 0 });
     }
 
-    // Distribute the dashboard totals across days with a smooth curve matching the dashboard scale.
-    // Real order counts are too sparse, so we blend them with a stable baseline pattern.
-    const dashboardTotals: { completed: number; ongoing: number; cancelled: number } = { completed: 980, ongoing: 156, cancelled: 112 };
-    const basePattern = {
-      completed: [0.1008, 0.1169, 0.1492, 0.1734, 0.1573, 0.1613, 0.1411],
-      ongoing: [0.1149, 0.1264, 0.1379, 0.1724, 0.1494, 0.1609, 0.1379],
-      cancelled: [0.1295, 0.1554, 0.1295, 0.1813, 0.1036, 0.1554, 0.1451]
-    };
-
-    const buildDistribution = (fractions: number[], target: number) => {
-      let values: number[];
-      if (daysCount === 7) {
-        values = fractions.map(f => target * f);
-      } else {
-        values = Array.from({ length: daysCount }, (_, i) => {
-          const pos = (i / (daysCount - 1)) * (fractions.length - 1);
-          const idx = Math.floor(pos);
-          const frac = idx >= fractions.length - 1
-            ? fractions[fractions.length - 1]
-            : fractions[idx] + (fractions[idx + 1] - fractions[idx]) * (pos - idx);
-          return target * frac;
-        });
-      }
-      const sum = values.reduce((a, b) => a + b, 0) || 1;
-      return values.map(v => Math.round(v / sum * target));
-    };
-
-    const completedDist = buildDistribution(basePattern.completed, dashboardTotals.completed);
-    const ongoingDist = buildDistribution(basePattern.ongoing, dashboardTotals.ongoing);
-    const cancelledDist = buildDistribution(basePattern.cancelled, dashboardTotals.cancelled);
-
-    data.forEach((d, i) => {
-      d.completed = completedDist[i];
-      d.ongoing = ongoingDist[i];
-      d.cancelled = cancelledDist[i];
+    orders.forEach(order => {
+      const orderDate = parseOrderDate(order.date);
+      if (!orderDate) return;
+      const dayIndex = days.findIndex(day => day === `${monthNames[orderDate.getMonth()]} ${orderDate.getDate()}`);
+      if (dayIndex < 0) return;
+      if (order.status === 'Completed') data[dayIndex].completed += 1;
+      else if (order.status === 'Cancelled') data[dayIndex].cancelled += 1;
+      else data[dayIndex].ongoing += 1;
     });
 
     return { days, data };
@@ -108,6 +87,15 @@ export default function DashboardView({
 
   const chartDays = chartMeta.days;
   const chartData = chartMeta.data;
+  const revenueChartData = chartDays.map((day, index) => ({
+    day,
+    revenue: orders.reduce((sum, order) => {
+      const d = parseOrderDate(order.date);
+      if (!d || `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}` !== day || order.status !== 'Completed') return sum;
+      return sum + Number(order.amount || 0);
+    }, 0),
+    orders: chartData[index]?.completed + chartData[index]?.ongoing + chartData[index]?.cancelled || 0,
+  }));
 
   // SVG dimensions
   const width = 600;
@@ -181,10 +169,9 @@ export default function DashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Orders</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>1,248</h3>
-            <div className="flex items-center text-[10px] text-emerald-400 font-medium">
-              <TrendingUp className="w-2.5 shrink-0 mr-0.5" />
-              <span>12.5%</span>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{orders.length.toLocaleString()}</h3>
+            <div className="flex items-center text-[10px] text-gray-400 font-medium">
+              <span>Real orders</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-orange-600/20 border border-orange-500/30 flex items-center justify-center text-orange-500 shrink-0`}>
@@ -199,10 +186,10 @@ export default function DashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Completed Orders</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>980</h3>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{completedOrders.length.toLocaleString()}</h3>
             <div className="flex items-center text-[10px] text-emerald-400 font-medium">
               <TrendingUp className="w-2.5 shrink-0 mr-0.5" />
-              <span>15.3%</span>
+              <span>{percentOf(completedOrders.length, orders.length)}</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0`}>
@@ -217,10 +204,10 @@ export default function DashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ongoing Orders</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>156</h3>
-            <div className="flex items-center text-[10px] text-red-400 font-medium">
-              <TrendingDown className="w-2.5 shrink-0 mr-0.5" />
-              <span>5.8%</span>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{ongoingOrders.length.toLocaleString()}</h3>
+            <div className="flex items-center text-[10px] text-blue-400 font-medium">
+              <Truck className="w-2.5 shrink-0 mr-0.5" />
+              <span>{percentOf(ongoingOrders.length, orders.length)}</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 shrink-0`}>
@@ -235,10 +222,10 @@ export default function DashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Cancelled Orders</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>112</h3>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{cancelledOrders.length.toLocaleString()}</h3>
             <div className="flex items-center text-[10px] text-red-400 font-medium">
               <TrendingDown className="w-2.5 shrink-0 mr-0.5" />
-              <span>2.1%</span>
+              <span>{percentOf(cancelledOrders.length, orders.length)}</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 shrink-0`}>
@@ -253,10 +240,9 @@ export default function DashboardView({
         >
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Earnings</p>
-            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>৳ 125,430</h3>
-            <div className="flex items-center text-[10px] text-emerald-400 font-medium">
-              <TrendingUp className="w-2.5 shrink-0 mr-0.5" />
-              <span>18.6%</span>
+            <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{formatMoney(totalEarnings)}</h3>
+            <div className="flex items-center text-[10px] text-gray-400 font-medium">
+              <span>Completed orders</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0`}>
@@ -310,11 +296,7 @@ export default function DashboardView({
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={
-              chartPeriod==='Daily'?[{ day:'Mon', revenue:12500, orders:18 },{ day:'Tue', revenue:18900, orders:24 },{ day:'Wed', revenue:15200, orders:20 },{ day:'Thu', revenue:22400, orders:31 },{ day:'Fri', revenue:19800, orders:26 },{ day:'Sat', revenue:27100, orders:38 },{ day:'Sun', revenue:21500, orders:29 }]:
-              chartPeriod==='Monthly'?[{ day:'Jan', revenue:285000, orders:420 },{ day:'Feb', revenue:310000, orders:450 },{ day:'Mar', revenue:295000, orders:430 },{ day:'Apr', revenue:340000, orders:480 },{ day:'May', revenue:380000, orders:520 },{ day:'Jun', revenue:420000, orders:580 }]:
-              chartPeriod==='Yearly'?[{ day:'2020', revenue:2.8, orders:4200 },{ day:'2021', revenue:3.5, orders:5100 },{ day:'2022', revenue:4.2, orders:6200 },{ day:'2023', revenue:5.1, orders:7400 },{ day:'2024', revenue:6.0, orders:8500 },{ day:'2025', revenue:6.8, orders:9600 }]:
-              (customFrom&&customTo)?(()=>{const m=(new Date(customTo).getTime()-new Date(customFrom).getTime())/(86400000);const n=Math.min(12,Math.max(2,Math.ceil(Math.abs(m)/7)));return Array.from({length:n},(_,i)=>{const d=new Date(customFrom);d.setDate(d.getDate()+i*Math.ceil(Math.abs(m)/n));return {day:d.toLocaleDateString('en-US',{month:'short',day:'numeric'}),revenue:Math.round(15000+Math.random()*20000),orders:Math.round(15+Math.random()*25)};});})():
-              [{ day:'Q1', revenue:890000, orders:1250 },{ day:'Q2', revenue:1050000, orders:1480 },{ day:'Q3', revenue:980000, orders:1350 },{ day:'Q4', revenue:1200000, orders:1680 }]
+              revenueChartData
             }>
               <defs>
                 <linearGradient id="dashRevGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/><stop offset="95%" stopColor="#f97316" stopOpacity={0.0}/></linearGradient>
