@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Package, Wallet, User, MessageSquare, BarChart3, Phone, Navigation,
   CheckCircle2, Star, LogIn, Power, Send, RefreshCw, MapPin, FileText, AlertCircle,
     History, Inbox, Headphones, Settings, ShieldCheck, LogOut, ChevronRight, Copy, Eye, Truck,
-    X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays, MailCheck, ArrowLeft
+    X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays, MailCheck, ArrowLeft, Fingerprint
   } from 'lucide-react';
 import PortalShell from './PortalShell';
 import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim, securityApi, supabaseClient } from './portalUtils';
@@ -79,6 +79,17 @@ export default function DriverPortal() {
   const [signupStage, setSignupStage] = useState<'account' | 'details'>('account');
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleError, setGoogleError] = useState('');
+  // Multi-method login: password, Google, Gmail OTP, or fingerprint (WebAuthn).
+  const [loginMode, setLoginMode] = useState<'password' | 'google' | 'otp' | 'fingerprint'>('password');
+  const [loginGoogleBusy, setLoginGoogleBusy] = useState(false);
+  const [loginGoogleError, setLoginGoogleError] = useState('');
+  const [loginOtpEmail, setLoginOtpEmail] = useState('');
+  const [loginOtpStep, setLoginOtpStep] = useState<'idle' | 'sent'>('idle');
+  const [loginOtpCode, setLoginOtpCode] = useState('');
+  const [loginOtpBusy, setLoginOtpBusy] = useState(false);
+  const [loginOtpError, setLoginOtpError] = useState('');
+  const [bioBusy, setBioBusy] = useState(false);
+  const [bioError, setBioError] = useState('');
   const [checkStatusInput, setCheckStatusInput] = useState('');
   const [checkStatusQuery, setCheckStatusQuery] = useState('');
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
@@ -331,9 +342,31 @@ export default function DriverPortal() {
     }).finally(() => setOtpBusy(false));
   };
 
-  // Google OAuth callback for driver signup: after the Gmail account chooser,
-  // Supabase redirects back with #access_token. The chosen Gmail counts as a
-  // verified email, so the driver goes straight to the registration form.
+  // Log the given driver record in (shared by password / Google / OTP / fingerprint).
+  const finishLoginAs = (d: { id: string; name?: string }) => {
+    setSessionId(d.id);
+    lsSet('sd_driver_session', d.id);
+    setAuthView('dashboard');
+    setTab('dashboard');
+    showToast(`Welcome back, ${(d.name || 'Driver').split(' ')[0]}!`);
+  };
+
+  // Authoritative driver lookup straight from the cloud (localState may still be
+  // empty right after a Google redirect, before cloud sync has finished loading).
+  const lookupDriverByEmail = async (email: string): Promise<any | null> => {
+    const local = drivers.find(d => (d.email || '').toLowerCase() === email);
+    if (local) return local;
+    try {
+      const res = await fetch('/api/state?key=nexago-main');
+      const data = await res.json();
+      const list: any[] = data?.state?.drivers || [];
+      return list.find(d => (d.email || '').toLowerCase() === email) || null;
+    } catch { return null; }
+  };
+
+  // Google OAuth callback: after the Gmail account chooser, Supabase redirects
+  // back with #access_token. If this Gmail already belongs to a driver, sign
+  // them in right away; otherwise pre-fill the verified Gmail on the signup form.
   useEffect(() => {
     const sb = supabaseClient();
     if (!sb) return;
@@ -345,11 +378,17 @@ export default function DriverPortal() {
         if (error || !data.session) throw error || new Error('no session');
         const email = String(data.session.user.email || '').trim().toLowerCase();
         if (email && /^[\w.+-]+@gmail\.com$/i.test(email)) {
-          setSignupGmail(email);
-          setOtpStep('verified');
-          setEmailVerified(true);
-          setSignupStage('details');
-          showToast('Google account verified — complete your registration below');
+          const existing = await lookupDriverByEmail(email);
+          if (existing && existing.verificationStatus !== 'Pending Audit') {
+            finishLoginAs(existing);
+          } else {
+            setSignupGmail(email);
+            setOtpStep('verified');
+            setEmailVerified(true);
+            setSignupStage('details');
+            setAuthView('signup');
+            showToast(existing ? 'Account not approved yet — complete your registration below' : 'Google account verified — complete your registration below');
+          }
         } else {
           showToast('That Google account has no Gmail address — use the Gmail + OTP option instead');
         }
@@ -358,6 +397,7 @@ export default function DriverPortal() {
       }
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const continueWithGoogle = async () => {
@@ -373,6 +413,130 @@ export default function DriverPortal() {
       setGoogleError(String(err?.message || 'Google sign-in failed — try again.'));
       setGoogleBusy(false);
     }
+  };
+
+  // Login method 2 — Continue with Google (same OAuth flow; the callback above
+  // decides whether this is a sign-in or a signup).
+  const loginWithGoogle = async () => {
+    const sb = supabaseClient();
+    if (!sb) { setLoginGoogleError('Google sign-in is not configured on this server yet — use ID + password.'); return; }
+    setLoginGoogleBusy(true);
+    setLoginGoogleError('');
+    try {
+      const redirectTo = `${window.location.origin}/driver`;
+      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+      if (error) { setLoginGoogleError(String(error.message)); setLoginGoogleBusy(false); }
+    } catch (err) {
+      setLoginGoogleError(String(err?.message || 'Google sign-in failed — try again.'));
+      setLoginGoogleBusy(false);
+    }
+  };
+
+  // Login method 3 — Gmail OTP: a 6-digit code is emailed, then verified with
+  // the same server OTP endpoints the signup flow uses.
+  const loginOtpSend = () => {
+    const email = loginOtpEmail.trim().toLowerCase();
+    if (!email || !/^[\w.+-]+@gmail\.com$/i.test(email)) { setLoginOtpError('Enter your Gmail address first.'); return; }
+    if (!drivers.some(d => (d.email || '').toLowerCase() === email)) { setLoginOtpError('No driver account found with this Gmail — register first.'); return; }
+    setLoginOtpBusy(true);
+    setLoginOtpError('');
+    securityApi('/otp-signup-send', { email }).then(() => {
+      setLoginOtpStep('sent');
+      setLoginOtpError('');
+      showToast('Verification code sent to your Gmail');
+    }).catch((err) => {
+      setLoginOtpError(String(err?.message || 'Could not send the code. Try again.'));
+    }).finally(() => setLoginOtpBusy(false));
+  };
+
+  const loginOtpVerify = () => {
+    const email = loginOtpEmail.trim().toLowerCase();
+    if (!loginOtpCode.trim()) { setLoginOtpError('Enter the 6-digit code from your email.'); return; }
+    setLoginOtpBusy(true);
+    setLoginOtpError('');
+    securityApi('/otp-signup-verify', { email, code: loginOtpCode }).then(() => {
+      const found = drivers.find(d => (d.email || '').toLowerCase() === email);
+      if (!found) { setLoginOtpError('Driver account not found for this Gmail.'); return; }
+      finishLoginAs(found);
+    }).catch((err) => {
+      setLoginOtpError(String(err?.message || 'Invalid or expired code.'));
+    }).finally(() => setLoginOtpBusy(false));
+  };
+
+  // Login method 4 — Fingerprint / biometric (WebAuthn platform authenticator:
+  // Windows Hello, Touch ID, Face ID, phone fingerprint). The credential is
+  // registered on this device once (Settings → Enable Fingerprint Sign-In) and
+  // unlocks the driver account without a password.
+  const webAuthnSupported = () => typeof window !== 'undefined' && !!navigator.credentials && !!window.PublicKeyCredential && typeof crypto !== 'undefined' && !!crypto.getRandomValues;
+  const bioRecord = () => lsGet<{ driverId: string; credentialId: string } | null>('sd_driver_bio', null);
+
+  const enableFingerprint = async () => {
+    if (!me) return;
+    if (!webAuthnSupported()) { showToast('This device or browser does not support fingerprint sign-in'); return; }
+    setBioBusy(true);
+    setBioError('');
+    try {
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+      const cred = await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: 'NexaGo BD' },
+          user: {
+            id: new TextEncoder().encode(`nexago-driver-${me.id}`),
+            name: (me.email || me.id) as string,
+            displayName: me.name,
+          },
+          pubKeyCredParams: [
+            { type: 'public-key', alg: -7 },
+            { type: 'public-key', alg: -257 },
+          ],
+          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+          timeout: 60000,
+        } as PublicKeyCredentialCreationOptions,
+      });
+      if (!cred) { setBioError('Fingerprint setup was cancelled.'); return; }
+      const pkc = cred as PublicKeyCredential;
+      const credentialId = btoa(String.fromCharCode(...new Uint8Array(pkc.rawId)));
+      lsSet('sd_driver_bio', { driverId: me.id, credentialId });
+      showToast('Fingerprint sign-in enabled for this device');
+    } catch (e: any) {
+      setBioError(String(e?.message || 'Could not set up fingerprint on this device.'));
+    } finally { setBioBusy(false); }
+  };
+
+  const fingerprintLogin = async () => {
+    if (!webAuthnSupported()) { setBioError('This device or browser does not support fingerprint sign-in.'); return; }
+    const bio = bioRecord();
+    if (!bio) { setBioError('Fingerprint is not set up yet — log in with your ID + password, then enable it from Settings.'); return; }
+    setBioBusy(true);
+    setBioError('');
+    try {
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+      const credId = Uint8Array.from(atob(bio.credentialId), c => c.charCodeAt(0));
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: window.location.hostname,
+          allowCredentials: [{ type: 'public-key', id: credId }],
+          userVerification: 'required',
+          timeout: 60000,
+        } as PublicKeyCredentialRequestOptions,
+      });
+      if (assertion) {
+        const driver = drivers.find(d => d.id === bio.driverId);
+        if (driver) finishLoginAs(driver);
+        else setBioError('Driver account not found for this fingerprint.');
+      } else {
+        setBioError('Fingerprint verification failed or was cancelled.');
+      }
+    } catch (e: any) {
+      setBioError(String(e?.message || 'Fingerprint verification failed or was cancelled.'));
+    } finally { setBioBusy(false); }
+  };
+
+  const disableFingerprint = () => {
+    lsSet('sd_driver_bio', null);
+    showToast('Fingerprint sign-in disabled for this device');
   };
 
   const handleLogout = () => {
@@ -743,39 +907,114 @@ export default function DriverPortal() {
                 <div className="space-y-2">
                   <p className="text-[9px] tracking-[0.35em] uppercase text-brand-orange font-semibold">NexaGo BD · Delivery Network</p>
                   <h4 className="text-xl font-bold text-white tracking-tight">Driver Dispatch Portal</h4>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">Sign in with your permanent Driver ID and password to receive and complete delivery orders.</p>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">Sign in with password, Google, Gmail OTP or fingerprint to receive and complete delivery orders.</p>
                 </div>
               </div>
               <div className="relative rounded-3xl bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] shadow-2xl shadow-black/40 p-5 space-y-3.5">
-                <div className="space-y-1.5">
-                  <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Driver ID / Phone</label>
-                  <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
-                    <User className="w-4 h-4 text-brand-orange/70 shrink-0" />
-                    <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="e.g. 3667463854"
-                      className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
-                  </div>
+                {/* Sign-in method selector */}
+                <div className="grid grid-cols-4 gap-1.5 rounded-xl bg-[#0a1322] border border-[#1e3050] p-1.5">
+                  {([
+                    { id: 'password', label: 'Password', icon: Lock },
+                    { id: 'google', label: 'Google', icon: Mail },
+                    { id: 'otp', label: 'OTP', icon: ShieldCheck },
+                    { id: 'fingerprint', label: 'Fingerprint', icon: Fingerprint },
+                  ] as const).map(m => (
+                    <button key={m.id} onClick={() => setLoginMode(m.id)}
+                      className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer ${loginMode === m.id ? 'bg-gradient-to-b from-brand-orange/90 to-orange-500/90 text-white shadow-lg shadow-brand-orange/20' : 'text-gray-400 hover:text-white hover:bg-[#132238]'}`}>
+                      <m.icon className="w-3.5 h-3.5" />
+                      {m.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Password</label>
-                  <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
-                    <Lock className="w-4 h-4 text-brand-orange/70 shrink-0" />
-                    <input type={showPassword ? 'text' : 'password'} value={loginPass} onChange={e => setLoginPass(e.target.value)}
-                      placeholder="••••••••" className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
-                    <button onClick={() => setShowPassword(!showPassword)} className="text-gray-400 hover:text-white cursor-pointer">
-                      <Eye className="w-3.5 h-3.5" />
+
+                {loginMode === 'password' && (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Driver ID / Phone</label>
+                      <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
+                        <User className="w-4 h-4 text-brand-orange/70 shrink-0" />
+                        <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="e.g. 3667463854"
+                          className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Password</label>
+                      <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
+                        <Lock className="w-4 h-4 text-brand-orange/70 shrink-0" />
+                        <input type={showPassword ? 'text' : 'password'} value={loginPass} onChange={e => setLoginPass(e.target.value)}
+                          placeholder="••••••••" className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
+                        <button onClick={() => setShowPassword(!showPassword)} className="text-gray-400 hover:text-white cursor-pointer">
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] pt-0.5">
+                      <label className="flex items-center space-x-1.5 cursor-pointer text-gray-300">
+                        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="rounded border-white/20 text-brand-orange focus:ring-0" />
+                        <span>Remember Me</span>
+                      </label>
+                      <button onClick={() => setAuthView('forgot')} className="text-brand-orange hover:underline font-bold">Forgot Password?</button>
+                    </div>
+                    <button onClick={handleLogin} className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-bold uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99]">
+                      Sign In Securely
+                    </button>
+                  </>
+                )}
+
+                {loginMode === 'google' && (
+                  <div className="space-y-2.5">
+                    <p className="text-[9px] text-gray-400 leading-relaxed text-center">Sign in with the Google account linked to your driver profile.</p>
+                    <button onClick={loginWithGoogle} disabled={loginGoogleBusy} className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-white text-[#1f1f1f] text-xs font-bold shadow-lg hover:bg-gray-100 transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer">
+                      <span className="flex items-center justify-center w-4 h-4">
+                        <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.77.43 3.45 1.18 4.94l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                      </span>
+                      {loginGoogleBusy ? 'Connecting to Google…' : 'Continue with Google'}
+                    </button>
+                    {loginGoogleError && <p className="text-[9px] font-bold text-red-400 text-center">{loginGoogleError}</p>}
+                  </div>
+                )}
+
+                {loginMode === 'otp' && (
+                  <div className="space-y-2.5">
+                    <p className="text-[9px] text-gray-400 leading-relaxed text-center">A one-time code is emailed to your Gmail. Enter it to sign in — no password needed.</p>
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Gmail Address</label>
+                      <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
+                        <Mail className="w-4 h-4 text-brand-orange/70 shrink-0" />
+                        <input value={loginOtpEmail} onChange={e => setLoginOtpEmail(e.target.value)} placeholder="name@gmail.com"
+                          className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
+                      </div>
+                    </div>
+                    {loginOtpStep === 'sent' && (
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">6-Digit Code</label>
+                        <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
+                          <ShieldCheck className="w-4 h-4 text-brand-orange/70 shrink-0" />
+                          <input value={loginOtpCode} onChange={e => setLoginOtpCode(e.target.value)} placeholder="••••••"
+                            className="flex-1 bg-transparent text-[11px] font-mono tracking-[0.3em] outline-none text-white placeholder:text-gray-600" />
+                        </div>
+                      </div>
+                    )}
+                    {loginOtpError && <p className="text-[9px] font-bold text-red-400 text-center">{loginOtpError}</p>}
+                    <button onClick={loginOtpStep === 'sent' ? loginOtpVerify : loginOtpSend} disabled={loginOtpBusy}
+                      className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-bold uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99] disabled:opacity-60">
+                      {loginOtpBusy ? 'Please wait…' : loginOtpStep === 'sent' ? 'Verify & Sign In' : 'Send Code to Gmail'}
                     </button>
                   </div>
-                </div>
-                <div className="flex items-center justify-between text-[10px] pt-0.5">
-                  <label className="flex items-center space-x-1.5 cursor-pointer text-gray-300">
-                    <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="rounded border-white/20 text-brand-orange focus:ring-0" />
-                    <span>Remember Me</span>
-                  </label>
-                  <button onClick={() => setAuthView('forgot')} className="text-brand-orange hover:underline font-bold">Forgot Password?</button>
-                </div>
-                <button onClick={handleLogin} className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-bold uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99]">
-                  Sign In Securely
-                </button>
+                )}
+
+                {loginMode === 'fingerprint' && (
+                  <div className="space-y-2.5">
+                    <p className="text-[9px] text-gray-400 leading-relaxed text-center">Unlock with your device fingerprint, Face ID or Windows Hello — quick and secure.</p>
+                    <button onClick={fingerprintLogin} disabled={bioBusy}
+                      className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border border-[#24395c] bg-[#0a1322] hover:border-brand-orange/60 hover:bg-[#132238] text-white transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer">
+                      <Fingerprint className={`w-10 h-10 ${bioBusy ? 'animate-pulse text-brand-orange' : 'text-brand-orange'}`} />
+                      <span className="text-xs font-bold uppercase">{bioBusy ? 'Waiting for fingerprint…' : 'Scan Fingerprint'}</span>
+                    </button>
+                    {bioError && <p className="text-[9px] font-bold text-red-400 text-center">{bioError}</p>}
+                    <p className="text-[9px] text-gray-500 text-center">No fingerprint set up yet? Log in with your ID + password, then enable it from Settings.</p>
+                  </div>
+                )}
               </div>
               <div className="relative flex items-center gap-3 text-[8px] text-gray-500 font-bold uppercase tracking-widest">
                 <span className="flex-1 h-px bg-gradient-to-r from-transparent to-[#24395c]"></span>
@@ -785,7 +1024,7 @@ export default function DriverPortal() {
               <button onClick={() => { setSignupStage('account'); setOtpStep('idle'); setOtpCode(''); setOtpError(''); setGoogleError(''); setAuthView('signup'); }} className="w-full py-3 bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] hover:border-brand-orange/50 hover:from-[#1b2f4d] hover:to-brand-card text-gray-200 hover:text-white text-[11px] font-bold rounded-xl cursor-pointer transition-all">
                 Create Driver Account
               </button>
-              <p className="relative text-center text-[9px] text-gray-500">Access with your permanent Driver ID + password. New riders can register below.</p>
+              <p className="relative text-center text-[9px] text-gray-500">Access with your permanent Driver ID + password, Google, Gmail OTP or fingerprint.</p>
               <button onClick={() => { setCheckStatusInput(''); setCheckStatusQuery(''); setAuthView('pending'); }} className="relative w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
                 Check my application status (any device) →
               </button>
@@ -1841,6 +2080,21 @@ export default function DriverPortal() {
                   <div className={`w-4 h-4 rounded-full bg-white transition-all shadow ${autoAccept ? 'ml-auto' : ''}`}></div>
                 </button>
               </div>
+              <div className="glass-soft rounded-xl p-3 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <Fingerprint className={`w-5 h-5 ${bioRecord() ? 'text-emerald-400' : 'text-gray-500'}`} />
+                  <div>
+                    <p className="text-[11px] font-bold text-white">Fingerprint Sign-In</p>
+                    <p className="text-[8px] text-gray-400">{bioRecord() ? 'ON — unlock with fingerprint / Face ID / Windows Hello' : 'OFF — use your device biometrics to skip the password'}</p>
+                  </div>
+                </div>
+                {bioRecord() ? (
+                  <button onClick={disableFingerprint} className="px-2.5 py-1.5 rounded-lg border border-red-500/40 text-red-300 text-[9px] font-bold uppercase hover:bg-red-500/10 cursor-pointer">Disable</button>
+                ) : (
+                  <button onClick={enableFingerprint} disabled={bioBusy} className="px-2.5 py-1.5 rounded-lg border border-brand-orange/40 text-brand-orange text-[9px] font-bold uppercase hover:bg-brand-orange/10 disabled:opacity-60 cursor-pointer">{bioBusy ? 'Setting up…' : 'Enable'}</button>
+                )}
+              </div>
+              {bioError && <p className="text-[9px] font-bold text-red-400">{bioError}</p>}
               <button onClick={() => showToast('NexaGo Driver v1.4.2 — you are on the latest version')} className="w-full glass-soft p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-[#132238]">
                 <p className="text-[10px] text-gray-400">App Version</p>
                 <p className="text-white font-bold text-[11px]">v1.4.2 ✓</p>
