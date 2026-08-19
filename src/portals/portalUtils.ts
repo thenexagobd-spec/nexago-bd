@@ -49,18 +49,29 @@ export const lsSet = <T,>(key: string, v: T) => {
 export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_orders_v2: 'orders',
   sd_drivers: 'drivers',
+  sd_driver_creds: 'driverCreds',
+  sd_zones: 'zones',
   sd_products: 'products',
   sd_categories: 'categories',
   sd_inventory: 'inventory',
+  sd_inventory_v2: 'inventoryV2',
+  sd_inventory_logs: 'inventoryLogs',
   sd_payments: 'payments',
   sd_tickets: 'tickets',
   sd_users: 'users',
+  sd_vehicles: 'vehicles',
   sd_stores: 'stores',
+  sd_stores_meta: 'storesMeta',
   sd_store_branches: 'branches',
+  sd_store_admin_creds: 'storeAdminCreds',
   sd_returns: 'returns',
   ss_refunds: 'refunds',
   ss_wallet_v2: 'wallet',
   ss_wtxn_v3: 'walletTxns',
+  ss_tickets_v2: 'customerTickets',
+  ss_rider_ratings: 'riderRatings',
+  ss_cust_accounts: 'customerAccounts',
+  ss_cust_wallet_alloc: 'customerWalletAlloc',
   sd_store_ratings: 'ratings',
   sd_coupons: 'coupons',
   sd_store_online: 'storeOnline',
@@ -68,19 +79,116 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_notifications: 'notifications',
   sd_store_admin_apps: 'storeAdminApps',
   sd_staff: 'staff',
+  sd_role_cards: 'roleCards',
+  sd_super_admin_card_profile: 'superAdminCardProfile',
   sd_reviews: 'reviews',
   sd_marketing: 'marketing',
   sd_banners: 'banners',
   sd_stock_ledger: 'stockLedger',
-  ss_tickets_v2: 'customerTickets',
+  sd_batches: 'batches',
+  sd_purchase_orders: 'purchaseOrders',
+  sd_undo_stack: 'undoStack',
+  sd_transfers: 'transfers',
   nexago_pos_sales: 'posSales',
   nexago_pos_holds: 'posHolds',
+  nexago_pos_bill_no: 'posBillNo',
+  sd_support_templates_v1: 'supportTemplates',
+  sd_known_issues_v1: 'knownIssues',
+  sd_tech_audit_v1: 'techAudit',
+  sd_users_v1: 'supportUsers',
+  sd_integrations_v1: 'integrations',
+  sd_maintenance_v1: 'maintenance',
+  sd_backlog_v1: 'backlog',
+  sd_sla_targets_v1: 'slaTargets',
+  sd_apilog_v1: 'apiLog',
+  sd_alertrules_v1: 'alertRules',
+  sd_sec_events_v1: 'securityEvents',
+  sd_sec_score_v1: 'securityScore',
+  sd_featureflags_v1: 'featureFlags',
+  sd_changes_v1: 'changes',
+  sd_warroom_v1: 'warroom',
+  sd_logs_v1: 'logs',
+  sd_webhooks_v1: 'webhooks',
+  sd_backups_v1: 'backups',
+  sd_digest_v1: 'digest',
+  sd_reviews_v1: 'supportReviews',
+  sd_sos_v1: 'sosAlerts',
+  sd_dr_v1: 'disasterRecovery',
+  sd_smsbal_v1: 'smsBalance',
+  sd_debt_v1: 'technicalDebt',
+  sd_broadcast_v1: 'broadcasts',
+  sd_fraudq_v1: 'fraudQueue',
+  sd_approvals_v1: 'approvals',
+  sd_certs_v1: 'certificates',
+  sd_relcheck_v1: 'releaseChecks',
+  sd_zones_v1: 'supportZones',
+  sd_ratelimit_v1: 'rateLimits',
+  sd_sessions_v1: 'supportSessions',
+  sd_searchidx_v1: 'searchIndex',
+  sd_retention_v1: 'retention',
+  sd_crashes_v1: 'crashes',
+  sd_allowlist_v1: 'allowlist',
+  sd_pipeline_v1: 'pipeline',
+  sd_pwpolicy_v1: 'passwordPolicy',
+  sd_locks_v1: 'locks',
+  sd_access_v1: 'accessModes',
+  sd_geofence_v1: 'geofence',
+  sd_smstpl_v1: 'smsTemplates',
+  sd_driverdocs_v1: 'driverDocuments',
+  sd_handover_v1: 'handover',
+  sd_storehealth_v1: 'storeHealth',
+  sd_featureboard_v1: 'featureBoard',
+  sd_batchjobs_v1: 'batchJobs',
+  sd_envconfig_v1: 'envConfig',
+  sd_forceupdate_v1: 'forceUpdate',
+  sd_canned_v1: 'cannedReplies',
+  sd_zonesla_v1: 'zoneSla',
+  sd_offlineq_v1: 'offlineQueue',
+  sd_promos_v1: 'supportPromos',
+  sd_payouts_v1: 'supportPayouts',
+  sd_cdn_v1: 'cdn',
+  sd_runbook_v1: 'runbook',
+  sd_refundvel_v1: 'refundVelocity',
+  sd_latency_v1: 'latency',
+  sd_tiers_v1: 'tierQueue',
+  sd_channels_v1: 'channels',
+  sd_ticket_categories_v1: 'ticketCategories',
+  sd_support_faqs_v1: 'supportFaqs',
 };
 
 // Every approved role writes its own store-scoped records. Server-side merge is
 // union-by-id, so Store Admin product/stock changes sync live without dropping
 // another store's data.
 const CLOUD_PUSH_EXCLUDE = new Set<string>();
+
+// Store/branch-scoped modules create localStorage keys dynamically, so they
+// cannot be listed one by one in CLOUD_KEY_MAP. Persist each dynamic key under
+// its own cloud field to avoid overwriting another store's records.
+const CLOUD_DYNAMIC_PREFIXES = [
+  'sd_store_staff_',
+  'sd_review_replies_',
+  'sd_active_branch_',
+  'mfs_',
+];
+
+const DYNAMIC_CLOUD_PREFIX = 'dynamic:';
+
+const isCloudDynamicLocalKey = (key: string) =>
+  CLOUD_DYNAMIC_PREFIXES.some(prefix => key.startsWith(prefix));
+
+const dynamicCloudEntries = (): Array<[string, any]> => {
+  const entries: Array<[string, any]> = [];
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const localKey = localStorage.key(i) || '';
+      if (!isCloudDynamicLocalKey(localKey)) continue;
+      entries.push([`${DYNAMIC_CLOUD_PREFIX}${localKey}`, lsGet(localKey, null)]);
+    }
+  } catch {
+    /* ignore */
+  }
+  return entries.sort(([a], [b]) => a.localeCompare(b));
+};
 
 const configuredApiBase = ((import.meta.env.VITE_RELAY_BASE as string) || '').replace(/\/+$/, '');
 const API_BASE = (configuredApiBase || window.location.origin).replace(/\/+$/, '');
@@ -226,7 +334,10 @@ export function useCloudSync() {
     let cancelled = false;
     const key = cloudKeyOf();
     const url = `${API_BASE}/api/state?key=${encodeURIComponent(key)}`;
-    const sig = () => JSON.stringify(Object.keys(CLOUD_KEY_MAP).map(k => lsGet(k, null)));
+    const sig = () => JSON.stringify([
+      ...Object.keys(CLOUD_KEY_MAP).map(k => [k, lsGet(k, null)]),
+      ...dynamicCloudEntries(),
+    ]);
     let lastPushedSig = '';
     let pullInFlight = false;
     let pushInFlight = false;
@@ -264,6 +375,21 @@ export function useCloudSync() {
           const b = JSON.stringify(localVal);
           if (a !== b) { lsSet(localKey, next); changed = true; }
         }
+        for (const [cloudKey, cloudVal] of Object.entries(state as Record<string, any>)) {
+          if (!cloudKey.startsWith(DYNAMIC_CLOUD_PREFIX) || cloudVal === undefined) continue;
+          const localKey = cloudKey.slice(DYNAMIC_CLOUD_PREFIX.length);
+          if (!isCloudDynamicLocalKey(localKey)) continue;
+          const localVal = lsGet<any>(localKey, null);
+          let next: any;
+          if (Array.isArray(cloudVal)) {
+            next = unionByIdArr(Array.isArray(localVal) ? localVal : [], cloudVal);
+          } else if (cloudVal && typeof cloudVal === 'object') {
+            next = { ...(localVal && typeof localVal === 'object' ? localVal as object : {}), ...cloudVal };
+          } else {
+            next = cloudVal;
+          }
+          if (JSON.stringify(next) !== JSON.stringify(localVal)) { lsSet(localKey, next); changed = true; }
+        }
         applyingRemoteState = false;
         lastPushedSig = sig();
         if (changed) window.dispatchEvent(new Event('storage'));
@@ -286,6 +412,9 @@ export function useCloudSync() {
         for (const [localKey, cloudKey] of Object.entries(CLOUD_KEY_MAP)) {
           if (CLOUD_PUSH_EXCLUDE.has(localKey)) continue;
           const val = lsGet<any>(localKey, null);
+          if (val !== null) payload[cloudKey] = val;
+        }
+        for (const [cloudKey, val] of dynamicCloudEntries()) {
           if (val !== null) payload[cloudKey] = val;
         }
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
