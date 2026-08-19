@@ -1826,6 +1826,81 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/security/card-registry') {
+    if (!rateLimit(req, 'card-registry', 120, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    const registryName = `card-registry-${safeKey(key)}`;
+    if (req.method === 'GET') {
+      const rawQuery = String(url.searchParams.get('q') || '').trim();
+      const query = rawQuery.toLowerCase();
+      const registry = readSecurity(registryName, {});
+      let cards = Object.values(registry || {});
+      if (query) {
+        cards = cards.filter((card) => {
+          const haystack = [
+            card?.id,
+            card?.cardId,
+            card?.permanentNumber,
+            card?.kind,
+            card?.name,
+            card?.phone,
+            card?.email,
+            card?.role,
+            card?.status,
+          ].join(' ').toLowerCase();
+          return haystack.includes(query);
+        });
+      }
+      cards.sort((a, b) => Date.parse(b?.updatedAt || b?.createdAt || 0) - Date.parse(a?.updatedAt || a?.createdAt || 0));
+      sendJson(res, 200, { ok: true, key, count: cards.length, cards: cards.slice(0, 100), cloud: supabaseConfigured ? 'supabase' : 'local' });
+      return;
+    }
+    if (req.method === 'POST') {
+      readBody(req).then((body) => {
+        const inputCards = Array.isArray(body.cards) ? body.cards : [body.card && typeof body.card === 'object' ? body.card : body];
+        const registry = readSecurity(registryName, {});
+        const now = new Date().toISOString();
+        const saved = [];
+        for (const card of inputCards) {
+          if (!card || typeof card !== 'object') continue;
+          const kind = String(card.kind || 'staff').trim();
+          const id = String(card.id || card.cardId || '').trim();
+          const permanentNumber = String(card.permanentNumber || '').trim();
+          if (!id || !permanentNumber) continue;
+          const cardKey = `${kind}:${id}`;
+          const existing = registry[cardKey] || {};
+          const safeCard = {
+            ...existing,
+            ...card,
+            kind,
+            id,
+            cardId: cardKey,
+            permanentNumber,
+            createdAt: existing.createdAt || card.createdAt || now,
+            updatedAt: now,
+            savedBy: session.userId,
+            platformKey: safeKey(key),
+          };
+          registry[cardKey] = safeCard;
+          saved.push(safeCard);
+        }
+        if (!saved.length) { sendJson(res, 400, { ok: false, error: 'at least one card with id and permanentNumber required' }); return; }
+        writeSecurity(registryName, registry);
+        appendAudit(key, {
+          actor: session.userId,
+          role: session.role,
+          action: 'card-registry-upserted',
+          ip: clientIp(req),
+          reason: body.reason || 'smart card permanent registry save',
+          newValue: { count: saved.length, cardIds: saved.map(c => c.cardId).slice(0, 25) },
+        });
+        sendJson(res, 200, { ok: true, count: saved.length, cards: saved, card: saved[0], cloud: supabaseConfigured ? 'supabase' : 'local' });
+      }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+      return;
+    }
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/security/file') {
     if (!rateLimit(req, 'security-file', 20, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {

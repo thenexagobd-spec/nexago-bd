@@ -95,7 +95,8 @@ export async function securityApi(path: string, body?: Record<string, any>, toke
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   const sessionToken = token || localStorage.getItem('sd_security_session') || '';
   if (sessionToken) headers['X-Session-Token'] = sessionToken;
-  const res = await fetch(`${API_BASE}/api/security${path}?key=${encodeURIComponent(key)}`, {
+  const joiner = path.includes('?') ? '&' : '?';
+  const res = await fetch(`${API_BASE}/api/security${path}${joiner}key=${encodeURIComponent(key)}`, {
     method: body ? 'POST' : 'GET',
     headers,
     body: body ? JSON.stringify(body) : undefined,

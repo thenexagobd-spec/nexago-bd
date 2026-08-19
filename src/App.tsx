@@ -585,6 +585,62 @@ export default function App() {
     const latest = normalizeStaffKyc(staff).find((s: any) => s.id === staffIdCard.id);
     if (latest) setStaffIdCard((prev: any) => ({ ...prev, ...latest }));
   }, [staff, staffIdCard?.id]);
+  const cardRegistryRecord = (kind: RoleCardKind | 'staff', record: any, meta: any = {}) => {
+    const id = String(kind === 'store-admin' ? (record.adminId || record.id) : record.id || '').trim();
+    const permanentNumber = String(meta.permanentNumber || record.permanentNumber || record.cardPermanentNumber || '').trim();
+    if (!id || !permanentNumber) return null;
+    return {
+      kind,
+      id,
+      permanentNumber,
+      name: record.name || record.ownerName || record.fullName || record.storeName || '',
+      phone: record.phone || '',
+      email: record.email || '',
+      role: record.role || record.assignedRole || ROLE_CARD_META[kind as RoleCardKind]?.sub || 'Staff',
+      status: record.status || 'Active',
+      cardIssuedAt: record.cardIssuedAt || record.issuedAt || meta.cardIssuedAt || record.verifiedAt || record.createdAt || '',
+      cardExpiresAt: record.cardExpiresAt || record.expiresAt || meta.cardExpiresAt || '',
+      photoDataUrl: record.photoDataUrl || meta.photoDataUrl || record.photo || '',
+      photoScale: record.photoScale || meta.photoScale || 1,
+      photoX: record.photoX || meta.photoX || 50,
+      photoY: record.photoY || meta.photoY || 50,
+      address: record.address || record.presentAddress || '',
+      joiningDate: record.joiningDate || '',
+      storeId: record.storeId || '',
+      branchId: record.branchId || '',
+      updatedAt: record.updatedAt || new Date().toISOString(),
+    };
+  };
+  useEffect(() => {
+    const session = localStorage.getItem('sd_security_session') || '';
+    if (!session) return;
+    const timer = window.setTimeout(() => {
+      const cards: any[] = [];
+      normalizeStaffKyc(staff).forEach((member: any) => {
+        const issuedAt = member.cardIssuedAt || member.verifiedAt || member.createdAt || new Date().toISOString();
+        const expiresAt = member.cardExpiresAt || member.expiresAt || new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
+        const permanentNumber = member.permanentNumber || `NXG${new Date(issuedAt).getFullYear()}${String(member.id || '').replace(/[^A-Z0-9]/gi, '').slice(-8)}`;
+        const card = cardRegistryRecord('staff', { ...member, permanentNumber, cardIssuedAt: issuedAt, cardExpiresAt: expiresAt });
+        if (card) cards.push(card);
+      });
+      Object.entries(roleCardsStore).forEach(([key, meta]) => {
+        const [kind, id] = key.split(':') as [RoleCardKind, string];
+        if (!kind || !id) return;
+        let source: any = { id };
+        if (kind === 'driver') source = drivers.find((d: any) => String(d.id) === id) || source;
+        if (kind === 'store-admin') source = storeAdminApps.find((s: any) => String(s.adminId || s.id) === id) || source;
+        if (kind === 'super-admin') source = { id, ...superAdminCardProfile, status: 'Active' };
+        const card = cardRegistryRecord(kind, source, meta);
+        if (card) cards.push(card);
+      });
+      if (superAdminCardProfile?.permanentNumber) {
+        const card = cardRegistryRecord('super-admin', { id: 'SUPERADMIN', ...superAdminCardProfile, status: 'Active' });
+        if (card) cards.push(card);
+      }
+      if (cards.length) securityApi('/card-registry', { cards, reason: 'automatic permanent smart card registry sync' }).catch(() => {});
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [staff, roleCardsStore, superAdminCardProfile, drivers, storeAdminApps]);
   useEffect(() => { setStoredData('sd_reviews', reviews); }, [reviews]);
   useEffect(() => { setStoredData('sd_marketing', marketing); }, [marketing]);
   useEffect(() => { setStoredData('sd_banners', banners); }, [banners]);
@@ -1680,7 +1736,7 @@ export default function App() {
     const key = roleCardKeyOf(kind, id);
     const existing = roleCardsStore[key];
     if (existing) return existing;
-    const permanentNumber = `${ROLE_CARD_META[kind].prefix}${new Date().getFullYear()}${Date.now().toString().slice(-8)}`;
+    const permanentNumber = seed.permanentNumber || `${ROLE_CARD_META[kind].prefix}${new Date().getFullYear()}${Date.now().toString().slice(-8)}`;
     const now = new Date().toISOString();
     const meta = {
       permanentNumber,
@@ -1887,7 +1943,25 @@ export default function App() {
     showToast('Incomplete staff record archived. Recovery Archived filter-e thakbe.', 'success');
   };
 
-  const applyStaffScan = (code: string) => {
+  const openRegistryCard = (card: any) => {
+    const kind = String(card?.kind || 'staff') as RoleCardKind | 'staff';
+    if (kind === 'staff') {
+      setStaffIdCard({
+        ...card,
+        issuedAt: card.cardIssuedAt || card.issuedAt || card.createdAt || new Date().toISOString(),
+        expiresAt: card.cardExpiresAt || card.expiresAt || '',
+      });
+      return;
+    }
+    openRoleCard(kind as RoleCardKind, {
+      ...card,
+      id: card.id,
+      adminId: kind === 'store-admin' ? card.id : undefined,
+      photoDataUrl: card.photoDataUrl || '',
+    });
+  };
+
+  const applyStaffScan = async (code: string) => {
     const clean = String(code || '').trim().toUpperCase();
     if (!clean) return;
     const match = staff.find((s: any) => {
@@ -1903,7 +1977,26 @@ export default function App() {
       securityAudit('staff-id-card-scanned', { actor: 'super-admin', newValue: { staffId: match.id, scanned: clean }, reason: 'staff ID card barcode/QR scanned and opened' });
       showToast(`${match.name} — full card opened.`, 'success');
     } else {
-      setStaffScanMsg(`No staff matches "${clean}". Verify the Permanent No on the card.`);
+      try {
+        const res = await securityApi(`/card-registry?q=${encodeURIComponent(clean)}`);
+        const found = (res.cards || []).find((card: any) => {
+          const pn = String(card.permanentNumber || '').toUpperCase();
+          const id = String(card.id || '').toUpperCase();
+          return pn === clean || id === clean || (clean.length >= 6 && (pn.endsWith(clean) || id.endsWith(clean)));
+        }) || (res.cards || [])[0];
+        if (found) {
+          setStaffScanMsg(null);
+          setStaffScanManual('');
+          setStaffScanOpen(false);
+          openRegistryCard(found);
+          securityAudit('smart-card-registry-looked-up', { actor: 'super-admin', newValue: { cardId: found.cardId, scanned: clean }, reason: 'Look Up opened permanent smart card registry record' });
+          showToast(`${found.name || found.id} — registry card opened.`, 'success');
+          return;
+        }
+      } catch {
+        /* local message below */
+      }
+      setStaffScanMsg(`No card matches "${clean}". Verify Permanent No / ID or sync Supabase registry.`);
     }
   };
 
