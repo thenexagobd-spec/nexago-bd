@@ -193,6 +193,68 @@ function localStateCounts(state = {}) {
   return Object.fromEntries(keys.map((name) => [name, Array.isArray(state[name]) ? state[name].length : 0]));
 }
 
+function backupIntegrity(files) {
+  if (!files.length) return { score: 0, status: 'No backup', warnings: ['No backup file found'] };
+  const warnings = [];
+  const latest = files[0];
+  const previous = files[1];
+  let score = 100;
+  if (latest.size < 1024) { score -= 35; warnings.push('Latest backup is very small'); }
+  if (previous && latest.size < previous.size * 0.5) { score -= 30; warnings.push('Latest backup is more than 50% smaller than previous backup'); }
+  const ageMin = Math.round((Date.now() - Date.parse(latest.createdAt || 0)) / 60000);
+  if (ageMin > Math.max(60, (SUPABASE_BACKUP_INTERVAL_MS / 60000) * 2)) { score -= 20; warnings.push('Latest backup is older than expected schedule'); }
+  score = Math.max(0, score);
+  return { score, status: score >= 80 ? 'Healthy' : score >= 50 ? 'Review' : 'Risk', warnings };
+}
+
+function detectStateConflicts(state = {}) {
+  const groups = ['orders', 'products', 'drivers', 'users', 'stores', 'branches', 'payments', 'staff', 'coupons'];
+  const conflicts = [];
+  for (const group of groups) {
+    const seen = new Map();
+    for (const row of Array.isArray(state[group]) ? state[group] : []) {
+      const id = String(row?.id || row?.productId || row?.orderId || row?.staffId || row?.storeId || row?.branchId || row?.code || '').trim();
+      if (!id) continue;
+      if (seen.has(id)) {
+        conflicts.push({ group, id, first: seen.get(id), second: row, reason: 'duplicate-id' });
+      } else {
+        seen.set(id, row);
+      }
+    }
+  }
+  return conflicts.slice(0, 50);
+}
+
+function incidentEvents(audit = []) {
+  const risky = /fail|failed|blocked|denied|suspicious|restore|rate-limit|lockdown|conflict/i;
+  return audit.filter((row) => risky.test(String(row.action || row.reason || ''))).slice(-30).reverse();
+}
+
+async function simulateRestoreFile(file) {
+  const verify = await verifyBackupFile(file);
+  if (!verify.ok) return { ok: false, verify, tables: [], copySections: 0, estimatedRows: 0 };
+  return new Promise((resolve) => {
+    const tables = new Set();
+    let copySections = 0;
+    let estimatedRows = 0;
+    let text = '';
+    const gunzip = zlib.createGunzip();
+    const input = fs.createReadStream(file);
+    const finish = () => {
+      const matches = text.matchAll(/(?:CREATE TABLE|COPY)\s+(?:public\.)?("?[\w_]+"?)/gi);
+      for (const match of matches) tables.add(String(match[1] || '').replace(/"/g, ''));
+      copySections = (text.match(/^COPY\s/igm) || []).length;
+      estimatedRows = (text.match(/^\d|^[0-9a-f-]{8}-/igm) || []).length;
+      resolve({ ok: true, verify, tables: Array.from(tables).slice(0, 80), copySections, estimatedRows });
+    };
+    input.on('error', (err) => resolve({ ok: false, verify, error: err.message, tables: [], copySections: 0, estimatedRows: 0 }));
+    gunzip.on('data', (chunk) => { if (text.length < 8_000_000) text += chunk.toString('utf8'); });
+    gunzip.on('error', (err) => resolve({ ok: false, verify, error: err.message, tables: [], copySections: 0, estimatedRows: 0 }));
+    gunzip.on('end', finish);
+    input.pipe(gunzip);
+  });
+}
+
 function pruneSupabaseBackups() {
   try {
     if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return;
@@ -1247,7 +1309,8 @@ const server = http.createServer((req, res) => {
     const session = requireSession(req, key);
     if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
     (async () => {
-    const latestBackup = lastSupabaseBackup || latestSupabaseBackupFile();
+    const backupFiles = listSupabaseBackupFiles();
+    const latestBackup = lastSupabaseBackup || backupFiles[0] || null;
     const localBackupDir = path.join(BACKUP_DIR, safeKey(key));
     const localBackupCount = fs.existsSync(localBackupDir) ? fs.readdirSync(localBackupDir).filter((name) => name.endsWith('.json')).length : 0;
     const audit = readSecurity(`audit-${safeKey(key)}`, []);
@@ -1285,6 +1348,12 @@ const server = http.createServer((req, res) => {
     const backupBytes = directorySize(SUPABASE_BACKUP_DIR, 2);
     const tableCounts = await supabaseTableCounts();
     const localCounts = localStateCounts(storeState);
+    const conflicts = detectStateConflicts(storeState);
+    const incidents = incidentEvents(audit);
+    const integrity = backupIntegrity(backupFiles);
+    const latestBackupAgeMinutes = latestBackup ? Math.max(0, Math.round((Date.now() - Date.parse(latestBackup.createdAt || 0)) / 60000)) : null;
+    const estimatedRestoreMinutes = latestBackup ? Math.max(2, Math.ceil((latestBackup.size || 0) / (1024 * 1024) * 0.8)) : null;
+    const lockdown = readSecurity(`lockdown-${safeKey(key)}`, { active: false });
     const protectionChecks = [
       { key: 'supabase', label: 'Supabase configured', ok: supabaseConfigured },
       { key: 'serviceRole', label: 'Server service role available', ok: !!serviceClient },
@@ -1304,7 +1373,8 @@ const server = http.createServer((req, res) => {
         running: supabaseBackupRunning,
         status: latestBackup ? 'Success' : (AUTO_SUPABASE_BACKUP ? 'Pending' : 'Disabled'),
         latest: latestBackup,
-        files: listSupabaseBackupFiles().slice(0, 10).map(({ name, sizeLabel, createdAt }) => ({ name, sizeLabel, createdAt })),
+        files: backupFiles.slice(0, 10).map(({ name, sizeLabel, createdAt }) => ({ name, sizeLabel, createdAt })),
+        integrity,
         nextRunAt: nextSupabaseBackupAt,
         intervalMinutes: Math.round(SUPABASE_BACKUP_INTERVAL_MS / 60000),
         retention: SUPABASE_BACKUP_RETENTION,
@@ -1335,11 +1405,25 @@ const server = http.createServer((req, res) => {
         auditTail: audit.slice(-12).reverse(),
         auditCount: audit.length,
         websocketSubscribers: Array.from(stateSubscribers.entries()).map(([stateKey, sockets]) => ({ key: stateKey, subscribers: sockets.size })),
+        conflicts,
+        incidents,
       },
       protection: {
         score: protectionChecks.filter((x) => x.ok).length,
         total: protectionChecks.length,
         checks: protectionChecks,
+      },
+      recovery: {
+        rpoMinutes: latestBackupAgeMinutes,
+        rtoEstimateMinutes: estimatedRestoreMinutes,
+        lockdown,
+        dependencies: [
+          { name: 'Supabase API', status: supabaseConfigured && serviceClient ? 'Configured' : 'Missing' },
+          { name: 'Supabase DB URL', status: process.env.SUPABASE_DB_URL ? 'Configured' : 'Missing' },
+          { name: 'Telegram Alert', status: TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID ? 'Configured' : 'Missing' },
+          { name: 'Webhook Alert', status: SECURITY_ALERT_WEBHOOK ? 'Configured' : 'Missing' },
+          { name: 'Encryption', status: DATA_ENCRYPTION_KEY ? 'Configured' : 'Missing' },
+        ],
       },
     });
     })().catch((e) => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
@@ -1379,6 +1463,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/system/backup/simulate-restore') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    readBody(req).then(async (body) => {
+      const name = String(body.name || '').trim();
+      if (!/^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name)) { sendJson(res, 400, { ok: false, error: 'INVALID_BACKUP_NAME' }); return; }
+      const file = path.join(SUPABASE_BACKUP_DIR, name);
+      if (!file.startsWith(SUPABASE_BACKUP_DIR) || !fs.existsSync(file)) { sendJson(res, 404, { ok: false, error: 'BACKUP_NOT_FOUND' }); return; }
+      const result = await simulateRestoreFile(file);
+      appendAudit(key, { actor: session.userId, role: session.role, action: result.ok ? 'restore-simulation-completed' : 'restore-simulation-failed', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: name, newValue: result });
+      sendJson(res, result.ok ? 200 : 422, { ok: result.ok, backup: name, ...result });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/system/alert/test') {
     const session = requireSession(req, key);
     if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
@@ -1387,6 +1486,32 @@ const server = http.createServer((req, res) => {
       await sendSecurityAlert('system-health-test-alert', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Manual test from System Health page' });
       sendJson(res, 200, { ok: true, webhookConfigured: !!SECURITY_ALERT_WEBHOOK, telegramConfigured: !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) });
     })().catch((e) => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/emergency-lockdown') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    readBody(req).then(async (body) => {
+      const active = body.active !== false;
+      const reason = String(body.reason || '').trim() || (active ? 'Emergency lockdown enabled' : 'Emergency lockdown disabled');
+      const sessions = readSecurity(`sessions-${safeKey(key)}`, {});
+      let revoked = 0;
+      if (active) {
+        for (const [token, row] of Object.entries(sessions)) {
+          if (row && row.role !== 'super-admin') {
+            sessions[token] = { ...row, status: 'Revoked', active: false, revokedAt: new Date().toISOString(), revokedBy: session.userId, revokeReason: 'emergency-lockdown' };
+            revoked += 1;
+          }
+        }
+        writeSecurity(`sessions-${safeKey(key)}`, sessions);
+      }
+      const lockdown = { active, reason, actor: session.userId, revoked, updatedAt: new Date().toISOString() };
+      writeSecurity(`lockdown-${safeKey(key)}`, lockdown);
+      appendAudit(key, { actor: session.userId, role: session.role, action: active ? 'emergency-lockdown-enabled' : 'emergency-lockdown-disabled', ip: clientIp(req), device: req.headers['user-agent'] || '', reason, newValue: lockdown });
+      await sendSecurityAlert(active ? 'emergency-lockdown-enabled' : 'emergency-lockdown-disabled', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason });
+      sendJson(res, 200, { ok: true, lockdown });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
 
