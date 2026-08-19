@@ -905,10 +905,8 @@ export default function DriverPortal() {
     { id: 'performance', label: 'Performance', icon: BarChart3 },
     { id: 'chat', label: 'Chat', icon: MessageSquare, badge: 1 },
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'register', label: 'Register', icon: Truck },
   ];
 
-  const registerNav = authNav.filter(n => n.id !== 'register');
   const nav = authView === 'dashboard' ? authNav : [];
 
   return (
@@ -2381,25 +2379,6 @@ export default function DriverPortal() {
               </div>
 
               <p className="text-[9px] text-gray-600 text-center pt-2">Last active: {todayStr()} · NexaGo Smart Delivery Network</p>
-            </div>
-          )}
-
-          {/* ============ REGISTER ============ */}
-          {tab === 'register' && (
-            <div className="max-w-lg mx-auto space-y-4">
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-orange to-amber-500 text-white flex items-center justify-center mx-auto text-3xl font-bold shadow-xl">
-                  <Truck className="w-8 h-8" />
-                </div>
-                <h4 className="text-base font-black text-white tracking-wide">Become a NexaGo Rider</h4>
-                <p className="text-[10px] text-gray-400">Register your vehicle & documents to start earning.</p>
-              </div>
-              <button onClick={() => setAuthView('login')} className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-black uppercase rounded-xl shadow-lg">
-                Already a Driver? Login →
-              </button>
-              <button onClick={() => setAuthView('signup')} className="w-full py-2.5 glass-soft hover:bg-[#132238] text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer">
-                Start Registration →
-              </button>
             </div>
           )}
         </>
