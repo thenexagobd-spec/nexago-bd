@@ -45,6 +45,7 @@ export interface Order {
   deliveryProvider?: 'platform' | 'personal' | 'both';
   requiresStorePersonalDriver?: boolean;
   storePersonalDriverNote?: string;
+  personalDriverInfo?: { name?: string; phone?: string; vehicle?: string };
   codAmount?: number;
   estimatedMinutes?: number;
   items?: Array<{ productId: string; name: string; price: number; quantity: number }>;

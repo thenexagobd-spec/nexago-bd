@@ -2656,17 +2656,25 @@ export default function App() {
                                     showToast('Reason required before changing delivery permission.', 'info');
                                     return;
                                   }
+                                  const personalDriverInfo = mode.id === 'personal' || mode.id === 'both'
+                                    ? {
+                                        name: window.prompt('Personal driver/company name', s.personalDriverInfo?.name || s.ownerName || '') || s.personalDriverInfo?.name || '',
+                                        phone: window.prompt('Personal driver/company phone', s.personalDriverInfo?.phone || s.phone || '') || s.personalDriverInfo?.phone || '',
+                                        vehicle: window.prompt('Vehicle / delivery note', s.personalDriverInfo?.vehicle || 'Store managed delivery') || s.personalDriverInfo?.vehicle || '',
+                                      }
+                                    : s.personalDriverInfo;
                                   setStores(prev => prev.map((store: any) => store.id === s.id ? {
                                     ...store,
                                     deliveryProviderMode: mode.id,
+                                    personalDriverInfo,
                                     deliveryPermissionUpdatedAt: new Date().toISOString(),
                                     deliveryPermissionReason: reason.trim(),
                                     deliveryPermissionLog: [
                                       ...(store.deliveryPermissionLog || []),
-                                      { mode: mode.id, label: mode.label, reason: reason.trim(), at: new Date().toISOString(), by: 'super-admin' },
+                                      { mode: mode.id, label: mode.label, reason: reason.trim(), personalDriverInfo, at: new Date().toISOString(), by: 'super-admin' },
                                     ],
                                   } : store));
-                                  securityAudit('store-delivery-provider-updated', { storeId: s.id, storeName: s.name, mode: mode.id, reason: reason.trim() });
+                                  securityAudit('store-delivery-provider-updated', { storeId: s.id, storeName: s.name, mode: mode.id, reason: reason.trim(), personalDriverInfo });
                                   showToast(`${s.name} delivery mode updated to ${mode.label}`, 'success');
                                 }}
                                 className={`rounded-lg border px-2 py-1.5 text-[8px] font-black uppercase transition-all ${active ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' : 'border-brand-border bg-[#080e17] text-gray-400 hover:border-emerald-500/30 hover:text-emerald-300'}`}
@@ -2678,6 +2686,14 @@ export default function App() {
                         </div>
                         {(s.deliveryPermissionLog || []).length > 0 && (
                           <p className="mt-2 text-[8px] text-gray-500">Last: {(s.deliveryPermissionLog || []).slice(-1)[0]?.label} · {(s.deliveryPermissionLog || []).slice(-1)[0]?.reason}</p>
+                        )}
+                        {(s.deliveryProviderMode === 'personal' || s.deliveryProviderMode === 'both') && (
+                          <div className="mt-2 rounded-lg border border-emerald-500/20 bg-[#080e17] p-2 text-[8px] text-gray-300">
+                            <p className="font-black uppercase text-emerald-300">Personal Driver Info Saved</p>
+                            <p>Name: <b className="text-white">{s.personalDriverInfo?.name || 'Not set'}</b></p>
+                            <p>Phone: <b className="text-white">{s.personalDriverInfo?.phone || 'Not set'}</b></p>
+                            <p>Vehicle/Note: <b className="text-white">{s.personalDriverInfo?.vehicle || 'Not set'}</b></p>
+                          </div>
                         )}
                       </div>
                       <div className="mb-3 flex flex-wrap gap-2">

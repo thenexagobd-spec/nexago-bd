@@ -373,7 +373,10 @@ export default function StoreAdminPortal() {
       ...(usesPersonalDriver ? { offeredDriverIds: undefined, offerRound: undefined, driverDeadline: undefined } : broadcast),
       deliveryProvider: usesPersonalDriver ? 'personal' : deliveryProviderMode,
       requiresStorePersonalDriver: usesPersonalDriver,
-      storePersonalDriverNote: usesPersonalDriver ? 'Store will deliver with its own personal driver. NexaGo driver broadcast disabled by Super Admin setting.' : undefined,
+      personalDriverInfo: usesPersonalDriver ? activeStore?.personalDriverInfo : undefined,
+      storePersonalDriverNote: usesPersonalDriver
+        ? `Store will deliver with its own personal driver${activeStore?.personalDriverInfo?.name ? `: ${activeStore.personalDriverInfo.name}` : ''}${activeStore?.personalDriverInfo?.phone ? ` (${activeStore.personalDriverInfo.phone})` : ''}. NexaGo driver broadcast disabled by Super Admin setting.`
+        : undefined,
       placedAt: order.placedAt || Date.now(),
     }, 'accepted', 'store', usesPersonalDriver ? 'Store admin accepted — delivery will be handled by store personal driver' : `Store admin accepted — offered to ${(broadcast.offeredDriverIds || []).length} riders`) : null;
     if (!updated) return;
