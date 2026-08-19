@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import zlib from 'node:zlib';
 import { supabaseConfigured, serviceClient, sendEmailOtp, verifyEmailOtp } from './supabase.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -92,6 +94,10 @@ const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const BACKUP_DIR = path.join(DATA_DIR, '_backups');
 if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+const SUPABASE_BACKUP_DIR = path.resolve(process.env.NEXAGO_SUPABASE_BACKUP_DIR || path.join(process.cwd(), 'backups'));
+const AUTO_SUPABASE_BACKUP = process.env.NEXAGO_AUTO_SUPABASE_BACKUP === '1';
+const SUPABASE_BACKUP_INTERVAL_MS = Math.max(15, Number(process.env.NEXAGO_SUPABASE_BACKUP_INTERVAL_MIN || 1440)) * 60 * 1000;
+const SUPABASE_BACKUP_RETENTION = Math.max(1, Number(process.env.NEXAGO_SUPABASE_BACKUP_RETENTION || 14));
 const SECURITY_DIR = path.join(DATA_DIR, '_security');
 const FILES_DIR = path.join(DATA_DIR, '_files');
 for (const dir of [SECURITY_DIR, FILES_DIR]) if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -99,6 +105,213 @@ for (const dir of [SECURITY_DIR, FILES_DIR]) if (!fs.existsSync(dir)) fs.mkdirSy
 const rateBuckets = new Map();
 const alertBuckets = new Map();
 const stateSubscribers = new Map();
+const requestActivity = new Map();
+let supabaseBackupRunning = false;
+let lastSupabaseBackup = null;
+let nextSupabaseBackupAt = null;
+
+function bytesLabel(bytes) {
+  const n = Number(bytes || 0);
+  if (n >= 1024 * 1024 * 1024) return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(2)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(2)} KB`;
+  return `${n} B`;
+}
+
+function directorySize(dir, depth = 3) {
+  try {
+    if (!fs.existsSync(dir) || depth < 0) return 0;
+    return fs.readdirSync(dir, { withFileTypes: true }).reduce((sum, ent) => {
+      const p = path.join(dir, ent.name);
+      if (ent.isDirectory()) return sum + directorySize(p, depth - 1);
+      if (ent.isFile()) return sum + fs.statSync(p).size;
+      return sum;
+    }, 0);
+  } catch {
+    return 0;
+  }
+}
+
+function latestSupabaseBackupFile() {
+  try {
+    if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return null;
+    const files = listSupabaseBackupFiles();
+    return files[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+function listSupabaseBackupFiles() {
+  try {
+    if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return [];
+    return fs.readdirSync(SUPABASE_BACKUP_DIR)
+      .filter((name) => /^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name))
+      .map((name) => {
+        const full = path.join(SUPABASE_BACKUP_DIR, name);
+        const stat = fs.statSync(full);
+        return { name, path: full, size: stat.size, sizeLabel: bytesLabel(stat.size), createdAt: stat.mtime.toISOString() };
+      })
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  } catch {
+    return [];
+  }
+}
+
+function verifyBackupFile(file) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    let bytes = 0;
+    const gunzip = zlib.createGunzip();
+    const input = fs.createReadStream(file);
+    input.on('data', (chunk) => { bytes += chunk.length; });
+    input.on('error', (err) => resolve({ ok: false, error: err.message, bytes, durationMs: Date.now() - startedAt }));
+    gunzip.on('data', () => {});
+    gunzip.on('error', (err) => resolve({ ok: false, error: err.message, bytes, durationMs: Date.now() - startedAt }));
+    gunzip.on('end', () => resolve({ ok: true, bytes, durationMs: Date.now() - startedAt }));
+    input.pipe(gunzip);
+  });
+}
+
+async function supabaseTableCounts() {
+  const tables = Object.entries(SUPABASE_TABLE).filter(([, table]) => String(table || '').startsWith('nexago_'));
+  const counts = {};
+  if (!supabaseConfigured || !serviceClient) return counts;
+  await Promise.all(tables.map(async ([keyName, table]) => {
+    try {
+      const { count, error } = await serviceClient.from(table).select('*', { count: 'exact', head: true });
+      counts[keyName] = error ? { table, error: error.message } : { table, count: count || 0 };
+    } catch (err) {
+      counts[keyName] = { table, error: String(err && err.message || err) };
+    }
+  }));
+  return counts;
+}
+
+function localStateCounts(state = {}) {
+  const keys = ['orders', 'products', 'categories', 'drivers', 'users', 'stores', 'branches', 'payments', 'staff', 'coupons', 'tickets', 'reviews', 'posSales'];
+  return Object.fromEntries(keys.map((name) => [name, Array.isArray(state[name]) ? state[name].length : 0]));
+}
+
+function pruneSupabaseBackups() {
+  try {
+    if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return;
+    const files = fs.readdirSync(SUPABASE_BACKUP_DIR)
+      .filter((name) => /^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name))
+      .map((name) => ({ name, path: path.join(SUPABASE_BACKUP_DIR, name), mtime: fs.statSync(path.join(SUPABASE_BACKUP_DIR, name)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+    for (const file of files.slice(SUPABASE_BACKUP_RETENTION)) {
+      try { fs.unlinkSync(file.path); } catch { /* keep backup if delete fails */ }
+    }
+  } catch (err) {
+    console.warn('[backup] retention cleanup failed:', err.message);
+  }
+}
+
+function recordRequestActivity(key, req) {
+  try {
+    if (!req.url || !req.url.startsWith('/api/')) return;
+    const safe = safeKey(key || 'default');
+    const current = requestActivity.get(safe) || { key: safe, count: 0, lastAt: '', lastPath: '', ip: '', device: '' };
+    requestActivity.set(safe, {
+      ...current,
+      count: current.count + 1,
+      lastAt: new Date().toISOString(),
+      lastPath: req.url.split('?')[0],
+      ip: clientIp(req),
+      device: String(req.headers['user-agent'] || '').slice(0, 120),
+    });
+  } catch {
+    /* ignore activity failure */
+  }
+}
+
+function runSupabaseBackup(reason = 'scheduled') {
+  if (!process.env.SUPABASE_DB_URL) {
+    console.warn('[backup] SUPABASE_DB_URL missing; automatic Supabase backup skipped.');
+    return;
+  }
+  if (supabaseBackupRunning) {
+    console.warn('[backup] previous Supabase backup still running; skipped.');
+    return;
+  }
+
+  fs.mkdirSync(SUPABASE_BACKUP_DIR, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
+  const target = path.join(SUPABASE_BACKUP_DIR, `nexago_supabase_${stamp}.sql.gz`);
+  const tempTarget = `${target}.tmp`;
+  supabaseBackupRunning = true;
+
+  const dump = spawn('pg_dump', [process.env.SUPABASE_DB_URL, '--no-owner', '--no-privileges'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const gzip = zlib.createGzip({ level: 9 });
+  const out = fs.createWriteStream(tempTarget);
+  let stderr = '';
+  let dumpExitCode = null;
+  let writeFinished = false;
+
+  const finalize = () => {
+    if (dumpExitCode === null || !writeFinished) return;
+    supabaseBackupRunning = false;
+    if (dumpExitCode !== 0) {
+      try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
+      console.warn(`[backup] Supabase backup failed (${reason}) code=${dumpExitCode}: ${stderr.trim() || 'unknown error'}`);
+      void sendSecurityAlert('supabase-backup-failed', { reason: `${reason} code=${dumpExitCode} ${stderr.trim() || 'unknown error'}` });
+      return;
+    }
+      try {
+        fs.renameSync(tempTarget, target);
+        const stat = fs.statSync(target);
+        lastSupabaseBackup = { name: path.basename(target), path: target, size: stat.size, sizeLabel: bytesLabel(stat.size), createdAt: new Date().toISOString(), status: 'Success', reason };
+        pruneSupabaseBackups();
+        console.log(`[backup] Supabase backup saved (${reason}): ${target}`);
+    } catch (err) {
+      try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
+      console.warn('[backup] finalize failed:', err.message);
+      void sendSecurityAlert('supabase-backup-finalize-failed', { reason: err.message });
+    }
+  };
+
+  dump.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+  dump.on('error', (err) => {
+    supabaseBackupRunning = false;
+    try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
+    console.warn('[backup] pg_dump failed to start:', err.message);
+    void sendSecurityAlert('supabase-backup-start-failed', { reason: err.message });
+  });
+  out.on('error', (err) => {
+    supabaseBackupRunning = false;
+    try { dump.kill(); } catch { /* ignore */ }
+    try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
+    console.warn('[backup] write failed:', err.message);
+    void sendSecurityAlert('supabase-backup-write-failed', { reason: err.message });
+  });
+  dump.stdout.pipe(gzip).pipe(out);
+  dump.on('close', (code) => {
+    dumpExitCode = code;
+    finalize();
+  });
+  out.on('finish', () => {
+    writeFinished = true;
+    finalize();
+  });
+}
+
+function startAutomaticSupabaseBackups() {
+  if (!AUTO_SUPABASE_BACKUP) {
+    console.log('[backup] automatic Supabase backup disabled. Set NEXAGO_AUTO_SUPABASE_BACKUP=1 to enable.');
+    return;
+  }
+  console.log(`[backup] automatic Supabase backup enabled every ${Math.round(SUPABASE_BACKUP_INTERVAL_MS / 60000)} minutes.`);
+  nextSupabaseBackupAt = new Date(Date.now() + 30_000).toISOString();
+  setTimeout(() => {
+    runSupabaseBackup('startup');
+    nextSupabaseBackupAt = new Date(Date.now() + SUPABASE_BACKUP_INTERVAL_MS).toISOString();
+  }, 30_000).unref();
+  setInterval(() => {
+    runSupabaseBackup('scheduled');
+    nextSupabaseBackupAt = new Date(Date.now() + SUPABASE_BACKUP_INTERVAL_MS).toISOString();
+  }, SUPABASE_BACKUP_INTERVAL_MS).unref();
+}
 
 function notifyStateSubscribers(key, detail = {}) {
   const safe = safeKey(key);
@@ -1026,8 +1239,190 @@ const server = http.createServer((req, res) => {
     sendJson(res, 400, { ok: false, error: 'INVALID_KEY' });
     return;
   }
+  recordRequestActivity(key, req);
 
   if (req.method === 'OPTIONS') { res.writeHead(204, corsHeaders); res.end(); return; }
+
+  if (req.method === 'GET' && url.pathname === '/api/system/health') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    (async () => {
+    const latestBackup = lastSupabaseBackup || latestSupabaseBackupFile();
+    const localBackupDir = path.join(BACKUP_DIR, safeKey(key));
+    const localBackupCount = fs.existsSync(localBackupDir) ? fs.readdirSync(localBackupDir).filter((name) => name.endsWith('.json')).length : 0;
+    const audit = readSecurity(`audit-${safeKey(key)}`, []);
+    const storeState = loadStore(key).state || {};
+    const branchMap = new Map();
+    const bumpBranch = (branchKey, patch = {}) => {
+      const current = branchMap.get(branchKey) || { key: branchKey, orders: 0, completed: 0, revenue: 0, posSales: 0, printerStatus: 'Unknown', lastOrderAt: '' };
+      branchMap.set(branchKey, { ...current, ...patch });
+      return branchMap.get(branchKey);
+    };
+    for (const order of Array.isArray(storeState.orders) ? storeState.orders : []) {
+      const branchKey = String(order.branchId || order.storeId || order.storeName || 'unassigned');
+      const row = bumpBranch(branchKey);
+      row.orders += 1;
+      if (String(order.status || '').toLowerCase() === 'completed') row.completed += 1;
+      row.revenue += Number(order.amount || order.total || order.grandTotal || 0);
+      row.lastOrderAt = order.updatedAt || order.createdAt || order.date || row.lastOrderAt;
+    }
+    for (const sale of Array.isArray(storeState.posSales) ? storeState.posSales : []) {
+      const branchKey = String(sale.branchId || sale.storeId || sale.storeName || 'pos');
+      const row = bumpBranch(branchKey);
+      row.posSales += 1;
+      row.revenue += Number(sale.total || sale.netTotal || sale.amount || 0);
+      row.lastOrderAt = sale.createdAt || sale.time || row.lastOrderAt;
+    }
+    for (const device of Array.isArray(storeState.devices) ? storeState.devices : []) {
+      const branchKey = String(device.branchId || device.storeId || device.name || 'device');
+      bumpBranch(branchKey, { printerStatus: device.printerStatus || device.status || 'Online' });
+    }
+    const memory = process.memoryUsage();
+    const load = os.loadavg();
+    const cpuCount = Math.max(1, os.cpus().length);
+    const cpuLoadPercent = Math.min(100, Math.round((load[0] / cpuCount) * 100));
+    const dataBytes = directorySize(DATA_DIR, 4);
+    const backupBytes = directorySize(SUPABASE_BACKUP_DIR, 2);
+    const tableCounts = await supabaseTableCounts();
+    const localCounts = localStateCounts(storeState);
+    const protectionChecks = [
+      { key: 'supabase', label: 'Supabase configured', ok: supabaseConfigured },
+      { key: 'serviceRole', label: 'Server service role available', ok: !!serviceClient },
+      { key: 'autoBackup', label: 'Automatic backup enabled', ok: AUTO_SUPABASE_BACKUP },
+      { key: 'dbUrl', label: 'SUPABASE_DB_URL configured', ok: !!process.env.SUPABASE_DB_URL },
+      { key: 'backupFile', label: 'At least one backup file exists', ok: !!latestBackup },
+      { key: 'encryption', label: 'Encryption key configured', ok: !!DATA_ENCRYPTION_KEY },
+      { key: 'alerts', label: 'Telegram/Webhook alert configured', ok: !!(SECURITY_ALERT_WEBHOOK || (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID)) },
+      { key: 'audit', label: 'Audit log active', ok: audit.length > 0 },
+    ];
+    sendJson(res, 200, {
+      ok: true,
+      key: safeKey(key),
+      checkedAt: new Date().toISOString(),
+      backup: {
+        automaticEnabled: AUTO_SUPABASE_BACKUP,
+        running: supabaseBackupRunning,
+        status: latestBackup ? 'Success' : (AUTO_SUPABASE_BACKUP ? 'Pending' : 'Disabled'),
+        latest: latestBackup,
+        files: listSupabaseBackupFiles().slice(0, 10).map(({ name, sizeLabel, createdAt }) => ({ name, sizeLabel, createdAt })),
+        nextRunAt: nextSupabaseBackupAt,
+        intervalMinutes: Math.round(SUPABASE_BACKUP_INTERVAL_MS / 60000),
+        retention: SUPABASE_BACKUP_RETENTION,
+        localJsonBackupCount: localBackupCount,
+      },
+      storage: {
+        databaseConfigured: supabaseConfigured,
+        databaseSizeEstimate: latestBackup?.sizeLabel || 'No backup yet',
+        localDataSize: bytesLabel(dataBytes),
+        backupStorageSize: bytesLabel(backupBytes),
+        localCounts,
+        tableCounts,
+      },
+      server: {
+        uptimeSeconds: Math.round(process.uptime()),
+        cpuLoadPercent,
+        loadAverage: load.map((x) => Number(x.toFixed(2))),
+        memoryUsed: bytesLabel(memory.rss),
+        heapUsed: bytesLabel(memory.heapUsed),
+        heapTotal: bytesLabel(memory.heapTotal),
+        freeSystemMemory: bytesLabel(os.freemem()),
+        totalSystemMemory: bytesLabel(os.totalmem()),
+        platform: `${os.platform()} ${os.arch()}`,
+      },
+      activity: {
+        activeKeys: Array.from(requestActivity.values()).sort((a, b) => Date.parse(b.lastAt || '0') - Date.parse(a.lastAt || '0')).slice(0, 20),
+        branches: Array.from(branchMap.values()).sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0)).slice(0, 20),
+        auditTail: audit.slice(-12).reverse(),
+        auditCount: audit.length,
+        websocketSubscribers: Array.from(stateSubscribers.entries()).map(([stateKey, sockets]) => ({ key: stateKey, subscribers: sockets.size })),
+      },
+      protection: {
+        score: protectionChecks.filter((x) => x.ok).length,
+        total: protectionChecks.length,
+        checks: protectionChecks,
+      },
+    });
+    })().catch((e) => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/backup/run') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    if (supabaseBackupRunning) { sendJson(res, 409, { ok: false, error: 'BACKUP_ALREADY_RUNNING' }); return; }
+    appendAudit(key, { actor: session.userId, role: session.role, action: 'manual-supabase-backup-triggered', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Super Admin dashboard backup button' });
+    runSupabaseBackup(`manual:${session.userId}`);
+    sendJson(res, 202, { ok: true, status: 'started', message: 'Backup started in background' });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/system/backups') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    sendJson(res, 200, { ok: true, backups: listSupabaseBackupFiles().map(({ name, sizeLabel, createdAt }) => ({ name, sizeLabel, createdAt })) });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/backup/verify') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    readBody(req).then(async (body) => {
+      const name = String(body.name || '').trim();
+      if (!/^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name)) { sendJson(res, 400, { ok: false, error: 'INVALID_BACKUP_NAME' }); return; }
+      const file = path.join(SUPABASE_BACKUP_DIR, name);
+      if (!file.startsWith(SUPABASE_BACKUP_DIR) || !fs.existsSync(file)) { sendJson(res, 404, { ok: false, error: 'BACKUP_NOT_FOUND' }); return; }
+      const result = await verifyBackupFile(file);
+      appendAudit(key, { actor: session.userId, role: session.role, action: result.ok ? 'supabase-backup-verified' : 'supabase-backup-verify-failed', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: name, newValue: result });
+      if (!result.ok) await sendSecurityAlert('supabase-backup-verify-failed', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: `${name}: ${result.error}` });
+      sendJson(res, result.ok ? 200 : 422, { ok: result.ok, backup: name, ...result });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/alert/test') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    (async () => {
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'system-alert-test-sent', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Super Admin System Health test alert' });
+      await sendSecurityAlert('system-health-test-alert', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Manual test from System Health page' });
+      sendJson(res, 200, { ok: true, webhookConfigured: !!SECURITY_ALERT_WEBHOOK, telegramConfigured: !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) });
+    })().catch((e) => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/system/backup/download') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    const name = String(url.searchParams.get('name') || '').trim();
+    if (!/^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name)) { sendJson(res, 400, { ok: false, error: 'INVALID_BACKUP_NAME' }); return; }
+    const file = path.join(SUPABASE_BACKUP_DIR, name);
+    if (!file.startsWith(SUPABASE_BACKUP_DIR) || !fs.existsSync(file)) { sendJson(res, 404, { ok: false, error: 'BACKUP_NOT_FOUND' }); return; }
+    appendAudit(key, { actor: session.userId, role: session.role, action: 'supabase-backup-downloaded', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: name });
+    res.writeHead(200, {
+      ...securityHeaders,
+      'Content-Type': 'application/gzip',
+      'Content-Disposition': `attachment; filename="${name}"`,
+      'Cache-Control': 'no-store',
+    });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/backup/restore-request') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    readBody(req).then(async (body) => {
+      const name = String(body.name || '').trim();
+      const reason = String(body.reason || '').trim();
+      const confirmText = String(body.confirmText || '').trim();
+      if (!/^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name)) { sendJson(res, 400, { ok: false, error: 'INVALID_BACKUP_NAME' }); return; }
+      if (confirmText !== 'RESTORE REQUEST') { sendJson(res, 400, { ok: false, error: 'CONFIRM_TEXT_REQUIRED' }); return; }
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'supabase-restore-requested', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: reason || 'restore requested from Super Admin dashboard', newValue: { backup: name } });
+      await sendSecurityAlert('supabase-restore-requested', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: `${name} :: ${reason || 'no reason'}` });
+      sendJson(res, 200, { ok: true, status: 'audit-saved', message: 'Restore request saved and alerted. Run restore only during maintenance window.' });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
 
   if (req.method === 'GET' && url.pathname === '/api/storefront') {
     const store = loadStore(key);
@@ -2224,4 +2619,5 @@ await initSupabaseBridge();
 server.listen(PORT, HOST, () => {
   console.log(`NexaGo Remote Relay running on ${HOST}:${PORT}`);
   console.log(`Share page: http://localhost:${PORT}/share`);
+  startAutomaticSupabaseBackups();
 });
