@@ -42,6 +42,10 @@ export interface Order {
   instructions?: string;
   customerNote?: string;      // comment the customer wrote when placing the order
   deliveryCharge?: number;
+  deliveryProvider?: 'platform' | 'personal' | 'both';
+  requiresStorePersonalDriver?: boolean;
+  storePersonalDriverNote?: string;
+  personalDriverInfo?: { name?: string; phone?: string; vehicle?: string };
   codAmount?: number;
   estimatedMinutes?: number;
   items?: Array<{ productId: string; name: string; price: number; quantity: number }>;

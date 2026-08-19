@@ -40,7 +40,7 @@ import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
 import { runExpiryAutoWaste } from './components/inventoryAutoWaste';
-import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, supabaseClient } from './portals/portalUtils';
+import { appendTimeline, useCloudSync, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, supabaseClient, persistOrderToCloud } from './portals/portalUtils';
 
 import { 
   LayoutDashboard, Users, UserSquare2, ShoppingCart, DollarSign, CreditCard, 
@@ -223,6 +223,7 @@ const STORE_ADMIN_PAGE_OPTIONS = [
   { id: 'products', label: 'Products' },
   { id: 'categories', label: 'Categories' },
   { id: 'inventory', label: 'Inventory' },
+  { id: 'pos', label: 'POS' },
   { id: 'reviews', label: 'Reviews' },
   { id: 'coupons', label: 'Coupons' },
   { id: 'tools', label: 'Order Tools' },
@@ -543,6 +544,7 @@ export default function App() {
 
   // Merchant specific interactive states
   const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
+  const [expandedStoreOrderId, setExpandedStoreOrderId] = useState<string | null>(null);
   const [mProdName, setMProdName] = useState('');
   const [mProdCat, setMProdCat] = useState('Fruits & Vegetables');
   const [mProdPrice, setMProdPrice] = useState('');
@@ -585,6 +587,62 @@ export default function App() {
     const latest = normalizeStaffKyc(staff).find((s: any) => s.id === staffIdCard.id);
     if (latest) setStaffIdCard((prev: any) => ({ ...prev, ...latest }));
   }, [staff, staffIdCard?.id]);
+  const cardRegistryRecord = (kind: RoleCardKind | 'staff', record: any, meta: any = {}) => {
+    const id = String(kind === 'store-admin' ? (record.adminId || record.id) : record.id || '').trim();
+    const permanentNumber = String(meta.permanentNumber || record.permanentNumber || record.cardPermanentNumber || '').trim();
+    if (!id || !permanentNumber) return null;
+    return {
+      kind,
+      id,
+      permanentNumber,
+      name: record.name || record.ownerName || record.fullName || record.storeName || '',
+      phone: record.phone || '',
+      email: record.email || '',
+      role: record.role || record.assignedRole || ROLE_CARD_META[kind as RoleCardKind]?.sub || 'Staff',
+      status: record.status || 'Active',
+      cardIssuedAt: record.cardIssuedAt || record.issuedAt || meta.cardIssuedAt || record.verifiedAt || record.createdAt || '',
+      cardExpiresAt: record.cardExpiresAt || record.expiresAt || meta.cardExpiresAt || '',
+      photoDataUrl: record.photoDataUrl || meta.photoDataUrl || record.photo || '',
+      photoScale: record.photoScale || meta.photoScale || 1,
+      photoX: record.photoX || meta.photoX || 50,
+      photoY: record.photoY || meta.photoY || 50,
+      address: record.address || record.presentAddress || '',
+      joiningDate: record.joiningDate || '',
+      storeId: record.storeId || '',
+      branchId: record.branchId || '',
+      updatedAt: record.updatedAt || new Date().toISOString(),
+    };
+  };
+  useEffect(() => {
+    const session = localStorage.getItem('sd_security_session') || '';
+    if (!session) return;
+    const timer = window.setTimeout(() => {
+      const cards: any[] = [];
+      normalizeStaffKyc(staff).forEach((member: any) => {
+        const issuedAt = member.cardIssuedAt || member.verifiedAt || member.createdAt || new Date().toISOString();
+        const expiresAt = member.cardExpiresAt || member.expiresAt || new Date(new Date(issuedAt).setFullYear(new Date(issuedAt).getFullYear() + 1)).toISOString();
+        const permanentNumber = member.permanentNumber || `NXG${new Date(issuedAt).getFullYear()}${String(member.id || '').replace(/[^A-Z0-9]/gi, '').slice(-8)}`;
+        const card = cardRegistryRecord('staff', { ...member, permanentNumber, cardIssuedAt: issuedAt, cardExpiresAt: expiresAt });
+        if (card) cards.push(card);
+      });
+      Object.entries(roleCardsStore).forEach(([key, meta]) => {
+        const [kind, id] = key.split(':') as [RoleCardKind, string];
+        if (!kind || !id) return;
+        let source: any = { id };
+        if (kind === 'driver') source = drivers.find((d: any) => String(d.id) === id) || source;
+        if (kind === 'store-admin') source = storeAdminApps.find((s: any) => String(s.adminId || s.id) === id) || source;
+        if (kind === 'super-admin') source = { id, ...superAdminCardProfile, status: 'Active' };
+        const card = cardRegistryRecord(kind, source, meta);
+        if (card) cards.push(card);
+      });
+      if (superAdminCardProfile?.permanentNumber) {
+        const card = cardRegistryRecord('super-admin', { id: 'SUPERADMIN', ...superAdminCardProfile, status: 'Active' });
+        if (card) cards.push(card);
+      }
+      if (cards.length) securityApi('/card-registry', { cards, reason: 'automatic permanent smart card registry sync' }).catch(() => {});
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [staff, roleCardsStore, superAdminCardProfile, drivers, storeAdminApps]);
   useEffect(() => { setStoredData('sd_reviews', reviews); }, [reviews]);
   useEffect(() => { setStoredData('sd_marketing', marketing); }, [marketing]);
   useEffect(() => { setStoredData('sd_banners', banners); }, [banners]);
@@ -912,6 +970,7 @@ export default function App() {
     }
 
     setOrders([newOrder, ...orders]);
+    persistOrderToCloud(newOrder);
 
     if (newOrder.deliveryCoords || newOrder.pickupCoords) {
       handleAddNotification({
@@ -968,6 +1027,7 @@ export default function App() {
     }
 
     setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+    persistOrderToCloud(updatedOrder);
 
     // Update payment
     setPayments(payments.map(p => p.orderId === updatedOrder.id ? {
@@ -1680,7 +1740,7 @@ export default function App() {
     const key = roleCardKeyOf(kind, id);
     const existing = roleCardsStore[key];
     if (existing) return existing;
-    const permanentNumber = `${ROLE_CARD_META[kind].prefix}${new Date().getFullYear()}${Date.now().toString().slice(-8)}`;
+    const permanentNumber = seed.permanentNumber || `${ROLE_CARD_META[kind].prefix}${new Date().getFullYear()}${Date.now().toString().slice(-8)}`;
     const now = new Date().toISOString();
     const meta = {
       permanentNumber,
@@ -1887,7 +1947,25 @@ export default function App() {
     showToast('Incomplete staff record archived. Recovery Archived filter-e thakbe.', 'success');
   };
 
-  const applyStaffScan = (code: string) => {
+  const openRegistryCard = (card: any) => {
+    const kind = String(card?.kind || 'staff') as RoleCardKind | 'staff';
+    if (kind === 'staff') {
+      setStaffIdCard({
+        ...card,
+        issuedAt: card.cardIssuedAt || card.issuedAt || card.createdAt || new Date().toISOString(),
+        expiresAt: card.cardExpiresAt || card.expiresAt || '',
+      });
+      return;
+    }
+    openRoleCard(kind as RoleCardKind, {
+      ...card,
+      id: card.id,
+      adminId: kind === 'store-admin' ? card.id : undefined,
+      photoDataUrl: card.photoDataUrl || '',
+    });
+  };
+
+  const applyStaffScan = async (code: string) => {
     const clean = String(code || '').trim().toUpperCase();
     if (!clean) return;
     const match = staff.find((s: any) => {
@@ -1903,7 +1981,26 @@ export default function App() {
       securityAudit('staff-id-card-scanned', { actor: 'super-admin', newValue: { staffId: match.id, scanned: clean }, reason: 'staff ID card barcode/QR scanned and opened' });
       showToast(`${match.name} — full card opened.`, 'success');
     } else {
-      setStaffScanMsg(`No staff matches "${clean}". Verify the Permanent No on the card.`);
+      try {
+        const res = await securityApi(`/card-registry?q=${encodeURIComponent(clean)}`);
+        const found = (res.cards || []).find((card: any) => {
+          const pn = String(card.permanentNumber || '').toUpperCase();
+          const id = String(card.id || '').toUpperCase();
+          return pn === clean || id === clean || (clean.length >= 6 && (pn.endsWith(clean) || id.endsWith(clean)));
+        }) || (res.cards || [])[0];
+        if (found) {
+          setStaffScanMsg(null);
+          setStaffScanManual('');
+          setStaffScanOpen(false);
+          openRegistryCard(found);
+          securityAudit('smart-card-registry-looked-up', { actor: 'super-admin', newValue: { cardId: found.cardId, scanned: clean }, reason: 'Look Up opened permanent smart card registry record' });
+          showToast(`${found.name || found.id} — registry card opened.`, 'success');
+          return;
+        }
+      } catch {
+        /* local message below */
+      }
+      setStaffScanMsg(`No card matches "${clean}". Verify Permanent No / ID or sync Supabase registry.`);
     }
   };
 
@@ -2520,6 +2617,12 @@ export default function App() {
               {stores.map(s => {
                 const dashboardUrl = `${window.location.origin}${window.location.pathname}?storeId=${s.id}`;
                 const storeBranches = branches.filter((b: any) => b.storeId === s.id);
+                const storeOrders = orders.filter((o: any) => ((o.storeId && o.storeId === s.id) || String(o.storeName || '').toLowerCase() === String(s.name || '').toLowerCase()));
+                const storeRevenue = storeOrders.filter((o: any) => o.status !== 'Cancelled').reduce((sum, o: any) => sum + (Number(o.amount) || 0), 0);
+                const branchOrderRows = storeBranches.map((b: any) => {
+                  const rows = storeOrders.filter((o: any) => o.branchId === b.id);
+                  return { branch: b, rows, revenue: rows.filter((o: any) => o.status !== 'Cancelled').reduce((sum, o: any) => sum + (Number(o.amount) || 0), 0) };
+                });
                 return (
                   <div key={s.id} className="bg-brand-card border border-brand-border rounded-xl p-5 flex flex-col justify-between shadow-lg hover:border-brand-border-hover transition-all">
                     <div>
@@ -2533,6 +2636,140 @@ export default function App() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 font-medium mb-2">{s.address}</p>
+                      <div className="mb-3 rounded-lg border border-brand-orange/25 bg-brand-orange/10 p-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-wider text-brand-orange">All Order Information</p>
+                            <p className="text-[8px] text-gray-500">Super Admin view only. This store admin's orders stay separate from every other store.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedStoreOrderId(prev => prev === s.id ? null : s.id)}
+                            className="rounded-lg border border-brand-orange/35 bg-[#080e17] px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange"
+                          >
+                            {expandedStoreOrderId === s.id ? 'Hide Orders' : `Orders Info (${storeOrders.length})`}
+                          </button>
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
+                          <div className="rounded-lg bg-[#080e17] p-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Orders</p>
+                            <p className="text-sm font-black text-white">{storeOrders.length}</p>
+                          </div>
+                          <div className="rounded-lg bg-[#080e17] p-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Revenue</p>
+                            <p className="text-sm font-black text-emerald-300">৳{storeRevenue.toLocaleString()}</p>
+                          </div>
+                          <div className="rounded-lg bg-[#080e17] p-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Pending</p>
+                            <p className="text-sm font-black text-amber-300">{storeOrders.filter((o: any) => ['Pending', 'Confirmed', 'Processing', 'Ongoing'].includes(o.status)).length}</p>
+                          </div>
+                        </div>
+                        {expandedStoreOrderId === s.id && (
+                          <div className="mt-3 space-y-2">
+                            <div className="rounded-lg border border-brand-border/40 bg-[#080e17] p-2">
+                              <p className="mb-1.5 text-[8px] font-black uppercase text-gray-400">Branch Wise Order Split</p>
+                              {branchOrderRows.length === 0 && <p className="text-[8px] text-gray-500">No branch added. Orders belong to main store account.</p>}
+                              {branchOrderRows.map(({ branch, rows, revenue }: any) => (
+                                <div key={branch.id} className="mb-1 grid grid-cols-[1fr_auto_auto] gap-2 rounded-md bg-[#0c1624] px-2 py-1 text-[8px] last:mb-0">
+                                  <span className="truncate text-gray-300">{branch.name} <b className="font-mono text-gray-500">({branch.id})</b></span>
+                                  <span className="font-black text-white">{rows.length} orders</span>
+                                  <span className="font-black text-emerald-300">৳{revenue.toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="max-h-64 overflow-auto rounded-lg border border-brand-border/40 bg-[#080e17]">
+                              <table className="w-full min-w-[720px] text-left text-[8px]">
+                                <thead className="sticky top-0 bg-[#0c1624] text-gray-500 uppercase">
+                                  <tr><th className="px-2 py-1.5">Order</th><th className="px-2 py-1.5">Customer</th><th className="px-2 py-1.5">Branch</th><th className="px-2 py-1.5">Status</th><th className="px-2 py-1.5">Delivery</th><th className="px-2 py-1.5 text-right">Amount</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-brand-border/30">
+                                  {storeOrders.map((o: any) => {
+                                    const branch = storeBranches.find((b: any) => b.id === o.branchId);
+                                    return (
+                                      <tr key={o.id}>
+                                        <td className="px-2 py-1.5 font-mono font-black text-brand-orange">#{o.id}</td>
+                                        <td className="px-2 py-1.5 text-gray-300">{o.customerName || 'Customer'}{o.customerPhone ? ` · ${o.customerPhone}` : ''}</td>
+                                        <td className="px-2 py-1.5 text-gray-400">{branch?.name || o.branchId || 'Main Store'}</td>
+                                        <td className="px-2 py-1.5 text-white">{o.status}</td>
+                                        <td className="px-2 py-1.5 text-gray-300">{o.requiresStorePersonalDriver ? `Store Driver${o.personalDriverInfo?.phone ? ` · ${o.personalDriverInfo.phone}` : ''}` : 'NexaGo Driver'}</td>
+                                        <td className="px-2 py-1.5 text-right font-black text-emerald-300">৳{Number(o.amount || 0).toLocaleString()}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                  {storeOrders.length === 0 && <tr><td colSpan={6} className="px-2 py-8 text-center text-[9px] text-gray-500">No real orders yet for this store admin.</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2.5">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-wider text-emerald-300">Delivery Driver Permission</p>
+                            <p className="text-[8px] text-gray-500">Super Admin controls if this store can deliver with their own personal drivers.</p>
+                          </div>
+                          <span className="rounded-md bg-[#080e17] px-2 py-1 text-[8px] font-black uppercase text-white">
+                            {(s.deliveryProviderMode || 'platform') === 'personal' ? 'Store Driver' : (s.deliveryProviderMode || 'platform') === 'both' ? 'Both' : 'NexaGo'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { id: 'platform', label: 'NexaGo Driver' },
+                            { id: 'personal', label: 'Store Driver' },
+                            { id: 'both', label: 'Both' },
+                          ].map(mode => {
+                            const active = (s.deliveryProviderMode || 'platform') === mode.id;
+                            return (
+                              <button
+                                key={mode.id}
+                                type="button"
+                                onClick={() => {
+                                  const reason = window.prompt('Reason for delivery permission change', `${s.name} delivery mode set to ${mode.label}`);
+                                  if (!reason?.trim()) {
+                                    showToast('Reason required before changing delivery permission.', 'info');
+                                    return;
+                                  }
+                                  const personalDriverInfo = mode.id === 'personal' || mode.id === 'both'
+                                    ? {
+                                        name: window.prompt('Personal driver/company name', s.personalDriverInfo?.name || s.ownerName || '') || s.personalDriverInfo?.name || '',
+                                        phone: window.prompt('Personal driver/company phone', s.personalDriverInfo?.phone || s.phone || '') || s.personalDriverInfo?.phone || '',
+                                        vehicle: window.prompt('Vehicle / delivery note', s.personalDriverInfo?.vehicle || 'Store managed delivery') || s.personalDriverInfo?.vehicle || '',
+                                      }
+                                    : s.personalDriverInfo;
+                                  setStores(prev => prev.map((store: any) => store.id === s.id ? {
+                                    ...store,
+                                    deliveryProviderMode: mode.id,
+                                    personalDriverInfo,
+                                    deliveryPermissionUpdatedAt: new Date().toISOString(),
+                                    deliveryPermissionReason: reason.trim(),
+                                    deliveryPermissionLog: [
+                                      ...(store.deliveryPermissionLog || []),
+                                      { mode: mode.id, label: mode.label, reason: reason.trim(), personalDriverInfo, at: new Date().toISOString(), by: 'super-admin' },
+                                    ],
+                                  } : store));
+                                  securityAudit('store-delivery-provider-updated', { storeId: s.id, storeName: s.name, mode: mode.id, reason: reason.trim(), personalDriverInfo });
+                                  showToast(`${s.name} delivery mode updated to ${mode.label}`, 'success');
+                                }}
+                                className={`rounded-lg border px-2 py-1.5 text-[8px] font-black uppercase transition-all ${active ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' : 'border-brand-border bg-[#080e17] text-gray-400 hover:border-emerald-500/30 hover:text-emerald-300'}`}
+                              >
+                                {mode.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {(s.deliveryPermissionLog || []).length > 0 && (
+                          <p className="mt-2 text-[8px] text-gray-500">Last: {(s.deliveryPermissionLog || []).slice(-1)[0]?.label} · {(s.deliveryPermissionLog || []).slice(-1)[0]?.reason}</p>
+                        )}
+                        {(s.deliveryProviderMode === 'personal' || s.deliveryProviderMode === 'both') && (
+                          <div className="mt-2 rounded-lg border border-emerald-500/20 bg-[#080e17] p-2 text-[8px] text-gray-300">
+                            <p className="font-black uppercase text-emerald-300">Personal Driver Info Saved</p>
+                            <p>Name: <b className="text-white">{s.personalDriverInfo?.name || 'Not set'}</b></p>
+                            <p>Phone: <b className="text-white">{s.personalDriverInfo?.phone || 'Not set'}</b></p>
+                            <p>Vehicle/Note: <b className="text-white">{s.personalDriverInfo?.vehicle || 'Not set'}</b></p>
+                          </div>
+                        )}
+                      </div>
                       <div className="mb-3 flex flex-wrap gap-2">
                         <span className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[9px] font-black uppercase text-sky-300">{storeBranches.length} Branches</span>
                         <button onClick={() => {
