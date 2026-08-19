@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import zlib from 'node:zlib';
 import { supabaseConfigured, serviceClient, sendEmailOtp, verifyEmailOtp } from './supabase.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -92,6 +94,10 @@ const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const BACKUP_DIR = path.join(DATA_DIR, '_backups');
 if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+const SUPABASE_BACKUP_DIR = path.resolve(process.env.NEXAGO_SUPABASE_BACKUP_DIR || path.join(process.cwd(), 'backups'));
+const AUTO_SUPABASE_BACKUP = process.env.NEXAGO_AUTO_SUPABASE_BACKUP === '1';
+const SUPABASE_BACKUP_INTERVAL_MS = Math.max(15, Number(process.env.NEXAGO_SUPABASE_BACKUP_INTERVAL_MIN || 1440)) * 60 * 1000;
+const SUPABASE_BACKUP_RETENTION = Math.max(1, Number(process.env.NEXAGO_SUPABASE_BACKUP_RETENTION || 14));
 const SECURITY_DIR = path.join(DATA_DIR, '_security');
 const FILES_DIR = path.join(DATA_DIR, '_files');
 for (const dir of [SECURITY_DIR, FILES_DIR]) if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -99,6 +105,96 @@ for (const dir of [SECURITY_DIR, FILES_DIR]) if (!fs.existsSync(dir)) fs.mkdirSy
 const rateBuckets = new Map();
 const alertBuckets = new Map();
 const stateSubscribers = new Map();
+let supabaseBackupRunning = false;
+
+function pruneSupabaseBackups() {
+  try {
+    if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return;
+    const files = fs.readdirSync(SUPABASE_BACKUP_DIR)
+      .filter((name) => /^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name))
+      .map((name) => ({ name, path: path.join(SUPABASE_BACKUP_DIR, name), mtime: fs.statSync(path.join(SUPABASE_BACKUP_DIR, name)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+    for (const file of files.slice(SUPABASE_BACKUP_RETENTION)) {
+      try { fs.unlinkSync(file.path); } catch { /* keep backup if delete fails */ }
+    }
+  } catch (err) {
+    console.warn('[backup] retention cleanup failed:', err.message);
+  }
+}
+
+function runSupabaseBackup(reason = 'scheduled') {
+  if (!process.env.SUPABASE_DB_URL) {
+    console.warn('[backup] SUPABASE_DB_URL missing; automatic Supabase backup skipped.');
+    return;
+  }
+  if (supabaseBackupRunning) {
+    console.warn('[backup] previous Supabase backup still running; skipped.');
+    return;
+  }
+
+  fs.mkdirSync(SUPABASE_BACKUP_DIR, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
+  const target = path.join(SUPABASE_BACKUP_DIR, `nexago_supabase_${stamp}.sql.gz`);
+  const tempTarget = `${target}.tmp`;
+  supabaseBackupRunning = true;
+
+  const dump = spawn('pg_dump', [process.env.SUPABASE_DB_URL, '--no-owner', '--no-privileges'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const gzip = zlib.createGzip({ level: 9 });
+  const out = fs.createWriteStream(tempTarget);
+  let stderr = '';
+  let dumpExitCode = null;
+  let writeFinished = false;
+
+  const finalize = () => {
+    if (dumpExitCode === null || !writeFinished) return;
+    supabaseBackupRunning = false;
+    if (dumpExitCode !== 0) {
+      try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
+      console.warn(`[backup] Supabase backup failed (${reason}) code=${dumpExitCode}: ${stderr.trim() || 'unknown error'}`);
+      return;
+    }
+    try {
+      fs.renameSync(tempTarget, target);
+      pruneSupabaseBackups();
+      console.log(`[backup] Supabase backup saved (${reason}): ${target}`);
+    } catch (err) {
+      try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
+      console.warn('[backup] finalize failed:', err.message);
+    }
+  };
+
+  dump.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+  dump.on('error', (err) => {
+    supabaseBackupRunning = false;
+    try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
+    console.warn('[backup] pg_dump failed to start:', err.message);
+  });
+  out.on('error', (err) => {
+    supabaseBackupRunning = false;
+    try { dump.kill(); } catch { /* ignore */ }
+    try { fs.rmSync(tempTarget, { force: true }); } catch { /* ignore */ }
+    console.warn('[backup] write failed:', err.message);
+  });
+  dump.stdout.pipe(gzip).pipe(out);
+  dump.on('close', (code) => {
+    dumpExitCode = code;
+    finalize();
+  });
+  out.on('finish', () => {
+    writeFinished = true;
+    finalize();
+  });
+}
+
+function startAutomaticSupabaseBackups() {
+  if (!AUTO_SUPABASE_BACKUP) {
+    console.log('[backup] automatic Supabase backup disabled. Set NEXAGO_AUTO_SUPABASE_BACKUP=1 to enable.');
+    return;
+  }
+  console.log(`[backup] automatic Supabase backup enabled every ${Math.round(SUPABASE_BACKUP_INTERVAL_MS / 60000)} minutes.`);
+  setTimeout(() => runSupabaseBackup('startup'), 30_000).unref();
+  setInterval(() => runSupabaseBackup('scheduled'), SUPABASE_BACKUP_INTERVAL_MS).unref();
+}
 
 function notifyStateSubscribers(key, detail = {}) {
   const safe = safeKey(key);
@@ -2224,4 +2320,5 @@ await initSupabaseBridge();
 server.listen(PORT, HOST, () => {
   console.log(`NexaGo Remote Relay running on ${HOST}:${PORT}`);
   console.log(`Share page: http://localhost:${PORT}/share`);
+  startAutomaticSupabaseBackups();
 });
