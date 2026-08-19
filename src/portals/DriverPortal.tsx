@@ -15,10 +15,10 @@ import {
   LayoutDashboard, Package, Wallet, User, MessageSquare, BarChart3, Phone, Navigation,
   CheckCircle2, Star, LogIn, Power, Send, RefreshCw, MapPin, FileText, AlertCircle,
     History, Inbox, Headphones, Settings, ShieldCheck, LogOut, ChevronRight, Copy, Eye, Truck,
-    X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays, MailCheck
+    X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays, MailCheck, ArrowLeft
   } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim, securityApi } from './portalUtils';
+import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim, securityApi, supabaseClient } from './portalUtils';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
@@ -73,6 +73,12 @@ export default function DriverPortal() {
   const [otpCode, setOtpCode] = useState('');
   const [otpBusy, setOtpBusy] = useState(false);
   const [otpError, setOtpError] = useState('');
+  // Signup is two steps: first verify the account (Google or Gmail OTP), then
+  // fill in the driver registration form. The "Driver Registration" screen only
+  // appears AFTER the account is verified.
+  const [signupStage, setSignupStage] = useState<'account' | 'details'>('account');
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleError, setGoogleError] = useState('');
   const [checkStatusInput, setCheckStatusInput] = useState('');
   const [checkStatusQuery, setCheckStatusQuery] = useState('');
   const [pickupProofName, setPickupProofName] = useState<string | null>(null);
@@ -318,10 +324,55 @@ export default function DriverPortal() {
       setOtpStep('verified');
       setEmailVerified(true);
       setOtpError('');
-      showToast('Gmail verified — you can now submit your application');
+      setSignupStage('details');
+      showToast('Gmail verified — complete your registration below');
     }).catch((err) => {
       setOtpError(String(err?.message || 'Invalid or expired code.'));
     }).finally(() => setOtpBusy(false));
+  };
+
+  // Google OAuth callback for driver signup: after the Gmail account chooser,
+  // Supabase redirects back with #access_token. The chosen Gmail counts as a
+  // verified email, so the driver goes straight to the registration form.
+  useEffect(() => {
+    const sb = supabaseClient();
+    if (!sb) return;
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (!params.get('access_token')) return;
+    (async () => {
+      try {
+        const { data, error } = await sb.auth.getSession();
+        if (error || !data.session) throw error || new Error('no session');
+        const email = String(data.session.user.email || '').trim().toLowerCase();
+        if (email && /^[\w.+-]+@gmail\.com$/i.test(email)) {
+          setSignupGmail(email);
+          setOtpStep('verified');
+          setEmailVerified(true);
+          setSignupStage('details');
+          showToast('Google account verified — complete your registration below');
+        } else {
+          showToast('That Google account has no Gmail address — use the Gmail + OTP option instead');
+        }
+      } catch {
+        showToast('Google sign-in could not be completed. Use Gmail + OTP instead.');
+      }
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    })();
+  }, []);
+
+  const continueWithGoogle = async () => {
+    const sb = supabaseClient();
+    if (!sb) { setGoogleError('Google sign-in is not configured on this server yet — use Gmail + OTP.'); return; }
+    setGoogleBusy(true);
+    setGoogleError('');
+    try {
+      const redirectTo = `${window.location.origin}/driver`;
+      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+      if (error) { setGoogleError(String(error.message)); setGoogleBusy(false); }
+    } catch (err) {
+      setGoogleError(String(err?.message || 'Google sign-in failed — try again.'));
+      setGoogleBusy(false);
+    }
   };
 
   const handleLogout = () => {
@@ -689,10 +740,10 @@ export default function DriverPortal() {
                     <Truck className="w-9 h-9" />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-[8px] tracking-[0.3em] uppercase text-brand-orange font-black">NexaGo BD</p>
-                  <h4 className="text-lg font-black text-white tracking-wide">The NexaGo BD Driver</h4>
-                  <p className="text-[10px] text-gray-400">Enter credentials to access the dispatch portal</p>
+                <div className="space-y-2">
+                  <p className="text-[9px] tracking-[0.35em] uppercase text-brand-orange font-semibold">NexaGo BD · Delivery Network</p>
+                  <h4 className="text-xl font-bold text-white tracking-tight">Driver Dispatch Portal</h4>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">Sign in with your permanent Driver ID and password to receive and complete delivery orders.</p>
                 </div>
               </div>
               <div className="relative rounded-3xl bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] shadow-2xl shadow-black/40 p-5 space-y-3.5">
@@ -722,8 +773,8 @@ export default function DriverPortal() {
                   </label>
                   <button onClick={() => setAuthView('forgot')} className="text-brand-orange hover:underline font-bold">Forgot Password?</button>
                 </div>
-                <button onClick={handleLogin} className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-black uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99]">
-                  Login to Portal
+                <button onClick={handleLogin} className="w-full py-3 bg-gradient-to-r from-brand-orange to-orange-500 hover:from-brand-orange-hover hover:to-orange-600 text-white text-xs font-bold uppercase rounded-xl shadow-lg shadow-brand-orange/25 transition-all hover:shadow-brand-orange/40 active:scale-[0.99]">
+                  Sign In Securely
                 </button>
               </div>
               <div className="relative flex items-center gap-3 text-[8px] text-gray-500 font-bold uppercase tracking-widest">
@@ -731,24 +782,86 @@ export default function DriverPortal() {
                 <span>New to NexaGo?</span>
                 <span className="flex-1 h-px bg-gradient-to-l from-transparent to-[#24395c]"></span>
               </div>
-              <button onClick={() => setAuthView('signup')} className="w-full py-3 bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] hover:border-brand-orange/50 hover:from-[#1b2f4d] hover:to-brand-card text-gray-200 hover:text-white text-[11px] font-bold rounded-xl cursor-pointer transition-all">
-                Register New Driver →
+              <button onClick={() => { setSignupStage('account'); setOtpStep('idle'); setOtpCode(''); setOtpError(''); setGoogleError(''); setAuthView('signup'); }} className="w-full py-3 bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] hover:border-brand-orange/50 hover:from-[#1b2f4d] hover:to-brand-card text-gray-200 hover:text-white text-[11px] font-bold rounded-xl cursor-pointer transition-all">
+                Create Driver Account
               </button>
-              <p className="relative text-center text-[9px] text-gray-500">Log in with your permanent Driver ID + password. New driver? Register below.</p>
+              <p className="relative text-center text-[9px] text-gray-500">Access with your permanent Driver ID + password. New riders can register below.</p>
               <button onClick={() => { setCheckStatusInput(''); setCheckStatusQuery(''); setAuthView('pending'); }} className="relative w-full text-center text-[9px] text-emerald-400 hover:underline font-bold cursor-pointer">
                 Check my application status (any device) →
               </button>
             </>
           )}
 
-          {/* ---- SIGNUP (Step 1) ---- */}
-          {authView === 'signup' && (
+          {/* ---- SIGNUP (Step A: verify account with Google or Gmail OTP first) ---- */}
+          {authView === 'signup' && signupStage === 'account' && (
+            <>
+              <div className="relative text-center space-y-2">
+                <p className="text-[9px] tracking-[0.35em] uppercase text-brand-orange font-semibold">NexaGo BD · Delivery Network</p>
+                <h4 className="text-xl font-bold text-white tracking-tight">Create Your Account</h4>
+                <p className="text-[11px] text-gray-400 leading-relaxed">Verify with Google or your Gmail first — then complete driver registration.</p>
+              </div>
+              <div className="relative rounded-3xl bg-gradient-to-b from-[#17273f] to-[#0e1a2e] border border-[#24395c] shadow-2xl shadow-black/40 p-5 space-y-3.5">
+                <button onClick={continueWithGoogle} disabled={googleBusy} className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-white text-[#1f1f1f] text-xs font-bold shadow-lg hover:bg-gray-100 transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer">
+                  <span className="flex items-center justify-center w-4 h-4">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.77.43 3.45 1.18 4.94l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                  </span>
+                  {googleBusy ? 'Connecting to Google…' : 'Continue with Google'}
+                </button>
+                {googleError && <p className="text-[9px] font-bold text-red-400 text-center">{googleError}</p>}
+                <div className="relative flex items-center gap-3 text-[8px] text-gray-500 font-bold uppercase tracking-widest">
+                  <span className="flex-1 h-px bg-gradient-to-r from-transparent to-[#24395c]"></span>
+                  <span>or with Gmail</span>
+                  <span className="flex-1 h-px bg-gradient-to-l from-transparent to-[#24395c]"></span>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] text-gray-400 uppercase block font-black tracking-widest">Gmail Address</label>
+                  <div className="flex items-center gap-2.5 glass-input border border-[#24395c] rounded-xl px-3.5 py-2.5 focus-within:border-brand-orange focus-within:ring-1 focus-within:ring-brand-orange/40 transition-all">
+                    <Mail className="w-4 h-4 text-brand-orange/70 shrink-0" />
+                    <input value={signupGmail} onChange={e => setSignupGmail(e.target.value)} placeholder="name@gmail.com"
+                      className="flex-1 bg-transparent text-[11px] font-mono outline-none text-white placeholder:text-gray-600" />
+                  </div>
+                </div>
+                <div className={`rounded-xl p-3 border ${otpStep === 'verified' ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-[#24395c] glass-soft'}`}>
+                  <div className="flex items-start space-x-2">
+                    <MailCheck className="w-3.5 h-3.5 text-brand-orange shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Verify Gmail with OTP</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">A 6-digit code is emailed to your Gmail. Your account is only created after this passes.</p>
+                      {otpStep === 'verified' ? (
+                        <p className="mt-2 text-[9px] font-bold text-emerald-400 flex items-center space-x-1"><CheckCircle2 className="w-3 h-3" /><span>Gmail verified — proceeding to registration…</span></p>
+                      ) : (
+                        <div className="mt-2 space-y-2">
+                          {otpStep === 'sent' && (
+                            <div className="flex items-center space-x-2">
+                              <input value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="6-digit code" className="flex-1 bg-[#0a1322] border border-[#1e3050] rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:border-brand-orange placeholder:text-gray-600" />
+                              <button onClick={verifySignupOtp} disabled={otpBusy} className="rounded-lg bg-brand-orange px-3 py-2 text-[9px] font-black uppercase text-white disabled:opacity-60">Verify</button>
+                            </div>
+                          )}
+                          <button onClick={sendSignupOtp} disabled={otpBusy} className="w-full rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20 disabled:opacity-60">
+                            {otpStep === 'sent' ? 'Resend Code' : 'Send OTP to Gmail'}
+                          </button>
+                          {otpError && <p className="text-[8px] font-bold text-red-400">{otpError}</p>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setAuthView('login')} className="relative w-full text-center text-[9px] text-brand-orange hover:underline font-bold cursor-pointer">
+                Already have an account? Sign in →
+              </button>
+            </>
+          )}
+
+          {/* ---- SIGNUP (Step B: Driver Registration — shown only after the
+               account is verified with Google or the Gmail OTP) ---- */}
+          {authView === 'signup' && signupStage === 'details' && (
             <>
               <div className="relative">
                 <div className="flex items-center justify-between">
-                  <button onClick={() => setAuthView('login')} className="text-gray-400 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
+                  <button onClick={() => setSignupStage('account')} className="text-gray-400 hover:text-white transition-colors" title="Change Gmail"><ArrowLeft className="w-4 h-4" /></button>
                   <div className="text-center flex-1">
-                    <h4 className="text-sm font-black text-white tracking-wide">Driver Registration</h4>
+                    <h4 className="text-sm font-bold text-white tracking-tight">Driver Registration</h4>
                     <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">Join the NexaGo Delivery Network</p>
                   </div>
                   <span className="w-4" />
@@ -767,10 +880,18 @@ export default function DriverPortal() {
                   <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5 flex items-center space-x-1.5">
                     <User className="w-3 h-3 text-brand-orange" /><span>Personal Information</span>
                   </p>
+                  <div className="glass-soft rounded-xl p-3 mb-2 border border-emerald-500/30 bg-emerald-500/5">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">Verified Gmail</label>
+                        <p className="text-[11px] text-emerald-300 font-mono mt-0.5 truncate">{signupGmail || '—'}</p>
+                      </div>
+                      <span className="flex items-center space-x-1 text-[9px] font-black text-emerald-400 shrink-0"><CheckCircle2 className="w-3 h-3" /><span>Verified</span></span>
+                    </div>
+                  </div>
                   {[
                     { label: 'Full Name (Bangla/English)', val: signupName, set: setSignupName, type: 'text', icon: User, ph: 'Enter full name' },
                     { label: 'Mobile Phone', val: signupPhone, set: setSignupPhone, type: 'tel', icon: Phone, ph: 'e.g. 01712345678' },
-                    { label: 'Gmail Address', val: signupGmail, set: setSignupGmail, type: 'email', icon: Mail, ph: 'name@gmail.com' },
                   ].map(f => (
                     <div key={f.label} className="glass-soft rounded-xl p-3 mb-2 last:mb-0 border-[#24395c]">
                       <label className="text-[7.5px] text-gray-400 uppercase block font-bold tracking-widest">{f.label} <span className="text-brand-orange">*</span></label>
@@ -780,32 +901,6 @@ export default function DriverPortal() {
                       </div>
                     </div>
                   ))}
-
-                  <div className={`rounded-xl p-3 border ${otpStep === 'verified' ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-[#24395c] glass-soft'}`}>
-                    <div className="flex items-start space-x-2">
-                      <MailCheck className="w-3.5 h-3.5 text-brand-orange shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Verify Gmail with OTP</p>
-                        <p className="text-[8px] text-gray-500 mt-0.5">A 6-digit code is emailed to your Gmail. Your account is only created after this passes.</p>
-                        {otpStep === 'verified' ? (
-                          <p className="mt-2 text-[9px] font-bold text-emerald-400 flex items-center space-x-1"><CheckCircle2 className="w-3 h-3" /><span>Gmail verified — you can submit your application</span></p>
-                        ) : (
-                          <div className="mt-2 space-y-2">
-                            {otpStep === 'sent' && (
-                              <div className="flex items-center space-x-2">
-                                <input value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="6-digit code" className="flex-1 bg-[#0a1322] border border-[#1e3050] rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:border-brand-orange placeholder:text-gray-600" />
-                                <button onClick={verifySignupOtp} disabled={otpBusy} className="rounded-lg bg-brand-orange px-3 py-2 text-[9px] font-black uppercase text-white disabled:opacity-60">Verify</button>
-                              </div>
-                            )}
-                            <button onClick={sendSignupOtp} disabled={otpBusy} className="w-full rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/20 disabled:opacity-60">
-                              {otpStep === 'sent' ? 'Resend Code' : 'Send OTP to Gmail'}
-                            </button>
-                            {otpError && <p className="text-[8px] font-bold text-red-400">{otpError}</p>}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <div>
