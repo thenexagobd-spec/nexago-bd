@@ -943,15 +943,16 @@ const server = http.createServer((req, res) => {
     sendJson(res, 403, { ok: false, error: 'blocked' });
     return;
   }
-  const isStateSync = url.pathname === '/api/state' || url.pathname === '/api/push';
-  if (url.pathname.startsWith('/api/') && !isStateSync && !rateLimit(req, 'api-global', 480, 60_000)) {
+  const isStateRead = url.pathname === '/api/state' && req.method === 'GET';
+  const isStateWrite = url.pathname === '/api/state' || url.pathname === '/api/push';
+  if (url.pathname.startsWith('/api/') && !isStateRead && !isStateWrite && !rateLimit(req, 'api-global', 480, 60_000)) {
     sendSecurityAlert('api-rate-limit', { ip: clientIp(req), device: req.headers['user-agent'] || '', reason: req.url });
     sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' });
     return;
   }
-  // Cloud-sync polling is the live backbone shared by every role site, so it
-  // gets its own generous bucket instead of draining the global API budget.
-  if (isStateSync && !rateLimit(req, 'state-sync', 300, 60_000)) {
+  // Live cloud-sync reads (GET) are the backbone shared by every role site, so
+  // they are not throttled; writes get their own generous bucket.
+  if (isStateWrite && !rateLimit(req, 'state-write', 600, 60_000)) {
     sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' });
     return;
   }

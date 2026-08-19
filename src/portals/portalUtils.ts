@@ -263,14 +263,26 @@ export function useCloudSync() {
       }
     };
 
-    // Subscribe to storage changes from any tab/site of this browser so local
-    // edits (orders accepted, drivers toggled online, refunds approved, ...) are
-    // pushed to the cloud for every other role site to see live. Push only when
-    // the local change did NOT come from a cloud pull (avoids echo pushes).
-    let dirty = false;
+    // Subscribe to local writes (any tab) so real edits are pushed to the cloud
+    // for every other role site to see live. A content signature is used so only
+    // genuine changes are pushed — echo writes that just mirror a cloud pull skip
+    // silently, keeping request volume tiny even with many tabs open.
     let applying = false;
-    const onStorage = () => { if (!applying) dirty = true; };
-    window.addEventListener('storage', onStorage);
+    const stateSig = () => JSON.stringify(Object.keys(CLOUD_KEY_MAP).map(k => lsGet(k, null)));
+    let lastPushed = '';
+    const flushPush = () => {
+      if (applying) return;
+      const s = stateSig();
+      if (s === lastPushed) return;
+      lastPushed = s;
+      push();
+    };
+    const onLocalChange = () => {
+      if (bc) bc.postMessage({ nexago: 'sync' });
+      setTimeout(flushPush, 0);
+    };
+    window.addEventListener('storage', onLocalChange);
+    window.addEventListener('nexago-local-write', onLocalChange);
 
     // Instant cross-tab delivery for the same browser: any tab that writes shared
     // state tells every other open tab to pull from the cloud right away instead
@@ -309,22 +321,13 @@ export function useCloudSync() {
       await push();
       if (!cancelled) setSyncState('online');
     })();
-    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 3000);
-    const flushPush = () => { if (dirty && !applying) { dirty = false; push(); } };
-    const pushTimer = setInterval(flushPush, 2000);
-
-    // Broadcast changes made in THIS tab so sibling tabs (driver site, admin, ...)
-    // trigger an immediate pull instead of waiting for the poll timer.
-    const onBroadcast = () => {
-      dirty = true;
-      if (bc) bc.postMessage({ nexago: 'sync' });
-    };
-    window.addEventListener('nexago-local-write', onBroadcast);
+    const pullTimer = setInterval(async () => { const ok = await pull(); if (!cancelled) setSyncState(ok ? 'online' : 'offline'); }, 4000);
+    const pushTimer = setInterval(flushPush, 3000);
 
     return () => {
       cancelled = true;
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('nexago-local-write', onBroadcast);
+      window.removeEventListener('storage', onLocalChange);
+      window.removeEventListener('nexago-local-write', onLocalChange);
       if (bc) bc.close();
       if (ws) ws.close();
       clearInterval(pullTimer);
