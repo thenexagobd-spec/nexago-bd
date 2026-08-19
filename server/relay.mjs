@@ -158,6 +158,41 @@ function listSupabaseBackupFiles() {
   }
 }
 
+function verifyBackupFile(file) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    let bytes = 0;
+    const gunzip = zlib.createGunzip();
+    const input = fs.createReadStream(file);
+    input.on('data', (chunk) => { bytes += chunk.length; });
+    input.on('error', (err) => resolve({ ok: false, error: err.message, bytes, durationMs: Date.now() - startedAt }));
+    gunzip.on('data', () => {});
+    gunzip.on('error', (err) => resolve({ ok: false, error: err.message, bytes, durationMs: Date.now() - startedAt }));
+    gunzip.on('end', () => resolve({ ok: true, bytes, durationMs: Date.now() - startedAt }));
+    input.pipe(gunzip);
+  });
+}
+
+async function supabaseTableCounts() {
+  const tables = Object.entries(SUPABASE_TABLE).filter(([, table]) => String(table || '').startsWith('nexago_'));
+  const counts = {};
+  if (!supabaseConfigured || !serviceClient) return counts;
+  await Promise.all(tables.map(async ([keyName, table]) => {
+    try {
+      const { count, error } = await serviceClient.from(table).select('*', { count: 'exact', head: true });
+      counts[keyName] = error ? { table, error: error.message } : { table, count: count || 0 };
+    } catch (err) {
+      counts[keyName] = { table, error: String(err && err.message || err) };
+    }
+  }));
+  return counts;
+}
+
+function localStateCounts(state = {}) {
+  const keys = ['orders', 'products', 'categories', 'drivers', 'users', 'stores', 'branches', 'payments', 'staff', 'coupons', 'tickets', 'reviews', 'posSales'];
+  return Object.fromEntries(keys.map((name) => [name, Array.isArray(state[name]) ? state[name].length : 0]));
+}
+
 function pruneSupabaseBackups() {
   try {
     if (!fs.existsSync(SUPABASE_BACKUP_DIR)) return;
@@ -1211,6 +1246,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/system/health') {
     const session = requireSession(req, key);
     if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    (async () => {
     const latestBackup = lastSupabaseBackup || latestSupabaseBackupFile();
     const localBackupDir = path.join(BACKUP_DIR, safeKey(key));
     const localBackupCount = fs.existsSync(localBackupDir) ? fs.readdirSync(localBackupDir).filter((name) => name.endsWith('.json')).length : 0;
@@ -1247,6 +1283,18 @@ const server = http.createServer((req, res) => {
     const cpuLoadPercent = Math.min(100, Math.round((load[0] / cpuCount) * 100));
     const dataBytes = directorySize(DATA_DIR, 4);
     const backupBytes = directorySize(SUPABASE_BACKUP_DIR, 2);
+    const tableCounts = await supabaseTableCounts();
+    const localCounts = localStateCounts(storeState);
+    const protectionChecks = [
+      { key: 'supabase', label: 'Supabase configured', ok: supabaseConfigured },
+      { key: 'serviceRole', label: 'Server service role available', ok: !!serviceClient },
+      { key: 'autoBackup', label: 'Automatic backup enabled', ok: AUTO_SUPABASE_BACKUP },
+      { key: 'dbUrl', label: 'SUPABASE_DB_URL configured', ok: !!process.env.SUPABASE_DB_URL },
+      { key: 'backupFile', label: 'At least one backup file exists', ok: !!latestBackup },
+      { key: 'encryption', label: 'Encryption key configured', ok: !!DATA_ENCRYPTION_KEY },
+      { key: 'alerts', label: 'Telegram/Webhook alert configured', ok: !!(SECURITY_ALERT_WEBHOOK || (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID)) },
+      { key: 'audit', label: 'Audit log active', ok: audit.length > 0 },
+    ];
     sendJson(res, 200, {
       ok: true,
       key: safeKey(key),
@@ -1267,6 +1315,8 @@ const server = http.createServer((req, res) => {
         databaseSizeEstimate: latestBackup?.sizeLabel || 'No backup yet',
         localDataSize: bytesLabel(dataBytes),
         backupStorageSize: bytesLabel(backupBytes),
+        localCounts,
+        tableCounts,
       },
       server: {
         uptimeSeconds: Math.round(process.uptime()),
@@ -1286,7 +1336,13 @@ const server = http.createServer((req, res) => {
         auditCount: audit.length,
         websocketSubscribers: Array.from(stateSubscribers.entries()).map(([stateKey, sockets]) => ({ key: stateKey, subscribers: sockets.size })),
       },
+      protection: {
+        score: protectionChecks.filter((x) => x.ok).length,
+        total: protectionChecks.length,
+        checks: protectionChecks,
+      },
     });
+    })().catch((e) => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
     return;
   }
 
@@ -1304,6 +1360,33 @@ const server = http.createServer((req, res) => {
     const session = requireSession(req, key);
     if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
     sendJson(res, 200, { ok: true, backups: listSupabaseBackupFiles().map(({ name, sizeLabel, createdAt }) => ({ name, sizeLabel, createdAt })) });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/backup/verify') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    readBody(req).then(async (body) => {
+      const name = String(body.name || '').trim();
+      if (!/^nexago_supabase_\d{8}_\d{6}\.sql\.gz$/.test(name)) { sendJson(res, 400, { ok: false, error: 'INVALID_BACKUP_NAME' }); return; }
+      const file = path.join(SUPABASE_BACKUP_DIR, name);
+      if (!file.startsWith(SUPABASE_BACKUP_DIR) || !fs.existsSync(file)) { sendJson(res, 404, { ok: false, error: 'BACKUP_NOT_FOUND' }); return; }
+      const result = await verifyBackupFile(file);
+      appendAudit(key, { actor: session.userId, role: session.role, action: result.ok ? 'supabase-backup-verified' : 'supabase-backup-verify-failed', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: name, newValue: result });
+      if (!result.ok) await sendSecurityAlert('supabase-backup-verify-failed', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: `${name}: ${result.error}` });
+      sendJson(res, result.ok ? 200 : 422, { ok: result.ok, backup: name, ...result });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/system/alert/test') {
+    const session = requireSession(req, key);
+    if (!session || session.role !== 'super-admin') { sendJson(res, 403, { ok: false, error: 'SUPER_ADMIN_SESSION_REQUIRED' }); return; }
+    (async () => {
+      appendAudit(key, { actor: session.userId, role: session.role, action: 'system-alert-test-sent', ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Super Admin System Health test alert' });
+      await sendSecurityAlert('system-health-test-alert', { actor: session.userId, ip: clientIp(req), device: req.headers['user-agent'] || '', reason: 'Manual test from System Health page' });
+      sendJson(res, 200, { ok: true, webhookConfigured: !!SECURITY_ALERT_WEBHOOK, telegramConfigured: !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) });
+    })().catch((e) => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
     return;
   }
 

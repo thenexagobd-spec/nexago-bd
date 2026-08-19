@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Clock, Database, Download, HardDrive, PlayCircle, RefreshCw, RotateCcw, Server, WifiOff } from 'lucide-react';
+import { Activity, AlertTriangle, BellRing, CheckCircle2, Clock, Database, Download, HardDrive, PlayCircle, RefreshCw, RotateCcw, Server, ShieldCheck, WifiOff } from 'lucide-react';
 
 type HealthPayload = {
   ok?: boolean;
@@ -20,6 +20,8 @@ type HealthPayload = {
     databaseSizeEstimate?: string;
     localDataSize?: string;
     backupStorageSize?: string;
+    localCounts?: Record<string, number>;
+    tableCounts?: Record<string, { table: string; count?: number; error?: string }>;
   };
   server?: {
     uptimeSeconds?: number;
@@ -36,6 +38,11 @@ type HealthPayload = {
     auditTail?: Array<{ id?: string; action?: string; actor?: string; role?: string; time?: string; reason?: string }>;
     auditCount?: number;
     websocketSubscribers?: Array<{ key: string; subscribers: number }>;
+  };
+  protection?: {
+    score?: number;
+    total?: number;
+    checks?: Array<{ key: string; label: string; ok: boolean }>;
   };
 };
 
@@ -129,6 +136,28 @@ export default function SystemHealthLog() {
     }
   };
 
+  const testAlert = async () => {
+    try {
+      setActionMsg('Sending test alert...');
+      const result = await systemApi('/api/system/alert/test', {});
+      setActionMsg(`Test alert sent. Telegram: ${result.telegramConfigured ? 'configured' : 'not configured'}, Webhook: ${result.webhookConfigured ? 'configured' : 'not configured'}.`);
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Alert test failed'));
+    }
+  };
+
+  const verifyBackup = async (name: string) => {
+    try {
+      setActionMsg(`Verifying ${name}...`);
+      const result = await systemApi('/api/system/backup/verify', { name });
+      setActionMsg(`Backup verified: ${name} (${result.durationMs || 0}ms)`);
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Backup verify failed'));
+      void loadHealth();
+    }
+  };
+
   const downloadBackup = (name: string) => {
     const token = localStorage.getItem('sd_security_session') || '';
     const url = `${API_BASE}/api/system/backup/download?key=${encodeURIComponent(key)}&name=${encodeURIComponent(name)}`;
@@ -205,6 +234,10 @@ export default function SystemHealthLog() {
             <PlayCircle className="w-3.5 h-3.5" />
             Trigger Backup
           </button>
+          <button onClick={() => void testAlert()} className="h-8 px-3 rounded-lg bg-sky-600/15 border border-sky-500/35 text-sky-300 hover:bg-sky-600/25 text-[10px] font-bold flex items-center gap-1.5">
+            <BellRing className="w-3.5 h-3.5" />
+            Test Alert
+          </button>
         </div>
       </div>
       {actionMsg && <p className="mb-3 text-[10px] font-bold text-brand-orange bg-brand-orange/10 border border-brand-orange/20 rounded-lg px-3 py-2">{actionMsg}</p>}
@@ -267,6 +300,42 @@ export default function SystemHealthLog() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mt-3">
+        <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Data Loss Protection</p>
+            <span className="text-[9px] font-black text-brand-orange">{health?.protection?.score || 0}/{health?.protection?.total || 0}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {(health?.protection?.checks || []).map((check) => (
+              <div key={check.key} className="flex items-center gap-2 rounded-lg border border-brand-border/50 bg-brand-card/50 px-2.5 py-2">
+                <span className={`h-2 w-2 rounded-full ${check.ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                <span className={`text-[10px] font-bold ${check.ok ? 'text-gray-200' : 'text-red-200'}`}>{check.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
+          <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Database className="w-3.5 h-3.5 text-cyan-400" /> Database / Local Row Counts</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            {Object.entries(health?.storage?.localCounts || {}).slice(0, 9).map(([name, count]) => (
+              <div key={name} className="rounded-lg border border-brand-border/50 bg-brand-card/50 px-2.5 py-2">
+                <p className="text-[8px] uppercase text-gray-500 font-black truncate">{name}</p>
+                <p className="text-sm font-black text-white">{Number(count || 0).toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 max-h-24 overflow-y-auto space-y-1">
+            {Object.entries((health?.storage?.tableCounts || {}) as Record<string, { table: string; count?: number; error?: string }>).slice(0, 10).map(([name, row]) => (
+              <div key={name} className="flex items-center justify-between gap-2 text-[9px] border-b border-brand-border/30 pb-1 last:border-0">
+                <span className="text-gray-400 truncate">{row.table}</span>
+                <span className={row.error ? 'text-red-300' : 'text-emerald-300'}>{row.error ? row.error : Number(row.count || 0).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="mt-3 rounded-lg border border-brand-border bg-brand-dark/20 p-3">
         <div className="flex items-center justify-between gap-3 mb-2">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-emerald-400" /> Multi-Branch Live Tracking</p>
@@ -307,6 +376,9 @@ export default function SystemHealthLog() {
               <div className="flex items-center gap-1.5 shrink-0">
                 <button onClick={() => downloadBackup(file.name)} className="h-7 px-2 rounded-md bg-brand-dark border border-brand-border text-cyan-300 hover:border-cyan-400/50 text-[9px] font-bold flex items-center gap-1">
                   <Download className="w-3 h-3" /> Download
+                </button>
+                <button onClick={() => void verifyBackup(file.name)} className="h-7 px-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-[9px] font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Verify
                 </button>
                 <button onClick={() => { setRestoreTarget(file.name); setRestoreReason(''); setRestoreConfirm(''); }} className="h-7 px-2 rounded-md bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 text-[9px] font-bold flex items-center gap-1">
                   <RotateCcw className="w-3 h-3" /> Restore
