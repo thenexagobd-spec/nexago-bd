@@ -85,6 +85,12 @@ const statusClass = (status?: string) => {
   return 'text-red-300 bg-red-500/10 border-red-500/30';
 };
 
+const asArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
+const text = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+
 export default function SystemHealthLog() {
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [error, setError] = useState('');
@@ -302,6 +308,14 @@ export default function SystemHealthLog() {
 
   const backupStatus = health?.backup?.running ? 'Running' : health?.backup?.status;
   const pendingQueue = offlineOrders + offlineStates;
+  const backupFiles = asArray<{ name?: string; sizeLabel?: string; createdAt?: string }>(health?.backup?.files).filter(file => text(file?.name));
+  const activeKeys = asArray<{ key?: string; count?: number; lastPath?: string }>(health?.activity?.activeKeys);
+  const auditTail = asArray<{ id?: string; action?: string; actor?: string; role?: string; time?: string }>(health?.activity?.auditTail);
+  const protectionChecks = asArray<{ key?: string; label?: string; ok?: boolean }>(health?.protection?.checks);
+  const dependencies = asArray<{ name?: string; status?: string }>(health?.recovery?.dependencies);
+  const conflicts = asArray<{ group?: string; id?: string; reason?: string }>(health?.activity?.conflicts);
+  const incidents = asArray<{ id?: string; action?: string; actor?: string; time?: string; reason?: string }>(health?.activity?.incidents);
+  const branches = asArray<{ key?: string; orders?: number; posSales?: number; revenue?: number; printerStatus?: string; lastOrderAt?: string }>(health?.activity?.branches);
   const commandGroups = [
     {
       title: 'Recovery',
@@ -455,7 +469,7 @@ export default function SystemHealthLog() {
         <div className="rounded-lg border border-brand-border bg-brand-dark/25 p-3">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-emerald-400" /> Active Store / Branch Requests</p>
           <div className="space-y-1.5 mt-2 max-h-28 overflow-y-auto pr-1">
-            {(health?.activity?.activeKeys || []).length === 0 ? <p className="text-[10px] text-gray-500">No live request recorded yet.</p> : health?.activity?.activeKeys?.slice(0, 5).map((row) => (
+            {activeKeys.length === 0 ? <p className="text-[10px] text-gray-500">No live request recorded yet.</p> : activeKeys.slice(0, 5).map((row) => (
               <div key={row.key} className="flex items-center justify-between gap-2 text-[10px]">
                 <span className="text-white font-bold truncate">{row.key}</span>
                 <span className="text-gray-500 truncate">{row.lastPath}</span>
@@ -467,7 +481,7 @@ export default function SystemHealthLog() {
         <div className="rounded-lg border border-brand-border bg-brand-dark/25 p-3">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Latest Audit Events</p>
           <div className="space-y-1.5 mt-2 max-h-28 overflow-y-auto pr-1">
-            {(health?.activity?.auditTail || []).length === 0 ? <p className="text-[10px] text-gray-500">No audit event yet.</p> : health?.activity?.auditTail?.slice(0, 5).map((row, idx) => (
+            {auditTail.length === 0 ? <p className="text-[10px] text-gray-500">No audit event yet.</p> : auditTail.slice(0, 5).map((row, idx) => (
               <div key={row.id || idx} className="text-[10px] border-b border-brand-border/40 last:border-0 pb-1">
                 <p className="text-white font-bold truncate">{row.action || 'audit-event'}</p>
                 <p className="text-gray-500 truncate">{row.actor || row.role || 'system'} · {fmtTime(row.time)}</p>
@@ -484,7 +498,7 @@ export default function SystemHealthLog() {
             <span className="text-[9px] font-black text-brand-orange">{health?.protection?.score || 0}/{health?.protection?.total || 0}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {(health?.protection?.checks || []).map((check) => (
+            {protectionChecks.map((check) => (
               <div key={check.key} className="flex items-center gap-2 rounded-lg border border-brand-border/50 bg-brand-card/50 px-2.5 py-2">
                 <span className={`h-2 w-2 rounded-full ${check.ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
                 <span className={`text-[10px] font-bold ${check.ok ? 'text-gray-200' : 'text-red-200'}`}>{check.label}</span>
@@ -535,7 +549,7 @@ export default function SystemHealthLog() {
         <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Server className="w-3.5 h-3.5 text-violet-400" /> Dependency Monitor</p>
           <div className="space-y-1.5 mt-2">
-            {(health?.recovery?.dependencies || []).map((dep) => (
+            {dependencies.map((dep) => (
               <div key={dep.name} className="flex items-center justify-between gap-2 text-[10px]">
                 <span className="text-gray-300">{dep.name}</span>
                 <span className={dep.status === 'Configured' ? 'text-emerald-400 font-bold' : 'text-red-300 font-bold'}>{dep.status}</span>
@@ -549,10 +563,10 @@ export default function SystemHealthLog() {
         <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Conflict Resolution Center</p>
           <div className="space-y-1.5 mt-2 max-h-32 overflow-y-auto">
-            {(health?.activity?.conflicts || []).length === 0 ? <p className="text-[10px] text-emerald-400">No duplicate ID conflict detected.</p> : health?.activity?.conflicts?.slice(0, 8).map((c, idx) => (
+            {conflicts.length === 0 ? <p className="text-[10px] text-emerald-400">No duplicate ID conflict detected.</p> : conflicts.slice(0, 8).map((c, idx) => (
               <div key={`${c.group}-${c.id}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px]">
                 <span className="text-white font-bold">{c.group}</span><span className="text-amber-200 truncate">{c.id}</span><span className="text-amber-400">{c.reason}</span>
-                <button onClick={() => void reviewConflict(c)} className="rounded-md border border-amber-500/30 px-2 py-1 text-[8px] font-black text-amber-200 hover:bg-amber-500/10">Review</button>
+                <button onClick={() => void reviewConflict({ group: text(c.group, 'unknown'), id: text(c.id, 'unknown'), reason: text(c.reason, 'review') })} className="rounded-md border border-amber-500/30 px-2 py-1 text-[8px] font-black text-amber-200 hover:bg-amber-500/10">Review</button>
               </div>
             ))}
           </div>
@@ -560,7 +574,7 @@ export default function SystemHealthLog() {
         <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-red-400" /> Auto Incident Timeline</p>
           <div className="space-y-1.5 mt-2 max-h-32 overflow-y-auto">
-            {(health?.activity?.incidents || []).length === 0 ? <p className="text-[10px] text-gray-500">No incident event detected.</p> : health?.activity?.incidents?.slice(0, 8).map((row, idx) => (
+            {incidents.length === 0 ? <p className="text-[10px] text-gray-500">No incident event detected.</p> : incidents.slice(0, 8).map((row, idx) => (
               <div key={row.id || idx} className="border-b border-brand-border/40 last:border-0 pb-1 text-[10px]">
                 <p className="text-white font-bold truncate">{row.action || 'incident'}</p>
                 <p className="text-gray-500 truncate">{row.actor || 'system'} · {fmtTime(row.time)} · {row.reason || ''}</p>
@@ -573,12 +587,12 @@ export default function SystemHealthLog() {
       <div className="mt-3 rounded-lg border border-brand-border bg-brand-dark/20 p-3">
         <div className="flex items-center justify-between gap-3 mb-2">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-emerald-400" /> Multi-Branch Live Tracking</p>
-          <span className="text-[9px] text-gray-500">{health?.activity?.branches?.length || 0} branch/store records</span>
+          <span className="text-[9px] text-gray-500">{branches.length || 0} branch/store records</span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2 mb-3">
-          {(health?.activity?.branches || []).length === 0 ? (
+          {branches.length === 0 ? (
             <p className="text-[10px] text-gray-500">No branch sales or POS records yet.</p>
-          ) : health?.activity?.branches?.slice(0, 6).map((branch) => (
+          ) : branches.slice(0, 6).map((branch) => (
             <div key={branch.key} className="rounded-lg border border-brand-border/60 bg-brand-card/70 px-3 py-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-black text-white truncate">{branch.key}</p>
@@ -596,12 +610,12 @@ export default function SystemHealthLog() {
 
         <div className="flex items-center justify-between gap-3 mb-2">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Database className="w-3.5 h-3.5 text-brand-orange" /> Backup Files</p>
-          <span className="text-[9px] text-gray-500">{health?.backup?.files?.length || 0} latest files</span>
+          <span className="text-[9px] text-gray-500">{backupFiles.length || 0} latest files</span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-          {(health?.backup?.files || []).length === 0 ? (
+          {backupFiles.length === 0 ? (
             <p className="text-[10px] text-gray-500">No backup file yet. Use Trigger Backup after `pg_dump` and `SUPABASE_DB_URL` are configured.</p>
-          ) : health?.backup?.files?.slice(0, 6).map((file) => (
+          ) : backupFiles.slice(0, 6).map((file) => (
             <div key={file.name} className="flex items-center justify-between gap-2 rounded-lg border border-brand-border/60 bg-brand-card/70 px-3 py-2">
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-white truncate">{file.name}</p>
