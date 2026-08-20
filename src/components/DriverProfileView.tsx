@@ -31,6 +31,9 @@ interface DriverProfileViewProps {
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
 }
 
+const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const formatNumber = (value: unknown) => safeNumber(value).toLocaleString();
+
 // Sparkline Chart Component for Visual Metric Trends
 const SparklineChart: React.FC<{
   data: number[];
@@ -474,7 +477,7 @@ export default function DriverProfileView({
   const earningsTrend7Days = weeklyPerformanceData.map(d => d.earnings);
   const earningsDiff = earningsTrend7Days[earningsTrend7Days.length - 1] - earningsTrend7Days[0];
   const isEarningsUp = earningsDiff >= 0;
-  const earningsTrendChartData = weeklyPerformanceData.map(d => ({ day: d.day, earnings: d.earnings, formatted: `৳${d.earnings.toLocaleString()}` }));
+  const earningsTrendChartData = weeklyPerformanceData.map(d => ({ day: d.day, earnings: safeNumber(d.earnings), formatted: `৳${formatNumber(d.earnings)}` }));
   const ordersTrend7Days = weeklyPerformanceData.map(d => d.orders);
   const onTimeTrend7Days = weeklyPerformanceData.map(d => d.onTime);
   const cancellationTrend7Days = weeklyPerformanceData.map((_, i) => {
@@ -771,8 +774,8 @@ export default function DriverProfileView({
             </div>
             <div className="px-2 border-x border-brand-border/40">
               <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Total Earnings</p>
-              <p className="text-lg font-black text-brand-green mt-0.5">৳{driver.earnings.toLocaleString()}</p>
-              <p className="text-[9px] text-gray-400 mt-0.5">Avg ৳{averageOrderFee.toLocaleString()}/order</p>
+              <p className="text-lg font-black text-brand-green mt-0.5">৳{formatNumber(driver.earnings)}</p>
+              <p className="text-[9px] text-gray-400 mt-0.5">Avg ৳{formatNumber(averageOrderFee)}/order</p>
             </div>
             <div className="px-2 flex flex-col items-center">
               <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Rating Score</p>
@@ -989,7 +992,7 @@ export default function DriverProfileView({
                 ) : (
                   <div>
                     <div className="flex items-baseline space-x-1">
-                      <span className="text-xl font-black text-emerald-400">৳{earningsTrend7Days[earningsTrend7Days.length - 1].toLocaleString()}</span>
+                      <span className="text-xl font-black text-emerald-400">৳{formatNumber(earningsTrend7Days[earningsTrend7Days.length - 1])}</span>
                     </div>
                     <p className="text-[9.5px] text-gray-400 mt-0.5">7d Payout Pace</p>
                   </div>
@@ -1002,7 +1005,7 @@ export default function DriverProfileView({
                   label={
                     trendMetricMode === 'ratings' 
                       ? `${isRatingUp ? '+' : ''}${ratingDiff} (7d)` 
-                      : `${isEarningsUp ? '+' : ''}৳${earningsDiff.toLocaleString()} (7d)`
+                      : `${isEarningsUp ? '+' : ''}৳${formatNumber(earningsDiff)} (7d)`
                   } 
                 />
               </div>
@@ -1235,7 +1238,7 @@ export default function DriverProfileView({
                   <div className="flex items-baseline justify-between pt-1">
                     <div>
                       <span className="text-lg font-black text-white">{zone.orders} Orders</span>
-                      <span className="text-[10px] text-gray-400 block font-mono">৳{zone.earnings.toLocaleString()} generated</span>
+                      <span className="text-[10px] text-gray-400 block font-mono">৳{formatNumber(zone.earnings)} generated</span>
                     </div>
                     <span className="text-xs font-black text-amber-400 font-mono">{zone.sharePct}% of total</span>
                   </div>
@@ -1818,7 +1821,7 @@ export default function DriverProfileView({
 
                 <div className="bg-brand-dark/50 border border-brand-border/60 p-3 rounded-xl">
                   <p className="text-[10px] text-gray-400 uppercase font-bold">Total Zone Revenue</p>
-                  <p className="text-xl font-black text-brand-green mt-1">৳{currentZone.earnings.toLocaleString()}</p>
+                  <p className="text-xl font-black text-brand-green mt-1">৳{formatNumber(currentZone.earnings)}</p>
                   <p className="text-[9px] text-gray-400 font-medium mt-0.5">Avg ৳{Math.round(currentZone.earnings / (currentZone.orders || 1))}/order</p>
                 </div>
 
@@ -1926,9 +1929,9 @@ export default function DriverProfileView({
               ) : (
                 <div className="flex items-center space-x-2 text-emerald-400 font-mono font-bold">
                   <Zap className="w-3.5 h-3.5 fill-current" />
-                  <span>৳{earningsTrend7Days[earningsTrend7Days.length - 1].toLocaleString()} daily</span>
+                  <span>৳{formatNumber(earningsTrend7Days[earningsTrend7Days.length - 1])} daily</span>
                   <span className={`text-[11px] flex items-center gap-0.5 ${isEarningsUp ? 'text-emerald-400' : 'text-red-400'}`}>
-                    ({isEarningsUp ? '+' : ''}৳{earningsDiff.toLocaleString()} 7d delta)
+                    ({isEarningsUp ? '+' : ''}৳{formatNumber(earningsDiff)} 7d delta)
                   </span>
                 </div>
               )}
@@ -1967,7 +1970,7 @@ export default function DriverProfileView({
                     <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `৳${v}`} tickLine={false} />
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }}
-                      formatter={(val: any) => [`৳${val.toLocaleString()}`, 'Daily Revenue']}
+                      formatter={(val: any) => [`৳${formatNumber(val)}`, 'Daily Revenue']}
                     />
                     <Area type="monotone" dataKey="earnings" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#earningsGrad)" />
                   </AreaChart>

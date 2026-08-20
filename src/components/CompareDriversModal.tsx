@@ -19,6 +19,9 @@ interface CompareDriversModalProps {
   onViewProfile?: (driverId: string) => void;
 }
 
+const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const formatNumber = (value: unknown) => safeNumber(value).toLocaleString();
+
 // Great-circle distance between two coordinates in kilometres.
 const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
   const R = 6371;
@@ -508,7 +511,7 @@ export default function CompareDriversModal({
                 }`}>
                   <div>
                     <span className="text-[9px] text-gray-400 font-mono block uppercase">Driver A</span>
-                    <span className="text-lg font-black">৳{driverA.earnings.toLocaleString()}</span>
+                    <span className="text-lg font-black">৳{formatNumber(driverA.earnings)}</span>
                   </div>
                   {driverA.earnings >= driverB.earnings && (
                     <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
@@ -527,7 +530,7 @@ export default function CompareDriversModal({
                 }`}>
                   <div>
                     <span className="text-[9px] text-gray-400 font-mono block uppercase">Driver B</span>
-                    <span className="text-lg font-black">৳{driverB.earnings.toLocaleString()}</span>
+                    <span className="text-lg font-black">৳{formatNumber(driverB.earnings)}</span>
                   </div>
                   {driverB.earnings >= driverA.earnings && (
                     <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">

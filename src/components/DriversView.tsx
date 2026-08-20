@@ -31,6 +31,8 @@ const safeText = (value: unknown, fallback = '') => {
   const next = String(value ?? '').trim();
   return next || fallback;
 };
+const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const formatNumber = (value: unknown) => safeNumber(value).toLocaleString();
 const initials = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
 
 export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriver, onDeleteDriver, onOpenCard, showToast, vehicles = [] }: DriversViewProps) {
@@ -222,7 +224,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
       codCashCollected: 0
     });
     if (showToast) {
-      showToast(`Collected ৳${amount.toLocaleString()} COD cash handover from ${driver.name}.`, 'success');
+      showToast(`Collected ৳${formatNumber(amount)} COD cash handover from ${safeText(driver.name, 'driver')}.`, 'success');
     }
   };
 
@@ -386,7 +388,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
         <div className="bg-brand-card border border-brand-border p-3.5 rounded-xl flex items-center justify-between">
           <div>
             <p className="text-[10px] text-gray-400 uppercase font-black tracking-wider">COD Cash Held by Riders</p>
-            <p className="text-lg font-black text-brand-orange mt-0.5">৳{totalCodCollected.toLocaleString()}</p>
+            <p className="text-lg font-black text-brand-orange mt-0.5">৳{formatNumber(totalCodCollected)}</p>
           </div>
           <div className="w-9 h-9 rounded-lg bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange">
             <DollarSign className="w-5 h-5" />
@@ -537,7 +539,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                 </div>
                 <div className="border-x border-brand-border/30">
                   <p className="text-[8px] text-gray-500 uppercase font-medium">Earnings</p>
-                  <p className="text-[11px] font-bold text-emerald-400 mt-0.5">৳{driver.earnings.toLocaleString()}</p>
+                  <p className="text-[11px] font-bold text-emerald-400 mt-0.5">৳{formatNumber(driver.earnings)}</p>
                 </div>
                 <div>
                   <p className="text-[8px] text-gray-500 uppercase font-medium">Rating</p>
@@ -553,7 +555,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                 <div className="flex items-center justify-between"><span className="text-[8px] text-gray-500 uppercase font-black flex items-center gap-1"><Truck className="w-2.5 h-2.5"/>Assigned Vehicle</span><span className={`px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase ${veh.status==='Active'?'bg-emerald-500/10 text-emerald-400':veh.status==='Maintenance'?'bg-amber-500/10 text-amber-400':'bg-gray-500/10 text-gray-400'}`}>{veh.status}</span></div>
                 <p className="text-[10px] font-mono font-black text-white truncate">{veh.regNo}</p>
                 <div className="flex items-center justify-between text-[9.5px]"><span className="text-gray-400 truncate">{veh.brand} {veh.model} · {veh.year} · {veh.fuelType}</span></div>
-                <div className="flex items-center justify-between text-[9px]"><span className="text-gray-500"><Gauge className="w-2 h-2 inline"/> {(veh.odoKm||0).toLocaleString()} km</span><span className="text-gray-500"><Fuel className="w-2 h-2 inline"/> ৳{(veh.fuelCost||0).toLocaleString()}</span></div>
+                <div className="flex items-center justify-between text-[9px]"><span className="text-gray-500"><Gauge className="w-2 h-2 inline"/> {formatNumber(veh.odoKm)} km</span><span className="text-gray-500"><Fuel className="w-2 h-2 inline"/> ৳{formatNumber(veh.fuelCost)}</span></div>
               </div>)})()}
 
               {/* COD + Verification Ribbon */}
@@ -562,7 +564,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   <span className="text-gray-400 font-medium">COD Cash Collected:</span>
                   <div className="flex items-center space-x-2">
                     <span className="font-mono font-bold text-brand-orange text-[11px]">
-                      ৳{(driver.codCashCollected || 0).toLocaleString()}
+                      ৳{formatNumber(driver.codCashCollected)}
                     </span>
                     {(driver.codCashCollected || 0) > 0 && (
                       <button
