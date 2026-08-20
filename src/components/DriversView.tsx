@@ -35,6 +35,11 @@ const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(v
 const formatNumber = (value: unknown) => safeNumber(value).toLocaleString();
 const fixedNumber = (value: unknown, digits = 1) => safeNumber(value).toFixed(digits);
 const initials = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+const hasRealLiveGps = (driver: Driver) => {
+  const lat = Number(driver.locationCoords?.lat);
+  const lng = Number(driver.locationCoords?.lng);
+  return Boolean(driver.lastLocationAt && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) > 0 && Math.abs(lng) > 0);
+};
 
 export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriver, onDeleteDriver, onOpenCard, showToast, vehicles = [] }: DriversViewProps) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
@@ -94,10 +99,11 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
   const totalPendingAudit = drivers.filter(d => d.verificationStatus === 'Pending Audit').length;
   const totalLocked = drivers.filter(d => d.dispatchLocked).length;
 
-  // All riders currently sharing a live GPS position (from the driver portal).
-  const fleetMapVeh = drivers.filter(d => d.locationCoords).map(d => ({
-    id: d.id, name: d.name, status: d.status, vehicleType: d.vehicleType, phone: d.phone,
-    lat: d.locationCoords!.lat, lng: d.locationCoords!.lng, tLat: d.locationCoords!.lat, tLng: d.locationCoords!.lng,
+  // Only riders with a real driver-app GPS ping are shown. No seeded/demo coordinates.
+  const fleetMapVeh = drivers.filter(hasRealLiveGps).map(d => ({
+    id: safeText(d.id), name: safeText(d.name, 'Driver'), status: safeText(d.status, 'Online'), vehicleType: safeText(d.vehicleType, 'Driver'), phone: safeText(d.phone),
+    lat: Number(d.locationCoords!.lat), lng: Number(d.locationCoords!.lng), tLat: Number(d.locationCoords!.lat), tLng: Number(d.locationCoords!.lng),
+    dest: d.status === 'On-Delivery' ? 'Customer' : 'Idle',
   }));
 
   const filteredDrivers = drivers.filter(driver => {
@@ -116,12 +122,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const formDocuments = documents.length > 0
-      ? documents
-      : ([
-          { type: 'NID Card' as const, fileName: 'nid_card.pdf', submittedAt: new Date().toLocaleString('en-GB'), status: 'Pending' as const },
-          { type: 'Driving License' as const, fileName: 'driving_license.pdf', submittedAt: new Date().toLocaleString('en-GB'), status: 'Pending' as const }
-        ]);
+    const formDocuments = documents;
     if (editingDriver) {
       onUpdateDriver({
         ...editingDriver,
@@ -147,8 +148,8 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
         commissionRate: 15,
         verificationStatus,
         codCashCollected: 0.00,
-        nidNumber: nidNumber || ('19922610' + Math.floor(100000 + Math.random() * 900000)),
-        licenseNumber: licenseNumber || ('DK-DL-2024-' + Math.floor(10000 + Math.random() * 90000)),
+        nidNumber,
+        licenseNumber,
         documents: formDocuments
       });
       setIsAddOpen(false);
@@ -426,18 +427,18 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
             </span>
             <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Live Fleet Map</h4>
-            <span className="text-[9px] text-gray-400 font-mono">{fleetMapVeh.length} riders sharing location</span>
+            <span className="text-[9px] text-gray-400 font-mono">{fleetMapVeh.length} real GPS driver{fleetMapVeh.length === 1 ? '' : 's'} online</span>
           </div>
           <button onClick={() => setStatusFilter('All')} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline cursor-pointer">Show all riders</button>
         </div>
         <div className="relative" style={{ height: 320 }}>
           {fleetMapVeh.length > 0 ? (
-            <LeafletMap vehicles={fleetMapVeh} zoomTo={11} onVehicleClick={(id) => { const d = drivers.find(x => x.id === id); if (d) setSelectedDriverId(id); }} />
+            <LeafletMap vehicles={fleetMapVeh} zoomTo={11} onVehicleClick={(id) => { const d = drivers.find(x => safeText(x.id) === id); if (d) setSelectedDriverId(safeText(d.id)); }} />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
               <MapPin className="w-8 h-8 text-gray-600 mb-2" />
-              <p className="text-[11px] text-gray-400 font-bold">No live GPS yet</p>
-              <p className="text-[9.5px] text-gray-500 mt-1">Riders who allow Location in the driver app and go online will appear here in real time.</p>
+              <p className="text-[11px] text-gray-400 font-bold">No real live GPS yet</p>
+              <p className="text-[9.5px] text-gray-500 mt-1">Only driver-app GPS pings with a saved live timestamp appear here. Demo or seeded coordinates are hidden.</p>
             </div>
           )}
         </div>
