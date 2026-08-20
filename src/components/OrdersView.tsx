@@ -418,7 +418,8 @@ export default function OrdersView({
 
   // Get Store initials/logo styling
   const getStoreLogo = (name: string) => {
-    const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const safeName = String(name || 'Store').trim() || 'Store';
+    const initials = safeName.split(/\s+/).map(n => n[0] || '').join('').substring(0, 2).toUpperCase() || 'ST';
     const colors = [
       'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       'bg-orange-500/10 text-orange-400 border-orange-500/20',
@@ -426,7 +427,7 @@ export default function OrdersView({
       'bg-purple-500/10 text-purple-400 border-purple-500/20',
       'bg-pink-500/10 text-pink-400 border-pink-500/20',
     ];
-    const charCodeSum = name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const charCodeSum = safeName.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
     const colorClass = colors[charCodeSum % colors.length];
 
     return (

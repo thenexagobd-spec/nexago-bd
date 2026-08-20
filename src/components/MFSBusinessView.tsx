@@ -18,6 +18,12 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const initials = (value: unknown, fallback = 'AG') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+
 // Persistent state hook — data survives browser reloads (real system behaviour)
 function useLocalState<T>(key: string, initial: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
@@ -1722,8 +1728,8 @@ export default function MFSBusinessView({ orders }: MFSBusinessViewProps) {
                       <td className="py-3 px-4 font-mono font-bold text-gray-300">{a.id}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-2.5">
-                          <span className="w-8 h-8 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-black text-brand-orange text-[10px]">{a.name.split(' ').map(n => n[0]).join('')}</span>
-                          <span className="font-bold text-white">{a.name}</span>
+                          <span className="w-8 h-8 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-black text-brand-orange text-[10px]">{initials(a.name)}</span>
+                          <span className="font-bold text-white">{safeText(a.name, 'Unnamed Agent')}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-gray-300 flex items-center space-x-1"><MapPin className="w-3 h-3 text-gray-500" />{a.area}</td>
@@ -1883,7 +1889,7 @@ export default function MFSBusinessView({ orders }: MFSBusinessViewProps) {
                           <td className="py-3 px-4 font-mono font-bold text-gray-300">{c.id}</td>
                           <td className="py-3 px-4">
                             <div className="flex items-center space-x-2.5">
-                              <span className="w-8 h-8 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-black text-brand-orange text-[10px]">{c.name.split(' ').map(n => n[0]).join('')}</span>
+                              <span className="w-8 h-8 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-black text-brand-orange text-[10px]">{initials(c.name)}</span>
                           <span className="font-bold text-white">{c.name}</span>
                         </div>
                       </td>

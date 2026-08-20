@@ -511,6 +511,7 @@ const SUPABASE_TABLE = {
   branches: 'nexago_branches',
   staff: 'nexago_staff',
   payments: 'nexago_payments',
+  orderHistory: 'nexago_order_history',
 };
 
 function supabaseWrite(table, row) {
@@ -559,6 +560,63 @@ function safeTimestamp(value, fallback = new Date().toISOString()) {
 async function upsertNormalized(table, rows, onConflict) {
   if (!supabaseConfigured || !serviceClient || !Array.isArray(rows) || rows.length === 0) return;
   const { error } = await serviceClient.from(table).upsert(rows, { onConflict });
+  if (error) throw error;
+}
+
+function orderHistoryRows(platformKey, order) {
+  if (!order || !order.id) return [];
+  const timeline = Array.isArray(order.timeline) ? order.timeline : [];
+  const baseStoreId = firstText(order.storeId, order.ownerStoreId, order.storeName);
+  const baseBranchId = firstText(order.branchId);
+  const rows = timeline.map((event, index) => {
+    const at = safeTimestamp(event?.time || event?.createdAt || event?.at);
+    const status = firstText(event?.status, order.status, 'updated');
+    const actor = firstText(event?.actor, 'system');
+    const note = firstText(event?.note, event?.reason);
+    const dayKey = firstText(event?.dayKey, at.slice(0, 10));
+    return {
+      event_id: firstText(event?.id, `${platformKey}:${order.id}:${at}:${index}:${status}:${actor}`),
+      platform_key: platformKey,
+      order_id: String(order.id),
+      store_id: baseStoreId,
+      branch_id: baseBranchId,
+      customer_id: firstText(order.customerId),
+      driver_id: firstText(order.driverId),
+      status,
+      actor,
+      note,
+      day_key: dayKey,
+      payload: { orderSnapshot: order, event },
+      created_at: at,
+    };
+  });
+  if (!rows.length) {
+    const at = safeTimestamp(order.placedAt || order.createdAt || order.date);
+    rows.push({
+      event_id: `${platformKey}:${order.id}:${at}:created`,
+      platform_key: platformKey,
+      order_id: String(order.id),
+      store_id: baseStoreId,
+      branch_id: baseBranchId,
+      customer_id: firstText(order.customerId),
+      driver_id: firstText(order.driverId),
+      status: firstText(order.status, 'created'),
+      actor: firstText(order.source, 'system'),
+      note: 'Order saved without timeline; permanent history row created by relay',
+      day_key: at.slice(0, 10),
+      payload: { orderSnapshot: order },
+      created_at: at,
+    });
+  }
+  return rows;
+}
+
+async function mirrorOrderHistory(platformKey, orders) {
+  if (!supabaseConfigured || !serviceClient) return;
+  const input = Array.isArray(orders) ? orders : [orders];
+  const rows = input.flatMap((order) => orderHistoryRows(platformKey, order)).filter((row) => row.event_id && row.order_id);
+  if (!rows.length) return;
+  const { error } = await serviceClient.from(SUPABASE_TABLE.orderHistory).upsert(rows, { onConflict: 'event_id' });
   if (error) throw error;
 }
 
@@ -661,6 +719,7 @@ async function supabaseMirrorNormalizedState(key, state = {}) {
     upsertNormalized(SUPABASE_TABLE.coupons, coupons, 'code'),
     upsertNormalized(SUPABASE_TABLE.staff, staff, 'staff_id'),
     upsertNormalized(SUPABASE_TABLE.payments, payments, 'payment_id'),
+    mirrorOrderHistory(platformKey, Array.isArray(state.orders) ? state.orders : []),
   ]);
 }
 
@@ -1078,6 +1137,17 @@ async function saveStorePermanent(key, obj) {
 // tickets, returns, refunds, wallet txns, ratings, stores, users, coupons),
 // and array keys are merged union-by-id so no site's data is ever dropped.
 function latestRecord(existing, incoming) {
+  if (existing && incoming && existing.id && incoming.id && existing.id === incoming.id && (Array.isArray(existing.timeline) || Array.isArray(incoming.timeline))) {
+    const byKey = new Map();
+    for (const ev of [...(Array.isArray(existing.timeline) ? existing.timeline : []), ...(Array.isArray(incoming.timeline) ? incoming.timeline : [])]) {
+      if (!ev || typeof ev !== 'object') continue;
+      const key = `${ev.time || ev.at || ev.createdAt || ''}|${ev.status || ''}|${ev.actor || ''}|${ev.note || ev.reason || ''}`;
+      byKey.set(key, ev);
+    }
+    const timeline = Array.from(byKey.values()).sort((a, b) => (Number(a.time || Date.parse(a.at || a.createdAt || '') || 0) - Number(b.time || Date.parse(b.at || b.createdAt || '') || 0)));
+    const newer = latestRecord({ ...existing, timeline: undefined }, { ...incoming, timeline: undefined });
+    return { ...newer, timeline };
+  }
   const a = Date.parse(existing && (existing.updatedAt || existing.verifiedAt || existing.loginCreatedAt || existing.createdAt) || '') || 0;
   const b = Date.parse(incoming && (incoming.updatedAt || incoming.verifiedAt || incoming.loginCreatedAt || incoming.createdAt) || '') || 0;
   if (b > a) return incoming;
@@ -2750,9 +2820,11 @@ const server = http.createServer((req, res) => {
       store.state.notifications = notifs.slice(0, 100);
       store.updatedAt = new Date().toISOString();
       await saveStorePermanent(key, store);
+      mirrorOrderHistory(safeKey(key), order).catch((e) => console.error('[supabase] order history mirror failed:', e.message));
       if (safeKey(key) !== 'nexago-main') {
         const central = await loadStoreLatest('nexago-main');
         await saveStorePermanent('nexago-main', mergeState(central, { orders: [order], notifications: store.state.notifications }));
+        mirrorOrderHistory('nexago-main', order).catch((e) => console.error('[supabase] central order history mirror failed:', e.message));
         notifyStateSubscribers('nexago-main', { sourceKey: safeKey(key), reason: 'order' });
       }
       notifyStateSubscribers(key, { reason: 'order' });

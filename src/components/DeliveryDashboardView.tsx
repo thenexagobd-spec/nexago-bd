@@ -27,6 +27,12 @@ interface DeliveryDashboardViewProps {
   isTightMode?: boolean;
 }
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const firstWord = (value: unknown, fallback = 'Unknown') => safeText(value, fallback).split(/\s+/)[0] || fallback;
+
 export const DeliveryDashboardView: React.FC<DeliveryDashboardViewProps> = ({
   orders,
   drivers,
@@ -639,7 +645,7 @@ export const DeliveryDashboardView: React.FC<DeliveryDashboardViewProps> = ({
                       fontWeight="bold" 
                       textAnchor="middle"
                     >
-                      {drv.name.split(' ')[0]}
+                      {firstWord(drv.name, 'Driver')}
                     </text>
                   </g>
                 );
@@ -1261,7 +1267,7 @@ export const DeliveryDashboardView: React.FC<DeliveryDashboardViewProps> = ({
                             </p>
                           )}
                         </div>
-                        <span className="text-gray-500 text-[8px] shrink-0 font-mono font-bold uppercase">{log.updatedBy?.split(' ')[0] || 'System'}</span>
+                        <span className="text-gray-500 text-[8px] shrink-0 font-mono font-bold uppercase">{firstWord(log.updatedBy, 'System')}</span>
                       </div>
                     ))
                   ) : (

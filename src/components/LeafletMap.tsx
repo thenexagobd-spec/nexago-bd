@@ -2,6 +2,18 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const finiteNumber = (value: unknown) => {
+  const next = Number(value);
+  return Number.isFinite(next) ? next : null;
+};
+const initialsOf = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+const firstWord = (value: unknown, fallback = 'Driver') => safeText(value, fallback).split(/\s+/)[0] || fallback;
+const hashName = (value: unknown) => safeText(value, 'Driver').split('').reduce((s, ch) => s + ch.charCodeAt(0), 0);
+
 const STYLE = `@keyframes nexPing{0%{transform:scale(0.7);opacity:1}100%{transform:scale(1.6);opacity:0}}.leaflet-container{font-family:inherit}.leaflet-tooltip.nexago-tip,.leaflet-tooltip.nexago-tip::before{background:#0f172a;border:1px solid #334155;color:#fff;border-radius:8px;font:600 11px/1.5 system-ui}`;
 if (typeof document !== 'undefined' && !document.getElementById('nexago-leaflet-css')) {
   const el = document.createElement('style');
@@ -215,30 +227,46 @@ export default function LeafletMap({ vehicles, zoomTo, onVehicleClick, trackingI
       return;
     }
 
+    const liveBounds: [number, number][] = [];
+
     vehicles.forEach(v => {
+      const lat = finiteNumber(v.lat);
+      const lng = finiteNumber(v.lng);
+      if (lat == null || lng == null) return;
+      liveBounds.push([lat, lng]);
       const dcol = DEST_COLOR[v.dest || 'Idle'] || '#34d399';
-      const road = nearestRoad(v.lat, v.lng);
+      const road = nearestRoad(lat, lng);
       const roadLabel = v.roadName || road.name;
-      const initials = v.name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
-      const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(v.name.split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % 8];
+      const displayName = safeText(v.name, 'Driver');
+      const initials = initialsOf(displayName);
+      const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(hashName(displayName)) % 8];
+      const speed = Math.max(0, Math.round(Number(v.speed) || 0));
+      const vehicleLabel = safeText(v.vehicleType, 'Driver');
       const icon = L.divIcon({
         className: '',
-        html: `<div style="position:relative;width:80px;height:82px;cursor:pointer;">
-          <div style="position:absolute;top:30px;left:14px;width:46px;height:6px;border-radius:3px;background:rgba(0,0,0,0.28);filter:blur(1.5px);"></div>
-          <div style="position:absolute;top:0;left:22px;width:36px;height:36px;border-radius:50%;background:${avatarBg};border:2.5px solid #0f172a;box-shadow:0 0 0 1.5px ${dcol},0 2px 8px rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;color:#0f172a;font:800 13px/1 Arial;letter-spacing:0.5px;">${initials}</div>
-          <div style="position:absolute;top:38px;left:30px;width:10px;height:10px;border-radius:50%;background:${dcol};border:1.5px solid #0f172a;"></div>
-          <div style="position:absolute;top:41px;left:8px;">${vehSVG(v.vehicleType, dcol)}</div>
-          <div style="position:absolute;top:52px;left:0;width:80px;text-align:center;background:rgba(2,6,23,0.88);border:1px solid ${dcol};color:#fff;font:700 8px/1.5 Arial;padding:1px 4px;border-radius:6px;white-space:nowrap;">${v.name.split(' ')[0]} · ${Math.round(v.speed || 0)}km/h</div>
-          <div style="position:absolute;top:64px;left:0;width:80px;text-align:center;background:rgba(2,6,23,0.88);color:${dcol};font:700 7.5px/1.5 Arial;padding:1px 4px;border-radius:6px;white-space:nowrap;border:1px solid ${dcol}55;">${v.dest === 'Idle' ? 'Resting' : '→ ' + v.dest}</div>
-          <div style="position:absolute;top:76px;left:0;width:80px;text-align:center;color:#e2c14a;font:700 7px/1.4 Arial;text-shadow:0 1px 2px #000;white-space:nowrap;">🛣 ${roadLabel}</div>
+        html: `<div style="position:relative;width:102px;height:106px;cursor:pointer;">
+          <div style="position:absolute;left:25px;top:57px;width:52px;height:9px;border-radius:999px;background:rgba(0,0,0,0.35);filter:blur(2px);"></div>
+          <div style="position:absolute;left:28px;top:4px;width:46px;height:56px;border-radius:18px 18px 22px 22px;background:linear-gradient(180deg,#111827 0%,#020617 100%);border:2px solid ${dcol};box-shadow:0 0 0 5px ${dcol}22,0 14px 28px rgba(0,0,0,0.48);">
+            <div style="position:absolute;left:8px;top:8px;width:26px;height:26px;border-radius:50%;background:${avatarBg};border:2px solid #f8fafc;display:flex;align-items:center;justify-content:center;color:#020617;font:900 10px/1 Arial;">${initials}</div>
+            <div style="position:absolute;right:6px;top:10px;width:8px;height:8px;border-radius:50%;background:${dcol};box-shadow:0 0 0 4px ${dcol}2b;"></div>
+            <div style="position:absolute;left:11px;top:37px;width:24px;height:9px;border-radius:10px 10px 4px 4px;background:${dcol};"></div>
+            <div style="position:absolute;left:18px;top:49px;width:10px;height:12px;background:${dcol};clip-path:polygon(50% 100%,0 0,100% 0);"></div>
+          </div>
+          <div style="position:absolute;left:6px;top:61px;width:90px;text-align:center;background:#020617;border:1px solid ${dcol};color:#fff;font:900 8.5px/1.5 Arial;padding:2px 5px;border-radius:7px;white-space:nowrap;box-shadow:0 8px 18px rgba(0,0,0,.38);">${firstWord(displayName)} · REAL GPS</div>
+          <div style="position:absolute;left:13px;top:80px;width:76px;text-align:center;background:#0f172a;border:1px solid ${dcol}66;color:${dcol};font:800 7.5px/1.45 Arial;padding:1px 4px;border-radius:7px;white-space:nowrap;">${speed} km/h · ${vehicleLabel}</div>
+          <div style="position:absolute;left:9px;top:96px;width:84px;text-align:center;color:#f8fafc;font:800 7px/1 Arial;text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${roadLabel}</div>
         </div>`,
-        iconSize: [80, 88],
-        iconAnchor: [40, 74],
+        iconSize: [102, 106],
+        iconAnchor: [51, 92],
       });
-      const mk = L.marker([v.lat, v.lng], { icon, title: v.name }).addTo(layer);
+      const mk = L.marker([lat, lng], { icon, title: displayName }).addTo(layer);
       mk.on('click', () => { if (onVehicleClick) onVehicleClick(v.id); });
-      mk.bindTooltip(`<b>${v.name}</b><br>On: <b>${roadLabel}</b><br>${v.dest || 'Idle'} · ${Math.round(v.speed || 0)} km/h<br>${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`, { direction: 'top', offset: [0, -40], className: 'nexago-tip' });
+      mk.bindTooltip(`<b>${displayName}</b><br>On: <b>${roadLabel}</b><br>${v.dest || 'Idle'} · ${speed} km/h<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`, { direction: 'top', offset: [0, -40], className: 'nexago-tip' });
     });
+
+    if (liveBounds.length && mapRef.current && !trackingId && !marker && !pickup && !dropoff) {
+      mapRef.current.fitBounds(L.latLngBounds(liveBounds), { padding: [42, 42], maxZoom: 14 });
+    }
 
     const trk = vehicles.find(v => v.id === trackingId);
 

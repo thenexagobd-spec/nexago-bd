@@ -19,6 +19,11 @@ const lsGet = <T,>(key: string, fallback: T): T => {
 const lsSet = (key: string, v: unknown) => {
   try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* noop */ }
 };
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const initials = (value: unknown, fallback = 'CU') => safeText(value, fallback).split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
 
 interface OrderToolsDashboardProps {
   orders: Order[];
@@ -228,7 +233,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
         <div style="text-align:right;font-size:9px;color:#9ca3af">OFFICIAL CUSTOMER DOCUMENT<br>Verification &amp; History Report</div>
       </div>
       <div class="head">
-        ${r.photo ? `<img class="avatar" src="${r.photo}" />` : `<div class="avatar init">${esc(r.name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase())}</div>`}
+        ${r.photo ? `<img class="avatar" src="${r.photo}" />` : `<div class="avatar init">${esc(initials(r.name))}</div>`}
         <div style="min-width:0">
           <h1>${esc(r.name)}</h1>
           <div class="badges">
@@ -931,7 +936,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                         <img src={lookupResult.photo} alt={lookupResult.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-brand-orange/50 shadow-lg shrink-0" />
                       ) : (
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-orange to-orange-600 border border-brand-orange/50 text-white flex items-center justify-center font-black text-xl shadow-lg shrink-0">
-                          {lookupResult.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                          {initials(lookupResult.name)}
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
@@ -1083,7 +1088,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                     <img src={lookupResult.photo} alt={lookupResult.name} className="w-20 h-20 rounded-xl object-cover border-2 border-brand-orange/60 shrink-0" />
                   ) : (
                     <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-brand-orange to-orange-600 text-white flex items-center justify-center font-black text-2xl shrink-0">
-                      {lookupResult.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                      {initials(lookupResult.name)}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
@@ -1299,7 +1304,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                           <div className="flex items-center space-x-3 min-w-0">
                             <div className="relative shrink-0">
                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm shadow-lg ${blocked ? 'bg-gradient-to-br from-red-500/30 to-red-600/30 text-red-400 border border-red-500/40' : 'bg-gradient-to-br from-brand-orange to-orange-600 text-white border border-brand-orange/50'}`}>
-                                {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                                {initials(c.name)}
                               </div>
                               <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-brand-card ${blocked ? 'bg-red-500' : 'bg-emerald-400'}`} />
                             </div>
@@ -1615,7 +1620,7 @@ export default function OrderToolsDashboard({ orders, onUpdateOrder, reports = [
                   <>
                     <div className="flex items-center space-x-2.5 bg-brand-dark/50 border border-brand-border/40 rounded-xl p-2.5">
                       <div className="w-9 h-9 rounded-full bg-brand-orange/20 border border-brand-orange/30 text-brand-orange text-[11px] font-black flex items-center justify-center shrink-0">
-                        {(cust?.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                        {initials(cust?.name)}
                       </div>
                       <div className="min-w-0">
                         <p className="text-white font-black text-xs">{cust?.name || '—'}</p>

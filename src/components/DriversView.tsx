@@ -27,6 +27,20 @@ interface DriversViewProps {
   vehicles?: VehicleInfo[];
 }
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const formatNumber = (value: unknown) => safeNumber(value).toLocaleString();
+const fixedNumber = (value: unknown, digits = 1) => safeNumber(value).toFixed(digits);
+const initials = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+const hasRealLiveGps = (driver: Driver) => {
+  const lat = Number(driver.locationCoords?.lat);
+  const lng = Number(driver.locationCoords?.lng);
+  return Boolean(driver.lastLocationAt && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) > 0 && Math.abs(lng) > 0);
+};
+
 export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriver, onDeleteDriver, onOpenCard, showToast, vehicles = [] }: DriversViewProps) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -81,23 +95,24 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
 
   // KPI Metrics
   const totalOnline = drivers.filter(d => d.status === 'Online').length;
-  const totalCodCollected = drivers.reduce((acc, d) => acc + (d.codCashCollected || 0), 0);
+  const totalCodCollected = drivers.reduce((acc, d) => acc + safeNumber(d.codCashCollected), 0);
   const totalPendingAudit = drivers.filter(d => d.verificationStatus === 'Pending Audit').length;
   const totalLocked = drivers.filter(d => d.dispatchLocked).length;
 
-  // All riders currently sharing a live GPS position (from the driver portal).
-  const fleetMapVeh = drivers.filter(d => d.locationCoords).map(d => ({
-    id: d.id, name: d.name, status: d.status, vehicleType: d.vehicleType, phone: d.phone,
-    lat: d.locationCoords!.lat, lng: d.locationCoords!.lng, tLat: d.locationCoords!.lat, tLng: d.locationCoords!.lng,
+  // Only riders with a real driver-app GPS ping are shown. No seeded/demo coordinates.
+  const fleetMapVeh = drivers.filter(hasRealLiveGps).map(d => ({
+    id: safeText(d.id), name: safeText(d.name, 'Driver'), status: safeText(d.status, 'Online'), vehicleType: safeText(d.vehicleType, 'Driver'), phone: safeText(d.phone),
+    lat: Number(d.locationCoords!.lat), lng: Number(d.locationCoords!.lng), tLat: Number(d.locationCoords!.lat), tLng: Number(d.locationCoords!.lng),
+    dest: d.status === 'On-Delivery' ? 'Customer' : 'Idle',
   }));
 
   const filteredDrivers = drivers.filter(driver => {
     const q = search.toLowerCase().trim();
     const matchesSearch = q === '' ||
-      driver.name.toLowerCase().includes(q) ||
-      driver.phone.includes(q) ||
-      (driver.email || '').toLowerCase().includes(q) ||
-      driver.id.toLowerCase().includes(q);
+      safeText(driver.name).toLowerCase().includes(q) ||
+      safeText(driver.phone).includes(q) ||
+      safeText(driver.email).toLowerCase().includes(q) ||
+      safeText(driver.id).toLowerCase().includes(q);
     if (statusFilter === 'All') return matchesSearch;
     if (statusFilter === 'Online' || statusFilter === 'On-Delivery' || statusFilter === 'Offline') return matchesSearch && driver.status === statusFilter;
     if (statusFilter === 'Audit Pending') return matchesSearch && driver.verificationStatus === 'Pending Audit';
@@ -107,12 +122,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const formDocuments = documents.length > 0
-      ? documents
-      : ([
-          { type: 'NID Card' as const, fileName: 'nid_card.pdf', submittedAt: new Date().toLocaleString('en-GB'), status: 'Pending' as const },
-          { type: 'Driving License' as const, fileName: 'driving_license.pdf', submittedAt: new Date().toLocaleString('en-GB'), status: 'Pending' as const }
-        ]);
+    const formDocuments = documents;
     if (editingDriver) {
       onUpdateDriver({
         ...editingDriver,
@@ -138,8 +148,8 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
         commissionRate: 15,
         verificationStatus,
         codCashCollected: 0.00,
-        nidNumber: nidNumber || ('19922610' + Math.floor(100000 + Math.random() * 900000)),
-        licenseNumber: licenseNumber || ('DK-DL-2024-' + Math.floor(10000 + Math.random() * 90000)),
+        nidNumber,
+        licenseNumber,
         documents: formDocuments
       });
       setIsAddOpen(false);
@@ -149,10 +159,10 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
 
   const startEdit = (driver: Driver) => {
     setEditingDriver(driver);
-    setName(driver.name);
-    setPhone(driver.phone);
+    setName(safeText(driver.name));
+    setPhone(safeText(driver.phone));
     setVehicleType(driver.vehicleType);
-    setRating(driver.rating);
+    setRating(safeNumber(driver.rating));
     setStatus(driver.status);
     setNidNumber(driver.nidNumber || '');
     setLicenseNumber(driver.licenseNumber || '');
@@ -185,7 +195,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
       statusHistory: [newLog, ...(driver.statusHistory || [])]
     });
     if (showToast) {
-      showToast(`Driver ${driver.name} status switched to ${nextStatus}`, 'info');
+      showToast(`Driver ${safeText(driver.name, 'driver')} status switched to ${nextStatus}`, 'info');
     }
   };
 
@@ -198,15 +208,15 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
     if (showToast) {
       showToast(
         nextState 
-          ? `Dispatch locked for ${driver.name}. Rider cannot accept orders.` 
-          : `Dispatch unlocked for ${driver.name}.`,
+          ? `Dispatch locked for ${safeText(driver.name, 'driver')}. Rider cannot accept orders.` 
+          : `Dispatch unlocked for ${safeText(driver.name, 'driver')}.`,
         nextState ? 'error' : 'success'
       );
     }
   };
 
   const handleCollectCodCash = (driver: Driver) => {
-    const amount = driver.codCashCollected || 0;
+    const amount = safeNumber(driver.codCashCollected);
     if (amount <= 0) {
       if (showToast) showToast('No pending COD cash balance to collect.', 'info');
       return;
@@ -216,7 +226,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
       codCashCollected: 0
     });
     if (showToast) {
-      showToast(`Collected ৳${amount.toLocaleString()} COD cash handover from ${driver.name}.`, 'success');
+      showToast(`Collected ৳${formatNumber(amount)} COD cash handover from ${safeText(driver.name, 'driver')}.`, 'success');
     }
   };
 
@@ -277,7 +287,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
 
   const setVerification = (driver: Driver, v: Driver['verificationStatus']) => {
     onUpdateDriver({ ...driver, verificationStatus: v });
-    if (showToast) showToast(`Driver ${driver.name} marked as ${v}.`, v === 'Verified' ? 'success' : 'info');
+    if (showToast) showToast(`Driver ${safeText(driver.name, 'driver')} marked as ${v}.`, v === 'Verified' ? 'success' : 'info');
   };
 
   const resetForm = () => {
@@ -380,7 +390,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
         <div className="bg-brand-card border border-brand-border p-3.5 rounded-xl flex items-center justify-between">
           <div>
             <p className="text-[10px] text-gray-400 uppercase font-black tracking-wider">COD Cash Held by Riders</p>
-            <p className="text-lg font-black text-brand-orange mt-0.5">৳{totalCodCollected.toLocaleString()}</p>
+            <p className="text-lg font-black text-brand-orange mt-0.5">৳{formatNumber(totalCodCollected)}</p>
           </div>
           <div className="w-9 h-9 rounded-lg bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange">
             <DollarSign className="w-5 h-5" />
@@ -417,18 +427,18 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
             </span>
             <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Live Fleet Map</h4>
-            <span className="text-[9px] text-gray-400 font-mono">{fleetMapVeh.length} riders sharing location</span>
+            <span className="text-[9px] text-gray-400 font-mono">{fleetMapVeh.length} real GPS driver{fleetMapVeh.length === 1 ? '' : 's'} online</span>
           </div>
           <button onClick={() => setStatusFilter('All')} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline cursor-pointer">Show all riders</button>
         </div>
         <div className="relative" style={{ height: 320 }}>
           {fleetMapVeh.length > 0 ? (
-            <LeafletMap vehicles={fleetMapVeh} zoomTo={11} onVehicleClick={(id) => { const d = drivers.find(x => x.id === id); if (d) setSelectedDriverId(id); }} />
+            <LeafletMap vehicles={fleetMapVeh} zoomTo={11} onVehicleClick={(id) => { const d = drivers.find(x => safeText(x.id) === id); if (d) setSelectedDriverId(safeText(d.id)); }} />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
               <MapPin className="w-8 h-8 text-gray-600 mb-2" />
-              <p className="text-[11px] text-gray-400 font-bold">No live GPS yet</p>
-              <p className="text-[9.5px] text-gray-500 mt-1">Riders who allow Location in the driver app and go online will appear here in real time.</p>
+              <p className="text-[11px] text-gray-400 font-bold">No real live GPS yet</p>
+              <p className="text-[9.5px] text-gray-500 mt-1">Only driver-app GPS pings with a saved live timestamp appear here. Demo or seeded coordinates are hidden.</p>
             </div>
           )}
         </div>
@@ -468,7 +478,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredDrivers.map((driver) => (
           <div 
-            key={driver.id} 
+            key={safeText(driver.id, `driver-${safeText(driver.name, 'unknown')}`)} 
             className={`bg-gradient-to-b from-brand-card to-brand-dark rounded-xl p-4 transition-all flex flex-col justify-between shadow-md relative group overflow-hidden ${
               driver.dispatchLocked ? 'border border-red-500/40 bg-red-500/5' : 'border border-brand-border/60 hover:border-brand-orange/40 hover:shadow-lg hover:shadow-brand-orange/5'
             }`}
@@ -501,18 +511,18 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center space-x-3 cursor-pointer group/card" onClick={() => setSelectedDriverId(driver.id)}>
+              <div className="flex items-center space-x-3 cursor-pointer group/card" onClick={() => setSelectedDriverId(safeText(driver.id))}>
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-orange/20 to-amber-500/10 border border-brand-orange/30 flex items-center justify-center font-black text-brand-orange text-[11px] shrink-0 relative group-hover/card:scale-105 transition-transform shadow-inner">
-                  {driver.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  {initials(driver.name)}
                   <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-card ${
                     driver.status === 'Online' ? 'bg-emerald-500' : driver.status === 'On-Delivery' ? 'bg-purple-500' : 'bg-red-500'
                   }`}></span>
                 </div>
                 <div className="min-w-0">
                   <h4 className="font-bold text-[13px] text-white truncate group-hover/card:text-brand-orange transition-colors">
-                    <span>{driver.name}</span>
+                    <span>{safeText(driver.name, 'Unnamed Driver')}</span>
                   </h4>
-                  <p className="text-[9px] text-gray-400 font-mono mt-0.5">{driver.id}</p>
+                  <p className="text-[9px] text-gray-400 font-mono mt-0.5">{safeText(driver.id, 'NO-ID')}</p>
                   <p className="text-[10px] text-gray-300 mt-0.5 truncate">{driver.vehicleType}</p>
                   {driver.locationCoords && (
                     <p className="text-[8.5px] text-emerald-400/80 font-mono mt-0.5 flex items-center space-x-1">
@@ -531,23 +541,23 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                 </div>
                 <div className="border-x border-brand-border/30">
                   <p className="text-[8px] text-gray-500 uppercase font-medium">Earnings</p>
-                  <p className="text-[11px] font-bold text-emerald-400 mt-0.5">৳{driver.earnings.toLocaleString()}</p>
+                  <p className="text-[11px] font-bold text-emerald-400 mt-0.5">৳{formatNumber(driver.earnings)}</p>
                 </div>
                 <div>
                   <p className="text-[8px] text-gray-500 uppercase font-medium">Rating</p>
                   <div className="flex items-center justify-center space-x-0.5 mt-0.5 text-[11px] font-bold text-yellow-400">
                     <Star className="w-2.5 h-2.5 fill-current" />
-                    <span>{driver.rating.toFixed(1)}</span>
+                    <span>{fixedNumber(driver.rating, 1)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Assigned Vehicle — only real assigned data, no synthetic fallbacks */}
-              {(()=>{const veh=vehicles.find(v=>v.driverName===driver.name);if(!veh)return null;return(<div className="bg-brand-dark/30 border border-brand-border/40 rounded-lg px-3 py-2 space-y-1">
+              {(()=>{const veh=vehicles.find(v=>safeText(v.driverName)===safeText(driver.name));if(!veh)return null;return(<div className="bg-brand-dark/30 border border-brand-border/40 rounded-lg px-3 py-2 space-y-1">
                 <div className="flex items-center justify-between"><span className="text-[8px] text-gray-500 uppercase font-black flex items-center gap-1"><Truck className="w-2.5 h-2.5"/>Assigned Vehicle</span><span className={`px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase ${veh.status==='Active'?'bg-emerald-500/10 text-emerald-400':veh.status==='Maintenance'?'bg-amber-500/10 text-amber-400':'bg-gray-500/10 text-gray-400'}`}>{veh.status}</span></div>
                 <p className="text-[10px] font-mono font-black text-white truncate">{veh.regNo}</p>
                 <div className="flex items-center justify-between text-[9.5px]"><span className="text-gray-400 truncate">{veh.brand} {veh.model} · {veh.year} · {veh.fuelType}</span></div>
-                <div className="flex items-center justify-between text-[9px]"><span className="text-gray-500"><Gauge className="w-2 h-2 inline"/> {(veh.odoKm||0).toLocaleString()} km</span><span className="text-gray-500"><Fuel className="w-2 h-2 inline"/> ৳{(veh.fuelCost||0).toLocaleString()}</span></div>
+                <div className="flex items-center justify-between text-[9px]"><span className="text-gray-500"><Gauge className="w-2 h-2 inline"/> {formatNumber(veh.odoKm)} km</span><span className="text-gray-500"><Fuel className="w-2 h-2 inline"/> ৳{formatNumber(veh.fuelCost)}</span></div>
               </div>)})()}
 
               {/* COD + Verification Ribbon */}
@@ -556,9 +566,9 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   <span className="text-gray-400 font-medium">COD Cash Collected:</span>
                   <div className="flex items-center space-x-2">
                     <span className="font-mono font-bold text-brand-orange text-[11px]">
-                      ৳{(driver.codCashCollected || 0).toLocaleString()}
+                      ৳{formatNumber(driver.codCashCollected)}
                     </span>
-                    {(driver.codCashCollected || 0) > 0 && (
+                    {safeNumber(driver.codCashCollected) > 0 && (
                       <button
                         onClick={() => handleCollectCodCash(driver)}
                         className="px-1.5 py-0.5 bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded text-[8.5px] font-bold transition-all cursor-pointer border border-emerald-500/30"
@@ -592,7 +602,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-1.5 min-w-0">
                   <Phone className="w-3 h-3 text-gray-500 shrink-0" />
-                  <span className="text-[10.5px] text-gray-300 truncate">{driver.phone}</span>
+                  <span className="text-[10.5px] text-gray-300 truncate">{safeText(driver.phone, 'No phone')}</span>
                 </div>
                 <button
                   onClick={() => setMessagingDriver(driver)}
@@ -603,8 +613,8 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   <span>Push Alert</span>
                 </button>
               </div>
-              {driver.email && (
-                <p className="text-[9.5px] font-mono text-gray-500 truncate">✉ {driver.email}</p>
+              {safeText(driver.email) && (
+                <p className="text-[9.5px] font-mono text-gray-500 truncate">✉ {safeText(driver.email)}</p>
               )}
             </div>
 
@@ -612,7 +622,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
             <div className="mt-3 pt-2.5 border-t border-brand-border/40 flex items-center justify-between">
               <div className="flex items-center space-x-1.5">
                 <button
-                  onClick={() => setSelectedDriverId(driver.id)}
+                  onClick={() => setSelectedDriverId(safeText(driver.id))}
                   className="px-2 py-1 bg-brand-orange/10 hover:bg-brand-orange text-brand-orange hover:text-white border border-brand-orange/30 rounded text-[10px] font-bold transition-all flex items-center space-x-1 cursor-pointer"
                   title="Open Detailed Performance Profile"
                 >
@@ -664,7 +674,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   <Edit3 className="w-3 h-3" />
                 </button>
                 <button
-                  onClick={() => onDeleteDriver(driver.id)}
+                  onClick={() => onDeleteDriver(safeText(driver.id))}
                   className="p-1.5 bg-brand-dark/60 hover:bg-red-500/20 text-gray-300 hover:text-red-400 border border-brand-border rounded cursor-pointer transition-colors"
                   title="Delete Driver"
                 >
@@ -676,8 +686,25 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
         ))}
 
         {filteredDrivers.length === 0 && (
-          <div className="col-span-full py-12 text-center bg-brand-card border border-brand-border rounded-xl">
-            <p className="text-xs text-gray-400">No dispatch drivers found matching the filter.</p>
+          <div className="col-span-full rounded-xl border border-brand-border bg-brand-card p-8 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-brand-orange/30 bg-brand-orange/10 text-brand-orange">
+              <Truck className="h-5 w-5" />
+            </div>
+            <p className="text-sm font-black text-white">{drivers.length === 0 ? 'No real driver record found.' : 'No dispatch drivers found matching the filter.'}</p>
+            <p className="mx-auto mt-2 max-w-md text-[11px] leading-relaxed text-gray-400">
+              {drivers.length === 0 ? 'Demo drivers are removed. Add a real driver from here or approve a driver signup; then it will appear in Driver Management.' : 'Clear the search/filter to see available drivers.'}
+            </p>
+            <div className="mt-4 flex justify-center gap-2">
+              {drivers.length === 0 ? (
+                <button onClick={() => setIsAddOpen(true)} className="rounded-lg bg-brand-orange px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-brand-orange-hover">
+                  Add Real Driver
+                </button>
+              ) : (
+                <button onClick={() => { setSearch(''); setStatusFilter('All'); }} className="rounded-lg border border-brand-border bg-brand-dark px-4 py-2 text-[10px] font-black uppercase text-gray-200 hover:border-brand-orange/50">
+                  Clear Filter
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

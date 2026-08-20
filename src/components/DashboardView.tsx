@@ -23,6 +23,12 @@ interface DashboardViewProps {
   isTightMode?: boolean;
 }
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const initials = (value: unknown, fallback = 'NA') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+
 export default function DashboardView({
   orders,
   drivers,
@@ -410,11 +416,11 @@ export default function DashboardView({
                     <td className={`${isTightMode ? 'py-1.5' : 'py-2.5'} pr-2`}>
                       <div className="flex items-center space-x-2.5">
                         <div className="w-7 h-7 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-bold text-brand-orange text-[10px]">
-                          {driver.name.split(' ').map(n => n[0]).join('')}
+                          {initials(driver.name, 'DR')}
                         </div>
                         <div>
-                          <div className="font-semibold text-white">{driver.name}</div>
-                          <div className="text-[10px] text-gray-500 font-mono">{driver.id}</div>
+                          <div className="font-semibold text-white">{safeText(driver.name, 'Unnamed Driver')}</div>
+                          <div className="text-[10px] text-gray-500 font-mono">{safeText(driver.id, 'NO-ID')}</div>
           </div>
           {chartPeriod==='Custom' && <div className="flex items-center flex-wrap gap-2 mt-2">
             <span className="text-[10px] text-gray-400">From:</span>
@@ -430,12 +436,12 @@ export default function DashboardView({
                     </td>
                     <td className={`${isTightMode ? 'py-1.5' : 'py-2.5'} text-right font-medium`}>
                       <div className="flex items-center justify-end space-x-1">
-                        <span>{driver.completedOrders}</span>
-                        <span className="text-[10px] text-emerald-400">↑ {Math.max(0, Math.round((driver.completedOrders || 0) * 0.04))}</span>
+                        <span>{Number(driver.completedOrders || 0)}</span>
+                        <span className="text-[10px] text-emerald-400">↑ {Math.max(0, Math.round((Number(driver.completedOrders) || 0) * 0.04))}</span>
                       </div>
                     </td>
                     <td className={`${isTightMode ? 'py-1.5' : 'py-2.5'} text-right text-white font-mono font-bold`}>
-                      ৳ {driver.earnings.toLocaleString()}
+                      ৳ {Number(driver.earnings || 0).toLocaleString()}
                     </td>
                   </tr>
                 ))}
