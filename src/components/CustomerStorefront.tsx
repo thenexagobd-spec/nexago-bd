@@ -789,6 +789,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   // Checkout: delivery pin on map + scheduling
   const [deliveryPin, setDeliveryPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [deliveryLocationMeta, setDeliveryLocationMeta] = useState<{ accuracy?: number; capturedAt?: string; source?: 'browser-gps' | 'map-pin'; area?: string } | null>(null);
+  const [isLocatingDelivery, setIsLocatingDelivery] = useState(false);
+  const [locationPermissionState, setLocationPermissionState] = useState<'checking' | 'granted' | 'denied' | 'prompt' | 'unsupported'>('checking');
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleSlot, setScheduleSlot] = useState(SCHEDULE_SLOTS[0]);
 
@@ -1604,7 +1607,95 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setActiveNav('My Orders');
   };
 
-  const handlePlaceCustomerOrder = () => {
+  const requireCustomerDeliveryLocation = async (): Promise<{ lat: number; lng: number; meta: { accuracy?: number; capturedAt: string; source: 'browser-gps' | 'map-pin'; area: string } } | null> => {
+    if (deliveryPin) {
+      const area = deliveryLocationMeta?.area || nearestAreaOf(deliveryPin.lat, deliveryPin.lng);
+      return {
+        lat: deliveryPin.lat,
+        lng: deliveryPin.lng,
+        meta: {
+          accuracy: deliveryLocationMeta?.accuracy,
+          capturedAt: deliveryLocationMeta?.capturedAt || new Date().toISOString(),
+          source: deliveryLocationMeta?.source === 'map-pin' ? 'map-pin' : 'browser-gps',
+          area,
+        },
+      };
+    }
+    if (!('geolocation' in navigator)) {
+      showToast('Map থেকে delivery pin দিন অথবা browser location Allow করুন.', 'info');
+      return null;
+    }
+    setIsLocatingDelivery(true);
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      });
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error('invalid location');
+      const area = nearestAreaOf(lat, lng);
+      const capturedAt = new Date().toISOString();
+      const nextPin = { lat, lng };
+      const nextMeta = { accuracy: pos.coords.accuracy, capturedAt, source: 'browser-gps' as const, area };
+      setDeliveryPin(nextPin);
+      setDeliveryLocationMeta(nextMeta);
+      if (!deliveryAddress.trim()) {
+        setDeliveryAddress(lang === 'bn'
+          ? `আপনার বর্তমান অবস্থান, ${AREA_NAMES_BN[area]}, ঢাকা`
+          : `Your current location, ${area}, Dhaka`);
+      }
+      return { ...nextPin, meta: nextMeta };
+    } catch {
+      showToast('Order করতে customer location permission Allow করতে হবে. Browser location Allow করে আবার চেষ্টা করুন.', 'info');
+      return null;
+    } finally {
+      setIsLocatingDelivery(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setLocationPermissionState('unsupported');
+      return;
+    }
+    let cancelled = false;
+    const captureOnOpen = () => {
+      setIsLocatingDelivery(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const area = nearestAreaOf(lat, lng);
+          setLocationPermissionState('granted');
+          setDeliveryPin({ lat, lng });
+          setDeliveryLocationMeta({ accuracy: pos.coords.accuracy, capturedAt: new Date().toISOString(), source: 'browser-gps', area });
+          setIsLocatingDelivery(false);
+        },
+        () => {
+          if (cancelled) return;
+          setLocationPermissionState('denied');
+          setIsLocatingDelivery(false);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    };
+    if (navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((status) => {
+        if (cancelled) return;
+        setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
+        captureOnOpen();
+        status.onchange = () => {
+          if (!cancelled) setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
+        };
+      }).catch(captureOnOpen);
+    } else {
+      captureOnOpen();
+    }
+    return () => { cancelled = true; };
+  }, []);
+
+  const handlePlaceCustomerOrder = async () => {
     if (cart.length === 0) {
       showToast('Your cart is empty. Add items to order!', 'info');
       return;
@@ -1613,6 +1704,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast('Sign in with your Gmail first to place an order', 'info');
       return;
     }
+    const loc = await requireCustomerDeliveryLocation();
+    if (!loc) return;
     proceedToPlaceOrder();
   };
 
@@ -1634,15 +1727,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setPayModal('COD');
   };
 
-  const confirmPayment = () => {
+  const confirmPayment = async () => {
+    const liveLocation = await requireCustomerDeliveryLocation();
+    if (!liveLocation) return;
     const targetStore = selectedStore || (cart[0] ? syncedStores.find(s => s.catalog.some(c => c.id === cart[0].product.id)) || null : null);
     if (!targetStore) {
       showToast('Please choose a store first to place your order.', 'info');
       return;
     }
-    const areaMatch = deliveryAddress.match(/(Dhanmondi|Gulshan|Banani|Mirpur|Motijheel|Uttara|Badda|Tejgaon|Farmgate|Shahbagh)/i);
-    const areaName = areaMatch ? areaMatch[1] : 'Dhanmondi';
-    const dest = deliveryPin || AREA_COORDS[areaName] || [23.7539, 90.3836];
+    const dest = [liveLocation.lat, liveLocation.lng] as [number, number];
     const estimated = parseInt(targetStore.deliveryTime) || 35;
     const assigned = liveDriverOf({ storeName: targetStore.name, pickupCoords: targetStore.pickup } as Order);
     const deliveryPinCode = String(Math.floor(1000 + Math.random() * 9000));
@@ -1677,6 +1770,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       customerPhone,
       address: deliveryAddress,
       deliveryCoords: { lat: dest[0], lng: dest[1] },
+      deliveryLocationMeta: liveLocation.meta,
       pickupCoords: targetStore.pickup,
       pickupLocation: targetStore.name,
       driverId: undefined,
@@ -1696,7 +1790,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setPayModal(null);
     resetPaySession();
     setIsScheduled(false);
-    setDeliveryPin(null);
     showToast(isSendMoney ? `Payment submitted — order #pending admin verification` : `Order placed successfully with ${nm(targetStore.name)}!`, isSendMoney ? 'info' : 'success');
   };
 
@@ -1715,7 +1808,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     if (!sendMoney.receipt) { showToast('Upload the payment screenshot/receipt before submitting', 'info'); return; }
     const claimed = parseFloat(sendMoney.amount) || 0;
     if (Math.abs(claimed - cartGrandTotal) > 0.01) { showToast(`Sent amount must match exactly ৳${cartGrandTotal} — you entered ৳${claimed}`, 'info'); return; }
-    confirmPayment();
+    void confirmPayment();
   };
 
   const submitRefund = () => {
@@ -2108,16 +2201,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        setLocationPermissionState('granted');
         setDeliveryPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         // Auto-fill the delivery address text from the pinned location — in Bangla or English
         const area = nearestAreaOf(pos.coords.latitude, pos.coords.longitude);
+        setDeliveryLocationMeta({ accuracy: pos.coords.accuracy, capturedAt: new Date().toISOString(), source: 'browser-gps', area });
         const addrText = lang === 'bn'
           ? `আপনার বর্তমান অবস্থান, ${AREA_NAMES_BN[area]}, ঢাকা`
           : `Your current location, ${area}, Dhaka`;
         setDeliveryAddress(addrText);
         showToast('Current location pinned — address updated', 'success');
       },
-      () => showToast('Could not fetch location — drag the pin to place it manually', 'info'),
+      () => { setLocationPermissionState('denied'); showToast('Could not fetch location — drag the pin to place it manually', 'info'); },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
@@ -3989,6 +4084,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
                 <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3 text-xs">
                   <h3 className="font-black uppercase tracking-wider text-gray-800">{T.deliveryDetails}</h3>
+                  {locationPermissionState !== 'granted' && (
+                    <div className={`rounded-xl border p-2.5 text-[10px] font-bold ${locationPermissionState === 'denied' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                      {locationPermissionState === 'denied'
+                        ? 'Location permission blocked. Manual map pin দিয়ে order করা যাবে, অথবা browser site settings থেকে Location Allow করুন.'
+                        : 'Customer app খোলার সময় location permission চাইবে. Real GPS দিলে order location auto save হবে.'}
+                    </div>
+                  )}
 
                   {/* Schedule toggle */}
                   <div>
@@ -4031,8 +4133,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         zoomTo={13}
                         marker={deliveryPin}
                         markerDraggable
-                        onMapClick={(lat, lng) => { setDeliveryPin({ lat, lng }); }}
-                        onMarkerDrag={(lat, lng) => setDeliveryPin({ lat, lng })}
+                        onMapClick={(lat, lng) => {
+                          const area = nearestAreaOf(lat, lng);
+                          setDeliveryPin({ lat, lng });
+                          setDeliveryLocationMeta({ capturedAt: new Date().toISOString(), source: 'map-pin', area });
+                        }}
+                        onMarkerDrag={(lat, lng) => {
+                          const area = nearestAreaOf(lat, lng);
+                          setDeliveryPin({ lat, lng });
+                          setDeliveryLocationMeta({ capturedAt: new Date().toISOString(), source: 'map-pin', area });
+                        }}
                       />
                     </div>
                     <div className="flex items-center justify-between mt-1.5 gap-2">
@@ -4100,10 +4210,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                   <button
                     onClick={handlePlaceCustomerOrder}
-                    disabled={cart.length === 0}
+                    disabled={cart.length === 0 || isLocatingDelivery}
                     className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
                   >
-                    <Zap className="w-4 h-4" /><span>{T.placeOrder} (৳{cartGrandTotal})</span>
+                    <Zap className="w-4 h-4" /><span>{isLocatingDelivery ? 'Getting location...' : `${T.placeOrder} (৳${cartGrandTotal})`}</span>
                   </button>
                 </div>
               </div>

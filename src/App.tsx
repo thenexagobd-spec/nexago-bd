@@ -1022,6 +1022,7 @@ export default function App() {
     }
 
     setOrders([newOrder, ...orders]);
+    persistOrderToCloud(newOrder);
 
     // Customer-placed order → surface on admin live board
     if (newOrder.deliveryCoords || newOrder.pickupCoords) {
