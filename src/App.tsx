@@ -10,7 +10,7 @@ import { createRoot } from 'react-dom/client';
 import { 
   Order, Driver, Zone, User, Payment, Vehicle, PromotionBanner, SupportTicket, SystemNotification, ChatLogEntry, OrderReportEntry, makeOrderId
 } from './types';
-import { getStoredData, setStoredData, getZonesWithDefaults } from './data';
+import { getStoredData, setStoredData, setStoredDataDebounced, getZonesWithDefaults } from './data';
 
 import DashboardView from './components/DashboardView';
 import UsersView from './components/UsersView';
@@ -628,18 +628,18 @@ export default function App() {
   const [isMerchantMobileSidebarOpen, setIsMerchantMobileSidebarOpen] = useState(false);
 
   // Sync to localStorage
-  useEffect(() => { setStoredData('sd_orders_v2', orders); }, [orders]);
-  useEffect(() => { setStoredData('sd_drivers', drivers); }, [drivers]);
-  useEffect(() => { setStoredData('sd_zones', zones); }, [zones]);
-  useEffect(() => { setStoredData('sd_users', users); }, [users]);
-  useEffect(() => { setStoredData('sd_payments', payments); }, [payments]);
-  useEffect(() => { setStoredData('sd_vehicles', vehicles); }, [vehicles]);
-  useEffect(() => { setStoredData('sd_deleted_records', deletedRecords); }, [deletedRecords]);
-  useEffect(() => { setStoredData('sd_products', products); }, [products]);
-  useEffect(() => { setStoredData('sd_categories', categories); }, [categories]);
-  useEffect(() => { setStoredData('sd_inventory', inventory); }, [inventory]);
-  useEffect(() => { setStoredData('sd_coupons', coupons); }, [coupons]);
-  useEffect(() => { setStoredData('sd_staff', normalizeStaffKyc(staff)); }, [staff]);
+  useEffect(() => { setStoredDataDebounced('sd_orders_v2', orders); }, [orders]);
+  useEffect(() => { setStoredDataDebounced('sd_drivers', drivers); }, [drivers]);
+  useEffect(() => { setStoredDataDebounced('sd_zones', zones); }, [zones]);
+  useEffect(() => { setStoredDataDebounced('sd_users', users); }, [users]);
+  useEffect(() => { setStoredDataDebounced('sd_payments', payments); }, [payments]);
+  useEffect(() => { setStoredDataDebounced('sd_vehicles', vehicles); }, [vehicles]);
+  useEffect(() => { setStoredDataDebounced('sd_deleted_records', deletedRecords); }, [deletedRecords]);
+  useEffect(() => { setStoredDataDebounced('sd_products', products); }, [products]);
+  useEffect(() => { setStoredDataDebounced('sd_categories', categories); }, [categories]);
+  useEffect(() => { setStoredDataDebounced('sd_inventory', inventory); }, [inventory]);
+  useEffect(() => { setStoredDataDebounced('sd_coupons', coupons); }, [coupons]);
+  useEffect(() => { setStoredDataDebounced('sd_staff', normalizeStaffKyc(staff)); }, [staff]);
   useEffect(() => {
     if (!staffIdCard?.id) return;
     const latest = normalizeStaffKyc(staff).find((s: any) => s.id === staffIdCard.id);
@@ -701,15 +701,15 @@ export default function App() {
     }, 1200);
     return () => window.clearTimeout(timer);
   }, [staff, roleCardsStore, superAdminCardProfile, drivers, storeAdminApps]);
-  useEffect(() => { setStoredData('sd_reviews', reviews); }, [reviews]);
-  useEffect(() => { setStoredData('sd_marketing', marketing); }, [marketing]);
-  useEffect(() => { setStoredData('sd_banners', banners); }, [banners]);
-  useEffect(() => { setStoredData('sd_tickets', supportTickets); }, [supportTickets]);
-  useEffect(() => { setStoredData('sd_notifications', notifications); }, [notifications]);
-  useEffect(() => { setStoredData('sd_stores', stores); }, [stores]);
-  useEffect(() => { setStoredData('sd_store_branches', branches); }, [branches]);
-  useEffect(() => { setStoredData('sd_store_admin_apps', storeAdminApps); }, [storeAdminApps]);
-  useEffect(() => { setStoredData('sd_store_admin_creds', storeAdminCreds); }, [storeAdminCreds]);
+  useEffect(() => { setStoredDataDebounced('sd_reviews', reviews); }, [reviews]);
+  useEffect(() => { setStoredDataDebounced('sd_marketing', marketing); }, [marketing]);
+  useEffect(() => { setStoredDataDebounced('sd_banners', banners); }, [banners]);
+  useEffect(() => { setStoredDataDebounced('sd_tickets', supportTickets); }, [supportTickets]);
+  useEffect(() => { setStoredDataDebounced('sd_notifications', notifications); }, [notifications]);
+  useEffect(() => { setStoredDataDebounced('sd_stores', stores); }, [stores]);
+  useEffect(() => { setStoredDataDebounced('sd_store_branches', branches); }, [branches]);
+  useEffect(() => { setStoredDataDebounced('sd_store_admin_apps', storeAdminApps); }, [storeAdminApps]);
+  useEffect(() => { setStoredDataDebounced('sd_store_admin_creds', storeAdminCreds); }, [storeAdminCreds]);
 
   // Toast System trigger helper
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {

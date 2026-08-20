@@ -42,6 +42,39 @@ export const lsSet = <T,>(key: string, v: T) => {
   }
 };
 
+const pendingLocalWrites = new Map<string, string>();
+let pendingLocalWriteTimer: number | null = null;
+
+const flushLocalWrites = () => {
+  if (pendingLocalWriteTimer !== null) {
+    window.clearTimeout(pendingLocalWriteTimer);
+    pendingLocalWriteTimer = null;
+  }
+  if (!pendingLocalWrites.size) return;
+  try {
+    pendingLocalWrites.forEach((payload, key) => localStorage.setItem(key, payload));
+    pendingLocalWrites.clear();
+    window.dispatchEvent(new Event('nexago-local-write'));
+  } catch {
+    /* ignore */
+  }
+};
+
+export const lsSetDebounced = <T,>(key: string, v: T, wait = 300) => {
+  try {
+    pendingLocalWrites.set(key, JSON.stringify(v));
+    if (pendingLocalWriteTimer !== null) window.clearTimeout(pendingLocalWriteTimer);
+    pendingLocalWriteTimer = window.setTimeout(flushLocalWrites, wait);
+  } catch {
+    /* ignore */
+  }
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushLocalWrites);
+  window.addEventListener('beforeunload', flushLocalWrites);
+}
+
 // ---- Live cloud sync (same engine every role site uses) ----
 // Maps each shared localStorage key to its cloud state key so a push from one
 // portal (driver/store/store-admin/staff) is visible live on every other site,
@@ -432,7 +465,20 @@ export function useCloudSync() {
     let pullInFlight = false;
     let pushInFlight = false;
     let syncBackoffUntil = 0;
+    let syncBackoffMs = 10_000;
     let applyingRemoteState = false;
+    let dirtySinceLastPush = true;
+    let pushDebounceTimer: number | null = null;
+
+    const applyBackoff = () => {
+      syncBackoffUntil = Date.now() + syncBackoffMs;
+      syncBackoffMs = Math.min(syncBackoffMs * 2, 120_000);
+    };
+
+    const resetBackoff = () => {
+      syncBackoffMs = 10_000;
+      syncBackoffUntil = 0;
+    };
 
     const pull = async () => {
       if (pullInFlight || Date.now() < syncBackoffUntil) return false;
@@ -440,10 +486,11 @@ export function useCloudSync() {
       try {
         const res = await fetch(url);
         if (res.status === 429) {
-          syncBackoffUntil = Date.now() + 15_000;
+          applyBackoff();
           return false;
         }
         if (!res.ok) return false;
+        resetBackoff();
         const data = await res.json();
         const state = data && data.state;
         if (!state || typeof state !== 'object') return false;
@@ -500,6 +547,7 @@ export function useCloudSync() {
 
     const push = async () => {
       if (pushInFlight || applyingRemoteState || Date.now() < syncBackoffUntil) return false;
+      if (!dirtySinceLastPush && lastPushedSig) return true;
       const currentSig = sig();
       if (currentSig === lastPushedSig) return true;
       pushInFlight = true;
@@ -518,7 +566,7 @@ export function useCloudSync() {
         if (sessionToken) headers['X-Session-Token'] = sessionToken;
         const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
         if (res.status === 429) {
-          syncBackoffUntil = Date.now() + 15_000;
+          applyBackoff();
           queueOfflineState(key, payload);
           return false;
         }
@@ -527,6 +575,8 @@ export function useCloudSync() {
           return false;
         }
         lastPushedSig = currentSig;
+        dirtySinceLastPush = false;
+        resetBackoff();
         return true;
       } catch {
         queueOfflineState(key, (() => {
@@ -552,6 +602,12 @@ export function useCloudSync() {
     // genuine changes are pushed — echo writes that just mirror a cloud pull skip
     // silently, keeping request volume tiny even with many tabs open.
     const isVisible = () => typeof document === 'undefined' || !document.hidden;
+    const schedulePush = () => {
+      dirtySinceLastPush = true;
+      if (!isVisible() || applyingRemoteState) return;
+      if (pushDebounceTimer !== null) window.clearTimeout(pushDebounceTimer);
+      pushDebounceTimer = window.setTimeout(flushPush, 900);
+    };
     const flushPush = () => {
       if (isVisible() && !applyingRemoteState) push();
     };
@@ -566,7 +622,7 @@ export function useCloudSync() {
     };
     const onLocalChange = () => {
       if (bc) bc.postMessage({ nexago: 'sync' });
-      setTimeout(flushPush, 0);
+      schedulePush();
     };
     window.addEventListener('storage', onLocalChange);
     window.addEventListener('nexago-local-write', onLocalChange);
@@ -616,9 +672,9 @@ export function useCloudSync() {
       if (!isVisible()) return;
       const ok = await pull();
       if (!cancelled) setSyncState(ok ? 'online' : 'offline');
-    }, 5000);
-    const pushTimer = setInterval(flushPush, 3000);
-    const offlineTimer = setInterval(flushOffline, 8000);
+    }, 12_000);
+    const pushTimer = setInterval(flushPush, 15_000);
+    const offlineTimer = setInterval(flushOffline, 15_000);
     const onVisible = () => { if (isVisible()) { pull(); flushOffline(); } };
     const onOnline = () => { flushOffline(); flushPush(); };
     document.addEventListener('visibilitychange', onVisible);
@@ -632,6 +688,7 @@ export function useCloudSync() {
       window.removeEventListener('online', onOnline);
       if (bc) bc.close();
       if (ws) ws.close();
+      if (pushDebounceTimer !== null) window.clearTimeout(pushDebounceTimer);
       clearInterval(pullTimer);
       clearInterval(pushTimer);
       clearInterval(offlineTimer);
@@ -695,7 +752,7 @@ export const makeNotif = (title: string, message: string, type: 'order' | 'syste
 
 function useShared<T>(key: string, fallback: T) {
   const [data, setData] = useState<T>(() => lsGet(key, fallback));
-  useEffect(() => lsSet(key, data), [key, data]);
+  useEffect(() => lsSetDebounced(key, data), [key, data]);
   useEffect(() => {
     const onStorage = () => setData(lsGet(key, fallback));
     window.addEventListener('storage', onStorage);

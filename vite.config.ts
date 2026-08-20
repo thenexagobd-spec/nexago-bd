@@ -12,6 +12,7 @@ export default defineConfig(() => {
       },
     },
     build: {
+      chunkSizeWarningLimit: 900,
       rollupOptions: {
         input: {
           index: path.resolve(__dirname, 'index.html'),
@@ -22,6 +23,17 @@ export default defineConfig(() => {
           'super-admin': path.resolve(__dirname, 'super-admin.html'),
           'super-admin-staff': path.resolve(__dirname, 'super-admin-staff.html'),
           roles: path.resolve(__dirname, 'roles.html'),
+        },
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('\\react\\') || id.includes('\\react-dom\\')) return 'vendor-react';
+            if (id.includes('recharts') || id.includes('d3')) return 'vendor-charts';
+            if (id.includes('leaflet')) return 'vendor-map';
+            if (id.includes('html5-qrcode') || id.includes('qrcode.react')) return 'vendor-qr';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            return undefined;
+          },
         },
       },
     },

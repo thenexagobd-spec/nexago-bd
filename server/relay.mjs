@@ -1085,6 +1085,9 @@ function backupFile(key, stamp = new Date().toISOString().replace(/[:.]/g, '-'))
   return path.join(dir, `${stamp}.json`);
 }
 
+const pendingStoreWrites = new Map();
+const pendingStoreTimers = new Map();
+
 function backupStore(key, obj, reason = 'autosave') {
   try {
     if (!obj || !obj.state) return;
@@ -1100,6 +1103,8 @@ function backupStore(key, obj, reason = 'autosave') {
 }
 
 function loadStore(key) {
+  const pending = pendingStoreWrites.get(key);
+  if (pending) return pending;
   const mirrored = supabaseStoreMirror.get(key);
   if (supabaseReady && mirrored) return mirrored;
   try {
@@ -1112,13 +1117,42 @@ function loadStore(key) {
   }
 }
 
-function saveStore(key, obj) {
+function writeStoreImmediate(key, obj, mirrorSupabase = true) {
   backupStore(key, loadStore(key), 'before-save');
-  fs.writeFileSync(storeFile(key), JSON.stringify(obj), 'utf8');
+  const target = storeFile(key);
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(obj), 'utf8');
+  fs.renameSync(tmp, target);
   backupStore(key, obj, 'after-save');
+  if (mirrorSupabase) supabaseStoreWrite(key, obj);
+}
+
+function saveStore(key, obj) {
+  pendingStoreWrites.set(key, obj);
+  const existing = pendingStoreTimers.get(key);
+  if (existing) clearTimeout(existing);
+  const timer = setTimeout(() => {
+    pendingStoreTimers.delete(key);
+    const latest = pendingStoreWrites.get(key);
+    pendingStoreWrites.delete(key);
+    try { writeStoreImmediate(key, latest, false); } catch (err) { console.error('[store] deferred write failed:', err.message); }
+  }, 250);
+  pendingStoreTimers.set(key, timer);
   supabaseStoreWrite(key, obj);
   return obj;
 }
+
+function flushPendingStoreWrites() {
+  for (const timer of pendingStoreTimers.values()) clearTimeout(timer);
+  pendingStoreTimers.clear();
+  for (const [key, obj] of pendingStoreWrites.entries()) {
+    try { writeStoreImmediate(key, obj); } catch (err) { console.error('[store] flush failed:', err.message); }
+  }
+  pendingStoreWrites.clear();
+}
+
+process.once('SIGINT', () => { flushPendingStoreWrites(); process.exit(0); });
+process.once('SIGTERM', () => { flushPendingStoreWrites(); process.exit(0); });
 
 async function loadStoreLatest(key) {
   return loadStore(key);
@@ -1274,7 +1308,10 @@ function serveDistFile(res, reqPath) {
       '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
       '.map': 'application/json', '.jpg': 'image/jpeg', '.webp': 'image/webp'
     }[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': mime, ...corsHeaders });
+    const cacheHeader = /\.(?:js|css|woff2|png|jpg|jpeg|webp|svg|ico)$/i.test(file)
+      ? { 'Cache-Control': 'public, max-age=31536000, immutable' }
+      : { 'Cache-Control': 'no-cache' };
+    res.writeHead(200, { 'Content-Type': mime, ...cacheHeader, ...corsHeaders });
     res.end(data);
     return true;
   } catch {
