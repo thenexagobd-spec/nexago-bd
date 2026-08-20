@@ -7,6 +7,12 @@ import { QRCodeSVG } from 'qrcode.react';
 interface EarningsViewProps { payments: Payment[]; drivers?: Driver[]; orders?: Order[]; }
 const formatBDT = (n: number) => `৳${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const COLORS = ['#f97316','#10b981','#3b82f6','#8b5cf6','#e2136e','#f59e0b','#06b6d4'];
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const firstWord = (value: unknown, fallback = 'Unknown') => safeText(value, fallback).split(/\s+/)[0] || fallback;
+const initials = (value: unknown, fallback = 'NA') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
 
 interface Settlement { id:string; driverName:string; amount:number; date:string; status:'Approved'|'Pending'|'Rejected'; payoutMethod:string; tax:number; scheduledDate?:string; commissionRate:number; incentiveBonus?:number; loanDeduct?:number; goalTarget?:number; referralBonus?:number; invoiceNo?:string; txnRef?:string; refNo?:string; authId?:string; }
 
@@ -35,21 +41,21 @@ export default function EarningsView({ payments, drivers = [], orders = [] }: Ea
   const schedulePayout = (id:string) => { setSettlements(prev=>prev.map(s=>s.id===id?{...s,scheduledDate:scheduleDate}:s)); setScheduleTarget(null); setScheduleDate(''); };
 
   const filtered = settlements.filter(s=>{
-    const matchSearch = s.driverName.toLowerCase().includes(searchQuery.toLowerCase()) || s.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchSearch = safeText(s.driverName).toLowerCase().includes(searchQuery.toLowerCase()) || safeText(s.id).toLowerCase().includes(searchQuery.toLowerCase());
     const matchDate = !dateFilter || s.date.includes(dateFilter) || (s.scheduledDate||'').includes(dateFilter);
     return matchSearch && matchDate;
   });
 
-  const totalEarnings = drivers.reduce((s,d)=>s+d.earnings,0);
+  const totalEarnings = drivers.reduce((s,d)=>s+Number(d.earnings || 0),0);
   const totalPending = filtered.filter(s=>s.status==='Pending').reduce((s,x)=>s+x.amount,0);
   const totalApproved = filtered.filter(s=>s.status==='Approved').reduce((s,x)=>s+x.amount,0);
   const totalTax = filtered.reduce((s,x)=>s+x.tax,0);
 
   const methodDist = useMemo(()=>{const m:Record<string,number>={};orders.forEach(o=>{m[o.paymentMethod]=(m[o.paymentMethod]||0)+o.amount});return Object.entries(m).map(([n,v])=>({name:n,value:Math.round(v)})).slice(0,7);},[orders]);
-  const driverData = drivers.map(d=>({name:d.name.split(' ')[0],earnings:d.earnings,orders:d.completedOrders,fullName:d.name})).sort((a,b)=>b.earnings-a.earnings);
+  const driverData = drivers.map(d=>({name:firstWord(d.name, 'Driver'),earnings:Number(d.earnings || 0),orders:Number(d.completedOrders || 0),fullName:safeText(d.name, 'Unnamed Driver')})).sort((a,b)=>b.earnings-a.earnings);
   const weeklyTrend = [{week:'W1',earnings:Math.round(totalEarnings*.18),payouts:Math.round(totalEarnings*.14)},{week:'W2',earnings:Math.round(totalEarnings*.22),payouts:Math.round(totalEarnings*.17)},{week:'W3',earnings:Math.round(totalEarnings*.25),payouts:Math.round(totalEarnings*.20)},{week:'W4',earnings:Math.round(totalEarnings*.35),payouts:Math.round(totalEarnings*.28)}];
 
-  const handleExportCSV = ()=>{const csv='data:text/csv;charset=utf-8,'+encodeURIComponent(['Driver,Earnings,Orders,Status'].concat(drivers.map(d=>`${d.name},${d.earnings},${d.completedOrders},${d.status}`)).join('\n'));const l=document.createElement('a');l.href=csv;l.download='driver_earnings.csv';l.click();};
+  const handleExportCSV = ()=>{const csv='data:text/csv;charset=utf-8,'+encodeURIComponent(['Driver,Earnings,Orders,Status'].concat(drivers.map(d=>`${safeText(d.name)},${Number(d.earnings || 0)},${Number(d.completedOrders || 0)},${safeText(d.status)}`)).join('\n'));const l=document.createElement('a');l.href=csv;l.download='driver_earnings.csv';l.click();};
 
   return (<div className="space-y-6 fade-in">
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -158,7 +164,7 @@ export default function EarningsView({ payments, drivers = [], orders = [] }: Ea
       {/* Payee Info */}
       <div className="px-6 py-2.5 flex items-center justify-between border-b border-gray-200">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-full border-2 border-gray-800 flex items-center justify-center font-black text-sm">{r.driverName.split(' ').map(n=>n[0]).join('')}</div>
+          <div className="w-9 h-9 rounded-full border-2 border-gray-800 flex items-center justify-center font-black text-sm">{initials(r.driverName, 'DR')}</div>
           <div>
             <p className="text-xs font-bold">Pay to: {r.driverName}</p>
             <p className="text-[9px] text-gray-500">{r.payoutMethod} • {r.scheduledDate||'Immediate Transfer'}</p>
@@ -296,8 +302,8 @@ export default function EarningsView({ payments, drivers = [], orders = [] }: Ea
           <button onClick={()=>{const dark=document.querySelector('[data-mfs-theme]');if(dark){const cur=dark.getAttribute('data-mfs-theme');dark.setAttribute('data-mfs-theme',cur==='dark'?'light':'dark');}}} className="px-3 py-2.5 bg-brand-dark hover:bg-white/10 text-gray-300 border border-brand-border rounded-lg text-[10px] font-bold cursor-pointer transition-all">🌓 Theme</button>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {(Object.entries(fuelAllowances) as [string,number][]).slice(0,4).map(([name,amt])=>(<div key={name} className="bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-1.5 text-[9px]"><span className="text-gray-300">{name.split(' ')[0]}:</span> <span className="text-green-400 font-bold">+{formatBDT(amt)}</span></div>))}
-          {(Object.entries(insurancePremiums) as [string,number][]).slice(0,4).map(([name,amt])=>(<div key={name} className="bg-purple-500/5 border border-purple-500/20 rounded-lg px-3 py-1.5 text-[9px]"><span className="text-gray-300">{name.split(' ')[0]}:</span> <span className="text-purple-400 font-bold">-{formatBDT(amt)}</span></div>))}
+          {(Object.entries(fuelAllowances) as [string,number][]).slice(0,4).map(([name,amt])=>(<div key={name} className="bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-1.5 text-[9px]"><span className="text-gray-300">{firstWord(name)}:</span> <span className="text-green-400 font-bold">+{formatBDT(amt)}</span></div>))}
+          {(Object.entries(insurancePremiums) as [string,number][]).slice(0,4).map(([name,amt])=>(<div key={name} className="bg-purple-500/5 border border-purple-500/20 rounded-lg px-3 py-1.5 text-[9px]"><span className="text-gray-300">{firstWord(name)}:</span> <span className="text-purple-400 font-bold">-{formatBDT(amt)}</span></div>))}
         </div>
       </div>
     </div>
