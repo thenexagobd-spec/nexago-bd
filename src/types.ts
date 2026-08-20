@@ -8,6 +8,7 @@ export interface OrderTimelineEntry {
   actor: 'customer' | 'store' | 'driver' | 'admin' | 'system';
   note?: string;
   time: number; // epoch ms
+  dayKey?: string; // YYYY-MM-DD for permanent day-by-day order history
 }
 
 export interface Order {

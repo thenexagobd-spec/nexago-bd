@@ -278,3 +278,31 @@ create index if not exists nexago_payments_platform_idx on nexago_payments (plat
 alter table nexago_payments enable row level security;
 drop policy if exists "service role only" on nexago_payments;
 create policy "service role only" on nexago_payments for all using (auth.role() = 'service_role');
+
+-- Append-only permanent order history. Every order gets its own day-by-day
+-- timeline rows here, while the full order remains in nexago_stores.payload.
+-- Do not delete from this table during normal operations.
+create table if not exists nexago_order_history (
+  id uuid primary key default gen_random_uuid(),
+  event_id text not null unique,
+  platform_key text not null default 'nexago-main',
+  order_id text not null,
+  store_id text default '',
+  branch_id text default '',
+  customer_id text default '',
+  driver_id text default '',
+  status text not null default 'updated',
+  actor text not null default 'system',
+  note text default '',
+  day_key date not null default current_date,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists nexago_order_history_order_idx on nexago_order_history (platform_key, order_id, created_at desc);
+create index if not exists nexago_order_history_store_day_idx on nexago_order_history (platform_key, store_id, branch_id, day_key desc);
+create index if not exists nexago_order_history_driver_day_idx on nexago_order_history (platform_key, driver_id, day_key desc);
+
+alter table nexago_order_history enable row level security;
+drop policy if exists "service role only" on nexago_order_history;
+create policy "service role only" on nexago_order_history for all using (auth.role() = 'service_role');

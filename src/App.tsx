@@ -910,13 +910,14 @@ export default function App() {
   // Orders
   const handleAddOrder = (orderData: Omit<Order, 'id' | 'date'> & { id?: string }) => {
     const newId = orderData.id || makeOrderId();
-    const newOrder: Order = {
+    let newOrder: Order = {
       ...orderData,
       id: newId,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       source: orderData.source || ((orderData.pickupCoords || orderData.deliveryCoords) ? 'customer-app' : 'counter')
     };
+    newOrder = appendTimeline(newOrder, 'created', newOrder.source === 'customer-app' ? 'customer' : 'admin', `Order created from ${newOrder.source || 'system'}`);
 
     // Auto-assign the nearest online live driver if none was chosen (customer orders)
     // Only for non-customer-app flows (simulator/counter). Customer-app orders wait
@@ -991,13 +992,14 @@ export default function App() {
   // which shows its own in-phone toast so nothing appears outside the device frames.
   const handleSilentAddOrder = (orderData: Omit<Order, 'id' | 'date'> & { id?: string }) => {
     const newId = orderData.id || makeOrderId();
-    const newOrder: Order = {
+    let newOrder: Order = {
       ...orderData,
       id: newId,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       source: orderData.source || ((orderData.pickupCoords || orderData.deliveryCoords) ? 'customer-app' : 'counter')
     };
+    newOrder = appendTimeline(newOrder, 'created', newOrder.source === 'customer-app' ? 'customer' : 'admin', `Order created from ${newOrder.source || 'system'}`);
 
     if (!newOrder.driverId && newOrder.pickupCoords) {
       let best: { id: string } | null = null;
@@ -1082,7 +1084,10 @@ export default function App() {
 
   const handleDeleteOrder = (id: string) => {
     // Deleted orders are not erased — they are marked Cancelled so they stay in order history
-    setOrders(orders.map(o => o.id === id ? { ...o, status: 'Cancelled' as const } : o));
+    const nextOrders = orders.map(o => o.id === id ? appendTimeline({ ...o, status: 'Cancelled' as const }, 'cancelled', 'admin', 'Cancelled from admin; retained permanently in order history') : o);
+    setOrders(nextOrders);
+    const cancelled = nextOrders.find(o => o.id === id);
+    if (cancelled) persistOrderToCloud(cancelled);
     setPayments(payments.map(p => p.orderId === id ? { ...p, status: 'Failed' as const } : p));
     showToast(`Order #${id} deleted (kept in history as Cancelled).`);
   };

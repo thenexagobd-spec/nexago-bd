@@ -663,11 +663,19 @@ export const verifyHandoff = (raw: string, orderId: string): boolean => {
   } catch { return false; }
 };
 
-// Append an audit entry to an order's timeline (keeps at most N entries)
+// Append an audit entry to an order's timeline. Order timelines are permanent:
+// do not trim here, because Supabase mirrors every event for day-by-day history.
 export const appendTimeline = <T extends { timeline?: any[] }>(order: T, status: string, actor: 'customer' | 'store' | 'driver' | 'admin' | 'system', note?: string): T => {
-  const entry = { status, actor, note, time: Date.now() };
+  const now = Date.now();
+  const entry = {
+    status,
+    actor,
+    note,
+    time: now,
+    dayKey: new Date(now).toISOString().slice(0, 10),
+  };
   const timeline = [...(order.timeline || []), entry];
-  return { ...order, timeline: timeline.slice(-40) };
+  return { ...order, timeline };
 };
 
 // Build a notification payload object (targeted) shared by all portals
