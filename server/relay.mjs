@@ -2650,6 +2650,30 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Targeted removal of specific driver records (e.g. ghost/test entries). The
+  // normal /api/state merge is union-by-id so records can never be dropped by a
+  // push; this endpoint is the only way to delete a driver from the cloud.
+  if (req.method === 'POST' && url.pathname === '/api/state/remove') {
+    if (!hasStateWriteAccess(req, key) || url.searchParams.get('confirm') !== 'REMOVE') {
+      sendJson(res, 403, { ok: false, error: 'REMOVE_CONFIRM_REQUIRED' });
+      return;
+    }
+    readBody(req).then(async (body) => {
+      const ids = new Set((Array.isArray(body && body.drivers) ? body.drivers : []).map((x) => String(x)));
+      if (ids.size === 0) { sendJson(res, 400, { ok: false, error: 'drivers[] required' }); return; }
+      const store = await loadStoreLatest(key);
+      const before = Array.isArray(store.state.drivers) ? store.state.drivers.length : 0;
+      if (before) {
+        store.state.drivers = store.state.drivers.filter((d) => d && !ids.has(String(d.id)));
+        store.updatedAt = new Date().toISOString();
+        await saveStorePermanent(key, store);
+        notifyStateSubscribers(key, { reason: 'state-remove' });
+      }
+      sendJson(res, 200, { ok: true, removed: before - (Array.isArray(store.state.drivers) ? store.state.drivers.length : 0) });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/recover') {
     if (!hasStateWriteAccess(req, key)) { sendJson(res, 401, { ok: false, error: 'RECOVER_LOCKED' }); return; }
     readBody(req).then(async (body) => {
