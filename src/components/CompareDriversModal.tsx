@@ -21,6 +21,7 @@ interface CompareDriversModalProps {
 
 const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const formatNumber = (value: unknown) => safeNumber(value).toLocaleString();
+const fixedNumber = (value: unknown, digits = 1) => safeNumber(value).toFixed(digits);
 
 // Great-circle distance between two coordinates in kilometres.
 const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
@@ -54,7 +55,7 @@ const Sparkline: React.FC<{
   const points = data.map((val, idx) => {
     const x = (idx / (data.length - 1)) * width;
     const y = height - ((val - min) / range) * (height - 6) - 3;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+    return `${fixedNumber(x, 1)},${fixedNumber(y, 1)}`;
   }).join(' ');
 
   const lastX = width;
@@ -129,7 +130,7 @@ export default function CompareDriversModal({
     const onTimeRate = settled > 0 ? Math.round((done.length / settled) * 100) : 0;
     const acceptanceRate = myOrders.length > 0 ? Math.round((done.length + (myOrders.length - settled)) / myOrders.length * 100) : 0;
     const cancelRate = settled > 0 ? Math.round((cancelled.length / settled) * 100) : 0;
-    const avgSpeed = done.length > 0 ? `${(totalKm / done.length).toFixed(1)} km/order` : '—';
+    const avgSpeed = done.length > 0 ? `${fixedNumber(totalKm / done.length, 1)} km/order` : '—';
 
     // 7 calendar days of real delivery volume / earnings / on-time / cancellations
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -147,7 +148,7 @@ export default function CompareDriversModal({
       };
     });
 
-    const rTrend = Array.from({ length: 7 }, () => Number(rainer.toFixed(2)));
+    const rTrend = Array.from({ length: 7 }, () => Number(fixedNumber(rainer, 2)));
     const onTimeTrend = weekly.map(d => d.onTime);
     const acceptanceTrend = weekly.map((_, i) => {
       const k = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toDateString();
@@ -419,7 +420,7 @@ export default function CompareDriversModal({
                 }`}>
                   <div>
                     <span className="text-xs text-gray-400 font-mono block text-[9px] uppercase">Driver A</span>
-                    <span className="text-lg font-black">{driverA.rating.toFixed(1)} ★</span>
+                    <span className="text-lg font-black">{fixedNumber(driverA.rating, 1)} ★</span>
                     {driverA.rating > driverB.rating && (
                       <span className="ml-1.5 text-[9px] font-black uppercase text-emerald-400">Higher</span>
                     )}
@@ -437,7 +438,7 @@ export default function CompareDriversModal({
                 }`}>
                   <div>
                     <span className="text-xs text-gray-400 font-mono block text-[9px] uppercase">Driver B</span>
-                    <span className="text-lg font-black">{driverB.rating.toFixed(1)} ★</span>
+                    <span className="text-lg font-black">{fixedNumber(driverB.rating, 1)} ★</span>
                     {driverB.rating > driverA.rating && (
                       <span className="ml-1.5 text-[9px] font-black uppercase text-emerald-400">Higher</span>
                     )}
@@ -624,9 +625,9 @@ export default function CompareDriversModal({
                 </>
               )}
               {driverA.rating >= driverB.rating ? (
-                <> Both riders maintain active status, with <strong className="text-amber-400">{driverA.name} holding a higher customer rating of {driverA.rating.toFixed(1)} ★</strong>.</>
+                <> Both riders maintain active status, with <strong className="text-amber-400">{driverA.name} holding a higher customer rating of {fixedNumber(driverA.rating, 1)} ★</strong>.</>
               ) : (
-                <> Both riders maintain active status, with <strong className="text-amber-400">{driverB.name} holding a higher customer rating of {driverB.rating.toFixed(1)} ★</strong>.</>
+                <> Both riders maintain active status, with <strong className="text-amber-400">{driverB.name} holding a higher customer rating of {fixedNumber(driverB.rating, 1)} ★</strong>.</>
               )}
             </p>
           </div>

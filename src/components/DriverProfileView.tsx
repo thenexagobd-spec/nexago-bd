@@ -33,6 +33,14 @@ interface DriverProfileViewProps {
 
 const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const formatNumber = (value: unknown) => safeNumber(value).toLocaleString();
+const fixedNumber = (value: unknown, digits = 1) => safeNumber(value).toFixed(digits);
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const initials = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+const firstWord = (value: unknown, fallback = '') => safeText(value, fallback).split(/\s+/)[0] || fallback;
+const firstPart = (value: unknown, separator = '&') => safeText(value).split(separator)[0] || '';
 
 // Sparkline Chart Component for Visual Metric Trends
 const SparklineChart: React.FC<{
@@ -57,7 +65,7 @@ const SparklineChart: React.FC<{
   const points = data.map((val, idx) => {
     const x = (idx / (data.length - 1)) * width;
     const y = height - ((val - min) / range) * (height - 8) - 4;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+    return `${fixedNumber(x, 1)},${fixedNumber(y, 1)}`;
   }).join(' ');
 
   const lastX = width;
@@ -493,10 +501,10 @@ export default function DriverProfileView({
 
   // Rating: the driver's one real aggregate rating (no per-order rating data exists anywhere)
   const realRating = driver.rating || 0;
-  const ratingTrend7Days = Array.from({ length: 7 }, () => Number(realRating.toFixed(2)));
+  const ratingTrend7Days = Array.from({ length: 7 }, () => Number(fixedNumber(realRating, 2)));
   const ratingDiff = 0;
   const isRatingUp = true;
-  const ratingTrendChartData = weeklyPerformanceData.map(d => ({ day: d.day, rating: Number(realRating.toFixed(2)) }));
+  const ratingTrendChartData = weeklyPerformanceData.map(d => ({ day: d.day, rating: Number(fixedNumber(realRating, 2)) }));
   const ratingBucket = Math.min(5, Math.max(1, Math.round(realRating)));
   const ratingDistribution = [5, 4, 3, 2, 1].map(stars => ({
     name: `${stars} Star${stars > 1 ? 's' : ''}`,
@@ -538,7 +546,7 @@ export default function DriverProfileView({
     orders: v.orders,
     earnings: v.earnings,
     sharePct: myOrders.length > 0 ? Math.round((v.orders / myOrders.length) * 100) : 0,
-    avgSpeed: `${(v.km / Math.max(1, v.orders)).toFixed(1)} km/order`,
+    avgSpeed: `${fixedNumber(safeNumber(v.km) / Math.max(1, safeNumber(v.orders)), 1)} km/order`,
     demandLevel: v.orders >= 10 ? 'HIGH DEMAND' : v.orders >= 4 ? 'MODERATE' : 'LOW',
     demandScore: myOrders.length > 0 ? Math.round((v.orders / myOrders.length) * 100) : 0,
     heatColor: zoneColors[i % zoneColors.length],
@@ -722,7 +730,7 @@ export default function DriverProfileView({
           <div className="flex items-center space-x-5">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-brand-orange to-amber-500 p-0.5 shadow-xl shrink-0 relative">
               <div className="w-full h-full bg-[#0d1622] rounded-[14px] flex items-center justify-center text-2xl font-black text-brand-orange uppercase">
-                {driver.name.split(' ').map(n => n[0]).join('')}
+                {initials(driver.name)}
               </div>
               <span className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-brand-card flex items-center justify-center ${
                 driver.status === 'Online' ? 'bg-emerald-500' : 'bg-red-500'
@@ -781,7 +789,7 @@ export default function DriverProfileView({
               <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Rating Score</p>
               <div className="flex items-center justify-center space-x-1 text-amber-400 mt-0.5">
                 <Star className="w-4 h-4 fill-current" />
-                <span className="text-lg font-black">{driver.rating.toFixed(1)}</span>
+                <span className="text-lg font-black">{fixedNumber(driver.rating, 1)}</span>
               </div>
               <div className="mt-1">
                 <SparklineChart 
@@ -984,7 +992,7 @@ export default function DriverProfileView({
                 {trendMetricMode === 'ratings' ? (
                   <div>
                     <div className="flex items-baseline space-x-1">
-                      <span className="text-2xl font-black text-white">{driver.rating.toFixed(1)}</span>
+                      <span className="text-2xl font-black text-white">{fixedNumber(driver.rating, 1)}</span>
                       <span className="text-[10px] text-amber-400 font-bold">/ 5.0</span>
                     </div>
                     <p className="text-[9.5px] text-gray-400 mt-0.5">{doneOrders.length} reviewed deliveries</p>
@@ -1742,7 +1750,7 @@ export default function DriverProfileView({
                       >
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: zone.heatColor }}></span>
                         <div className="text-left">
-                          <p className="text-[10.5px] font-black leading-none">{zone.name.split(' ')[0]}</p>
+                          <p className="text-[10.5px] font-black leading-none">{firstWord(zone.name, 'Zone')}</p>
                           <p className="text-[8.5px] font-mono font-bold text-gray-400 leading-tight mt-0.5">{zone.orders} orders</p>
                         </div>
                       </div>
@@ -1770,7 +1778,7 @@ export default function DriverProfileView({
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={heatmapZones}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1f293d" />
-                      <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickFormatter={(val) => val.split(' ')[0]} />
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickFormatter={(val) => firstWord(val, 'Zone')} />
                       <YAxis stroke="#64748b" fontSize={10} />
                       <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
                       <Bar dataKey="orders" name="Fulfilled Orders" radius={[4, 4, 0, 0]}>
@@ -1833,7 +1841,7 @@ export default function DriverProfileView({
 
                 <div className="bg-brand-dark/50 border border-brand-border/60 p-3 rounded-xl">
                   <p className="text-[10px] text-gray-400 uppercase font-bold">Peak Order Window</p>
-                  <p className="text-xs font-bold text-white mt-1 leading-tight">{currentZone.peakHours.split('&')[0]}</p>
+                  <p className="text-xs font-bold text-white mt-1 leading-tight">{firstPart(currentZone.peakHours, '&')}</p>
                   <p className="text-[9px] text-gray-400 mt-0.5">Lunch & Dinner surges</p>
                 </div>
               </div>
@@ -1921,7 +1929,7 @@ export default function DriverProfileView({
               {trendMetricMode === 'ratings' ? (
                 <div className="flex items-center space-x-2 text-amber-400 font-mono font-bold">
                   <Star className="w-3.5 h-3.5 fill-current" />
-                  <span>{driver.rating.toFixed(1)} / 5.0 Score</span>
+                  <span>{fixedNumber(driver.rating, 1)} / 5.0 Score</span>
                   <span className={`text-[11px] flex items-center gap-0.5 ${isRatingUp ? 'text-emerald-400' : 'text-red-400'}`}>
                     ({isRatingUp ? '+' : ''}{ratingDiff} 7d delta)
                   </span>
@@ -1984,7 +1992,7 @@ export default function DriverProfileView({
             {/* Rating Breakdown & Distribution Chart */}
             <div className="bg-brand-card border border-brand-border p-5 rounded-xl shadow-sm space-y-4">
               <div className="text-center border-b border-brand-border/60 pb-4">
-                <span className="text-4xl font-black text-white">{driver.rating.toFixed(1)}</span>
+                <span className="text-4xl font-black text-white">{fixedNumber(driver.rating, 1)}</span>
                 <div className="flex items-center justify-center space-x-1 text-amber-400 my-1">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star key={s} className="w-4 h-4 fill-current" />
@@ -2080,7 +2088,7 @@ export default function DriverProfileView({
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3">
                         <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs ${rev.avatarBg}`}>
-                          {rev.customerName.split(' ').map(n => n[0]).join('')}
+                          {initials(rev.customerName, 'CU')}
                         </div>
                         <div>
                           <h4 className="text-xs font-bold text-white">{rev.customerName}</h4>
@@ -2253,7 +2261,7 @@ export default function DriverProfileView({
                     <p className="text-[11px] text-gray-400">Real kilometers driven vs orders completed per day</p>
                   </div>
                   <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                    Avg: {avgRatio.toFixed(1)} km/order
+                    Avg: {fixedNumber(avgRatio, 1)} km/order
                   </span>
                 </div>
 

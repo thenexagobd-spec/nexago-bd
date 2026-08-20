@@ -33,6 +33,7 @@ const safeText = (value: unknown, fallback = '') => {
 };
 const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const formatNumber = (value: unknown) => safeNumber(value).toLocaleString();
+const fixedNumber = (value: unknown, digits = 1) => safeNumber(value).toFixed(digits);
 const initials = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
 
 export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriver, onDeleteDriver, onOpenCard, showToast, vehicles = [] }: DriversViewProps) {
@@ -545,7 +546,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                   <p className="text-[8px] text-gray-500 uppercase font-medium">Rating</p>
                   <div className="flex items-center justify-center space-x-0.5 mt-0.5 text-[11px] font-bold text-yellow-400">
                     <Star className="w-2.5 h-2.5 fill-current" />
-                    <span>{driver.rating.toFixed(1)}</span>
+                    <span>{fixedNumber(driver.rating, 1)}</span>
                   </div>
                 </div>
               </div>
