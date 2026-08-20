@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Component, useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, BellRing, CheckCircle2, Clock, Database, Download, HardDrive, Lock, PlayCircle, RefreshCw, RotateCcw, Server, ShieldCheck, WifiOff } from 'lucide-react';
 
 type HealthPayload = {
@@ -91,7 +91,52 @@ const text = (value: unknown, fallback = '') => {
   return next || fallback;
 };
 
+type BoundaryState = { error: string };
+
+class SystemHealthBoundary extends Component<Record<string, never>, BoundaryState> {
+  state: BoundaryState = { error: '' };
+
+  static getDerivedStateFromError(error: unknown): BoundaryState {
+    return { error: error instanceof Error ? error.message : String(error || 'Unknown display error') };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('SystemHealthLog display failed', error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <section className="space-y-4">
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-black text-red-200">System Health display failed</h3>
+                <p className="mt-1 text-[10px] font-bold text-red-100/80">{this.state.error}</p>
+                <p className="mt-1 text-[10px] text-gray-400">Dashboard black screen bondho kora hoyeche. Refresh dile module abar load hobe.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="h-9 rounded-lg border border-red-400/40 bg-red-500/15 px-3 text-[10px] font-black uppercase text-red-100 hover:bg-red-500/25"
+              >
+                Retry System Health
+              </button>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    return <SystemHealthLogInner />;
+  }
+}
+
 export default function SystemHealthLog() {
+  return <SystemHealthBoundary />;
+}
+
+function SystemHealthLogInner() {
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -225,8 +270,10 @@ export default function SystemHealthLog() {
     try {
       const result = await systemApi('/api/system/action', { action, reason });
       setActionMsg(`${action} completed: ${result.result?.status || 'saved'}`);
-      if (result.result?.checklist) setScanReport({ scanId: 'RECOVERY-CHECKLIST', dependencyMissing: [], integrity: { score: 100 }, conflicts: 0, backupCount: 0, checklist: result.result.checklist });
-      if (result.result?.dependencies) setScanReport({ scanId: 'DEPENDENCY-RECHECK', dependencyMissing: result.result.dependencies.filter((d: any) => !d.ok).map((d: any) => d.name), integrity: { score: 100 }, conflicts: 0, backupCount: 0 });
+      const checklist = asArray(result.result?.checklist);
+      const actionDependencies = asArray<{ ok?: boolean; name?: string }>(result.result?.dependencies);
+      if (checklist.length) setScanReport({ scanId: 'RECOVERY-CHECKLIST', dependencyMissing: [], integrity: { score: 100 }, conflicts: 0, backupCount: 0, checklist });
+      if (actionDependencies.length) setScanReport({ scanId: 'DEPENDENCY-RECHECK', dependencyMissing: actionDependencies.filter((d) => !d.ok).map((d) => text(d.name, 'Unknown')), integrity: { score: 100 }, conflicts: 0, backupCount: 0 });
       void loadHealth();
     } catch (err: any) {
       setActionMsg(String(err?.message || err || `${action} failed`));
@@ -316,6 +363,11 @@ export default function SystemHealthLog() {
   const conflicts = asArray<{ group?: string; id?: string; reason?: string }>(health?.activity?.conflicts);
   const incidents = asArray<{ id?: string; action?: string; actor?: string; time?: string; reason?: string }>(health?.activity?.incidents);
   const branches = asArray<{ key?: string; orders?: number; posSales?: number; revenue?: number; printerStatus?: string; lastOrderAt?: string }>(health?.activity?.branches);
+  const scanMissing = asArray<string>(scanReport?.dependencyMissing);
+  const simulationTables = asArray<string>(simulationResult?.tables);
+  const localCounts = health?.storage?.localCounts && typeof health.storage.localCounts === 'object' ? health.storage.localCounts : {};
+  const tableCounts = health?.storage?.tableCounts && typeof health.storage.tableCounts === 'object' ? health.storage.tableCounts : {};
+  const integrityWarnings = asArray<string>(health?.backup?.integrity?.warnings);
   const commandGroups = [
     {
       title: 'Recovery',
@@ -390,7 +442,7 @@ export default function SystemHealthLog() {
                 <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-gray-500">{group.title}</p>
                 <div className="space-y-1.5">
                   {group.items.map((item) => {
-                    const Icon = item.icon;
+                    const Icon = item.icon || Activity;
                     return (
                       <button key={item.label} disabled={item.disabled} onClick={() => void item.run()} className="w-full h-9 rounded-md border border-brand-border bg-[#07111f] px-2.5 text-left text-[10px] font-bold text-gray-200 hover:border-brand-orange/50 hover:bg-[#0d1a2a] disabled:opacity-50 flex items-center justify-between">
                         <span className="flex items-center gap-2"><Icon className="w-3.5 h-3.5 text-brand-orange" />{item.label}</span>
@@ -420,14 +472,14 @@ export default function SystemHealthLog() {
       {scanReport && (
         <div className="mb-3 rounded-lg border border-brand-orange/25 bg-brand-orange/5 p-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] font-black text-brand-orange">Full Scan Report: {scanReport.scanId}</p>
+            <p className="text-[10px] font-black text-brand-orange">Full Scan Report: {text(scanReport.scanId, 'SCAN')}</p>
             <button onClick={() => setScanReport(null)} className="text-[10px] text-gray-400 hover:text-white font-bold">Close</button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2 text-[10px]">
             <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Backups <b className="text-white">{scanReport.backupCount || 0}</b></span>
             <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Integrity <b className="text-white">{scanReport.integrity?.score || 0}</b></span>
             <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Conflicts <b className="text-white">{scanReport.conflicts || 0}</b></span>
-            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Missing <b className="text-white">{scanReport.dependencyMissing?.length || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Missing <b className="text-white">{scanMissing.length}</b></span>
             <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Latest <b className="text-white">{scanReport.latestBackup?.name ? 'Yes' : 'No'}</b></span>
           </div>
         </div>
@@ -470,10 +522,10 @@ export default function SystemHealthLog() {
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-emerald-400" /> Active Store / Branch Requests</p>
           <div className="space-y-1.5 mt-2 max-h-28 overflow-y-auto pr-1">
             {activeKeys.length === 0 ? <p className="text-[10px] text-gray-500">No live request recorded yet.</p> : activeKeys.slice(0, 5).map((row) => (
-              <div key={row.key} className="flex items-center justify-between gap-2 text-[10px]">
-                <span className="text-white font-bold truncate">{row.key}</span>
-                <span className="text-gray-500 truncate">{row.lastPath}</span>
-                <span className="text-brand-orange font-mono">{row.count}</span>
+              <div key={text(row.key, `active-${row.count || 0}`)} className="flex items-center justify-between gap-2 text-[10px]">
+                <span className="text-white font-bold truncate">{text(row.key, 'unknown')}</span>
+                <span className="text-gray-500 truncate">{text(row.lastPath, '-')}</span>
+                <span className="text-brand-orange font-mono">{Number(row.count || 0)}</span>
               </div>
             ))}
           </div>
@@ -499,9 +551,9 @@ export default function SystemHealthLog() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {protectionChecks.map((check) => (
-              <div key={check.key} className="flex items-center gap-2 rounded-lg border border-brand-border/50 bg-brand-card/50 px-2.5 py-2">
+              <div key={text(check.key, text(check.label, 'check'))} className="flex items-center gap-2 rounded-lg border border-brand-border/50 bg-brand-card/50 px-2.5 py-2">
                 <span className={`h-2 w-2 rounded-full ${check.ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
-                <span className={`text-[10px] font-bold ${check.ok ? 'text-gray-200' : 'text-red-200'}`}>{check.label}</span>
+                <span className={`text-[10px] font-bold ${check.ok ? 'text-gray-200' : 'text-red-200'}`}>{text(check.label, 'Protection check')}</span>
               </div>
             ))}
           </div>
@@ -509,7 +561,7 @@ export default function SystemHealthLog() {
         <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Database className="w-3.5 h-3.5 text-cyan-400" /> Database / Local Row Counts</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-            {Object.entries(health?.storage?.localCounts || {}).slice(0, 9).map(([name, count]) => (
+            {Object.entries(localCounts).slice(0, 9).map(([name, count]) => (
               <div key={name} className="rounded-lg border border-brand-border/50 bg-brand-card/50 px-2.5 py-2">
                 <p className="text-[8px] uppercase text-gray-500 font-black truncate">{name}</p>
                 <p className="text-sm font-black text-white">{Number(count || 0).toLocaleString()}</p>
@@ -517,10 +569,10 @@ export default function SystemHealthLog() {
             ))}
           </div>
           <div className="mt-2 max-h-24 overflow-y-auto space-y-1">
-            {Object.entries((health?.storage?.tableCounts || {}) as Record<string, { table: string; count?: number; error?: string }>).slice(0, 10).map(([name, row]) => (
+            {Object.entries(tableCounts as Record<string, { table?: string; count?: number; error?: string }>).slice(0, 10).map(([name, row]) => (
               <div key={name} className="flex items-center justify-between gap-2 text-[9px] border-b border-brand-border/30 pb-1 last:border-0">
-                <span className="text-gray-400 truncate">{row.table}</span>
-                <span className={row.error ? 'text-red-300' : 'text-emerald-300'}>{row.error ? row.error : Number(row.count || 0).toLocaleString()}</span>
+                <span className="text-gray-400 truncate">{text(row?.table, name)}</span>
+                <span className={row?.error ? 'text-red-300' : 'text-emerald-300'}>{row?.error ? text(row.error) : Number(row?.count || 0).toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -535,7 +587,7 @@ export default function SystemHealthLog() {
             <span className="text-[10px] font-black text-white">{health?.backup?.integrity?.status || 'Checking'}</span>
           </div>
           <div className="mt-2 space-y-1">
-            {(health?.backup?.integrity?.warnings || []).length === 0 ? <p className="text-[10px] text-emerald-400">No integrity warning.</p> : health?.backup?.integrity?.warnings?.map((w) => <p key={w} className="text-[10px] text-amber-300">{w}</p>)}
+            {integrityWarnings.length === 0 ? <p className="text-[10px] text-emerald-400">No integrity warning.</p> : integrityWarnings.map((w, idx) => <p key={`${w}-${idx}`} className="text-[10px] text-amber-300">{text(w, 'Warning')}</p>)}
           </div>
         </div>
         <div className="rounded-lg border border-brand-border bg-brand-dark/20 p-3">
@@ -550,9 +602,9 @@ export default function SystemHealthLog() {
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><Server className="w-3.5 h-3.5 text-violet-400" /> Dependency Monitor</p>
           <div className="space-y-1.5 mt-2">
             {dependencies.map((dep) => (
-              <div key={dep.name} className="flex items-center justify-between gap-2 text-[10px]">
-                <span className="text-gray-300">{dep.name}</span>
-                <span className={dep.status === 'Configured' ? 'text-emerald-400 font-bold' : 'text-red-300 font-bold'}>{dep.status}</span>
+              <div key={text(dep.name, 'dependency')} className="flex items-center justify-between gap-2 text-[10px]">
+                <span className="text-gray-300">{text(dep.name, 'Dependency')}</span>
+                <span className={dep.status === 'Configured' ? 'text-emerald-400 font-bold' : 'text-red-300 font-bold'}>{text(dep.status, 'Missing')}</span>
               </div>
             ))}
           </div>
@@ -564,8 +616,8 @@ export default function SystemHealthLog() {
           <p className="text-[9px] uppercase font-black text-gray-500 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Conflict Resolution Center</p>
           <div className="space-y-1.5 mt-2 max-h-32 overflow-y-auto">
             {conflicts.length === 0 ? <p className="text-[10px] text-emerald-400">No duplicate ID conflict detected.</p> : conflicts.slice(0, 8).map((c, idx) => (
-              <div key={`${c.group}-${c.id}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px]">
-                <span className="text-white font-bold">{c.group}</span><span className="text-amber-200 truncate">{c.id}</span><span className="text-amber-400">{c.reason}</span>
+              <div key={`${text(c.group, 'group')}-${text(c.id, 'id')}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px]">
+                <span className="text-white font-bold">{text(c.group, 'Group')}</span><span className="text-amber-200 truncate">{text(c.id, 'ID')}</span><span className="text-amber-400">{text(c.reason, 'Needs review')}</span>
                 <button onClick={() => void reviewConflict({ group: text(c.group, 'unknown'), id: text(c.id, 'unknown'), reason: text(c.reason, 'review') })} className="rounded-md border border-amber-500/30 px-2 py-1 text-[8px] font-black text-amber-200 hover:bg-amber-500/10">Review</button>
               </div>
             ))}
@@ -593,9 +645,9 @@ export default function SystemHealthLog() {
           {branches.length === 0 ? (
             <p className="text-[10px] text-gray-500">No branch sales or POS records yet.</p>
           ) : branches.slice(0, 6).map((branch) => (
-            <div key={branch.key} className="rounded-lg border border-brand-border/60 bg-brand-card/70 px-3 py-2">
+            <div key={text(branch.key, 'branch')} className="rounded-lg border border-brand-border/60 bg-brand-card/70 px-3 py-2">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-black text-white truncate">{branch.key}</p>
+                <p className="text-[10px] font-black text-white truncate">{text(branch.key, 'Branch')}</p>
                 <span className={`px-2 py-0.5 rounded text-[8px] font-black ${branch.printerStatus === 'Unknown' ? 'bg-gray-500/10 text-gray-400' : 'bg-emerald-500/10 text-emerald-300'}`}>{branch.printerStatus}</span>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-[9px]">
@@ -657,16 +709,16 @@ export default function SystemHealthLog() {
         {simulationResult && (
           <div className="mt-3 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black text-violet-200">Restore Simulation Report: {simulationResult.backup}</p>
+              <p className="text-[10px] font-black text-violet-200">Restore Simulation Report: {text(simulationResult.backup, 'Backup')}</p>
               <button onClick={() => setSimulationResult(null)} className="text-[10px] text-gray-400 hover:text-white font-bold">Close</button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-[10px]">
               <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Verify: <b className={simulationResult.ok ? 'text-emerald-400' : 'text-red-300'}>{simulationResult.ok ? 'Pass' : 'Fail'}</b></span>
-              <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Tables: <b className="text-white">{simulationResult.tables?.length || 0}</b></span>
+              <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Tables: <b className="text-white">{simulationTables.length}</b></span>
               <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">COPY: <b className="text-white">{simulationResult.copySections || 0}</b></span>
               <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Rows est: <b className="text-white">{simulationResult.estimatedRows || 0}</b></span>
             </div>
-            <p className="mt-2 text-[9px] text-gray-500 truncate">Tables: {(simulationResult.tables || []).join(', ') || 'No table detected in first scan window'}</p>
+            <p className="mt-2 text-[9px] text-gray-500 truncate">Tables: {simulationTables.map((table) => text(table, 'table')).join(', ') || 'No table detected in first scan window'}</p>
           </div>
         )}
         <p className="mt-2 text-[9px] text-gray-600">Restore button saves a secured restore request, audit and alert. Actual database restore should be run in a maintenance window to avoid data loss.</p>
