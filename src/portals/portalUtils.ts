@@ -481,7 +481,13 @@ export function useCloudSync() {
           if (JSON.stringify(next) !== JSON.stringify(localVal)) { lsSet(localKey, next); changed = true; }
         }
         applyingRemoteState = false;
-        lastPushedSig = sig();
+        // Only treat the local state as "fully uploaded" when the pull changed
+        // nothing locally. If the pull merged new cloud data on top of an
+        // un-pushed local edit (e.g. a driver just went online), overwriting
+        // lastPushedSig here would make the next push() see an identical
+        // signature and silently skip — the online/location change would never
+        // reach the cloud and the Super Admin would keep showing Offline.
+        if (!changed) lastPushedSig = sig();
         if (changed) window.dispatchEvent(new Event('storage'));
         return true;
       } catch {

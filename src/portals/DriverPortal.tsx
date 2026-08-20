@@ -18,14 +18,14 @@ import {
     X, Bell, Clock, RotateCcw, Search, Lock, Mail, CalendarDays, MailCheck, ArrowLeft, Fingerprint
   } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim, securityApi, supabaseClient } from './portalUtils';
+import { useOrders, useDrivers, useWalletTxns, useTickets, useNotifications, bdt, todayStr, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, useCloudSync, identityCheck, identityClaim, securityApi, supabaseClient, currentCloudKey } from './portalUtils';
 import { computeOfferBatch, OFFER_WINDOW_MS } from '../utils/autoAssign';
-import type { DriverStatusLog } from '../types';
+import type { Driver, DriverStatusLog } from '../types';
 
 type AuthView = 'login' | 'signup' | 'docs' | 'pending' | 'forgot' | 'terms' | 'dashboard';
 
 export default function DriverPortal() {
-  useCloudSync();
+  const syncState = useCloudSync();
   const [orders, setOrders] = useOrders();
   const [drivers, setDrivers] = useDrivers();
   const [txns, setTxns] = useWalletTxns();
@@ -89,7 +89,7 @@ export default function DriverPortal() {
         setLocStatus('granted'); setLocError(''); setGpsOn(true);
         lsSet('sd_driver_loc_perm', 'granted');
         const coord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        if (me) setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, locationCoords: coord, lastLocationAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : d)));
+        if (me) pushDriverRecord({ locationCoords: coord, lastLocationAt: new Date().toISOString() });
         startLocWatch();
       },
       (err) => {
@@ -118,7 +118,7 @@ export default function DriverPortal() {
         const coord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setGpsOn(true);
         if (me) {
-          setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, locationCoords: coord, lastLocationAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : d)));
+          pushDriverRecord({ locationCoords: coord, lastLocationAt: new Date().toISOString() });
           // Persist the last known spot even while offline so the admin map keeps the rider visible
           try { localStorage.setItem('sd_driver_last_loc', JSON.stringify({ ...coord, at: Date.now() })); } catch { /* ignore */ }
         }
@@ -131,18 +131,37 @@ export default function DriverPortal() {
   };
 
   // Keep the driver record fresh every ~20s while this tab is open (drivers are
-  // cloud-synced, so the Super Admin map updates without a page reload).
+  // cloud-synced, so the Super Admin map updates without a page reload). The
+  // stamp runs even without a location fix yet so the Online status itself keeps
+  // reaching the cloud — otherwise a single swallowed push would leave the admin
+  // permanently showing Offline.
   useEffect(() => {
     if (!me) return;
     if (locStatus !== 'granted') return;
     const t = setInterval(() => {
-      if (me.locationCoords) {
-        setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, updatedAt: new Date().toISOString() } : d)));
-      }
+      setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, updatedAt: new Date().toISOString() } : d)));
     }, 20000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.id, locStatus]);
+
+  // Deterministic, targeted cloud write of the logged-in driver's record. The
+  // shared cloud-sync engine dedupes by content signature, so an interleaved
+  // pull can swallow a status/location change; this direct POST guarantees the
+  // Super Admin sees the driver online + live position. It is idempotent
+  // (union-by-id on the relay) and lightweight (a single driver record).
+  const pushDriverRecord = (patch: Partial<Driver>) => {
+    if (!me) return;
+    const nowIso = new Date().toISOString();
+    setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, ...patch, updatedAt: nowIso } : d)));
+    const updated = { ...me, ...patch, updatedAt: nowIso };
+    const key = currentCloudKey();
+    fetch(`${window.location.origin}/api/state?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drivers: [updated] }),
+    }).catch(() => { /* the shared engine re-syncs on the next push tick */ });
+  };
 
   // Auth form state
   const [loginId, setLoginId] = useState('');
@@ -840,12 +859,12 @@ export default function DriverPortal() {
       onlineSinceRef.current = null;
       const minutes = started ? Math.max(1, Math.round((Date.now() - started) / 60000)) : 0;
       const log: DriverStatusLog = { id: `sl-${Date.now()}`, status: 'Offline', timestamp: new Date().toISOString(), formattedTime: new Date().toLocaleString('en-GB'), durationMinutes: minutes, location: me.locationCoords ? `${me.locationCoords.lat.toFixed(4)}, ${me.locationCoords.lng.toFixed(4)}` : undefined };
-      setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: next as any, updatedAt: new Date().toISOString(), statusHistory: [log, ...(d.statusHistory || [])] } : d)));
+      pushDriverRecord({ status: next as any, statusHistory: [log, ...(me.statusHistory || [])] });
       return;
     }
     // Online: record the online event too so the Super Admin has a full timeline.
     const log: DriverStatusLog = { id: `sl-${Date.now()}`, status: 'Online', timestamp: new Date().toISOString(), formattedTime: new Date().toLocaleString('en-GB'), location: me.locationCoords ? `${me.locationCoords.lat.toFixed(4)}, ${me.locationCoords.lng.toFixed(4)}` : undefined };
-    setDrivers(prev => prev.map(d => (d.id === me.id ? { ...d, status: next as any, updatedAt: new Date().toISOString(), statusHistory: [log, ...(d.statusHistory || [])] } : d)));
+    pushDriverRecord({ status: next as any, statusHistory: [log, ...(me.statusHistory || [])] });
     if (locStatus === 'granted') startLocWatch();
   };
 
@@ -1765,6 +1784,10 @@ export default function DriverPortal() {
                   <button onClick={toggleDuty} className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-colors ${online ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-gray-500/20 border-gray-500/40 text-gray-300'}`}>
                     <Power className="w-3.5 h-3.5" /><span>{online ? (activeOrder ? 'On-Delivery' : 'Online') : 'Offline'}</span>
                   </button>
+                  <span title="Cloud sync status — online means your live position is reaching the Super Admin" className={`flex items-center space-x-1 text-[8px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border ${syncState === 'online' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-amber-400 border-amber-500/30 bg-amber-500/10'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${syncState === 'online' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+                    <span>{syncState === 'online' ? 'Cloud · Live' : 'Reconnecting'}</span>
+                  </span>
                 </div>
               </div>
 

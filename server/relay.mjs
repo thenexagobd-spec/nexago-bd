@@ -548,6 +548,14 @@ function boolActive(value, fallback = true) {
   return fallback;
 }
 
+// Display-only time strings like "09:10 AM" (toLocaleTimeString) must never be
+// written into a timestamptz column — that aborts the whole Supabase mirror.
+function safeTimestamp(value, fallback = new Date().toISOString()) {
+  if (!value) return fallback;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? fallback : new Date(parsed).toISOString();
+}
+
 async function upsertNormalized(table, rows, onConflict) {
   if (!supabaseConfigured || !serviceClient || !Array.isArray(rows) || rows.length === 0) return;
   const { error } = await serviceClient.from(table).upsert(rows, { onConflict });
@@ -569,8 +577,8 @@ async function supabaseMirrorNormalizedState(key, state = {}) {
       address: firstText(b.address, b.location),
       is_active: boolActive(b.status ?? b.isActive, true),
       payload: b,
-      created_at: b.createdAt || now,
-      updated_at: b.updatedAt || now,
+      created_at: safeTimestamp(b.createdAt),
+      updated_at: safeTimestamp(b.updatedAt),
     }))
     .filter((b) => b.branch_id && b.store_id);
 
@@ -588,8 +596,8 @@ async function supabaseMirrorNormalizedState(key, state = {}) {
       stock_qty: Number(p.stock ?? p.stockQty ?? p.quantity ?? 0),
       is_active: boolActive(p.status ?? p.isActive, Number(p.stock ?? 0) > 0),
       payload: p,
-      created_at: p.createdAt || now,
-      updated_at: p.updatedAt || now,
+      created_at: safeTimestamp(p.createdAt),
+      updated_at: safeTimestamp(p.updatedAt),
     }))
     .filter((p) => p.product_id && p.store_id && p.name);
 
@@ -608,8 +616,8 @@ async function supabaseMirrorNormalizedState(key, state = {}) {
       expires_at: c.expiresAt || c.endDate || null,
       is_active: boolActive(c.status ?? c.isActive, true),
       payload: c,
-      created_at: c.createdAt || now,
-      updated_at: c.updatedAt || now,
+      created_at: safeTimestamp(c.createdAt),
+      updated_at: safeTimestamp(c.updatedAt),
     }))
     .filter((c) => c.code);
 
@@ -624,8 +632,8 @@ async function supabaseMirrorNormalizedState(key, state = {}) {
       role: firstText(s.role, s.assignedRole, 'staff'),
       is_active: boolActive(s.status ?? s.isActive, true),
       payload: s,
-      created_at: s.createdAt || now,
-      updated_at: s.updatedAt || now,
+      created_at: safeTimestamp(s.createdAt),
+      updated_at: safeTimestamp(s.updatedAt),
     }))
     .filter((s) => s.staff_id && s.store_id);
 
@@ -642,8 +650,8 @@ async function supabaseMirrorNormalizedState(key, state = {}) {
       status: firstText(p.status, p.paymentStatus, 'pending').toLowerCase(),
       gateway_response: p.gatewayResponse || p.gateway_response || {},
       payload: p,
-      created_at: p.createdAt || p.time || now,
-      updated_at: p.updatedAt || now,
+      created_at: safeTimestamp(p.createdAt || p.paidAt || p.paymentDate),
+      updated_at: safeTimestamp(p.updatedAt),
     }))
     .filter((p) => p.payment_id);
 
