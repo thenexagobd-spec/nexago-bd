@@ -99,7 +99,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
   const totalPendingAudit = drivers.filter(d => d.verificationStatus === 'Pending Audit').length;
   const totalLocked = drivers.filter(d => d.dispatchLocked).length;
 
-  // Only riders with a real driver-app GPS ping are shown. No seeded/demo coordinates.
+  // Only riders with a real driver-app GPS ping are shown.
   const fleetMapVeh = drivers.filter(hasRealLiveGps).map(d => ({
     id: safeText(d.id), name: safeText(d.name, 'Driver'), status: safeText(d.status, 'Online'), vehicleType: safeText(d.vehicleType, 'Driver'), phone: safeText(d.phone),
     lat: Number(d.locationCoords!.lat), lng: Number(d.locationCoords!.lng), tLat: Number(d.locationCoords!.lat), tLng: Number(d.locationCoords!.lng),
@@ -438,7 +438,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
               <MapPin className="w-8 h-8 text-gray-600 mb-2" />
               <p className="text-[11px] text-gray-400 font-bold">No real live GPS yet</p>
-              <p className="text-[9.5px] text-gray-500 mt-1">Only driver-app GPS pings with a saved live timestamp appear here. Demo or seeded coordinates are hidden.</p>
+              <p className="text-[9.5px] text-gray-500 mt-1">Only driver-app GPS pings with a saved live timestamp appear here.</p>
             </div>
           )}
         </div>
@@ -520,7 +520,7 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
                 </div>
                 <div className="min-w-0">
                   <h4 className="font-bold text-[13px] text-white truncate group-hover/card:text-brand-orange transition-colors">
-                    <span>{safeText(driver.name, 'Unnamed Driver')}</span>
+                    <span>{safeText(driver.name, 'Driver')}</span>
                   </h4>
                   <p className="text-[9px] text-gray-400 font-mono mt-0.5">{safeText(driver.id, 'NO-ID')}</p>
                   <p className="text-[10px] text-gray-300 mt-0.5 truncate">{driver.vehicleType}</p>

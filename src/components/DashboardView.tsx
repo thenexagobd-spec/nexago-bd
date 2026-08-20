@@ -419,7 +419,7 @@ export default function DashboardView({
                           {initials(driver.name, 'DR')}
                         </div>
                         <div>
-                          <div className="font-semibold text-white">{safeText(driver.name, 'Unnamed Driver')}</div>
+                          <div className="font-semibold text-white">{safeText(driver.name, 'Driver')}</div>
                           <div className="text-[10px] text-gray-500 font-mono">{safeText(driver.id, 'NO-ID')}</div>
           </div>
           {chartPeriod==='Custom' && <div className="flex items-center flex-wrap gap-2 mt-2">

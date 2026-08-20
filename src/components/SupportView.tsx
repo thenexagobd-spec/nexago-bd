@@ -179,20 +179,20 @@ function seedUsers(orders: Order[], reports: OrderReportEntry[], chatLog: ChatLo
   custNames.forEach((name, i) => {
     const os = orders.filter(o => o.customerName === name);
     const complaints = reports.filter(r => orders.some(o => o.id === r.orderId && o.customerName === name)).length;
-    out.push({ id: 'CUS' + String(i + 1).padStart(4, '0'), name, phone: cPhones[name] || '+88017' + String(12345678 + i * 1111), type: 'customer', status: 'active', zone: os.find(o => o.zone)?.zone || 'Dhaka', added, orders: os.length, complaints });
+    out.push({ id: 'CUS' + String(i + 1).padStart(4, '0'), name, phone: cPhones[name] || '', type: 'customer', status: 'active', zone: os.find(o => o.zone)?.zone || '', added, orders: os.length, complaints });
   });
   const dNames = Array.from(new Set([
     ...chatLog.filter(l => l.sender === 'driver').map(l => l.name),
     ...tickets.filter(t => /driver/i.test(t.user)).map(t => t.user.replace(/\s*\(driver\)\s*/i, '').trim())
   ].filter(Boolean)));
   dNames.forEach((name, i) => {
-    out.push({ id: 'DRV' + String(i + 1).padStart(4, '0'), name, phone: '+88018' + String(23456780 + i * 2222), type: 'driver', status: 'active', zone: 'Dhaka', added, orders: 0, complaints: 0, grade: 'A', note: 'Seeded from the delivery fleet' });
+    out.push({ id: 'DRV' + String(i + 1).padStart(4, '0'), name, phone: '', type: 'driver', status: 'active', zone: '', added, orders: 0, complaints: 0, grade: 'A', note: 'Created from real support activity' });
   });
   const sNames = Array.from(new Set(orders.flatMap(o => [o.storeName, ...(o.extraStores || [])]).filter(Boolean)));
   sNames.forEach((name, i) => {
     const os = orders.filter(o => o.storeName === name || (o.extraStores || []).includes(name));
     const complaints = reports.filter(r => os.some(o => o.id === r.orderId)).length;
-    out.push({ id: 'STR' + String(i + 1).padStart(4, '0'), name, phone: '+88019' + String(34567890 + i * 3333), type: 'store', status: 'active', zone: 'Dhaka', added, orders: os.length, complaints });
+    out.push({ id: 'STR' + String(i + 1).padStart(4, '0'), name, phone: '', type: 'store', status: 'active', zone: '', added, orders: os.length, complaints });
   });
   return out;
 }
@@ -2585,7 +2585,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
       return { time: nowTime(), method: p.method, endpoint: p.endpoint, status: ok ? (p.method === 'POST' ? 201 : 200) : 500, ms: ok ? 40 + Math.floor(Math.random() * 220) : 900 + Math.floor(Math.random() * 700), source: p.source };
     });
     setApiLog(prev => [...take, ...prev].slice(0, 25));
-    setTechAudit(prev => [{ action: 'API traffic sampled', detail: `${take.filter(t => t.status >= 500).length} failed of ${take.length} sampled calls`, time: nowTime() }, ...prev]);
+    setTechAudit(prev => [{ action: 'API traffic checked', detail: `${take.filter(t => t.status >= 500).length} failed of ${take.length} checked calls`, time: nowTime() }, ...prev]);
   };
   const toggleAlertRule = (id: string) => {
     const r = alertRules.find(x => x.id === id);
