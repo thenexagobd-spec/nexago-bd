@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Banknote, Barcode, Calculator, CreditCard, Package, Printer, RefreshCw, Search, ShoppingCart, Trash2, Truck } from 'lucide-react';
+import { Banknote, Barcode, Calculator, CreditCard, Package, Printer, ShoppingCart, Trash2, Truck } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product } from '../types';
 
@@ -102,8 +102,8 @@ export default function BangladeshPosSystem({ products, orders = [], onProductsC
   };
 
   return (
-    <div className="min-h-[calc(100dvh-0px)] bg-[#dbeaf3] text-[#12304a] p-2 overflow-auto">
-      <div className="min-w-[1180px] grid grid-cols-[330px_minmax(0,1fr)_280px] gap-2">
+    <div className="min-h-dvh bg-[#dbeaf3] text-[#12304a] p-1 sm:p-2 overflow-auto">
+      <div className="grid grid-cols-1 xl:grid-cols-[330px_minmax(0,1fr)_280px] gap-2 min-w-0">
         <section className="bg-[#b9d7e8] border-2 border-[#6fa4c4]">
           <div className="h-11 bg-[#2378b5] text-white px-3 flex items-center justify-between font-black text-xs">
             <span>বাংলাদেশ POS · NEW</span>
@@ -122,7 +122,7 @@ export default function BangladeshPosSystem({ products, orders = [], onProductsC
               <button onClick={scanOrSearch} className="w-11 bg-[#1976ad] text-white grid place-items-center"><Barcode className="w-5 h-5" /></button>
             </div>
           </div>
-          <div className="h-[420px] bg-white border-y border-[#87adbf] overflow-auto">
+          <div className="h-[min(42dvh,420px)] min-h-[260px] bg-white border-y border-[#87adbf] overflow-auto">
             <table className="w-full text-[11px]">
               <thead className="sticky top-0 bg-[#506f86] text-white">
                 <tr><th className="p-2 text-left">Item</th><th>Qty</th><th className="text-right pr-2">Total</th><th></th></tr>
@@ -147,15 +147,15 @@ export default function BangladeshPosSystem({ products, orders = [], onProductsC
           </div>
         </section>
 
-        <section className="bg-[#cae5f6] border-2 border-[#6fa4c4]">
+        <section className="bg-[#cae5f6] border-2 border-[#6fa4c4] min-w-0">
           <div className="h-11 bg-[#2c86c4] text-white px-3 flex items-center justify-between">
-            <div className="flex gap-2 overflow-x-auto">
-              {categories.map(cat => <button key={cat} onClick={() => setCategory(cat)} className={`px-4 h-8 text-xs font-black border border-white/30 ${category === cat ? 'bg-white text-[#126195]' : 'bg-[#126da6] text-white'}`}>{cat}</button>)}
+            <div className="flex gap-2 overflow-x-auto min-w-0">
+              {categories.map(cat => <button key={cat} onClick={() => setCategory(cat)} className={`shrink-0 px-3 sm:px-4 h-8 text-xs font-black border border-white/30 ${category === cat ? 'bg-white text-[#126195]' : 'bg-[#126da6] text-white'}`}>{cat}</button>)}
             </div>
           </div>
-          <div className="grid grid-cols-5 gap-2 p-3 content-start max-h-[650px] overflow-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-2 p-2 sm:p-3 content-start xl:max-h-[650px] overflow-auto">
             {visible.map(product => (
-              <button key={product.id} onClick={() => addProduct(product)} className="min-h-28 bg-white border border-[#86b4ca] hover:border-[#176aa2] shadow-sm p-2 text-center">
+              <button key={product.id} onClick={() => addProduct(product)} className="min-h-28 bg-white border border-[#86b4ca] hover:border-[#176aa2] shadow-sm p-2 text-center min-w-0">
                 <div className="w-12 h-12 mx-auto rounded bg-[#d7eef8] border border-[#9fc8dc] grid place-items-center text-[#2476a6]"><Package className="w-6 h-6" /></div>
                 <p className="mt-1 text-[11px] font-black leading-tight line-clamp-2">{product.name}</p>
                 <p className="text-[10px] font-mono text-[#1e749c]">{money(product.price)}</p>
@@ -165,14 +165,14 @@ export default function BangladeshPosSystem({ products, orders = [], onProductsC
           </div>
         </section>
 
-        <aside className="bg-[#d6e4ec] border-2 border-[#6fa4c4]">
+        <aside className="bg-[#d6e4ec] border-2 border-[#6fa4c4] min-w-0">
           <div className="h-28 bg-white border-b border-[#8dafbf] flex items-center justify-center">
             <div className="text-center">
               <div className="text-4xl font-black text-[#1f6d9b]">NEXAGO</div>
               <div className="text-[10px] font-black text-gray-500">BANGLADESH SMART POS</div>
             </div>
           </div>
-          <div className="p-3 space-y-2 text-sm">
+          <div className="p-2 sm:p-3 space-y-2 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><b>{money(subtotal)}</b></div>
             <div className="flex justify-between"><span>Discount</span><b>{money(discount)}</b></div>
             <div className="flex justify-between"><span>VAT 5%</span><b>{money(vat)}</b></div>
