@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import DriverProfileView from './DriverProfileView';
 import CompareDriversModal from './CompareDriversModal';
+import LeafletMap from './LeafletMap';
 
 interface VehicleInfo { id:string; regNo:string; type:string; brand:string; model:string; year:number; driverName:string; fuelType:string; status:string; fuelCost:number; maintenanceCost:number; odoKm:number; downtime:number; }
 
@@ -83,6 +84,12 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
   const totalCodCollected = drivers.reduce((acc, d) => acc + (d.codCashCollected || 0), 0);
   const totalPendingAudit = drivers.filter(d => d.verificationStatus === 'Pending Audit').length;
   const totalLocked = drivers.filter(d => d.dispatchLocked).length;
+
+  // All riders currently sharing a live GPS position (from the driver portal).
+  const fleetMapVeh = drivers.filter(d => d.locationCoords).map(d => ({
+    id: d.id, name: d.name, status: d.status, vehicleType: d.vehicleType, phone: d.phone,
+    lat: d.locationCoords!.lat, lng: d.locationCoords!.lng, tLat: d.locationCoords!.lat, tLng: d.locationCoords!.lng,
+  }));
 
   const filteredDrivers = drivers.filter(driver => {
     const q = search.toLowerCase().trim();
@@ -398,6 +405,32 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
           <div className="w-9 h-9 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
             <Lock className="w-5 h-5" />
           </div>
+        </div>
+      </div>
+
+      {/* Live Fleet Map — every rider's real GPS position from the driver app */}
+      <div className="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border/60">
+          <div className="flex items-center space-x-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+            </span>
+            <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Live Fleet Map</h4>
+            <span className="text-[9px] text-gray-400 font-mono">{fleetMapVeh.length} riders sharing location</span>
+          </div>
+          <button onClick={() => setStatusFilter('All')} className="text-[9px] font-black text-brand-orange uppercase tracking-wider hover:underline cursor-pointer">Show all riders</button>
+        </div>
+        <div className="relative" style={{ height: 320 }}>
+          {fleetMapVeh.length > 0 ? (
+            <LeafletMap vehicles={fleetMapVeh} zoomTo={11} onVehicleClick={(id) => { const d = drivers.find(x => x.id === id); if (d) setSelectedDriverId(id); }} />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+              <MapPin className="w-8 h-8 text-gray-600 mb-2" />
+              <p className="text-[11px] text-gray-400 font-bold">No live GPS yet</p>
+              <p className="text-[9.5px] text-gray-500 mt-1">Riders who allow Location in the driver app and go online will appear here in real time.</p>
+            </div>
+          )}
         </div>
       </div>
 
