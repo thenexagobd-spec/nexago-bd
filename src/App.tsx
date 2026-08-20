@@ -448,6 +448,7 @@ export default function App() {
   const [payments, setPayments] = useState<Payment[]>(() => stripLegacySeedData(getStoredData('sd_payments', []), 'payments'));
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => stripLegacySeedData(getStoredData('sd_vehicles', []), 'vehicles'));
   const [banners, setBanners] = useState<PromotionBanner[]>(() => stripLegacySeedData(getStoredData('sd_banners', []), 'banners'));
+  const [deletedRecords, setDeletedRecords] = useState<any[]>(() => getStoredData<any[]>('sd_deleted_records', []));
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => stripLegacySeedData(getStoredData('sd_tickets', []), 'tickets'));
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => stripLegacySeedData(getStoredData('sd_notifications', []), 'notifications'));
   const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
@@ -570,6 +571,7 @@ export default function App() {
   // UI Control states
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [quickActionModal, setQuickActionModal] = useState<'driver' | 'user' | 'zone' | 'notification' | 'banner' | null>(null);
+  const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<Record<string, string>>({});
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isAddingStore, setIsAddingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
@@ -621,6 +623,7 @@ export default function App() {
   useEffect(() => { setStoredData('sd_users', users); }, [users]);
   useEffect(() => { setStoredData('sd_payments', payments); }, [payments]);
   useEffect(() => { setStoredData('sd_vehicles', vehicles); }, [vehicles]);
+  useEffect(() => { setStoredData('sd_deleted_records', deletedRecords); }, [deletedRecords]);
   useEffect(() => { setStoredData('sd_products', products); }, [products]);
   useEffect(() => { setStoredData('sd_categories', categories); }, [categories]);
   useEffect(() => { setStoredData('sd_inventory', inventory); }, [inventory]);
@@ -739,6 +742,7 @@ export default function App() {
         reviews,
         banners,
         orders,
+        deletedRecords,
         notifications
       };
       const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`, {
@@ -771,6 +775,7 @@ export default function App() {
         if (Array.isArray(data.state.reviews)) setReviews(data.state.reviews);
         if (Array.isArray(data.state.banners)) setBanners(stripLegacySeedData(data.state.banners, 'banners'));
         if (Array.isArray(data.state.orders)) setOrders(stripLegacySeedData(data.state.orders, 'orders'));
+        if (Array.isArray(data.state.deletedRecords)) setDeletedRecords(data.state.deletedRecords);
         if (Array.isArray(data.state.notifications)) setNotifications(stripLegacySeedData(data.state.notifications, 'notifications'));
         setLastSyncAt(data.state.updatedAt);
         setSyncState('online');
@@ -830,7 +835,7 @@ export default function App() {
     if (firstSyncRun.current) { firstSyncRun.current = false; return; }
     const t = setTimeout(() => { pushState(true); }, 1500);
     return () => clearTimeout(t);
-  }, [products, categories, stores, branches, coupons, reviews, banners, orders, notifications]);
+  }, [products, categories, stores, branches, coupons, reviews, banners, orders, deletedRecords, notifications]);
 
   // On first load: seed the cloud with local data if the cloud is empty (local stays authoritative)
   useEffect(() => { seedCloudIfEmpty(); }, []);
@@ -1087,9 +1092,12 @@ export default function App() {
     const nextOrders = orders.map(o => o.id === id ? appendTimeline({ ...o, status: 'Cancelled' as const }, 'cancelled', 'admin', 'Cancelled from admin; retained permanently in order history') : o);
     setOrders(nextOrders);
     const cancelled = nextOrders.find(o => o.id === id);
-    if (cancelled) persistOrderToCloud(cancelled);
+    if (cancelled) {
+      archiveRecord('order', cancelled, `Order #${cancelled.id}`);
+      persistOrderToCloud(cancelled);
+    }
     setPayments(payments.map(p => p.orderId === id ? { ...p, status: 'Failed' as const } : p));
-    showToast(`Order #${id} deleted (kept in history as Cancelled).`);
+    showToast(`Order #${id} moved to Recovery Vault and kept in history as Cancelled.`);
   };
 
   // Manually assign a driver to an order (used when driver rejects/doesn't accept)
@@ -1167,9 +1175,59 @@ export default function App() {
     showToast(`Driver profile ${updatedDriver.id} updated.`);
   };
 
+  const archiveRecord = (kind: string, record: any, label: string) => {
+    const now = new Date().toISOString();
+    const id = String(record?.id || record?.phone || record?.plateNumber || record?.plateNo || record?.code || '').trim();
+    if (!id) return;
+    setDeletedRecords(prev => [
+      {
+        vaultId: `DEL-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        kind,
+        recordId: id,
+        label,
+        record,
+        deletedAt: now,
+        deletedBy: 'super-admin',
+        status: 'Recoverable',
+        reason: 'Moved to Super Admin Recovery Vault',
+      },
+      ...prev.filter((row: any) => !(row.kind === kind && row.recordId === id))
+    ]);
+    securityAudit('record-soft-deleted', { actor: 'super-admin', role: 'super-admin', reason: 'recoverable delete', newValue: { kind, recordId: id, label } });
+  };
+
+  const restoreDeletedRecord = (vaultId: string) => {
+    const row = deletedRecords.find((x: any) => x.vaultId === vaultId);
+    if (!row) return;
+    const rec = row.record;
+    if (row.kind === 'order') setOrders(prev => prev.some(o => o.id === rec.id) ? prev : [appendTimeline(rec, 'restored', 'admin', 'Restored from Super Admin Recovery Vault'), ...prev]);
+    if (row.kind === 'driver') setDrivers(prev => prev.some(d => d.id === rec.id) ? prev : [rec, ...prev]);
+    if (row.kind === 'user') setUsers(prev => prev.some(u => u.phone === rec.phone || u.id === rec.id) ? prev : [rec, ...prev]);
+    if (row.kind === 'zone') setZones(prev => prev.some(z => z.id === rec.id) ? prev : [rec, ...prev]);
+    if (row.kind === 'vehicle') setVehicles(prev => prev.some(v => v.plateNumber === rec.plateNumber) ? prev : [rec, ...prev]);
+    if (row.kind === 'banner') setBanners(prev => prev.some(b => b.id === rec.id) ? prev : [rec, ...prev]);
+    setDeletedRecords(prev => prev.map((x: any) => x.vaultId === vaultId ? { ...x, status: 'Restored', restoredAt: new Date().toISOString() } : x));
+    securityAudit('record-restored', { actor: 'super-admin', role: 'super-admin', reason: 'restored from recovery vault', newValue: { kind: row.kind, recordId: row.recordId } });
+    showToast(`${row.label} restored from Recovery Vault.`, 'success');
+  };
+
+  const permanentDeleteVaultRecord = (vaultId: string, confirmText: string) => {
+    const row = deletedRecords.find((x: any) => x.vaultId === vaultId);
+    if (!row) return;
+    if (confirmText.trim() !== 'PERMANENT DELETE') {
+      showToast('Permanent delete korte PERMANENT DELETE likhte hobe.', 'info');
+      return;
+    }
+    setDeletedRecords(prev => prev.filter((x: any) => x.vaultId !== vaultId));
+    securityAudit('record-permanently-deleted', { actor: 'super-admin', role: 'super-admin', reason: 'manual permanent delete from recovery vault', newValue: { kind: row.kind, recordId: row.recordId, label: row.label } });
+    showToast(`${row.label} permanently deleted from Recovery Vault.`, 'info');
+  };
+
   const handleDeleteDriver = (id: string) => {
+    const driver = drivers.find(d => d.id === id);
+    if (driver) archiveRecord('driver', driver, `Driver ${driver.name || id}`);
     setDrivers(drivers.filter(d => d.id !== id));
-    showToast(`Driver ${id} deleted from fleet.`);
+    showToast(`Driver ${id} moved to Recovery Vault.`);
   };
 
   // Zones
@@ -1204,8 +1262,10 @@ export default function App() {
   };
 
   const handleDeleteZone = (id: string) => {
+    const zone = zones.find(z => z.id === id);
+    if (zone) archiveRecord('zone', zone, `Zone ${zone.name || id}`);
     setZones(zones.filter(z => z.id !== id));
-    showToast(`Zone ${id} deactivated.`);
+    showToast(`Zone ${id} moved to Recovery Vault.`);
   };
 
   // Users
@@ -1220,8 +1280,10 @@ export default function App() {
   };
 
   const handleDeleteUser = (phone: string) => {
-    setUsers(users.filter(u => u.phone !== phone));
-    showToast("User account terminated.");
+    const user = users.find(u => u.phone === phone || u.id === phone);
+    if (user) archiveRecord('user', user, `User ${user.name || phone}`);
+    setUsers(users.filter(u => u.phone !== phone && u.id !== phone));
+    showToast("User account moved to Recovery Vault.");
   };
 
   // Vehicles
@@ -1231,8 +1293,10 @@ export default function App() {
   };
 
   const handleDeleteVehicle = (plateNo: string) => {
+    const vehicle = vehicles.find(v => v.plateNumber === plateNo);
+    if (vehicle) archiveRecord('vehicle', vehicle, `Vehicle ${vehicle.plateNumber || plateNo}`);
     setVehicles(vehicles.filter(v => v.plateNumber !== plateNo));
-    showToast("Vehicle unlinked.");
+    showToast("Vehicle moved to Recovery Vault.");
   };
 
   // Banners
@@ -1247,8 +1311,10 @@ export default function App() {
   };
 
   const handleDeleteBanner = (id: string) => {
+    const banner = banners.find(b => b.id === id);
+    if (banner) archiveRecord('banner', banner, `Banner ${banner.title || id}`);
     setBanners(banners.filter(b => b.id !== id));
-    showToast("Banner removed.");
+    showToast("Banner moved to Recovery Vault.");
   };
 
   // Notifications
@@ -2116,6 +2182,7 @@ export default function App() {
       { name: 'Reports & Analytics', icon: BarChart3 },
       { name: 'Security Control', icon: ShieldCheck },
       { name: 'System Health', icon: Database },
+      { name: 'Recovery Vault', icon: Trash2, badgeCount: deletedRecords.filter((row: any) => row.status !== 'Restored').length },
       { name: 'Settings', icon: Settings },
     ];
 
@@ -2127,7 +2194,7 @@ export default function App() {
           'Dashboard', 'Mobile App Simulator', 'Users Management', 'Drivers Management', 'Orders Management', 
           'Earnings & Payouts', 'Zones & Areas', 'Vehicles Management', 'Promotions & Banners', 'KPI Dashboard',
           'Order Tools Dashboard',
-          'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Settings'
+          'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Recovery Vault', 'Settings'
         ].includes(item.name)
       ).map((item) => {
         if (item.name === 'Dashboard') {
@@ -2143,7 +2210,7 @@ export default function App() {
         [
           'Store Dashboard', 'Products', 'Categories', 'Inventory', 
           'Stores & Merchants', 'Staff Management', 'Reviews', 'Coupons', 'Customer Storefront', 'Live Store Sync',
-          'Payments', 'MFS Business & Settlement', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Settings'
+          'Payments', 'MFS Business & Settlement', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Recovery Vault', 'Settings'
         ].includes(item.name)
       ).map((item) => {
         if (item.name === 'Store Dashboard') {
@@ -2167,6 +2234,7 @@ export default function App() {
     products.length,
     categories.length,
     stores.length,
+    deletedRecords,
     supportTickets,
     unreadNotifCount
   ]);
@@ -7199,6 +7267,89 @@ export default function App() {
             <SystemHealthLog />
           )}
 
+          {activeTab === 'Recovery Vault' && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-brand-border bg-brand-card p-4 shadow-sm">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-white">Super Admin Recovery Vault</h3>
+                    <p className="mt-1 text-[11px] font-semibold text-gray-400">Delete korle data ekhane recoverable thakbe. Permanent delete korte exact confirmation lagbe.</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl border border-brand-border bg-brand-dark/50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase text-gray-500">Recoverable</p>
+                      <p className="text-lg font-black text-amber-300">{deletedRecords.filter((r: any) => r.status !== 'Restored').length}</p>
+                    </div>
+                    <div className="rounded-xl border border-brand-border bg-brand-dark/50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase text-gray-500">Restored</p>
+                      <p className="text-lg font-black text-emerald-300">{deletedRecords.filter((r: any) => r.status === 'Restored').length}</p>
+                    </div>
+                    <div className="rounded-xl border border-brand-border bg-brand-dark/50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase text-gray-500">Total</p>
+                      <p className="text-lg font-black text-white">{deletedRecords.length}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-brand-border bg-brand-card shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[820px] text-left text-xs">
+                    <thead className="bg-brand-dark/70 text-[10px] uppercase text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3">Type</th>
+                        <th className="px-4 py-3">Record</th>
+                        <th className="px-4 py-3">Deleted At</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Permanent Delete Guard</th>
+                        <th className="px-4 py-3 text-right">Control</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brand-border/40">
+                      {deletedRecords.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-[11px] font-bold text-gray-500">Recovery Vault empty. Kono deleted record nei.</td></tr>
+                      )}
+                      {deletedRecords.map((row: any) => {
+                        const restored = row.status === 'Restored';
+                        return (
+                          <tr key={row.vaultId} className={restored ? 'opacity-60' : ''}>
+                            <td className="px-4 py-3">
+                              <span className="rounded-full border border-brand-orange/30 bg-brand-orange/10 px-2 py-1 text-[9px] font-black uppercase text-brand-orange">{row.kind}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="font-black text-white">{row.label || row.recordId}</p>
+                              <p className="mt-0.5 font-mono text-[9px] text-gray-500">{row.recordId}</p>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-[10px] text-gray-400">{row.deletedAt ? new Date(row.deletedAt).toLocaleString() : 'N/A'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase ${restored ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{row.status || 'Recoverable'}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                value={permanentDeleteConfirm[row.vaultId] || ''}
+                                onChange={(e) => setPermanentDeleteConfirm(prev => ({ ...prev, [row.vaultId]: e.target.value }))}
+                                placeholder="Type PERMANENT DELETE"
+                                className="w-full rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-[10px] font-bold text-white outline-none focus:border-red-500"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex justify-end gap-2">
+                                {!restored && (
+                                  <button onClick={() => restoreDeletedRecord(row.vaultId)} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300 hover:bg-emerald-500/20">Restore</button>
+                                )}
+                                <button onClick={() => permanentDeleteVaultRecord(row.vaultId, permanentDeleteConfirm[row.vaultId] || '')} className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase text-red-300 hover:bg-red-500/20">Permanent Delete</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'Dashboard' && activePanelMode === 'delivery' && (
             <DeliveryDashboardView 
               orders={orders}
@@ -7384,7 +7535,7 @@ export default function App() {
           )}
 
           {/* Render high-fidelity dynamic panel for other active tabs */}
-          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator', 'System Health'].includes(activeTab) && (
+          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator', 'System Health', 'Recovery Vault'].includes(activeTab) && (
             renderGenericView(activeTab)
           )}
           </PanelErrorBoundary>
