@@ -535,7 +535,10 @@ export function useCloudSync() {
         // signature and silently skip — the online/location change would never
         // reach the cloud and the Super Admin would keep showing Offline.
         if (!changed) lastPushedSig = sig();
-        if (changed) window.dispatchEvent(new Event('storage'));
+        if (changed) {
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new Event('nexago-cloud-pull'));
+        }
         return true;
       } catch {
         return false;
@@ -639,24 +642,45 @@ export function useCloudSync() {
       };
     }
     let ws: WebSocket | null = null;
-    const wsEnabled =
-      import.meta.env.VITE_ENABLE_WEBSOCKET_SYNC === 'true' ||
-      new URLSearchParams(window.location.search).get('ws') === '1';
-    if (wsEnabled) {
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+    let wsReconnectTimer: number | null = null;
+    let wsRetryMs = 1000;
+    const wsEnabled = import.meta.env.VITE_ENABLE_WEBSOCKET_SYNC !== 'false' && new URLSearchParams(window.location.search).get('ws') !== '0';
+    const connectWs = () => {
+      if (!wsEnabled || cancelled || (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING))) return;
+      const configuredWsBase = API_BASE.startsWith('https://')
+        ? API_BASE.replace(/^https:/, 'wss:')
+        : API_BASE.startsWith('http://')
+          ? API_BASE.replace(/^http:/, 'ws:')
+          : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+      const wsUrl = `${configuredWsBase}/ws`;
       try {
         ws = new WebSocket(wsUrl);
-        ws.onopen = () => ws?.send(JSON.stringify({ type: 'state-subscribe', key }));
+        ws.onopen = () => {
+          wsRetryMs = 1000;
+          ws?.send(JSON.stringify({ type: 'state-subscribe', key }));
+        };
         ws.onmessage = (event) => {
           try {
             const msg = JSON.parse(String(event.data || '{}'));
-            if (msg.type === 'state-updated' && (!msg.key || msg.key === key)) { if (isVisible()) pull(); }
+            if (msg.type === 'state-updated' && (!msg.key || msg.key === key || msg.key === 'nexago-main')) {
+              void pull();
+            }
           } catch { /* ignore non-json ws messages */ }
         };
         ws.onerror = () => { try { ws?.close(); } catch { /* noop */ } };
-      } catch { /* websocket is optional; polling remains active */ }
-    }
+        ws.onclose = () => {
+          if (cancelled || !wsEnabled) return;
+          if (wsReconnectTimer !== null) window.clearTimeout(wsReconnectTimer);
+          wsReconnectTimer = window.setTimeout(connectWs, wsRetryMs);
+          wsRetryMs = Math.min(wsRetryMs * 2, 30_000);
+        };
+      } catch {
+        if (wsReconnectTimer !== null) window.clearTimeout(wsReconnectTimer);
+        wsReconnectTimer = window.setTimeout(connectWs, wsRetryMs);
+        wsRetryMs = Math.min(wsRetryMs * 2, 30_000);
+      }
+    };
+    connectWs();
 
     (async () => {
       const ok = await pull();
@@ -687,6 +711,7 @@ export function useCloudSync() {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onOnline);
       if (bc) bc.close();
+      if (wsReconnectTimer !== null) window.clearTimeout(wsReconnectTimer);
       if (ws) ws.close();
       if (pushDebounceTimer !== null) window.clearTimeout(pushDebounceTimer);
       clearInterval(pullTimer);

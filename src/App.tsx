@@ -711,6 +711,72 @@ export default function App() {
   useEffect(() => { setStoredDataDebounced('sd_store_admin_apps', storeAdminApps); }, [storeAdminApps]);
   useEffect(() => { setStoredDataDebounced('sd_store_admin_creds', storeAdminCreds); }, [storeAdminCreds]);
 
+  useEffect(() => {
+    const same = (a: any, b: any) => {
+      try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+    };
+    const refreshFromSharedStorage = () => {
+      setOrders(prev => {
+        const next = stripLegacySeedData(getStoredData<Order[]>('sd_orders_v2', []), 'orders');
+        return same(prev, next) ? prev : next;
+      });
+      setDrivers(prev => {
+        const next = stripLegacySeedData(getStoredData<Driver[]>('sd_drivers', []), 'drivers');
+        return same(prev, next) ? prev : next;
+      });
+      setProducts(prev => {
+        const next = stripLegacySeedData(getStoredData<any[]>('sd_products', []), 'products');
+        return same(prev, next) ? prev : next;
+      });
+      setCategories(prev => {
+        const next = getStoredData<any[]>('sd_categories', []);
+        return same(prev, next) ? prev : next;
+      });
+      setStores(prev => {
+        const next = stripLegacySeedData(getStoredData<any[]>('sd_stores', []), 'stores');
+        return same(prev, next) ? prev : next;
+      });
+      setBranches(prev => {
+        const next = getStoredData<any[]>('sd_store_branches', []);
+        return same(prev, next) ? prev : next;
+      });
+      setCoupons(prev => {
+        const next = getStoredData<any[]>('sd_coupons', []);
+        return same(prev, next) ? prev : next;
+      });
+      setPayments(prev => {
+        const next = stripLegacySeedData(getStoredData<Payment[]>('sd_payments', []), 'payments');
+        return same(prev, next) ? prev : next;
+      });
+      setSupportTickets(prev => {
+        const next = stripLegacySeedData(getStoredData<SupportTicket[]>('sd_tickets', []), 'tickets');
+        return same(prev, next) ? prev : next;
+      });
+      setNotifications(prev => {
+        const next = stripLegacySeedData(getStoredData<SystemNotification[]>('sd_notifications', []), 'notifications');
+        return same(prev, next) ? prev : next;
+      });
+      setStaff(prev => {
+        const next = normalizeStaffKyc(getStoredData('sd_staff', [])).filter((s: any) => !(s && (s.testRecord === true || s.id === 'STF-TEST-001')));
+        return same(prev, next) ? prev : next;
+      });
+      setStoreAdminApps(prev => {
+        const next = getStoredData<any[]>('sd_store_admin_apps', []);
+        return same(prev, next) ? prev : next;
+      });
+      setRoleCardsStore(prev => {
+        const next = getStoredData<Record<string, any>>('sd_role_cards', {});
+        return same(prev, next) ? prev : next;
+      });
+    };
+    window.addEventListener('storage', refreshFromSharedStorage);
+    window.addEventListener('nexago-cloud-pull', refreshFromSharedStorage);
+    return () => {
+      window.removeEventListener('storage', refreshFromSharedStorage);
+      window.removeEventListener('nexago-cloud-pull', refreshFromSharedStorage);
+    };
+  }, []);
+
   // Toast System trigger helper
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
