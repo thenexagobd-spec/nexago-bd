@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Component, useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -234,6 +234,49 @@ const STORE_ADMIN_PAGE_OPTIONS = [
   { id: 'support', label: 'Support' },
 ];
 const DEFAULT_STORE_ADMIN_PAGES = STORE_ADMIN_PAGE_OPTIONS.map(p => p.id);
+
+type PanelErrorBoundaryProps = { activeTab: string; children: React.ReactNode };
+type PanelErrorBoundaryState = { error: string; activeTab: string };
+
+class PanelErrorBoundary extends Component<PanelErrorBoundaryProps, PanelErrorBoundaryState> {
+  declare props: Readonly<PanelErrorBoundaryProps>;
+  declare state: Readonly<PanelErrorBoundaryState>;
+
+  constructor(props: PanelErrorBoundaryProps) {
+    super(props);
+    this.state = { error: '', activeTab: props.activeTab };
+  }
+
+  static getDerivedStateFromError(error: unknown): Partial<PanelErrorBoundaryState> {
+    return { error: error instanceof Error ? error.message : String(error || 'Unknown panel error') };
+  }
+
+  static getDerivedStateFromProps(props: PanelErrorBoundaryProps, state: PanelErrorBoundaryState): Partial<PanelErrorBoundaryState> | null {
+    return props.activeTab !== state.activeTab ? { activeTab: props.activeTab, error: '' } : null;
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('Super Admin panel display failed', error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-red-300">Panel Display Protection</p>
+          <h2 className="mt-2 text-lg font-black text-white">This panel could not load safely.</h2>
+          <p className="mt-2 text-xs font-bold text-red-100">{this.state.error}</p>
+          <p className="mt-2 text-xs text-gray-400">Super Admin app is still running. Change sidebar option or refresh after fixing the broken record.</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg border border-red-400/40 bg-red-500/15 px-4 py-2 text-[10px] font-black uppercase text-red-100 hover:bg-red-500/25">
+            Reload Dashboard
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const makeStoreId = () => `STR-${Date.now().toString().slice(-7)}`;
 const makeStoreAdminId = () => `SA-${Date.now().toString().slice(-8)}`;
@@ -7052,6 +7095,7 @@ export default function App() {
 
         {/* CORE CONTENT SWITCH CONTAINER */}
         <main className={`flex-1 overflow-x-hidden overflow-y-auto ${activeTab === 'Mobile App Simulator' || activeTab === 'POS System' ? 'p-0' : 'p-3 sm:p-4 md:p-6'}`}>
+          <PanelErrorBoundary activeTab={activeTab}>
           {activeTab === 'Dashboard' && activePanelMode === 'super_admin' && (
             <DashboardView 
               orders={orders} 
@@ -7338,6 +7382,7 @@ export default function App() {
           {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator', 'System Health'].includes(activeTab) && (
             renderGenericView(activeTab)
           )}
+          </PanelErrorBoundary>
         </main>
 
         {/* ROLE ID CARD MODAL (Driver / Store Admin / Super Admin smart cards) */}
