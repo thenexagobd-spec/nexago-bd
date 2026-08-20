@@ -22,6 +22,13 @@ interface ZonesViewProps {
 }
 
 const fmt = (n: number) => '৳' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const initialsOf = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+const firstWord = (value: unknown, fallback = 'Driver') => safeText(value, fallback).split(/\s+/)[0] || fallback;
+const hashName = (value: unknown) => safeText(value, 'Driver').split('').reduce((s, ch) => s + ch.charCodeAt(0), 0);
 
 const VehIcon = ({ v, color }: { v?: string; color: string }) => {
   const cls = `w-4 h-4`;
@@ -91,8 +98,9 @@ const destLabel: Record<string, string> = { Customer: '→ Customer', Restaurant
 const DriverMarker: React.FC<{ x: number; y: number; tx?: number; ty?: number; name: string; status: string; vehicleType?: string; dest?: string; speed?: number; onClick?: (e: any) => void }> = ({ x, y, tx, ty, name, status, vehicleType, dest, speed, onClick }) => {
   const dc = status === 'Active' || status === 'On-Delivery' ? '#34d399' : status === 'Idle' ? '#facc15' : '#f87171';
   const dd = dest ? destColor[dest] || dc : dc;
-  const initials = name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
-  const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(name.split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % 8];
+  const displayName = safeText(name, 'Driver');
+  const initials = initialsOf(displayName);
+  const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(hashName(displayName)) % 8];
   return (
     <g onClick={e => { e.stopPropagation(); if (onClick) onClick(dest); }} style={{ pointerEvents: 'auto', cursor: 'pointer' }}>
       {tx != null && ty != null && <line x1={x} y1={y} x2={tx} y2={ty} stroke={dd} strokeWidth="1" strokeDasharray="3 3" opacity="0.4"/>}
@@ -104,7 +112,7 @@ const DriverMarker: React.FC<{ x: number; y: number; tx?: number; ty?: number; n
       <circle cx={x} cy={y - 14} r={7} fill="none" stroke={dd} strokeWidth={1}/>
       <text x={x} y={y - 11} fontSize="6.5" fontWeight={900} fill="#0f172a" textAnchor="middle">{initials}</text>
       <ellipse cx={x} cy={y + 9} rx={8} ry={2.2} fill="#000" opacity="0.25"/>
-      <text x={x + 14} y={y - 11} fontSize="8" fontWeight={800} fill="#e2e8f0" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>{name.split(' ')[0]}</text>
+      <text x={x + 14} y={y - 11} fontSize="8" fontWeight={800} fill="#e2e8f0" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>{firstWord(displayName)}</text>
       {dest && speed != null && (
         <g>
           <rect x={x + 14} y={y + 6} width="86" height="16" rx="5" fill="rgba(2,6,23,0.88)"/>
@@ -412,13 +420,14 @@ export default function ZonesView({ zones, liveDrivers, locSim, onToggleLocSim, 
                   const dc = d.status === 'Active' || d.status === 'On-Delivery' ? 'text-emerald-400' : d.status === 'Idle' ? 'text-amber-400' : 'text-red-400';
                   const dcol = d.dest ? destColor[d.dest] || '#94a3b8' : '#94a3b8';
                   const rd = d.roadName || nearestRoad(d.lat, d.lng).name;
-                  const initials = d.name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
-                  const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(d.name.split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % 8];
+                  const displayName = safeText(d.name, 'Driver');
+                  const initials = initialsOf(displayName);
+                  const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(hashName(displayName)) % 8];
                   return (
                     <div key={d.id} className="flex items-center justify-between bg-brand-dark/40 border border-brand-border/50 rounded-lg p-2 cursor-pointer" onClick={() => setDriverPanel(d)}>
                       <div className="flex items-center gap-2">
                         <span className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black text-[#0f172a] shrink-0" style={{ backgroundColor: avatarBg, border: `1.5px solid ${dcol}` }}>{initials}</span>
-                        <span className="text-[10px] font-bold text-white">{d.name}</span>
+                        <span className="text-[10px] font-bold text-white">{displayName}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[8px] font-bold" style={{ color: dcol }}>{destLabel[d.dest || ''] || d.dest}</span>
@@ -465,8 +474,9 @@ export default function ZonesView({ zones, liveDrivers, locSim, onToggleLocSim, 
         const nearT = REAL_SPOTS.map(s => ({ n: s[2], d: Math.sqrt((s[0] - d.tLat) ** 2 + (s[1] - d.tLng) ** 2) })).sort((a, b) => a.d - b.d)[0];
         const curRoad = { name: d.roadName || nearestRoad(d.lat, d.lng).name };
         const goRoad = nearestRoad(d.tLat, d.tLng);
-        const initials = d.name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
-        const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(d.name.split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % 8];
+        const displayName = safeText(d.name, 'Driver');
+        const initials = initialsOf(displayName);
+        const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(hashName(displayName)) % 8];
         return (
           <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDriverPanel(null)}>
             <div className="bg-brand-card border border-brand-border rounded-xl max-w-md w-full overflow-hidden shadow-2xl fade-in" onClick={e => e.stopPropagation()}>
@@ -474,7 +484,7 @@ export default function ZonesView({ zones, liveDrivers, locSim, onToggleLocSim, 
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black text-[#0f172a] shrink-0" style={{ backgroundColor: avatarBg, border: `2px solid ${destColor[d.dest] || '#f97316'}` }}>{initials}</div>
                   <div>
-                    <h3 className="font-bold text-white text-sm">{d.name}</h3>
+                    <h3 className="font-bold text-white text-sm">{displayName}</h3>
                     <p className="text-[9px] text-gray-500 font-mono">{d.id}</p>
                   </div>
                 </div>
@@ -718,7 +728,7 @@ export default function ZonesView({ zones, liveDrivers, locSim, onToggleLocSim, 
 
                 {zone.drivers && zone.drivers.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {zone.drivers.map(d => <span key={d} className="px-1.5 py-0.5 bg-brand-orange/10 border border-brand-orange/20 text-[8px] font-bold text-brand-orange rounded">{d.split(' ')[0]}</span>)}
+                    {zone.drivers.map((d, idx) => <span key={`${safeText(d, 'driver')}-${idx}`} className="px-1.5 py-0.5 bg-brand-orange/10 border border-brand-orange/20 text-[8px] font-bold text-brand-orange rounded">{firstWord(d)}</span>)}
                   </div>
                 )}
 

@@ -19,6 +19,12 @@ interface UsersViewProps {
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
 }
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const initials = (value: unknown, fallback = 'US') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+
 export default function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, showToast }: UsersViewProps) {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'All' | 'Customer' | 'Admin' | 'Super Admin'>('All');
@@ -290,7 +296,7 @@ export default function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser
             <div className="space-y-3.5">
               <div className="flex items-start space-x-3.5">
                 <div className="w-12 h-12 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-bold text-brand-orange text-sm shrink-0 relative">
-                  {user.name.split(' ').map(n => n[0]).join('')}
+                  {initials(user.name)}
                   {user.status === 'Suspended' && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-brand-card flex items-center justify-center text-[8px] text-white">
                       ✕
@@ -299,7 +305,7 @@ export default function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser
                 </div>
 
                 <div className="space-y-1 min-w-0">
-                  <h4 className="font-bold text-sm text-white truncate pr-20">{user.name}</h4>
+                  <h4 className="font-bold text-sm text-white truncate pr-20">{safeText(user.name, 'Unnamed User')}</h4>
                   <p className="text-[10px] text-gray-400 font-mono">{user.id}</p>
 
                   <div className="space-y-1 text-xs text-gray-300">

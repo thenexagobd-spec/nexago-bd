@@ -2,6 +2,14 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const initialsOf = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+const firstWord = (value: unknown, fallback = 'Driver') => safeText(value, fallback).split(/\s+/)[0] || fallback;
+const hashName = (value: unknown) => safeText(value, 'Driver').split('').reduce((s, ch) => s + ch.charCodeAt(0), 0);
+
 const STYLE = `@keyframes nexPing{0%{transform:scale(0.7);opacity:1}100%{transform:scale(1.6);opacity:0}}.leaflet-container{font-family:inherit}.leaflet-tooltip.nexago-tip,.leaflet-tooltip.nexago-tip::before{background:#0f172a;border:1px solid #334155;color:#fff;border-radius:8px;font:600 11px/1.5 system-ui}`;
 if (typeof document !== 'undefined' && !document.getElementById('nexago-leaflet-css')) {
   const el = document.createElement('style');
@@ -219,8 +227,9 @@ export default function LeafletMap({ vehicles, zoomTo, onVehicleClick, trackingI
       const dcol = DEST_COLOR[v.dest || 'Idle'] || '#34d399';
       const road = nearestRoad(v.lat, v.lng);
       const roadLabel = v.roadName || road.name;
-      const initials = v.name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
-      const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(v.name.split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % 8];
+      const displayName = safeText(v.name, 'Driver');
+      const initials = initialsOf(displayName);
+      const avatarBg = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171', '#22d3ee', '#4ade80'][Math.abs(hashName(displayName)) % 8];
       const icon = L.divIcon({
         className: '',
         html: `<div style="position:relative;width:80px;height:82px;cursor:pointer;">
@@ -228,16 +237,16 @@ export default function LeafletMap({ vehicles, zoomTo, onVehicleClick, trackingI
           <div style="position:absolute;top:0;left:22px;width:36px;height:36px;border-radius:50%;background:${avatarBg};border:2.5px solid #0f172a;box-shadow:0 0 0 1.5px ${dcol},0 2px 8px rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;color:#0f172a;font:800 13px/1 Arial;letter-spacing:0.5px;">${initials}</div>
           <div style="position:absolute;top:38px;left:30px;width:10px;height:10px;border-radius:50%;background:${dcol};border:1.5px solid #0f172a;"></div>
           <div style="position:absolute;top:41px;left:8px;">${vehSVG(v.vehicleType, dcol)}</div>
-          <div style="position:absolute;top:52px;left:0;width:80px;text-align:center;background:rgba(2,6,23,0.88);border:1px solid ${dcol};color:#fff;font:700 8px/1.5 Arial;padding:1px 4px;border-radius:6px;white-space:nowrap;">${v.name.split(' ')[0]} · ${Math.round(v.speed || 0)}km/h</div>
+          <div style="position:absolute;top:52px;left:0;width:80px;text-align:center;background:rgba(2,6,23,0.88);border:1px solid ${dcol};color:#fff;font:700 8px/1.5 Arial;padding:1px 4px;border-radius:6px;white-space:nowrap;">${firstWord(displayName)} · ${Math.round(v.speed || 0)}km/h</div>
           <div style="position:absolute;top:64px;left:0;width:80px;text-align:center;background:rgba(2,6,23,0.88);color:${dcol};font:700 7.5px/1.5 Arial;padding:1px 4px;border-radius:6px;white-space:nowrap;border:1px solid ${dcol}55;">${v.dest === 'Idle' ? 'Resting' : '→ ' + v.dest}</div>
           <div style="position:absolute;top:76px;left:0;width:80px;text-align:center;color:#e2c14a;font:700 7px/1.4 Arial;text-shadow:0 1px 2px #000;white-space:nowrap;">🛣 ${roadLabel}</div>
         </div>`,
         iconSize: [80, 88],
         iconAnchor: [40, 74],
       });
-      const mk = L.marker([v.lat, v.lng], { icon, title: v.name }).addTo(layer);
+      const mk = L.marker([v.lat, v.lng], { icon, title: displayName }).addTo(layer);
       mk.on('click', () => { if (onVehicleClick) onVehicleClick(v.id); });
-      mk.bindTooltip(`<b>${v.name}</b><br>On: <b>${roadLabel}</b><br>${v.dest || 'Idle'} · ${Math.round(v.speed || 0)} km/h<br>${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`, { direction: 'top', offset: [0, -40], className: 'nexago-tip' });
+      mk.bindTooltip(`<b>${displayName}</b><br>On: <b>${roadLabel}</b><br>${v.dest || 'Idle'} · ${Math.round(v.speed || 0)} km/h<br>${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`, { direction: 'top', offset: [0, -40], className: 'nexago-tip' });
     });
 
     const trk = vehicles.find(v => v.id === trackingId);

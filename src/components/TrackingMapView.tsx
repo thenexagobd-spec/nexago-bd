@@ -27,6 +27,12 @@ interface SimulatedRoute {
   completed: boolean;
 }
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const firstWord = (value: unknown, fallback = 'Driver') => safeText(value, fallback).split(/\s+/)[0] || fallback;
+
 // Coordinate regions for live zones
 const zoneCoords: Record<string, { x: number; y: number; r: number; color: string }> = {
   'Dhanmondi': { x: 90, y: 310, r: 45, color: '#3b82f6' }, // Blue
@@ -662,7 +668,7 @@ export const TrackingMapView: React.FC<TrackingMapViewProps> = ({ orders, driver
                         strokeWidth="0.5" 
                       />
                       <text x="0" y="2" fill="#ffffff" fontSize="6.5" fontWeight="black" textAnchor="middle" className="tracking-wide">
-                        {route.driverName.split(' ')[0]}
+                        {firstWord(route.driverName)}
                       </text>
                     </g>
                   </g>

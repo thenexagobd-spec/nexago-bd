@@ -655,8 +655,13 @@ const LOYALTY_TIERS = [
 ];
 
 const AVATAR_COLORS = ['bg-emerald-600', 'bg-orange-500', 'bg-blue-600', 'bg-rose-600', 'bg-violet-600', 'bg-teal-600', 'bg-amber-500', 'bg-indigo-600'];
-const hashColor = (s: string) => AVATAR_COLORS[Math.abs(s.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length];
-const initialsOf = (s: string) => (s || '').split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const hashColor = (s: unknown) => AVATAR_COLORS[Math.abs(safeText(s, 'Customer').split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length];
+const initialsOf = (s: unknown, fallback = 'CU') => safeText(s, fallback).split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+const firstPart = (s: unknown, separator = ',') => safeText(s).split(separator)[0] || '';
 
 const ETA_STEPS = [
   { label: 'Order Confirmed', desc: 'Store has accepted your order', min: 0.0 },
@@ -2028,7 +2033,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       lat: pos.lat, lng: pos.lng, tLat: dv.lat, tLng: dv.lng,
       roadName: trackProgress < 0.12 ? `${trackingOrder.storeName} pickup point` : 'En route to you',
       restLat: pk.lat, restLng: pk.lng, restName: trackingOrder.storeName,
-      custLat: dv.lat, custLng: dv.lng, custName: (trackingOrder.address || deliveryAddress).split(',').pop()?.trim() || 'Your Address'
+      custLat: dv.lat, custLng: dv.lng, custName: safeText(trackingOrder.address || deliveryAddress).split(',').pop()?.trim() || 'Your Address'
     };
   }, [trackingOrder, trackingDriver, trackProgress]);
 
@@ -3057,7 +3062,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                               <div className="pt-1 space-y-1">
                                 <div className="flex items-center space-x-2">
                                   <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[8px] font-black border border-emerald-200 shrink-0">
-                                    {drv.name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()}
+                                    {initialsOf(drv.name, 'DR')}
                                   </span>
                                   <span className="text-[10px] text-gray-500 font-medium">
                                     {drv.name} · {drv.vehicleType || 'Bike'} · <span className="text-emerald-600 font-bold font-mono">{Number.isFinite(prog) ? Math.round(prog * 100) : 0}%</span>
@@ -3595,7 +3600,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div className="flex items-center space-x-4">
                       <div className="relative">
                         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-xl font-black overflow-hidden shrink-0">
-                          {customerProfile.profilePic ? <img src={customerProfile.profilePic} alt={customerProfile.name} className="w-full h-full object-cover" /> : customerProfile.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                          {customerProfile.profilePic ? <img src={customerProfile.profilePic} alt={customerProfile.name} className="w-full h-full object-cover" /> : initialsOf(customerProfile.name)}
                         </div>
                         <label className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center cursor-pointer shadow-md">
                           <Camera className="w-3 h-3" />
@@ -5436,7 +5441,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div key={c.id} className="border border-gray-200 rounded-2xl p-3 flex items-center justify-between gap-2">
                       <div className="flex items-center space-x-3 min-w-0">
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-[11px] font-black flex items-center justify-center shrink-0">
-                          {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                          {initialsOf(c.name)}
                         </div>
                         <div className="min-w-0">
                           <p className="font-black text-gray-900 text-xs truncate">{c.name}</p>
@@ -5632,9 +5637,10 @@ const CustomerAuthScreen: React.FC<{
           showToast?.('This Gmail already belongs to another account. Log in with that account instead.', 'info');
           return;
         }
-        const res = await customerRegister({ name: nameField.trim() || gmail.split('@')[0], email: gmail, phone: phoneField.trim(), customerId, balance: 0 });
+        const emailPrefix = safeText(gmail).split('@')[0] || 'customer';
+        const res = await customerRegister({ name: nameField.trim() || emailPrefix, email: gmail, phone: phoneField.trim(), customerId, balance: 0 });
         if (!res || !res.customer) throw new Error('register failed');
-        onUpdateProfile({ name: (res.customer.name || gmail.split('@')[0]), email: gmail, phone: res.customer.phone || phoneField });
+        onUpdateProfile({ name: (res.customer.name || emailPrefix), email: gmail, phone: res.customer.phone || phoneField });
         showToast?.('Signed in with Google — welcome!', 'success');
         onVerified({ customerId: res.customer.customerId, name: res.customer.name, email: gmail, phone: res.customer.phone || phoneField });
       } catch {

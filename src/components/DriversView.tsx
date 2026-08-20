@@ -27,6 +27,12 @@ interface DriversViewProps {
   vehicles?: VehicleInfo[];
 }
 
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const initials = (value: unknown, fallback = 'DR') => safeText(value, fallback).split(/\s+/).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || fallback;
+
 export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriver, onDeleteDriver, onOpenCard, showToast, vehicles = [] }: DriversViewProps) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -503,14 +509,14 @@ export default function DriversView({ drivers, orders, onAddDriver, onUpdateDriv
             <div className="space-y-3">
               <div className="flex items-center space-x-3 cursor-pointer group/card" onClick={() => setSelectedDriverId(driver.id)}>
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-orange/20 to-amber-500/10 border border-brand-orange/30 flex items-center justify-center font-black text-brand-orange text-[11px] shrink-0 relative group-hover/card:scale-105 transition-transform shadow-inner">
-                  {driver.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  {initials(driver.name)}
                   <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-card ${
                     driver.status === 'Online' ? 'bg-emerald-500' : driver.status === 'On-Delivery' ? 'bg-purple-500' : 'bg-red-500'
                   }`}></span>
                 </div>
                 <div className="min-w-0">
                   <h4 className="font-bold text-[13px] text-white truncate group-hover/card:text-brand-orange transition-colors">
-                    <span>{driver.name}</span>
+                    <span>{safeText(driver.name, 'Unnamed Driver')}</span>
                   </h4>
                   <p className="text-[9px] text-gray-400 font-mono mt-0.5">{driver.id}</p>
                   <p className="text-[10px] text-gray-300 mt-0.5 truncate">{driver.vehicleType}</p>
