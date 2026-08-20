@@ -36,6 +36,7 @@ import OrderToolsDashboard from './components/OrderToolsDashboard';
 import MobileAppSimulator from './components/MobileAppSimulator';
 import MFSBusinessView from './components/MFSBusinessView';
 import PosSystem from './components/PosSystem';
+import BangladeshPosSystem from './components/BangladeshPosSystem';
 import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
@@ -2257,6 +2258,7 @@ export default function App() {
       { section: 'Finance & System', name: 'Payments', icon: CreditCard },
       { name: 'MFS Business & Settlement', icon: Wallet },
       { name: 'POS System', icon: ShoppingCart },
+      { name: 'Bangladesh POS', icon: ShoppingCart },
       { name: 'Support Tickets', icon: LifeBuoy, badgeCount: supportTickets.filter(t => t.status === 'Open').length },
       { name: 'Notifications', icon: Bell, badgeCount: unreadNotifCount },
       { name: 'Reports & Analytics', icon: BarChart3 },
@@ -2290,7 +2292,7 @@ export default function App() {
         [
           'Store Dashboard', 'Products', 'Categories', 'Inventory', 
           'Stores & Merchants', 'Staff Management', 'Reviews', 'Coupons', 'Customer Storefront', 'Live Store Sync',
-          'Payments', 'MFS Business & Settlement', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Recovery Vault', 'Settings'
+          'Payments', 'MFS Business & Settlement', 'POS System', 'Bangladesh POS', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Recovery Vault', 'Settings'
         ].includes(item.name)
       ).map((item) => {
         if (item.name === 'Store Dashboard') {
@@ -6792,7 +6794,7 @@ export default function App() {
       
       {/* SIDEBAR - Left panel */}
       {/* Desktop static Sidebar */}
-      {activeTab !== 'POS System' && (
+      {activeTab !== 'POS System' && activeTab !== 'Bangladesh POS' && (
       <aside className="hidden lg:flex flex-col w-64 bg-[#0c1624] border-r border-brand-border/60 shrink-0 select-none">
         
         {/* Workspace Switcher Header for 3 Separate Dashboards */}
@@ -7123,7 +7125,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
         
         {/* HEADER BAR */}
-        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && (
+        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && activeTab !== 'Bangladesh POS' && (
         <header className="min-h-16 border-b border-brand-border/60 bg-[#0c1624]/65 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-5 select-none shrink-0 sticky top-0 z-40">
           <div className="flex items-center space-x-3">
             <button
@@ -7247,7 +7249,7 @@ export default function App() {
         )}
 
         {/* CORE CONTENT SWITCH CONTAINER */}
-        <main className={`flex-1 overflow-x-hidden overflow-y-auto ${activeTab === 'Mobile App Simulator' || activeTab === 'POS System' ? 'p-0' : 'p-3 sm:p-4 md:p-6'}`}>
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto ${activeTab === 'Mobile App Simulator' || activeTab === 'POS System' || activeTab === 'Bangladesh POS' ? 'p-0' : 'p-3 sm:p-4 md:p-6'}`}>
           <PanelErrorBoundary activeTab={activeTab}>
           {activeTab === 'Dashboard' && activePanelMode === 'super_admin' && (
             <DashboardView 
@@ -7522,6 +7524,10 @@ export default function App() {
             <PosSystem products={products} orders={orders} onProductsChange={setProducts} onCreateOrder={handleSilentAddOrder} onUpdateOrder={handleUpdateOrder} onSendToDriver={setDriverDispatchOrder} onDeleteOrder={handleDeleteOrder} onNavigate={setActiveTab} onSaleRecorded={handlePosSaleRecorded} />
           )}
 
+          {activeTab === 'Bangladesh POS' && (
+            <BangladeshPosSystem products={products} orders={orders} onProductsChange={setProducts} onCreateOrder={handleSilentAddOrder} onSaleRecorded={handlePosSaleRecorded} />
+          )}
+
           {activeTab === 'Vehicles Management' && (
             <VehiclesView />
           )}
@@ -7615,7 +7621,7 @@ export default function App() {
           )}
 
           {/* Render high-fidelity dynamic panel for other active tabs */}
-          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator', 'System Health', 'Recovery Vault'].includes(activeTab) && (
+          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Bangladesh POS', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator', 'System Health', 'Recovery Vault'].includes(activeTab) && (
             renderGenericView(activeTab)
           )}
           </PanelErrorBoundary>
@@ -7763,7 +7769,7 @@ export default function App() {
         )}
 
         {/* APP FOOTER LINE */}
-        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && (
+        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && activeTab !== 'Bangladesh POS' && (
         <footer className="py-4 border-t border-brand-border/40 text-center text-[10px] text-gray-500 select-none bg-[#0c1624]/20">
           <p>© 2026 The NexaGo BD. All rights reserved. Version 1.0.0 &nbsp;|&nbsp; Support: <span className="text-brand-orange">thenexagobd@gmail.com</span></p>
         </footer>
