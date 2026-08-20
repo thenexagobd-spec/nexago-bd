@@ -96,6 +96,7 @@ export default function SystemHealthLog() {
   const [restoreReason, setRestoreReason] = useState('');
   const [restoreConfirm, setRestoreConfirm] = useState('');
   const [simulationResult, setSimulationResult] = useState<any>(null);
+  const [scanReport, setScanReport] = useState<any>(null);
 
   const key = useMemo(() => new URLSearchParams(window.location.search).get('key') || localStorage.getItem('sd_store_key') || 'nexago-main', []);
 
@@ -192,6 +193,64 @@ export default function SystemHealthLog() {
     }
   };
 
+  const runFullScan = async () => {
+    try {
+      setActionMsg('Running full system scan...');
+      const result = await systemApi('/api/system/full-scan', {});
+      setScanReport(result.report);
+      setActionMsg(`Full scan complete: ${result.report.scanId}`);
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Full scan failed'));
+    }
+  };
+
+  const createIncident = async (subject = 'System Health Incident', message = 'Created from System Health') => {
+    try {
+      const result = await systemApi('/api/system/incident/create', { subject, message, priority: 'High' });
+      setActionMsg(`Incident created: ${result.incident?.id || subject}`);
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Incident create failed'));
+    }
+  };
+
+  const runSystemAction = async (action: string, reason: string) => {
+    try {
+      const result = await systemApi('/api/system/action', { action, reason });
+      setActionMsg(`${action} completed: ${result.result?.status || 'saved'}`);
+      if (result.result?.checklist) setScanReport({ scanId: 'RECOVERY-CHECKLIST', dependencyMissing: [], integrity: { score: 100 }, conflicts: 0, backupCount: 0, checklist: result.result.checklist });
+      if (result.result?.dependencies) setScanReport({ scanId: 'DEPENDENCY-RECHECK', dependencyMissing: result.result.dependencies.filter((d: any) => !d.ok).map((d: any) => d.name), integrity: { score: 100 }, conflicts: 0, backupCount: 0 });
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || `${action} failed`));
+    }
+  };
+
+  const reviewConflict = async (conflict: { group: string; id: string; reason: string }) => {
+    try {
+      await systemApi('/api/system/conflict/review', conflict);
+      setActionMsg(`Conflict reviewed: ${conflict.group} ${conflict.id}`);
+      void loadHealth();
+    } catch (err: any) {
+      setActionMsg(String(err?.message || err || 'Conflict review failed'));
+    }
+  };
+
+  const exportReport = () => {
+    const report = { exportedAt: new Date().toISOString(), health, localOfflineQueue: { orders: offlineOrders, states: offlineStates }, scanReport };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexago-system-health-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setActionMsg('System health report exported.');
+  };
+
   const downloadBackup = (name: string) => {
     const token = localStorage.getItem('sd_security_session') || '';
     const url = `${API_BASE}/api/system/backup/download?key=${encodeURIComponent(key)}&name=${encodeURIComponent(name)}`;
@@ -243,10 +302,40 @@ export default function SystemHealthLog() {
 
   const backupStatus = health?.backup?.running ? 'Running' : health?.backup?.status;
   const pendingQueue = offlineOrders + offlineStates;
+  const commandGroups = [
+    {
+      title: 'Recovery',
+      items: [
+        { label: 'Full Scan', icon: Activity, run: () => runFullScan() },
+        { label: 'Trigger Backup', icon: PlayCircle, run: () => triggerBackup(), disabled: !!health?.backup?.running },
+        { label: 'Backup Drill', icon: Database, run: () => runSystemAction('backup-drill-ticket', 'Create backup drill ticket') },
+        { label: 'Recovery Checklist', icon: ShieldCheck, run: () => runSystemAction('recovery-checklist', 'Generate recovery checklist') },
+      ],
+    },
+    {
+      title: 'Operations',
+      items: [
+        { label: 'Maintenance On', icon: Clock, run: () => runSystemAction('maintenance-on', 'Super Admin enabled maintenance mode') },
+        { label: 'Maintenance Off', icon: CheckCircle2, run: () => runSystemAction('maintenance-off', 'Super Admin disabled maintenance mode') },
+        { label: 'Sync Broadcast', icon: Activity, run: () => runSystemAction('sync-broadcast', 'Manual sync broadcast to live clients') },
+        { label: 'Restart Request', icon: Server, run: () => runSystemAction('restart-request', 'Super Admin requested controlled server restart') },
+      ],
+    },
+    {
+      title: 'Risk',
+      items: [
+        { label: 'Create Incident', icon: AlertTriangle, run: () => createIncident('Manual System Health Incident', 'Super Admin created incident from System Health panel') },
+        { label: 'Repair Dry Run', icon: ShieldCheck, run: () => runSystemAction('data-repair-dry-run', 'Create dry-run data repair ticket') },
+        { label: 'Dependency Recheck', icon: RefreshCw, run: () => runSystemAction('dependency-recheck', 'Manual dependency recheck from System Health') },
+        { label: 'Alert Test', icon: BellRing, run: () => testAlert() },
+      ],
+    },
+  ];
 
   return (
-    <section className="bg-brand-card border border-brand-border rounded-xl p-4 shadow-sm">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
+    <section className="space-y-4">
+      <div className="bg-brand-card border border-brand-border rounded-lg p-4 shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-black text-white flex items-center gap-2">
             <Database className="w-4 h-4 text-brand-orange" />
@@ -264,21 +353,71 @@ export default function SystemHealthLog() {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <button onClick={() => void triggerBackup()} disabled={health?.backup?.running} className="h-8 px-3 rounded-lg bg-emerald-600/15 border border-emerald-500/35 text-emerald-300 hover:bg-emerald-600/25 disabled:opacity-50 text-[10px] font-bold flex items-center gap-1.5">
-            <PlayCircle className="w-3.5 h-3.5" />
-            Trigger Backup
-          </button>
-          <button onClick={() => void testAlert()} className="h-8 px-3 rounded-lg bg-sky-600/15 border border-sky-500/35 text-sky-300 hover:bg-sky-600/25 text-[10px] font-bold flex items-center gap-1.5">
-            <BellRing className="w-3.5 h-3.5" />
-            Test Alert
-          </button>
           <button onClick={() => void toggleLockdown(!health?.recovery?.lockdown?.active)} className={`h-8 px-3 rounded-lg border text-[10px] font-bold flex items-center gap-1.5 ${health?.recovery?.lockdown?.active ? 'bg-red-600/25 border-red-500/50 text-red-200' : 'bg-red-600/10 border-red-500/30 text-red-300 hover:bg-red-600/20'}`}>
             <Lock className="w-3.5 h-3.5" />
             {health?.recovery?.lockdown?.active ? 'Release Lockdown' : 'Emergency Lockdown'}
           </button>
         </div>
       </div>
-      {actionMsg && <p className="mb-3 text-[10px] font-bold text-brand-orange bg-brand-orange/10 border border-brand-orange/20 rounded-lg px-3 py-2">{actionMsg}</p>}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
+        <aside className="bg-brand-card border border-brand-border rounded-lg p-3">
+          <div className="flex items-center justify-between border-b border-brand-border/50 pb-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-brand-orange">Command Console</p>
+              <p className="text-[10px] text-gray-500 mt-1">Audited operations only</p>
+            </div>
+            <button onClick={exportReport} className="h-8 px-2.5 rounded-md border border-brand-border bg-brand-dark text-[9px] font-black text-gray-200 hover:border-brand-orange/50 flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Export</button>
+          </div>
+          <div className="mt-3 space-y-4">
+            {commandGroups.map((group) => (
+              <div key={group.title}>
+                <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-gray-500">{group.title}</p>
+                <div className="space-y-1.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button key={item.label} disabled={item.disabled} onClick={() => void item.run()} className="w-full h-9 rounded-md border border-brand-border bg-[#07111f] px-2.5 text-left text-[10px] font-bold text-gray-200 hover:border-brand-orange/50 hover:bg-[#0d1a2a] disabled:opacity-50 flex items-center justify-between">
+                        <span className="flex items-center gap-2"><Icon className="w-3.5 h-3.5 text-brand-orange" />{item.label}</span>
+                        <span className="text-gray-600">Run</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <div className="min-w-0 space-y-3">
+          <div className="bg-brand-card border border-brand-border rounded-lg p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Command Output</p>
+                <p className="text-xs font-bold text-white mt-1">{actionMsg || 'No command running. Select an operation from the command console.'}</p>
+              </div>
+              <div className="flex items-center gap-2 text-[10px]">
+                <span className={`px-2 py-1 rounded-md border ${statusClass(backupStatus)}`}>{backupStatus || 'Checking'}</span>
+                <span className={`px-2 py-1 rounded-md border ${pendingQueue ? 'border-amber-500/30 text-amber-300 bg-amber-500/10' : 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10'}`}>Queue {pendingQueue}</span>
+              </div>
+            </div>
+          </div>
+      {scanReport && (
+        <div className="mb-3 rounded-lg border border-brand-orange/25 bg-brand-orange/5 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-black text-brand-orange">Full Scan Report: {scanReport.scanId}</p>
+            <button onClick={() => setScanReport(null)} className="text-[10px] text-gray-400 hover:text-white font-bold">Close</button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2 text-[10px]">
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Backups <b className="text-white">{scanReport.backupCount || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Integrity <b className="text-white">{scanReport.integrity?.score || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Conflicts <b className="text-white">{scanReport.conflicts || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Missing <b className="text-white">{scanReport.dependencyMissing?.length || 0}</b></span>
+            <span className="rounded-lg border border-brand-border/50 bg-brand-card/50 p-2 text-gray-300">Latest <b className="text-white">{scanReport.latestBackup?.name ? 'Yes' : 'No'}</b></span>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="rounded-lg border border-brand-border bg-brand-dark/35 p-3">
@@ -413,6 +552,7 @@ export default function SystemHealthLog() {
             {(health?.activity?.conflicts || []).length === 0 ? <p className="text-[10px] text-emerald-400">No duplicate ID conflict detected.</p> : health?.activity?.conflicts?.slice(0, 8).map((c, idx) => (
               <div key={`${c.group}-${c.id}-${idx}`} className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px]">
                 <span className="text-white font-bold">{c.group}</span><span className="text-amber-200 truncate">{c.id}</span><span className="text-amber-400">{c.reason}</span>
+                <button onClick={() => void reviewConflict(c)} className="rounded-md border border-amber-500/30 px-2 py-1 text-[8px] font-black text-amber-200 hover:bg-amber-500/10">Review</button>
               </div>
             ))}
           </div>
@@ -516,6 +656,8 @@ export default function SystemHealthLog() {
           </div>
         )}
         <p className="mt-2 text-[9px] text-gray-600">Restore button saves a secured restore request, audit and alert. Actual database restore should be run in a maintenance window to avoid data loss.</p>
+      </div>
+        </div>
       </div>
     </section>
   );
