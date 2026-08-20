@@ -395,6 +395,13 @@ export default function App() {
   // Separate Workspace Panel State: 'super_admin' = Super Admin Control Center, 'store' = Grocery Admin, 'delivery' = Delivery Logistics
   const [activePanelMode, setActivePanelMode] = useState<'super_admin' | 'store' | 'delivery'>('super_admin');
 
+  const isFakeDriverProbe = (row: Record<string, any>) => {
+    const id = String(row.id || row.driverId || '').trim().toUpperCase();
+    const name = String(row.name || '').trim().toUpperCase();
+    const phone = String(row.phone || '').trim().toUpperCase();
+    return id.startsWith('DEVPROBE') || phone.startsWith('DEVPROBE') || name === 'UNNAMED DRIVER';
+  };
+
   const stripLegacySeedData = <T extends Record<string, any>>(rows: T[] = [], kind: 'orders' | 'drivers' | 'zones' | 'users' | 'payments' | 'vehicles' | 'banners' | 'tickets' | 'notifications' | 'products' | 'stores' | 'inventory'): T[] => {
     const legacyNames = /rahim|shakib|arif hossain|chillox|sultan|madchef|takeout|gulshan|dhanmondi/i;
     const legacyOrderPrefix = 'ORD-' + '001';
@@ -405,7 +412,7 @@ export default function App() {
       const id = String(row.id || row.orderId || row.plateNumber || '');
       const text = JSON.stringify(row || {});
       if (kind === 'orders' && new RegExp(`^${legacyOrderPrefix}\\d+`).test(id)) return false;
-      if (kind === 'drivers' && (new RegExp(`^${legacyDriverPrefix}[6-9]$`).test(id) || legacyNames.test(text))) return false;
+      if (kind === 'drivers' && (isFakeDriverProbe(row) || new RegExp(`^${legacyDriverPrefix}[6-9]$`).test(id) || legacyNames.test(text))) return false;
       if (kind === 'zones' && /^Z-[1-5]$/.test(id)) return false;
       if (kind === 'payments' && (/^TXN-982\d+/.test(id) || new RegExp(`^${legacyOrderPrefix}\\d+`).test(String(row.orderId || '')))) return false;
       if (kind === 'vehicles' && (/^VEH-00\d$/.test(id) || /^V00\d$/.test(id) || legacyNames.test(text))) return false;
@@ -563,6 +570,10 @@ export default function App() {
   const [reviews, setReviews] = useState<any[]>(() => getStoredData('sd_reviews', []));
 
   const [marketing, setMarketing] = useState<any[]>(() => getStoredData('sd_marketing', []));
+
+  useEffect(() => {
+    setDrivers(prev => prev.filter((driver: any) => !isFakeDriverProbe(driver)));
+  }, []);
 
   useEffect(() => {
     setCoupons(prev => prev.filter((c: any) => !/^CPN-0[1-3]$/.test(c.id || '')));
@@ -742,6 +753,7 @@ export default function App() {
         reviews,
         banners,
         orders,
+        drivers,
         deletedRecords,
         notifications
       };
@@ -775,6 +787,7 @@ export default function App() {
         if (Array.isArray(data.state.reviews)) setReviews(data.state.reviews);
         if (Array.isArray(data.state.banners)) setBanners(stripLegacySeedData(data.state.banners, 'banners'));
         if (Array.isArray(data.state.orders)) setOrders(stripLegacySeedData(data.state.orders, 'orders'));
+        if (Array.isArray(data.state.drivers)) setDrivers(stripLegacySeedData(data.state.drivers, 'drivers'));
         if (Array.isArray(data.state.deletedRecords)) setDeletedRecords(data.state.deletedRecords);
         if (Array.isArray(data.state.notifications)) setNotifications(stripLegacySeedData(data.state.notifications, 'notifications'));
         setLastSyncAt(data.state.updatedAt);
@@ -835,7 +848,7 @@ export default function App() {
     if (firstSyncRun.current) { firstSyncRun.current = false; return; }
     const t = setTimeout(() => { pushState(true); }, 1500);
     return () => clearTimeout(t);
-  }, [products, categories, stores, branches, coupons, reviews, banners, orders, deletedRecords, notifications]);
+  }, [products, categories, stores, branches, coupons, reviews, banners, orders, drivers, deletedRecords, notifications]);
 
   // On first load: seed the cloud with local data if the cloud is empty (local stays authoritative)
   useEffect(() => { seedCloudIfEmpty(); }, []);
