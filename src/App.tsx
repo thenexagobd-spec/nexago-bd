@@ -603,6 +603,7 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [quickActionModal, setQuickActionModal] = useState<'driver' | 'user' | 'zone' | 'notification' | 'banner' | null>(null);
   const [storeAdminPrompt, setStoreAdminPrompt] = useState<any | null>(null);
+  const [storeAdminDocPreview, setStoreAdminDocPreview] = useState<any | null>(null);
   const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<Record<string, string>>({});
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isAddingStore, setIsAddingStore] = useState(false);
@@ -2720,20 +2721,20 @@ export default function App() {
               {storeAdminApps.length === 0 ? (
                 <p className="py-4 text-center text-[10px] text-gray-500">No real store admin application submitted yet.</p>
               ) : (
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-3 2xl:grid-cols-4">
                   {storeAdminApps.map(app => {
                     const cred = storeAdminCreds[app.adminId];
                     const storeLink = `${window.location.origin}/store?key=${encodeURIComponent(app.storeId)}`;
                     const adminLink = `${window.location.origin}/store-admin?key=${encodeURIComponent(app.storeId)}`;
                     const isOpen = expandedStoreAdminAppId === app.id;
                     return (
-                    <div key={app.id} className="rounded-xl border border-brand-border/70 bg-[#080e17] p-3">
+                    <div key={app.id} className="rounded-lg border border-brand-border/70 bg-[#080e17] p-2.5">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-mono text-[10px] font-black text-brand-orange">{app.adminId} · {app.storeId}</p>
-                          <p className="mt-1 truncate text-sm font-black text-white">{app.storeName}</p>
-                          <p className="text-[10px] text-gray-400">{app.ownerName} · {app.phone}</p>
-                          <p className="text-[10px] text-gray-500">{app.storeAddress}</p>
+                          <p className="font-mono text-[9px] font-black text-brand-orange">{app.adminId} · {app.storeId}</p>
+                          <p className="mt-1 truncate text-xs font-black text-white">{app.storeName}</p>
+                          <p className="truncate text-[9px] text-gray-400">{app.ownerName} · {app.phone}</p>
+                          <p className="truncate text-[9px] text-gray-500">{app.storeAddress}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`rounded-lg border px-2 py-1 text-[8px] font-black uppercase ${app.status === 'Verified' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : app.status === 'Rejected' ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{app.status}</span>
@@ -2748,12 +2749,15 @@ export default function App() {
                       </div>
                       {isOpen && (
                       <>
-                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {(app.documents || []).map((doc: any) => (
-                          <a key={doc.type} href={doc.dataUrl || '#'} target="_blank" rel="noreferrer" className={`rounded-lg border px-2 py-2 text-[9px] font-bold ${doc.dataUrl ? 'border-sky-500/30 bg-sky-500/10 text-sky-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>
-                            <FileText className="mr-1 inline h-3 w-3" /> {doc.type}
-                          </a>
-                        ))}
+                      <div className="mt-3 grid grid-cols-1 gap-1.5">
+                        {(app.documents || []).map((doc: any) => {
+                          const docUrl = doc.dataUrl || doc.privateUrl || doc.secureFile?.dataUrl || '';
+                          return (
+                          <button key={doc.type} type="button" onClick={() => docUrl && setStoreAdminDocPreview({ ...doc, url: docUrl, storeName: app.storeName, adminId: app.adminId })} className={`flex items-center justify-between rounded-lg border px-2 py-2 text-left text-[9px] font-bold ${docUrl ? 'border-sky-500/30 bg-sky-500/10 text-sky-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>
+                            <span className="min-w-0 truncate"><FileText className="mr-1 inline h-3 w-3" /> {doc.type}</span>
+                            <span className="ml-2 rounded bg-white/10 px-2 py-0.5 text-[8px] uppercase">{docUrl ? 'Show' : 'Missing'}</span>
+                          </button>
+                        );})}
                       </div>
                       {(app.modificationLog || []).length > 0 && (
                         <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/10 p-2">
@@ -2869,7 +2873,7 @@ export default function App() {
               </form>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {stores.map(s => {
                 const dashboardUrl = `${window.location.origin}${window.location.pathname}?storeId=${s.id}`;
                 const storeBranches = branches.filter((b: any) => b.storeId === s.id);
@@ -2881,30 +2885,30 @@ export default function App() {
                   return { branch: b, rows, revenue: rows.filter((o: any) => o.status !== 'Cancelled').reduce((sum, o: any) => sum + (Number(o.amount) || 0), 0) };
                 });
                 return (
-                  <div key={s.id} className="bg-brand-card border border-brand-border rounded-xl p-5 flex flex-col justify-between shadow-lg hover:border-brand-border-hover transition-all">
+                  <div key={s.id} className="bg-brand-card border border-brand-border rounded-xl p-3 flex flex-col justify-between shadow-lg hover:border-brand-border-hover transition-all">
                     <div>
-                      <div className="flex items-center justify-between border-b border-brand-border/35 pb-2.5 mb-3">
+                      <div className="flex items-center justify-between border-b border-brand-border/35 pb-2 mb-2">
                         <div className="flex items-center space-x-2">
                           <Store className="w-4 h-4 text-brand-orange" />
-                          <span className="font-bold text-white text-sm">{s.name}</span>
+                          <span className="truncate font-bold text-white text-xs">{s.name}</span>
                         </div>
                         <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase border border-emerald-500/10">
                           {s.status}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400 font-medium mb-2">{s.address}</p>
+                      <p className="truncate text-[10px] text-gray-400 font-medium mb-2">{s.address}</p>
                       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                         <div className="rounded-lg bg-[#080e17] p-2">
                           <p className="text-[8px] font-black uppercase text-gray-500">Orders</p>
-                          <p className="text-sm font-black text-white">{storeOrders.length}</p>
+                          <p className="text-xs font-black text-white">{storeOrders.length}</p>
                         </div>
                         <div className="rounded-lg bg-[#080e17] p-2">
                           <p className="text-[8px] font-black uppercase text-gray-500">Revenue</p>
-                          <p className="text-sm font-black text-emerald-300">৳{storeRevenue.toLocaleString()}</p>
+                          <p className="text-xs font-black text-emerald-300">৳{storeRevenue.toLocaleString()}</p>
                         </div>
                         <div className="rounded-lg bg-[#080e17] p-2">
                           <p className="text-[8px] font-black uppercase text-gray-500">Branches</p>
-                          <p className="text-sm font-black text-sky-300">{storeBranches.length}</p>
+                          <p className="text-xs font-black text-sky-300">{storeBranches.length}</p>
                         </div>
                         <button
                           type="button"
@@ -2915,7 +2919,7 @@ export default function App() {
                         </button>
                       </div>
                       {isStoreOpen && (
-                      <>
+                      <div className="space-y-3">
                       <div className="mb-3 rounded-lg border border-brand-orange/25 bg-brand-orange/10 p-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
@@ -2983,8 +2987,6 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      </>
-                      )}
                       <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2.5">
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <div>
@@ -3278,8 +3280,10 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                    </div>
+                      </div>
+                      )}
 
+                    {isStoreOpen && (
                     <div className="flex justify-between items-center border-t border-brand-border/40 pt-3.5 text-xs">
                       <div className="flex items-center space-x-3">
                         <span className="text-gray-400 text-[11px]">Rating: <b className="text-white">⭐ {s.rating}</b></span>
@@ -3310,6 +3314,8 @@ export default function App() {
                         <ExternalLink className="w-3 h-3" />
                       </button>
                     </div>
+                    )}
+                  </div>
                   </div>
                 );
               })}
@@ -7915,6 +7921,61 @@ export default function App() {
                 <input type="number" min="0" value={couponForm.minOrder} onChange={e => setCouponForm(f => ({ ...f, minOrder: e.target.value }))} placeholder="0" className="w-full px-3 py-2 bg-brand-dark text-xs text-white border brand-border rounded-lg outline-none focus:border-brand-orange placeholder:text-gray-600" />
               </div>
               <button onClick={submitNewCoupon} className="w-full px-4 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold cursor-pointer">Create Promo Code</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STORE ADMIN DOCUMENT PREVIEW MODAL */}
+      {storeAdminDocPreview && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-dark/90 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-brand-border bg-[#0c1624] shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-brand-border p-4">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-black uppercase tracking-wider text-white">{storeAdminDocPreview.type || 'Store Document'}</h3>
+                <p className="mt-1 truncate text-[10px] font-semibold text-gray-400">{storeAdminDocPreview.storeName} · {storeAdminDocPreview.adminId}</p>
+              </div>
+              <button onClick={() => setStoreAdminDocPreview(null)} className="rounded-lg border border-brand-border bg-brand-dark p-2 text-gray-400 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-[320px] overflow-auto bg-[#080e17] p-3">
+              <div className="mb-3 rounded-lg border border-brand-border/60 bg-[#0c1624] p-3 text-xs text-gray-300">
+                <p><b className="text-white">Document:</b> {storeAdminDocPreview.type || 'Store Document'}</p>
+                <p><b className="text-white">Store:</b> {storeAdminDocPreview.storeName || '-'}</p>
+                <p><b className="text-white">Admin ID:</b> {storeAdminDocPreview.adminId || '-'}</p>
+                <p className="break-all"><b className="text-white">File:</b> {storeAdminDocPreview.name || storeAdminDocPreview.fileName || 'Submitted document'}</p>
+              </div>
+              {String(storeAdminDocPreview.url || '').startsWith('data:application/pdf') || String(storeAdminDocPreview.mimeType || storeAdminDocPreview.type || '').toLowerCase().includes('pdf') ? (
+                <iframe title={storeAdminDocPreview.type || 'document'} src={storeAdminDocPreview.url} className="h-[70vh] w-full rounded-lg border border-brand-border bg-white" />
+              ) : (
+                <img src={storeAdminDocPreview.url} alt={storeAdminDocPreview.type || 'Store admin document'} className="mx-auto max-h-[70vh] max-w-full rounded-lg border border-brand-border object-contain" />
+              )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-brand-border p-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const text = `Store Admin Document\nStore: ${storeAdminDocPreview.storeName || '-'}\nAdmin ID: ${storeAdminDocPreview.adminId || '-'}\nDocument: ${storeAdminDocPreview.type || '-'}\nFile: ${storeAdminDocPreview.name || storeAdminDocPreview.fileName || 'Submitted document'}`;
+                  navigator.clipboard?.writeText(text).then(() => showToast('Document text copied.', 'success')).catch(() => showToast('Copy failed.', 'info'));
+                }}
+                className="rounded-lg border border-brand-border bg-brand-dark px-4 py-2 text-xs font-black text-gray-300"
+              >
+                Copy Text
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const text = `Store Admin Document%0AStore: ${encodeURIComponent(storeAdminDocPreview.storeName || '-')}%0AAdmin ID: ${encodeURIComponent(storeAdminDocPreview.adminId || '-')}%0ADocument: ${encodeURIComponent(storeAdminDocPreview.type || '-')}`;
+                  window.open(`https://wa.me/?text=${text}`, '_blank');
+                }}
+                className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs font-black text-emerald-300"
+              >
+                WhatsApp
+              </button>
+              <button type="button" onClick={() => window.print()} className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-2 text-xs font-black text-purple-300">Print</button>
+              <a href={storeAdminDocPreview.url} target="_blank" rel="noreferrer" className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-xs font-black text-sky-300">Open Full</a>
+              <button onClick={() => setStoreAdminDocPreview(null)} className="rounded-lg bg-brand-orange px-4 py-2 text-xs font-black text-white">Close</button>
             </div>
           </div>
         </div>
