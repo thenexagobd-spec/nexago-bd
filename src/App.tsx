@@ -950,6 +950,7 @@ export default function App() {
   const playAlertSound = () => {
     try {
       const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      if (typeof Ctx !== 'function') return;
       const ctx = new Ctx();
       [880, 1174, 1568, 1174].forEach((f, i) => {
         const o = ctx.createOscillator();
