@@ -10,7 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip, History, ShoppingCart } from 'lucide-react';
 import PortalShell from './PortalShell';
 import PosSystem from '../components/PosSystem';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsGet, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, persistOrderToCloud, platformLogin, platformOtpSend, platformOtpLogin } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsGet, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, persistOrderToCloud, platformLogin, platformOtpSend, platformOtpLogin, supabaseClient } from './portalUtils';
 import { newOfferRound } from '../utils/autoAssign';
 
 interface Staff {
@@ -63,6 +63,7 @@ export default function StoreAdminPortal() {
   const [loginOtpSent, setLoginOtpSent] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [loginGoogleBusy, setLoginGoogleBusy] = useState(false);
   const [trackId, setTrackId] = useState('');
   const [signup, setSignup] = useState({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '', password: '', confirmPassword: '' });
   const [emailVerified, setEmailVerified] = useState(false);
@@ -379,6 +380,53 @@ export default function StoreAdminPortal() {
     finishStoreAdminLogin(secure.user.userId || email, secure.token);
   };
 
+  useEffect(() => {
+    const sb = supabaseClient();
+    if (!sb) return;
+    const search = new URLSearchParams(window.location.search);
+    if (search.get('oauthRole') !== 'store-admin') return;
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (!hash.get('access_token')) return;
+    (async () => {
+      try {
+        const { data, error } = await sb.auth.getSession();
+        if (error || !data.session) throw error || new Error('no session');
+        const email = String(data.session.user.email || '').trim().toLowerCase();
+        if (!email) throw new Error('no email');
+        setAuthView('login');
+        setLoginMode('otp');
+        setLoginId(email);
+        setLoginOtpSent(false);
+        const ok = await platformOtpSend(email);
+        if (!ok) throw new Error('otp send failed');
+        setLoginOtpSent(true);
+        setLoginError('');
+      } catch {
+        setLoginError('Google auth complete holo na. Password ba Gmail OTP use korun.');
+      } finally {
+        setLoginGoogleBusy(false);
+        search.delete('oauthRole');
+        const clean = search.toString();
+        window.history.replaceState(null, '', window.location.pathname + (clean ? `?${clean}` : ''));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loginWithGoogle = () => {
+    const sb = supabaseClient();
+    if (!sb) { setLoginError('Google auth configure kora nei. Gmail OTP ba password use korun.'); return; }
+    setLoginGoogleBusy(true);
+    setLoginError('');
+    const params = new URLSearchParams(window.location.search);
+    params.set('oauthRole', 'store-admin');
+    const redirectTo = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } }).catch(() => {
+      setLoginGoogleBusy(false);
+      setLoginError('Google auth unavailable. Gmail OTP ba password use korun.');
+    });
+  };
+
   const logout = () => {
     localStorage.removeItem('sd_store_admin_session');
     localStorage.removeItem('sd_security_session');
@@ -627,6 +675,14 @@ export default function StoreAdminPortal() {
               <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
                 <h2 className="flex items-center gap-2 text-sm font-black text-white"><LogIn className="h-4 w-4 text-brand-orange" /> Login</h2>
                 <div className="mt-4 space-y-3">
+                  <button onClick={loginWithGoogle} disabled={loginGoogleBusy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white px-4 py-2.5 text-[10px] font-black uppercase text-gray-900 disabled:opacity-60">
+                    {loginGoogleBusy ? 'Opening Google...' : 'Continue with Google'}
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-[#1e3050]" />
+                    <span className="text-[9px] font-black uppercase text-gray-500">or</span>
+                    <div className="h-px flex-1 bg-[#1e3050]" />
+                  </div>
                   <div className="grid grid-cols-2 gap-1 rounded-xl border border-[#1e3050] bg-[#0a1322] p-1">
                     <button onClick={() => { setLoginMode('password'); setLoginError(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${loginMode === 'password' ? 'bg-brand-orange text-white' : 'text-gray-400'}`}>Password</button>
                     <button onClick={() => { setLoginMode('otp'); setLoginError(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${loginMode === 'otp' ? 'bg-brand-orange text-white' : 'text-gray-400'}`}>Gmail OTP</button>

@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, LifeBuoy, Bell, BarChart3, CheckCircle2, TrendingUp, Ticket, ShieldCheck, Lock, LogOut } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync, securityApi, securityAudit, lsGet, platformOtpSend, platformOtpLogin } from './portalUtils';
+import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync, securityApi, securityAudit, lsGet, platformOtpSend, platformOtpLogin, supabaseClient } from './portalUtils';
 
 export default function StaffPortal() {
   useCloudSync();
@@ -21,6 +21,7 @@ export default function StaffPortal() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [loginBusy, setLoginBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [orders, setOrders] = useOrders();
   const [tickets, setTickets] = useTickets();
@@ -132,6 +133,52 @@ export default function StaffPortal() {
     securityAudit('staff-otp-login-success', { actor: email, role: data.user?.role || 'staff', reason: 'staff Gmail OTP login' });
   };
 
+  useEffect(() => {
+    const sb = supabaseClient();
+    if (!sb) return;
+    const search = new URLSearchParams(window.location.search);
+    if (search.get('oauthRole') !== 'super-admin-staff') return;
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (!hash.get('access_token')) return;
+    (async () => {
+      try {
+        const { data, error } = await sb.auth.getSession();
+        if (error || !data.session) throw error || new Error('no session');
+        const email = String(data.session.user.email || '').trim().toLowerCase();
+        if (!email) throw new Error('no email');
+        setLoginMode('otp');
+        setLogin(prev => ({ ...prev, userId: email }));
+        setOtpSent(false);
+        const ok = await platformOtpSend(email);
+        if (!ok) throw new Error('otp send failed');
+        setOtpSent(true);
+        setLoginError('');
+      } catch {
+        setLoginError('Google auth complete holo na. Staff Gmail OTP ba password use korun.');
+      } finally {
+        setGoogleBusy(false);
+        search.delete('oauthRole');
+        const clean = search.toString();
+        window.history.replaceState(null, '', window.location.pathname + (clean ? `?${clean}` : ''));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const staffGoogleLogin = () => {
+    const sb = supabaseClient();
+    if (!sb) { setLoginError('Google auth configure kora nei. Gmail OTP ba password use korun.'); return; }
+    setGoogleBusy(true);
+    setLoginError('');
+    const params = new URLSearchParams(window.location.search);
+    params.set('oauthRole', 'super-admin-staff');
+    const redirectTo = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } }).catch(() => {
+      setGoogleBusy(false);
+      setLoginError('Google auth unavailable. Gmail OTP ba password use korun.');
+    });
+  };
+
   const staffLogout = () => {
     localStorage.removeItem('sd_staff_security_session');
     localStorage.removeItem('sd_security_session');
@@ -171,6 +218,14 @@ export default function StaffPortal() {
                 <p className="mt-1 text-[11px] text-gray-400">Enter approved Staff ID/email and password.</p>
               </div>
               <div className="space-y-3">
+                <button type="button" onClick={staffGoogleLogin} disabled={googleBusy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white px-4 py-3 text-[10px] font-black uppercase text-gray-900 disabled:opacity-60">
+                  {googleBusy ? 'Opening Google...' : 'Continue with Google'}
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-[#1e3050]" />
+                  <span className="text-[9px] font-black uppercase text-gray-500">or</span>
+                  <div className="h-px flex-1 bg-[#1e3050]" />
+                </div>
                 <div className="grid grid-cols-2 gap-1 rounded-xl border border-[#1e3050] bg-[#080e17] p-1">
                   <button type="button" onClick={() => { setLoginMode('password'); setLoginError(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${loginMode === 'password' ? 'bg-violet-600 text-white' : 'text-gray-400'}`}>Password</button>
                   <button type="button" onClick={() => { setLoginMode('otp'); setLoginError(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${loginMode === 'otp' ? 'bg-violet-600 text-white' : 'text-gray-400'}`}>Gmail OTP</button>

@@ -20,7 +20,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import PortalShell from './PortalShell';
 import PosSystem from '../components/PosSystem';
-import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, useProducts, usePayments, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds, persistOrderToCloud, platformLogin, platformOtpSend, platformOtpLogin } from './portalUtils';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, useProducts, usePayments, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds, persistOrderToCloud, platformLogin, platformOtpSend, platformOtpLogin, supabaseClient } from './portalUtils';
 import { newOfferRound } from '../utils/autoAssign';
 
 export default function StorePortal() {
@@ -49,6 +49,7 @@ export default function StorePortal() {
   const [authOtpSent, setAuthOtpSent] = useState(false);
   const [authOtpCode, setAuthOtpCode] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const [authGoogleBusy, setAuthGoogleBusy] = useState(false);
 
   useEffect(() => {
     const onStorage = () => setReturns(lsGet('sd_returns', []));
@@ -144,6 +145,52 @@ export default function StorePortal() {
       return;
     }
     finishStoreAuth(secure.user.userId || email, secure.token);
+  };
+
+  useEffect(() => {
+    const sb = supabaseClient();
+    if (!sb) return;
+    const search = new URLSearchParams(window.location.search);
+    if (search.get('oauthRole') !== 'store-site') return;
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (!hash.get('access_token')) return;
+    (async () => {
+      try {
+        const { data, error } = await sb.auth.getSession();
+        if (error || !data.session) throw error || new Error('no session');
+        const email = String(data.session.user.email || '').trim().toLowerCase();
+        if (!email) throw new Error('no email');
+        setAuthMode('otp');
+        setAuthId(email);
+        setAuthOtpSent(false);
+        const ok = await platformOtpSend(email);
+        if (!ok) throw new Error('otp send failed');
+        setAuthOtpSent(true);
+        setAuthMsg('');
+      } catch {
+        setAuthMsg('Google auth complete holo na. Password ba Gmail OTP use korun.');
+      } finally {
+        setAuthGoogleBusy(false);
+        search.delete('oauthRole');
+        const clean = search.toString();
+        window.history.replaceState(null, '', window.location.pathname + (clean ? `?${clean}` : ''));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const authWithGoogle = () => {
+    const sb = supabaseClient();
+    if (!sb) { setAuthMsg('Google auth configure kora nei. Gmail OTP ba password use korun.'); return; }
+    setAuthGoogleBusy(true);
+    setAuthMsg('');
+    const params = new URLSearchParams(window.location.search);
+    params.set('oauthRole', 'store-site');
+    const redirectTo = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } }).catch(() => {
+      setAuthGoogleBusy(false);
+      setAuthMsg('Google auth unavailable. Gmail OTP ba password use korun.');
+    });
   };
   const handleStoreLogout = () => {
     lsSet('sd_store_site_session', '');
@@ -415,6 +462,14 @@ export default function StorePortal() {
               </div>
             </div>
             <form onSubmit={handleStoreAuth} className="space-y-3">
+              <button type="button" onClick={authWithGoogle} disabled={authGoogleBusy} className="w-full rounded-xl border border-white/20 bg-white px-4 py-3 text-[10px] font-black uppercase text-gray-900 disabled:opacity-60">
+                {authGoogleBusy ? 'Opening Google...' : 'Continue with Google'}
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-[#1e3050]" />
+                <span className="text-[9px] font-black uppercase text-gray-500">or</span>
+                <div className="h-px flex-1 bg-[#1e3050]" />
+              </div>
               <div className="grid grid-cols-2 gap-1 rounded-xl border border-[#1e3050] bg-[#0a1626] p-1">
                 <button type="button" onClick={() => { setAuthMode('password'); setAuthMsg(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${authMode === 'password' ? 'bg-brand-orange text-white' : 'text-gray-400'}`}>Password</button>
                 <button type="button" onClick={() => { setAuthMode('otp'); setAuthMsg(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${authMode === 'otp' ? 'bg-brand-orange text-white' : 'text-gray-400'}`}>Gmail OTP</button>
