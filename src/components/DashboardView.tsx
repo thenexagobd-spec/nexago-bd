@@ -376,6 +376,12 @@ export default function DashboardView({
                   </div>
                   <p className="text-xs font-bold text-white mt-2 truncate">{o.storeName}</p>
                   <p className="text-[10px] text-gray-400 mt-0.5 truncate">👤 {o.customerName} · 🛵 {o.driverId || 'Assigning rider…'}</p>
+                  {o.deliveryCoords && (
+                    <p className="text-[9px] text-emerald-400 mt-1 truncate">
+                      📍 Customer {Number(o.deliveryCoords.lat).toFixed(5)}, {Number(o.deliveryCoords.lng).toFixed(5)}
+                      {(o as any).deliveryLocationMeta?.source ? ` · ${(o as any).deliveryLocationMeta.source}` : ''}
+                    </p>
+                  )}
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-brand-border/40">
                     <span className="font-mono font-black text-emerald-400 text-xs">৳{o.amount.toLocaleString()}</span>
                     <span className="text-[9px] text-gray-500 font-mono">{o.time || o.date}</span>
@@ -419,7 +425,7 @@ export default function DashboardView({
                           {initials(driver.name, 'DR')}
                         </div>
                         <div>
-                          <div className="font-semibold text-white">{safeText(driver.name, 'Unnamed Driver')}</div>
+                          <div className="font-semibold text-white">{safeText(driver.name, 'Driver')}</div>
                           <div className="text-[10px] text-gray-500 font-mono">{safeText(driver.id, 'NO-ID')}</div>
           </div>
           {chartPeriod==='Custom' && <div className="flex items-center flex-wrap gap-2 mt-2">

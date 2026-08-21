@@ -52,7 +52,7 @@ export default function EarningsView({ payments, drivers = [], orders = [] }: Ea
   const totalTax = filtered.reduce((s,x)=>s+x.tax,0);
 
   const methodDist = useMemo(()=>{const m:Record<string,number>={};orders.forEach(o=>{m[o.paymentMethod]=(m[o.paymentMethod]||0)+o.amount});return Object.entries(m).map(([n,v])=>({name:n,value:Math.round(v)})).slice(0,7);},[orders]);
-  const driverData = drivers.map(d=>({name:firstWord(d.name, 'Driver'),earnings:Number(d.earnings || 0),orders:Number(d.completedOrders || 0),fullName:safeText(d.name, 'Unnamed Driver')})).sort((a,b)=>b.earnings-a.earnings);
+  const driverData = drivers.map(d=>({name:firstWord(d.name, 'Driver'),earnings:Number(d.earnings || 0),orders:Number(d.completedOrders || 0),fullName:safeText(d.name, 'Driver')})).sort((a,b)=>b.earnings-a.earnings);
   const weeklyTrend = [{week:'W1',earnings:Math.round(totalEarnings*.18),payouts:Math.round(totalEarnings*.14)},{week:'W2',earnings:Math.round(totalEarnings*.22),payouts:Math.round(totalEarnings*.17)},{week:'W3',earnings:Math.round(totalEarnings*.25),payouts:Math.round(totalEarnings*.20)},{week:'W4',earnings:Math.round(totalEarnings*.35),payouts:Math.round(totalEarnings*.28)}];
 
   const handleExportCSV = ()=>{const csv='data:text/csv;charset=utf-8,'+encodeURIComponent(['Driver,Earnings,Orders,Status'].concat(drivers.map(d=>`${safeText(d.name)},${Number(d.earnings || 0)},${Number(d.completedOrders || 0)},${safeText(d.status)}`)).join('\n'));const l=document.createElement('a');l.href=csv;l.download='driver_earnings.csv';l.click();};

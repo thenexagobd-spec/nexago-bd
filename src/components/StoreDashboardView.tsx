@@ -24,10 +24,10 @@ interface StoreDashboardViewProps {
 export default function StoreDashboardView({
   orders,
   onNavigate,
-  productsCount = 7,
-  categoriesCount = 6,
-  customersCount = 5,
-  reviewsCount = 3,
+  productsCount = 0,
+  categoriesCount = 0,
+  customersCount = 0,
+  reviewsCount = 0,
   isTightMode = false
 }: StoreDashboardViewProps) {
   // Chart Hover State
@@ -198,9 +198,8 @@ export default function StoreDashboardView({
           <div className="space-y-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Customers</p>
             <h3 className={`${isTightMode ? 'text-lg' : 'text-xl'} font-bold text-white tracking-tight`}>{dispCustomersCount.toLocaleString()}</h3>
-            <div className="flex items-center text-[10px] text-emerald-400 font-medium">
-              <TrendingUp className="w-2.5 shrink-0 mr-0.5" />
-              <span>8.4%</span>
+            <div className="flex items-center text-[10px] text-gray-400 font-medium">
+              <span>Real customers</span>
             </div>
           </div>
           <div className={`${isTightMode ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0`}>

@@ -10,7 +10,7 @@ import { createRoot } from 'react-dom/client';
 import { 
   Order, Driver, Zone, User, Payment, Vehicle, PromotionBanner, SupportTicket, SystemNotification, ChatLogEntry, OrderReportEntry, makeOrderId
 } from './types';
-import { getStoredData, setStoredData, getZonesWithDefaults } from './data';
+import { getStoredData, setStoredData, setStoredDataDebounced, getZonesWithDefaults } from './data';
 
 import DashboardView from './components/DashboardView';
 import UsersView from './components/UsersView';
@@ -36,6 +36,7 @@ import OrderToolsDashboard from './components/OrderToolsDashboard';
 import MobileAppSimulator from './components/MobileAppSimulator';
 import MFSBusinessView from './components/MFSBusinessView';
 import PosSystem from './components/PosSystem';
+import BangladeshPosSystem from './components/BangladeshPosSystem';
 import VehiclesView from './components/VehiclesView';
 import StoreSyncView from './components/StoreSyncView';
 import KpiDashboardView from './components/KpiDashboardView';
@@ -395,6 +396,13 @@ export default function App() {
   // Separate Workspace Panel State: 'super_admin' = Super Admin Control Center, 'store' = Grocery Admin, 'delivery' = Delivery Logistics
   const [activePanelMode, setActivePanelMode] = useState<'super_admin' | 'store' | 'delivery'>('super_admin');
 
+  const isFakeDriverProbe = (row: Record<string, any>) => {
+    const id = String(row.id || row.driverId || '').trim().toUpperCase();
+    const name = String(row.name || '').trim().toUpperCase();
+    const phone = String(row.phone || '').trim().toUpperCase();
+    return id.startsWith('DEVPROBE') || phone.startsWith('DEVPROBE') || name === 'UNNAMED DRIVER';
+  };
+
   const stripLegacySeedData = <T extends Record<string, any>>(rows: T[] = [], kind: 'orders' | 'drivers' | 'zones' | 'users' | 'payments' | 'vehicles' | 'banners' | 'tickets' | 'notifications' | 'products' | 'stores' | 'inventory'): T[] => {
     const legacyNames = /rahim|shakib|arif hossain|chillox|sultan|madchef|takeout|gulshan|dhanmondi/i;
     const legacyOrderPrefix = 'ORD-' + '001';
@@ -405,7 +413,7 @@ export default function App() {
       const id = String(row.id || row.orderId || row.plateNumber || '');
       const text = JSON.stringify(row || {});
       if (kind === 'orders' && new RegExp(`^${legacyOrderPrefix}\\d+`).test(id)) return false;
-      if (kind === 'drivers' && (new RegExp(`^${legacyDriverPrefix}[6-9]$`).test(id) || legacyNames.test(text))) return false;
+      if (kind === 'drivers' && (isFakeDriverProbe(row) || new RegExp(`^${legacyDriverPrefix}[6-9]$`).test(id) || legacyNames.test(text))) return false;
       if (kind === 'zones' && /^Z-[1-5]$/.test(id)) return false;
       if (kind === 'payments' && (/^TXN-982\d+/.test(id) || new RegExp(`^${legacyOrderPrefix}\\d+`).test(String(row.orderId || '')))) return false;
       if (kind === 'vehicles' && (/^VEH-00\d$/.test(id) || /^V00\d$/.test(id) || legacyNames.test(text))) return false;
@@ -448,6 +456,7 @@ export default function App() {
   const [payments, setPayments] = useState<Payment[]>(() => stripLegacySeedData(getStoredData('sd_payments', []), 'payments'));
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => stripLegacySeedData(getStoredData('sd_vehicles', []), 'vehicles'));
   const [banners, setBanners] = useState<PromotionBanner[]>(() => stripLegacySeedData(getStoredData('sd_banners', []), 'banners'));
+  const [deletedRecords, setDeletedRecords] = useState<any[]>(() => getStoredData<any[]>('sd_deleted_records', []));
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => stripLegacySeedData(getStoredData('sd_tickets', []), 'tickets'));
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => stripLegacySeedData(getStoredData('sd_notifications', []), 'notifications'));
   const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
@@ -564,12 +573,17 @@ export default function App() {
   const [marketing, setMarketing] = useState<any[]>(() => getStoredData('sd_marketing', []));
 
   useEffect(() => {
+    setDrivers(prev => prev.filter((driver: any) => !isFakeDriverProbe(driver)));
+  }, []);
+
+  useEffect(() => {
     setCoupons(prev => prev.filter((c: any) => !/^CPN-0[1-3]$/.test(c.id || '')));
   }, []);
 
   // UI Control states
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [quickActionModal, setQuickActionModal] = useState<'driver' | 'user' | 'zone' | 'notification' | 'banner' | null>(null);
+  const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<Record<string, string>>({});
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isAddingStore, setIsAddingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
@@ -615,17 +629,18 @@ export default function App() {
   const [isMerchantMobileSidebarOpen, setIsMerchantMobileSidebarOpen] = useState(false);
 
   // Sync to localStorage
-  useEffect(() => { setStoredData('sd_orders_v2', orders); }, [orders]);
-  useEffect(() => { setStoredData('sd_drivers', drivers); }, [drivers]);
-  useEffect(() => { setStoredData('sd_zones', zones); }, [zones]);
-  useEffect(() => { setStoredData('sd_users', users); }, [users]);
-  useEffect(() => { setStoredData('sd_payments', payments); }, [payments]);
-  useEffect(() => { setStoredData('sd_vehicles', vehicles); }, [vehicles]);
-  useEffect(() => { setStoredData('sd_products', products); }, [products]);
-  useEffect(() => { setStoredData('sd_categories', categories); }, [categories]);
-  useEffect(() => { setStoredData('sd_inventory', inventory); }, [inventory]);
-  useEffect(() => { setStoredData('sd_coupons', coupons); }, [coupons]);
-  useEffect(() => { setStoredData('sd_staff', normalizeStaffKyc(staff)); }, [staff]);
+  useEffect(() => { setStoredDataDebounced('sd_orders_v2', orders); }, [orders]);
+  useEffect(() => { setStoredDataDebounced('sd_drivers', drivers); }, [drivers]);
+  useEffect(() => { setStoredDataDebounced('sd_zones', zones); }, [zones]);
+  useEffect(() => { setStoredDataDebounced('sd_users', users); }, [users]);
+  useEffect(() => { setStoredDataDebounced('sd_payments', payments); }, [payments]);
+  useEffect(() => { setStoredDataDebounced('sd_vehicles', vehicles); }, [vehicles]);
+  useEffect(() => { setStoredDataDebounced('sd_deleted_records', deletedRecords); }, [deletedRecords]);
+  useEffect(() => { setStoredDataDebounced('sd_products', products); }, [products]);
+  useEffect(() => { setStoredDataDebounced('sd_categories', categories); }, [categories]);
+  useEffect(() => { setStoredDataDebounced('sd_inventory', inventory); }, [inventory]);
+  useEffect(() => { setStoredDataDebounced('sd_coupons', coupons); }, [coupons]);
+  useEffect(() => { setStoredDataDebounced('sd_staff', normalizeStaffKyc(staff)); }, [staff]);
   useEffect(() => {
     if (!staffIdCard?.id) return;
     const latest = normalizeStaffKyc(staff).find((s: any) => s.id === staffIdCard.id);
@@ -687,15 +702,81 @@ export default function App() {
     }, 1200);
     return () => window.clearTimeout(timer);
   }, [staff, roleCardsStore, superAdminCardProfile, drivers, storeAdminApps]);
-  useEffect(() => { setStoredData('sd_reviews', reviews); }, [reviews]);
-  useEffect(() => { setStoredData('sd_marketing', marketing); }, [marketing]);
-  useEffect(() => { setStoredData('sd_banners', banners); }, [banners]);
-  useEffect(() => { setStoredData('sd_tickets', supportTickets); }, [supportTickets]);
-  useEffect(() => { setStoredData('sd_notifications', notifications); }, [notifications]);
-  useEffect(() => { setStoredData('sd_stores', stores); }, [stores]);
-  useEffect(() => { setStoredData('sd_store_branches', branches); }, [branches]);
-  useEffect(() => { setStoredData('sd_store_admin_apps', storeAdminApps); }, [storeAdminApps]);
-  useEffect(() => { setStoredData('sd_store_admin_creds', storeAdminCreds); }, [storeAdminCreds]);
+  useEffect(() => { setStoredDataDebounced('sd_reviews', reviews); }, [reviews]);
+  useEffect(() => { setStoredDataDebounced('sd_marketing', marketing); }, [marketing]);
+  useEffect(() => { setStoredDataDebounced('sd_banners', banners); }, [banners]);
+  useEffect(() => { setStoredDataDebounced('sd_tickets', supportTickets); }, [supportTickets]);
+  useEffect(() => { setStoredDataDebounced('sd_notifications', notifications); }, [notifications]);
+  useEffect(() => { setStoredDataDebounced('sd_stores', stores); }, [stores]);
+  useEffect(() => { setStoredDataDebounced('sd_store_branches', branches); }, [branches]);
+  useEffect(() => { setStoredDataDebounced('sd_store_admin_apps', storeAdminApps); }, [storeAdminApps]);
+  useEffect(() => { setStoredDataDebounced('sd_store_admin_creds', storeAdminCreds); }, [storeAdminCreds]);
+
+  useEffect(() => {
+    const same = (a: any, b: any) => {
+      try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+    };
+    const refreshFromSharedStorage = () => {
+      setOrders(prev => {
+        const next = stripLegacySeedData(getStoredData<Order[]>('sd_orders_v2', []), 'orders');
+        return same(prev, next) ? prev : next;
+      });
+      setDrivers(prev => {
+        const next = stripLegacySeedData(getStoredData<Driver[]>('sd_drivers', []), 'drivers');
+        return same(prev, next) ? prev : next;
+      });
+      setProducts(prev => {
+        const next = stripLegacySeedData(getStoredData<any[]>('sd_products', []), 'products');
+        return same(prev, next) ? prev : next;
+      });
+      setCategories(prev => {
+        const next = getStoredData<any[]>('sd_categories', []);
+        return same(prev, next) ? prev : next;
+      });
+      setStores(prev => {
+        const next = stripLegacySeedData(getStoredData<any[]>('sd_stores', []), 'stores');
+        return same(prev, next) ? prev : next;
+      });
+      setBranches(prev => {
+        const next = getStoredData<any[]>('sd_store_branches', []);
+        return same(prev, next) ? prev : next;
+      });
+      setCoupons(prev => {
+        const next = getStoredData<any[]>('sd_coupons', []);
+        return same(prev, next) ? prev : next;
+      });
+      setPayments(prev => {
+        const next = stripLegacySeedData(getStoredData<Payment[]>('sd_payments', []), 'payments');
+        return same(prev, next) ? prev : next;
+      });
+      setSupportTickets(prev => {
+        const next = stripLegacySeedData(getStoredData<SupportTicket[]>('sd_tickets', []), 'tickets');
+        return same(prev, next) ? prev : next;
+      });
+      setNotifications(prev => {
+        const next = stripLegacySeedData(getStoredData<SystemNotification[]>('sd_notifications', []), 'notifications');
+        return same(prev, next) ? prev : next;
+      });
+      setStaff(prev => {
+        const next = normalizeStaffKyc(getStoredData('sd_staff', [])).filter((s: any) => !(s && (s.testRecord === true || s.id === 'STF-TEST-001')));
+        return same(prev, next) ? prev : next;
+      });
+      setStoreAdminApps(prev => {
+        const next = getStoredData<any[]>('sd_store_admin_apps', []);
+        return same(prev, next) ? prev : next;
+      });
+      setRoleCardsStore(prev => {
+        const next = getStoredData<Record<string, any>>('sd_role_cards', {});
+        return same(prev, next) ? prev : next;
+      });
+    };
+    window.addEventListener('storage', refreshFromSharedStorage);
+    window.addEventListener('nexago-cloud-pull', refreshFromSharedStorage);
+    return () => {
+      window.removeEventListener('storage', refreshFromSharedStorage);
+      window.removeEventListener('nexago-cloud-pull', refreshFromSharedStorage);
+    };
+  }, []);
 
   // Toast System trigger helper
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
@@ -739,6 +820,8 @@ export default function App() {
         reviews,
         banners,
         orders,
+        drivers,
+        deletedRecords,
         notifications
       };
       const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`, {
@@ -771,6 +854,8 @@ export default function App() {
         if (Array.isArray(data.state.reviews)) setReviews(data.state.reviews);
         if (Array.isArray(data.state.banners)) setBanners(stripLegacySeedData(data.state.banners, 'banners'));
         if (Array.isArray(data.state.orders)) setOrders(stripLegacySeedData(data.state.orders, 'orders'));
+        if (Array.isArray(data.state.drivers)) setDrivers(stripLegacySeedData(data.state.drivers, 'drivers'));
+        if (Array.isArray(data.state.deletedRecords)) setDeletedRecords(data.state.deletedRecords);
         if (Array.isArray(data.state.notifications)) setNotifications(stripLegacySeedData(data.state.notifications, 'notifications'));
         setLastSyncAt(data.state.updatedAt);
         setSyncState('online');
@@ -830,7 +915,7 @@ export default function App() {
     if (firstSyncRun.current) { firstSyncRun.current = false; return; }
     const t = setTimeout(() => { pushState(true); }, 1500);
     return () => clearTimeout(t);
-  }, [products, categories, stores, branches, coupons, reviews, banners, orders, notifications]);
+  }, [products, categories, stores, branches, coupons, reviews, banners, orders, drivers, deletedRecords, notifications]);
 
   // On first load: seed the cloud with local data if the cloud is empty (local stays authoritative)
   useEffect(() => { seedCloudIfEmpty(); }, []);
@@ -938,6 +1023,7 @@ export default function App() {
     }
 
     setOrders([newOrder, ...orders]);
+    persistOrderToCloud(newOrder);
 
     // Customer-placed order → surface on admin live board
     if (newOrder.deliveryCoords || newOrder.pickupCoords) {
@@ -1087,9 +1173,12 @@ export default function App() {
     const nextOrders = orders.map(o => o.id === id ? appendTimeline({ ...o, status: 'Cancelled' as const }, 'cancelled', 'admin', 'Cancelled from admin; retained permanently in order history') : o);
     setOrders(nextOrders);
     const cancelled = nextOrders.find(o => o.id === id);
-    if (cancelled) persistOrderToCloud(cancelled);
+    if (cancelled) {
+      archiveRecord('order', cancelled, `Order #${cancelled.id}`);
+      persistOrderToCloud(cancelled);
+    }
     setPayments(payments.map(p => p.orderId === id ? { ...p, status: 'Failed' as const } : p));
-    showToast(`Order #${id} deleted (kept in history as Cancelled).`);
+    showToast(`Order #${id} moved to Recovery Vault and kept in history as Cancelled.`);
   };
 
   // Manually assign a driver to an order (used when driver rejects/doesn't accept)
@@ -1167,9 +1256,59 @@ export default function App() {
     showToast(`Driver profile ${updatedDriver.id} updated.`);
   };
 
+  const archiveRecord = (kind: string, record: any, label: string) => {
+    const now = new Date().toISOString();
+    const id = String(record?.id || record?.phone || record?.plateNumber || record?.plateNo || record?.code || '').trim();
+    if (!id) return;
+    setDeletedRecords(prev => [
+      {
+        vaultId: `DEL-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        kind,
+        recordId: id,
+        label,
+        record,
+        deletedAt: now,
+        deletedBy: 'super-admin',
+        status: 'Recoverable',
+        reason: 'Moved to Super Admin Recovery Vault',
+      },
+      ...prev.filter((row: any) => !(row.kind === kind && row.recordId === id))
+    ]);
+    securityAudit('record-soft-deleted', { actor: 'super-admin', role: 'super-admin', reason: 'recoverable delete', newValue: { kind, recordId: id, label } });
+  };
+
+  const restoreDeletedRecord = (vaultId: string) => {
+    const row = deletedRecords.find((x: any) => x.vaultId === vaultId);
+    if (!row) return;
+    const rec = row.record;
+    if (row.kind === 'order') setOrders(prev => prev.some(o => o.id === rec.id) ? prev : [appendTimeline(rec, 'restored', 'admin', 'Restored from Super Admin Recovery Vault'), ...prev]);
+    if (row.kind === 'driver') setDrivers(prev => prev.some(d => d.id === rec.id) ? prev : [rec, ...prev]);
+    if (row.kind === 'user') setUsers(prev => prev.some(u => u.phone === rec.phone || u.id === rec.id) ? prev : [rec, ...prev]);
+    if (row.kind === 'zone') setZones(prev => prev.some(z => z.id === rec.id) ? prev : [rec, ...prev]);
+    if (row.kind === 'vehicle') setVehicles(prev => prev.some(v => v.plateNumber === rec.plateNumber) ? prev : [rec, ...prev]);
+    if (row.kind === 'banner') setBanners(prev => prev.some(b => b.id === rec.id) ? prev : [rec, ...prev]);
+    setDeletedRecords(prev => prev.map((x: any) => x.vaultId === vaultId ? { ...x, status: 'Restored', restoredAt: new Date().toISOString() } : x));
+    securityAudit('record-restored', { actor: 'super-admin', role: 'super-admin', reason: 'restored from recovery vault', newValue: { kind: row.kind, recordId: row.recordId } });
+    showToast(`${row.label} restored from Recovery Vault.`, 'success');
+  };
+
+  const permanentDeleteVaultRecord = (vaultId: string, confirmText: string) => {
+    const row = deletedRecords.find((x: any) => x.vaultId === vaultId);
+    if (!row) return;
+    if (confirmText.trim() !== 'PERMANENT DELETE') {
+      showToast('Permanent delete korte PERMANENT DELETE likhte hobe.', 'info');
+      return;
+    }
+    setDeletedRecords(prev => prev.filter((x: any) => x.vaultId !== vaultId));
+    securityAudit('record-permanently-deleted', { actor: 'super-admin', role: 'super-admin', reason: 'manual permanent delete from recovery vault', newValue: { kind: row.kind, recordId: row.recordId, label: row.label } });
+    showToast(`${row.label} permanently deleted from Recovery Vault.`, 'info');
+  };
+
   const handleDeleteDriver = (id: string) => {
+    const driver = drivers.find(d => d.id === id);
+    if (driver) archiveRecord('driver', driver, `Driver ${driver.name || id}`);
     setDrivers(drivers.filter(d => d.id !== id));
-    showToast(`Driver ${id} deleted from fleet.`);
+    showToast(`Driver ${id} moved to Recovery Vault.`);
   };
 
   // Zones
@@ -1204,8 +1343,10 @@ export default function App() {
   };
 
   const handleDeleteZone = (id: string) => {
+    const zone = zones.find(z => z.id === id);
+    if (zone) archiveRecord('zone', zone, `Zone ${zone.name || id}`);
     setZones(zones.filter(z => z.id !== id));
-    showToast(`Zone ${id} deactivated.`);
+    showToast(`Zone ${id} moved to Recovery Vault.`);
   };
 
   // Users
@@ -1220,8 +1361,10 @@ export default function App() {
   };
 
   const handleDeleteUser = (phone: string) => {
-    setUsers(users.filter(u => u.phone !== phone));
-    showToast("User account terminated.");
+    const user = users.find(u => u.phone === phone || u.id === phone);
+    if (user) archiveRecord('user', user, `User ${user.name || phone}`);
+    setUsers(users.filter(u => u.phone !== phone && u.id !== phone));
+    showToast("User account moved to Recovery Vault.");
   };
 
   // Vehicles
@@ -1231,8 +1374,10 @@ export default function App() {
   };
 
   const handleDeleteVehicle = (plateNo: string) => {
+    const vehicle = vehicles.find(v => v.plateNumber === plateNo);
+    if (vehicle) archiveRecord('vehicle', vehicle, `Vehicle ${vehicle.plateNumber || plateNo}`);
     setVehicles(vehicles.filter(v => v.plateNumber !== plateNo));
-    showToast("Vehicle unlinked.");
+    showToast("Vehicle moved to Recovery Vault.");
   };
 
   // Banners
@@ -1247,8 +1392,10 @@ export default function App() {
   };
 
   const handleDeleteBanner = (id: string) => {
+    const banner = banners.find(b => b.id === id);
+    if (banner) archiveRecord('banner', banner, `Banner ${banner.title || id}`);
     setBanners(banners.filter(b => b.id !== id));
-    showToast("Banner removed.");
+    showToast("Banner moved to Recovery Vault.");
   };
 
   // Notifications
@@ -2111,11 +2258,13 @@ export default function App() {
       { section: 'Finance & System', name: 'Payments', icon: CreditCard },
       { name: 'MFS Business & Settlement', icon: Wallet },
       { name: 'POS System', icon: ShoppingCart },
+      { name: 'Bangladesh POS', icon: ShoppingCart },
       { name: 'Support Tickets', icon: LifeBuoy, badgeCount: supportTickets.filter(t => t.status === 'Open').length },
       { name: 'Notifications', icon: Bell, badgeCount: unreadNotifCount },
       { name: 'Reports & Analytics', icon: BarChart3 },
       { name: 'Security Control', icon: ShieldCheck },
       { name: 'System Health', icon: Database },
+      { name: 'Recovery Vault', icon: Trash2, badgeCount: deletedRecords.filter((row: any) => row.status !== 'Restored').length },
       { name: 'Settings', icon: Settings },
     ];
 
@@ -2127,7 +2276,7 @@ export default function App() {
           'Dashboard', 'Mobile App Simulator', 'Users Management', 'Drivers Management', 'Orders Management', 
           'Earnings & Payouts', 'Zones & Areas', 'Vehicles Management', 'Promotions & Banners', 'KPI Dashboard',
           'Order Tools Dashboard',
-          'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Settings'
+          'Payments', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Recovery Vault', 'Settings'
         ].includes(item.name)
       ).map((item) => {
         if (item.name === 'Dashboard') {
@@ -2143,7 +2292,7 @@ export default function App() {
         [
           'Store Dashboard', 'Products', 'Categories', 'Inventory', 
           'Stores & Merchants', 'Staff Management', 'Reviews', 'Coupons', 'Customer Storefront', 'Live Store Sync',
-          'Payments', 'MFS Business & Settlement', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Settings'
+          'Payments', 'MFS Business & Settlement', 'POS System', 'Bangladesh POS', 'Support Tickets', 'Notifications', 'Reports & Analytics', 'System Health', 'Recovery Vault', 'Settings'
         ].includes(item.name)
       ).map((item) => {
         if (item.name === 'Store Dashboard') {
@@ -2167,6 +2316,7 @@ export default function App() {
     products.length,
     categories.length,
     stores.length,
+    deletedRecords,
     supportTickets,
     unreadNotifCount
   ]);
@@ -6644,7 +6794,7 @@ export default function App() {
       
       {/* SIDEBAR - Left panel */}
       {/* Desktop static Sidebar */}
-      {activeTab !== 'POS System' && (
+      {activeTab !== 'POS System' && activeTab !== 'Bangladesh POS' && (
       <aside className="hidden lg:flex flex-col w-64 bg-[#0c1624] border-r border-brand-border/60 shrink-0 select-none">
         
         {/* Workspace Switcher Header for 3 Separate Dashboards */}
@@ -6975,7 +7125,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
         
         {/* HEADER BAR */}
-        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && (
+        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && activeTab !== 'Bangladesh POS' && (
         <header className="min-h-16 border-b border-brand-border/60 bg-[#0c1624]/65 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-5 select-none shrink-0 sticky top-0 z-40">
           <div className="flex items-center space-x-3">
             <button
@@ -7099,7 +7249,7 @@ export default function App() {
         )}
 
         {/* CORE CONTENT SWITCH CONTAINER */}
-        <main className={`flex-1 overflow-x-hidden overflow-y-auto ${activeTab === 'Mobile App Simulator' || activeTab === 'POS System' ? 'p-0' : 'p-3 sm:p-4 md:p-6'}`}>
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto ${activeTab === 'Mobile App Simulator' || activeTab === 'POS System' || activeTab === 'Bangladesh POS' ? 'p-0' : 'p-3 sm:p-4 md:p-6'}`}>
           <PanelErrorBoundary activeTab={activeTab}>
           {activeTab === 'Dashboard' && activePanelMode === 'super_admin' && (
             <DashboardView 
@@ -7199,6 +7349,89 @@ export default function App() {
             <SystemHealthLog />
           )}
 
+          {activeTab === 'Recovery Vault' && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-brand-border bg-brand-card p-4 shadow-sm">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-white">Super Admin Recovery Vault</h3>
+                    <p className="mt-1 text-[11px] font-semibold text-gray-400">Delete korle data ekhane recoverable thakbe. Permanent delete korte exact confirmation lagbe.</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl border border-brand-border bg-brand-dark/50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase text-gray-500">Recoverable</p>
+                      <p className="text-lg font-black text-amber-300">{deletedRecords.filter((r: any) => r.status !== 'Restored').length}</p>
+                    </div>
+                    <div className="rounded-xl border border-brand-border bg-brand-dark/50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase text-gray-500">Restored</p>
+                      <p className="text-lg font-black text-emerald-300">{deletedRecords.filter((r: any) => r.status === 'Restored').length}</p>
+                    </div>
+                    <div className="rounded-xl border border-brand-border bg-brand-dark/50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase text-gray-500">Total</p>
+                      <p className="text-lg font-black text-white">{deletedRecords.length}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-brand-border bg-brand-card shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[820px] text-left text-xs">
+                    <thead className="bg-brand-dark/70 text-[10px] uppercase text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3">Type</th>
+                        <th className="px-4 py-3">Record</th>
+                        <th className="px-4 py-3">Deleted At</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Permanent Delete Guard</th>
+                        <th className="px-4 py-3 text-right">Control</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brand-border/40">
+                      {deletedRecords.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-[11px] font-bold text-gray-500">Recovery Vault empty. Kono deleted record nei.</td></tr>
+                      )}
+                      {deletedRecords.map((row: any) => {
+                        const restored = row.status === 'Restored';
+                        return (
+                          <tr key={row.vaultId} className={restored ? 'opacity-60' : ''}>
+                            <td className="px-4 py-3">
+                              <span className="rounded-full border border-brand-orange/30 bg-brand-orange/10 px-2 py-1 text-[9px] font-black uppercase text-brand-orange">{row.kind}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="font-black text-white">{row.label || row.recordId}</p>
+                              <p className="mt-0.5 font-mono text-[9px] text-gray-500">{row.recordId}</p>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-[10px] text-gray-400">{row.deletedAt ? new Date(row.deletedAt).toLocaleString() : 'N/A'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase ${restored ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{row.status || 'Recoverable'}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                value={permanentDeleteConfirm[row.vaultId] || ''}
+                                onChange={(e) => setPermanentDeleteConfirm(prev => ({ ...prev, [row.vaultId]: e.target.value }))}
+                                placeholder="Type PERMANENT DELETE"
+                                className="w-full rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-[10px] font-bold text-white outline-none focus:border-red-500"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex justify-end gap-2">
+                                {!restored && (
+                                  <button onClick={() => restoreDeletedRecord(row.vaultId)} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300 hover:bg-emerald-500/20">Restore</button>
+                                )}
+                                <button onClick={() => permanentDeleteVaultRecord(row.vaultId, permanentDeleteConfirm[row.vaultId] || '')} className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase text-red-300 hover:bg-red-500/20">Permanent Delete</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'Dashboard' && activePanelMode === 'delivery' && (
             <DeliveryDashboardView 
               orders={orders}
@@ -7289,6 +7522,10 @@ export default function App() {
 
           {activeTab === 'POS System' && (
             <PosSystem products={products} orders={orders} onProductsChange={setProducts} onCreateOrder={handleSilentAddOrder} onUpdateOrder={handleUpdateOrder} onSendToDriver={setDriverDispatchOrder} onDeleteOrder={handleDeleteOrder} onNavigate={setActiveTab} onSaleRecorded={handlePosSaleRecorded} />
+          )}
+
+          {activeTab === 'Bangladesh POS' && (
+            <BangladeshPosSystem products={products} orders={orders} onProductsChange={setProducts} onCreateOrder={handleSilentAddOrder} onSaleRecorded={handlePosSaleRecorded} />
           )}
 
           {activeTab === 'Vehicles Management' && (
@@ -7384,7 +7621,7 @@ export default function App() {
           )}
 
           {/* Render high-fidelity dynamic panel for other active tabs */}
-          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator', 'System Health'].includes(activeTab) && (
+          {!['Dashboard', 'Store Dashboard', 'Orders Management', 'Orders', 'Users Management', 'Customers', 'Drivers Management', 'Suppliers', 'Zones & Areas', 'Delivery Management', 'Settings', 'Support Tickets', 'Stores & Merchants', 'Customer Storefront', 'Payments', 'MFS Business & Settlement', 'POS System', 'Bangladesh POS', 'Earnings & Payouts', 'Vehicles Management', 'Mobile App Simulator', 'System Health', 'Recovery Vault'].includes(activeTab) && (
             renderGenericView(activeTab)
           )}
           </PanelErrorBoundary>
@@ -7532,7 +7769,7 @@ export default function App() {
         )}
 
         {/* APP FOOTER LINE */}
-        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && (
+        {activeTab !== 'Mobile App Simulator' && activeTab !== 'POS System' && activeTab !== 'Bangladesh POS' && (
         <footer className="py-4 border-t border-brand-border/40 text-center text-[10px] text-gray-500 select-none bg-[#0c1624]/20">
           <p>© 2026 The NexaGo BD. All rights reserved. Version 1.0.0 &nbsp;|&nbsp; Support: <span className="text-brand-orange">thenexagobd@gmail.com</span></p>
         </footer>

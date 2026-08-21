@@ -611,29 +611,29 @@ export default function PosSystem({ products, orders = [], onProductsChange, onC
   ] as const;
 
   return (
-    <div ref={posRootRef} className={`classic-pos ${darkMode ? 'pos-dark' : ''} min-w-[1050px] min-h-[720px] bg-[#d8e1e8] text-[#142333] border border-[#617b90] shadow-2xl overflow-hidden`}>
-      <div className="pos-layout grid grid-cols-[minmax(0,1fr)_118px_330px] min-h-[720px]">
-        <section className="pos-left flex flex-col border-r border-[#6b879b]">
-          <div className="pos-top grid grid-cols-5 h-14 bg-[#1d5c91] border-b border-[#547c9b]">
+    <div ref={posRootRef} className={`classic-pos ${darkMode ? 'pos-dark' : ''} w-full min-h-dvh bg-[#d8e1e8] text-[#142333] border border-[#617b90] shadow-2xl overflow-auto`}>
+      <div className="pos-layout grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_118px_330px] min-h-dvh min-w-0">
+        <section className="pos-left flex flex-col border-r border-[#6b879b] min-w-0">
+          <div className="pos-top grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 min-h-14 bg-[#1d5c91] border-b border-[#547c9b]">
             {topKeys.map(([label, action], index) => (
               <button key={label} onClick={action} className={`pos-top-key border-r border-white/40 text-white text-sm font-bold hover:bg-[#174a76] ${index === 0 && mode === 'SALES' || index === 1 && mode === 'RETURN' ? 'pos-top-key-active bg-[#123f66]' : 'bg-[#246ca5]'}`}>{label}</button>
             ))}
           </div>
 
-          <div className="pos-bill-info h-10 px-3 bg-[#456f90] text-white grid grid-cols-4 items-center text-xs font-semibold">
+          <div className="pos-bill-info min-h-10 px-3 py-2 bg-[#456f90] text-white grid grid-cols-2 md:grid-cols-4 gap-1 items-center text-xs font-semibold">
             <span>Bill No: <b>{billNo}</b></span>
             <span>POS</span>
             <span>C.No: {sales.length + 1}</span>
             <span>{new Date().toLocaleDateString()} - {mode}</span>
           </div>
 
-          <div className="pos-customer-info h-12 px-3 bg-[#587f9b] text-white grid grid-cols-3 items-center text-xs">
+          <div className="pos-customer-info min-h-12 px-3 py-2 bg-[#587f9b] text-white grid grid-cols-1 sm:grid-cols-3 gap-1 items-center text-xs">
             <span>Customer: <b>{customer}</b></span>
             <span>Salesman: <b>{salesman}</b></span>
             <span>Balance: <b>{formatMoney(mode === 'RETURN' ? signedNet : Math.max(0, netTotal - Number(received || 0)))}</b></span>
           </div>
 
-          <div className="pos-table-wrap flex-1 bg-[#eef2f4] overflow-auto">
+          <div className="pos-table-wrap flex-1 min-h-[260px] max-h-[46dvh] xl:max-h-none bg-[#eef2f4] overflow-auto">
             <table className="pos-table w-full text-[11px] border-collapse">
               <thead className="sticky top-0 bg-[#718da2] text-white">
                 <tr>{['Sl', 'Barcode', 'Particulars', 'UOM', 'Qty', 'FOC', 'Rate', 'Dsc%', 'Discount', 'Tax', 'Total'].map(label => <th key={label} className="border border-[#9fb1bf] px-1.5 py-2 text-left font-semibold">{label}</th>)}</tr>
@@ -664,7 +664,7 @@ export default function PosSystem({ products, orders = [], onProductsChange, onC
             </table>
           </div>
 
-          <div className="pos-status h-9 bg-[#5b839a] px-3 flex items-center justify-between text-xs text-white">
+          <div className="pos-status min-h-9 bg-[#5b839a] px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-white">
             <span>Sales: {formatMoney(itemSubtotal)}</span>
             <span>Returns: {mode === 'RETURN' ? formatMoney(netTotal) : formatMoney(0)}</span>
             <span>{toast}</span>
@@ -678,7 +678,7 @@ export default function PosSystem({ products, orders = [], onProductsChange, onC
             </div>
           </div>
 
-          <div className="pos-bottom grid grid-cols-[320px_1fr] min-h-[195px] bg-[#426d87]">
+          <div className="pos-bottom grid grid-cols-1 lg:grid-cols-[320px_1fr] min-h-[195px] bg-[#426d87]">
             <div className="grid grid-cols-4 gap-1.5 p-2 border-r border-white/20">
               {['1','2','3','HOME','4','5','6','END','7','8','9','.','0','00','CLEAR','ENTER'].map(key => (
                 <button key={key} onClick={() => keypad(key)} className={`pos-key ${key === 'ENTER' ? 'pos-key-enter bg-[#2f8b55]' : key === 'CLEAR' ? 'pos-key-clear bg-[#9b2f32]' : 'bg-[#667d8e]'} border border-white/25 text-white text-xs font-bold hover:brightness-110`}>{key}</button>
@@ -697,11 +697,11 @@ export default function PosSystem({ products, orders = [], onProductsChange, onC
           </div>
         </section>
 
-        <aside className="pos-side grid grid-rows-[repeat(15,minmax(0,1fr))] bg-[#2d789d] border-r border-[#607f91]">
+        <aside className="pos-side grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-1 xl:grid-rows-[repeat(15,minmax(0,1fr))] bg-[#2d789d] border-r border-[#607f91]">
           {sideKeys.map(([label, action]) => <button key={label} onClick={action} className="border-b border-white/35 px-1 text-[11px] leading-tight font-bold text-white hover:bg-[#175d83]">{label}</button>)}
         </aside>
 
-        <aside className="pos-right flex flex-col bg-[#d9e1e6]">
+        <aside className="pos-right flex flex-col bg-[#d9e1e6] min-w-0">
           <div className="pos-right-header h-14 bg-[#244a62] text-white px-2 flex items-center justify-between gap-2 text-xs">
             <span className="whitespace-nowrap">Logged User: 1</span>
             <div className="flex items-center gap-1">
@@ -720,7 +720,7 @@ export default function PosSystem({ products, orders = [], onProductsChange, onC
           <div className="pos-categories flex gap-1 p-1 bg-[#b8c7d1] overflow-x-auto">
             {categories.slice(0, 5).map(item => <button key={item} onClick={() => setCategory(item)} className={`pos-category px-2 py-1 text-[9px] font-bold whitespace-nowrap ${category === item ? 'pos-category-active bg-[#226e9f] text-white' : 'bg-white text-[#415766]'}`}>{item}</button>)}
           </div>
-          <div className="pos-products grid grid-cols-3 gap-1.5 p-2 h-[310px] overflow-y-auto content-start">
+          <div className="pos-products grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-3 gap-1.5 p-2 h-auto xl:h-[310px] max-h-[42dvh] xl:max-h-none overflow-y-auto content-start">
             {visibleProducts.map(product => (
               <button key={product.id} onClick={() => addProduct(product)} className="pos-product min-h-[88px] bg-[#edf1f3] border border-[#a7b8c4] hover:border-[#2876a4] p-1.5 text-center flex flex-col items-center justify-center">
                 <div className="pos-product-icon w-8 h-8 mb-1 bg-[#ccd6dc] border border-[#aab8c1] flex items-center justify-center text-[#607684]"><Package className="w-4 h-4" /></div>

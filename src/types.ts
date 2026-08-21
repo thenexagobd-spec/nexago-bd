@@ -28,6 +28,7 @@ export interface Order {
   paymentMethod: string;
   pickupCoords?: { lat: number; lng: number };
   deliveryCoords?: { lat: number; lng: number };
+  deliveryLocationMeta?: { accuracy?: number; capturedAt?: string; source?: 'browser-gps' | 'map-pin'; area?: string };
   priority?: 'Normal' | 'Express' | 'Urgent';
   pickupLocation?: string;
   // Store/Driver delivery flow fields (mirror the simulator's live order lifecycle)
