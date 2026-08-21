@@ -22,10 +22,11 @@ interface PortalShellProps {
   active: string;
   onNav: (id: string) => void;
   onBack: () => void;
+  contentClassName?: string;
   children: React.ReactNode;
 }
 
-export default function PortalShell({ role, tagline, nav, active, onNav, onBack, children }: PortalShellProps) {
+export default function PortalShell({ role, tagline, nav, active, onNav, onBack, contentClassName = 'max-w-5xl', children }: PortalShellProps) {
   const [clock, setClock] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -41,7 +42,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-orange to-orange-600 flex items-center justify-center font-black text-white text-sm shadow-lg">N</div>
             <div className="min-w-0">
               <p className="truncate font-black tracking-widest leading-none text-sm">NEXAGO</p>
-              <p className="mt-0.5 truncate text-[8px] text-gray-400 uppercase tracking-widest">Smart Delivery Network</p>
+              <p className="mt-0.5 truncate text-[8px] text-gray-400 uppercase tracking-widest">{tagline || 'Smart Delivery Network'}</p>
             </div>
           </div>
 
@@ -99,7 +100,7 @@ export default function PortalShell({ role, tagline, nav, active, onNav, onBack,
 
         {/* Content */}
         <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto p-3 pb-20 sm:p-4 md:py-6 md:pr-6 md:pl-24">
-          <div className="mx-auto max-w-5xl space-y-5 fade-in">{children}</div>
+          <div className={`mx-auto w-full space-y-5 fade-in ${contentClassName}`}>{children}</div>
         </main>
       </div>
 

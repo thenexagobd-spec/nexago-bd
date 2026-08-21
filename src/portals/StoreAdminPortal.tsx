@@ -679,33 +679,52 @@ export default function StoreAdminPortal() {
     );
   }
 
+  const storeAdminAccessUrl = `${window.location.origin}/store-admin?key=${activeStoreId}${activeBranchId ? `&branch=${activeBranchId}` : ''}`;
+
   return (
-    <PortalShell role="Store Admin" tagline="Store Operations" nav={nav} active={tab} onNav={setTab} onBack={goBack}>
+    <PortalShell role="Store Admin" tagline="Real Store Admin Account" nav={nav} active={tab} onNav={setTab} onBack={goBack} contentClassName="max-w-7xl">
       {tab === 'dashboard' && (
         <div className="space-y-5">
-          <div className="rounded-2xl p-5 bg-gradient-to-r from-teal-500/15 via-[#101d30] to-[#101d30] border border-teal-500/20 flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center font-black text-white text-xl">SA</div>
-              <div>
-                <p className="text-[9px] text-gray-400 uppercase tracking-widest">Store Admin Console</p>
-                <p className="text-lg font-black text-white">{activeStoreName}</p>
-                <p className="text-[10px] text-gray-400">Store ID {activeStoreId} · Branch {activeBranchId || 'All'} · {staff.length} staff online</p>
+          <div className="rounded-2xl border border-brand-border/60 bg-[#0c1624]/70 p-4 shadow-xl">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-orange to-orange-700 text-xl font-black text-white shadow-lg">SA</div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.28em] text-brand-orange">NexaGo Store Admin</p>
+                  <h1 className="mt-1 truncate text-xl font-black text-white">Real Store Admin Account</h1>
+                  <p className="mt-1 truncate text-[10px] text-gray-400">{activeStoreName} · Store ID {activeStoreId} · Branch {activeBranchId || 'All'}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { label: 'Store Site', url: `${window.location.origin}/store?key=${activeStoreId}` },
+                  { label: 'Store Admin', url: storeAdminAccessUrl },
+                  { label: 'Branch Admin', url: `${window.location.origin}/store-admin?key=${activeStoreId}&branch=${activeBranchId}` },
+                ].map(link => (
+                  <button key={link.label} onClick={() => navigator.clipboard.writeText(link.url)} className="flex items-center gap-1.5 rounded-xl border border-[#1e3050] bg-[#101d30] px-3 py-2 text-[9px] font-black uppercase text-gray-300 hover:border-brand-orange/50 hover:text-white">
+                    <Copy className="h-3 w-3 text-brand-orange" /> {link.label}
+                  </button>
+                ))}
+                <button onClick={() => setTab('tools')} className="flex items-center gap-2 rounded-xl bg-brand-orange px-4 py-2 text-[10px] font-black uppercase text-white">
+                  <Wrench className="h-3.5 w-3.5" /><span>Order Tools {pending.length > 0 && `(${pending.length})`}</span>
+                </button>
+                <button onClick={logout} className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[9px] font-black uppercase text-red-300">Logout</button>
               </div>
             </div>
-            <button onClick={() => setTab('tools')} className="flex items-center space-x-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors">
-              <Wrench className="w-3.5 h-3.5" /><span>Review Top-Ups {pending.length > 0 && `(${pending.length})`}</span>
-            </button>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { label: 'Store Site', url: `${window.location.origin}/store?key=${activeStoreId}` },
-                { label: 'Store Admin', url: `${window.location.origin}/store-admin?key=${activeStoreId}` },
-                { label: 'Branch Admin', url: `${window.location.origin}/store-admin?key=${activeStoreId}&branch=${activeBranchId}` },
-              ].map(link => (
-                <button key={link.label} onClick={() => navigator.clipboard.writeText(link.url)} className="flex items-center gap-1.5 rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-[9px] font-black uppercase text-gray-300">
-                  <Copy className="h-3 w-3" /> {link.label}
-                </button>
-              ))}
-              <button onClick={logout} className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[9px] font-black uppercase text-red-300">Logout</button>
+            <div className="mt-4 flex flex-col gap-3 rounded-xl border border-brand-border/60 bg-[#08111f]/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 text-xs">
+                <span className="font-medium text-gray-400">Store Admin Dashboard Access Link:</span>
+                <span className="ml-0 mt-2 block select-all truncate rounded border border-brand-border/40 bg-brand-dark/60 px-2.5 py-1 font-mono font-bold text-brand-orange sm:ml-2 sm:mt-0 sm:inline-block">
+                  {storeAdminAccessUrl}
+                </span>
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText(storeAdminAccessUrl)}
+                className="flex items-center justify-center gap-1 rounded-lg border border-brand-orange/35 bg-brand-orange/10 px-3 py-1.5 text-xs font-bold text-brand-orange hover:bg-brand-orange/20"
+              >
+                <Copy className="h-3 w-3" />
+                <span>Copy Link</span>
+              </button>
             </div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
