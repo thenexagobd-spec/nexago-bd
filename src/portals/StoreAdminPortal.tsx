@@ -10,7 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, UserSquare2, CreditCard, LifeBuoy, CheckCircle2, TrendingUp, UserPlus, Phone, Box, Ticket, Package, Plus, Search, Bell, Clock, FileText, Lock, LogIn, ShieldCheck, Store, Copy, FolderOpen, Star, Trash2, Send, Paperclip, History, ShoppingCart } from 'lucide-react';
 import PortalShell from './PortalShell';
 import PosSystem from '../components/PosSystem';
-import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsGet, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, persistOrderToCloud } from './portalUtils';
+import { useOrders, usePayments, useTickets, useWalletBal, useWalletTxns, useProducts, useCategories, useCoupons, useReviews, useNotifications, useDrivers, useStores, useBranches, useStoreAdminApps, useStoreAdminCreds, bdt, statusBadge, appendTimeline, makeNotif, useCloudSync, lsGet, lsSet, secureFileUpload, securityApi, securityAudit, identityCheck, identityClaim, persistOrderToCloud, platformLogin, platformOtpSend, platformOtpLogin } from './portalUtils';
 import { newOfferRound } from '../utils/autoAssign';
 
 interface Staff {
@@ -58,6 +58,11 @@ export default function StoreAdminPortal() {
   const [sessionAdminId, setSessionAdminId] = useState(() => localStorage.getItem('sd_store_admin_session') || '');
   const [loginId, setLoginId] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [loginMode, setLoginMode] = useState<'password' | 'otp'>('password');
+  const [loginOtpCode, setLoginOtpCode] = useState('');
+  const [loginOtpSent, setLoginOtpSent] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const [trackId, setTrackId] = useState('');
   const [signup, setSignup] = useState({ ownerName: '', phone: '', email: '', storeName: '', storeAddress: '', businessType: 'Grocery / Super Shop', tradeLicenseNo: '', tinBin: '', settlementNumber: '', password: '', confirmPassword: '' });
   const [emailVerified, setEmailVerified] = useState(false);
@@ -310,27 +315,77 @@ export default function StoreAdminPortal() {
     setSignupReview(false);
   };
 
-  const login = () => {
+  const finishStoreAdminLogin = (id: string, token?: string) => {
+    if (token) localStorage.setItem('sd_security_session', token);
+    localStorage.setItem('sd_store_admin_session', id);
+    setSessionAdminId(id);
+    setTab('dashboard');
+    setAuthView('login');
+    setLoginError('');
+  };
+
+  const login = async () => {
     const id = loginId.trim();
+    if (!id) { setLoginError('Store Admin ID / Email দিন।'); return; }
+    setLoginBusy(true);
+    setLoginError('');
+    const secure = await platformLogin({ userId: id, password: loginPassword });
+    if (secure?.token && secure.user && ['store-admin', 'branch-admin', 'super-admin'].includes(String(secure.user.role || ''))) {
+      finishStoreAdminLogin(secure.user.userId || id, secure.token);
+      setLoginBusy(false);
+      return;
+    }
     const cred = storeAdminCreds[id];
     const app = storeAdminApps.find((a: any) => a.adminId === id && a.status === 'Verified');
     const branch = branches.find((b: any) => b.branchAdminId === id && b.branchPassword === loginPassword && b.status === 'Active');
     const loginStore = stores.find((s: any) => s.id === (app?.storeId || branch?.storeId));
-    if (['Suspended', 'Blacklisted'].includes(loginStore?.status || '') || ['suspend', 'blacklist'].includes(loginStore?.adminRiskStatus || '')) return;
+    if (['Suspended', 'Blacklisted'].includes(loginStore?.status || '') || ['suspend', 'blacklist'].includes(loginStore?.adminRiskStatus || '')) {
+      setLoginError('এই Store Admin account blocked/suspended.');
+      setLoginBusy(false);
+      return;
+    }
     const ownerPassword = (app && app.password) || (cred && cred.password);
-    if ((!ownerPassword || ownerPassword !== loginPassword) && !branch) return;
-    securityApi('/login', { userId: id, password: loginPassword }).then((data) => {
-      if (data.token) localStorage.setItem('sd_security_session', data.token);
-    }).catch(() => {});
-    localStorage.setItem('sd_store_admin_session', id);
-    setSessionAdminId(id);
-    setTab('dashboard');
+    if ((!ownerPassword || ownerPassword !== loginPassword) && !branch) {
+      setLoginError('Invalid Store Admin ID/email or password.');
+      setLoginBusy(false);
+      return;
+    }
+    finishStoreAdminLogin(id);
+    setLoginBusy(false);
+  };
+
+  const sendLoginOtp = async () => {
+    const email = loginId.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginError('OTP login-এর জন্য approved email দিন।'); return; }
+    setLoginBusy(true);
+    setLoginError('');
+    const ok = await platformOtpSend(email);
+    setLoginBusy(false);
+    if (!ok) { setLoginError('OTP পাঠানো যায়নি। Super Admin-created login হলে OTP চলবে, না হলে password login ব্যবহার করুন।'); return; }
+    setLoginOtpSent(true);
+  };
+
+  const loginWithOtp = async () => {
+    const email = loginId.trim().toLowerCase();
+    if (!loginOtpCode.trim()) { setLoginError('Gmail OTP code দিন।'); return; }
+    setLoginBusy(true);
+    setLoginError('');
+    const secure = await platformOtpLogin({ email, code: loginOtpCode });
+    setLoginBusy(false);
+    if (!secure?.token || !secure.user || !['store-admin', 'branch-admin', 'super-admin'].includes(String(secure.user.role || ''))) {
+      setLoginError('OTP login failed. Code/account check করুন।');
+      return;
+    }
+    finishStoreAdminLogin(secure.user.userId || email, secure.token);
   };
 
   const logout = () => {
     localStorage.removeItem('sd_store_admin_session');
+    localStorage.removeItem('sd_security_session');
     setSessionAdminId('');
     setLoginPassword('');
+    setLoginOtpCode('');
+    setLoginOtpSent(false);
     setAuthView('login');
   };
 
@@ -572,9 +627,24 @@ export default function StoreAdminPortal() {
               <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">
                 <h2 className="flex items-center gap-2 text-sm font-black text-white"><LogIn className="h-4 w-4 text-brand-orange" /> Login</h2>
                 <div className="mt-4 space-y-3">
-                  <input value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="Permanent Store Admin ID (SA-...)" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
-                  <input value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Password from approval tracking page" type="password" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
-                  <button onClick={login} className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-2.5 text-[10px] font-black uppercase text-white"><Lock className="h-3.5 w-3.5" /> Login to Store Admin</button>
+                  <div className="grid grid-cols-2 gap-1 rounded-xl border border-[#1e3050] bg-[#0a1322] p-1">
+                    <button onClick={() => { setLoginMode('password'); setLoginError(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${loginMode === 'password' ? 'bg-brand-orange text-white' : 'text-gray-400'}`}>Password</button>
+                    <button onClick={() => { setLoginMode('otp'); setLoginError(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${loginMode === 'otp' ? 'bg-brand-orange text-white' : 'text-gray-400'}`}>Gmail OTP</button>
+                  </div>
+                  <input value={loginId} onChange={e => { setLoginId(e.target.value); setLoginError(''); }} placeholder={loginMode === 'otp' ? 'Approved email address' : 'Permanent Store Admin ID / Email (SA-...)'} className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+                  {loginMode === 'password' ? (
+                    <>
+                      <input value={loginPassword} onChange={e => { setLoginPassword(e.target.value); setLoginError(''); }} placeholder="Password from approval tracking page" type="password" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
+                      <button onClick={login} disabled={loginBusy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-2.5 text-[10px] font-black uppercase text-white disabled:opacity-60"><Lock className="h-3.5 w-3.5" /> {loginBusy ? 'Checking...' : 'Login to Store Admin'}</button>
+                    </>
+                  ) : (
+                    <>
+                      {loginOtpSent && <input value={loginOtpCode} onChange={e => { setLoginOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setLoginError(''); }} placeholder="6-digit OTP" inputMode="numeric" className="w-full rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />}
+                      <button onClick={loginOtpSent ? loginWithOtp : sendLoginOtp} disabled={loginBusy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-2.5 text-[10px] font-black uppercase text-white disabled:opacity-60"><ShieldCheck className="h-3.5 w-3.5" /> {loginBusy ? 'Please wait...' : loginOtpSent ? 'Verify OTP & Login' : 'Send Login OTP'}</button>
+                      {loginOtpSent && <button onClick={sendLoginOtp} disabled={loginBusy} className="w-full rounded-xl border border-[#1e3050] px-4 py-2 text-[10px] font-black uppercase text-gray-300 disabled:opacity-60">Resend OTP</button>}
+                    </>
+                  )}
+                  {loginError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">{loginError}</p>}
                 </div>
               </div>
               <div className="rounded-2xl border border-[#1e3050] bg-[#101d30] p-4">

@@ -20,7 +20,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import PortalShell from './PortalShell';
 import PosSystem from '../components/PosSystem';
-import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, useProducts, usePayments, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds, persistOrderToCloud } from './portalUtils';
+import { useOrders, useDrivers, useStoreProfile, useNotifications, useStores, useProducts, usePayments, bdt, statusBadge, lsGet, lsSet, appendTimeline, makeNotif, verifyHandoff, handoffCodeOf, useCloudSync, useStoreAdminApps, useStoreAdminCreds, persistOrderToCloud, platformLogin, platformOtpSend, platformOtpLogin } from './portalUtils';
 import { newOfferRound } from '../utils/autoAssign';
 
 export default function StorePortal() {
@@ -45,6 +45,10 @@ export default function StorePortal() {
   const [storeAuthed, setStoreAuthed] = useState<boolean>(() => lsGet('sd_store_site_session', '') !== '');
   const [authId, setAuthId] = useState('');
   const [authPass, setAuthPass] = useState('');
+  const [authMode, setAuthMode] = useState<'password' | 'otp'>('password');
+  const [authOtpSent, setAuthOtpSent] = useState(false);
+  const [authOtpCode, setAuthOtpCode] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
 
   useEffect(() => {
     const onStorage = () => setReturns(lsGet('sd_returns', []));
@@ -75,9 +79,29 @@ export default function StorePortal() {
   const [storeAdminApps] = useStoreAdminApps();
   const [storeAdminCreds] = useStoreAdminCreds();
   const [authMsg, setAuthMsg] = useState('');
-  const handleStoreAuth = (e: React.FormEvent) => {
+  const finishStoreAuth = (id: string, token?: string) => {
+    if (token) localStorage.setItem('sd_security_session', token);
+    lsSet('sd_store_site_session', id);
+    setStoreAuthed(true);
+    setAuthId('');
+    setAuthPass('');
+    setAuthOtpCode('');
+    setAuthOtpSent(false);
+    setAuthMsg('');
+  };
+
+  const handleStoreAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = authId.trim();
+    if (!id) { setAuthMsg('Store Admin ID / Email দিন।'); return; }
+    setAuthBusy(true);
+    setAuthMsg('');
+    const secure = await platformLogin({ userId: id, password: authPass });
+    if (secure?.token && secure.user && ['store-admin', 'branch-admin', 'super-admin'].includes(String(secure.user.role || ''))) {
+      finishStoreAuth(secure.user.userId || id, secure.token);
+      setAuthBusy(false);
+      return;
+    }
     const foundApp = (storeAdminApps as any[]).find((a: any) =>
       (a.id === id || a.adminId === id || (a.email || '').toLowerCase() === id.toLowerCase() || (a.phone || '') === id) &&
       a.status === 'Verified'
@@ -87,20 +111,43 @@ export default function StorePortal() {
     const storedPass = credRecord?.password || foundApp?.password || (foundApp as any)?.branchAdminPassword || '';
     if (!foundApp || !storedPass) {
       setAuthMsg('Store admin account not found or not verified yet.');
+      setAuthBusy(false);
       return;
     }
     if (storedPass !== authPass) {
       setAuthMsg('Incorrect password — try again.');
+      setAuthBusy(false);
       return;
     }
-    lsSet('sd_store_site_session', id);
-    setStoreAuthed(true);
-    setAuthId('');
-    setAuthPass('');
+    finishStoreAuth(id);
+    setAuthBusy(false);
+  };
+  const sendStoreOtp = async () => {
+    const email = authId.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setAuthMsg('OTP login-এর জন্য approved email দিন।'); return; }
+    setAuthBusy(true);
     setAuthMsg('');
+    const ok = await platformOtpSend(email);
+    setAuthBusy(false);
+    if (!ok) { setAuthMsg('OTP পাঠানো যায়নি। Password login ব্যবহার করুন বা Super Admin-created login verify করুন।'); return; }
+    setAuthOtpSent(true);
+  };
+  const loginStoreOtp = async () => {
+    const email = authId.trim().toLowerCase();
+    if (!authOtpCode.trim()) { setAuthMsg('OTP code দিন।'); return; }
+    setAuthBusy(true);
+    setAuthMsg('');
+    const secure = await platformOtpLogin({ email, code: authOtpCode });
+    setAuthBusy(false);
+    if (!secure?.token || !secure.user || !['store-admin', 'branch-admin', 'super-admin'].includes(String(secure.user.role || ''))) {
+      setAuthMsg('OTP login failed. Code/account check করুন।');
+      return;
+    }
+    finishStoreAuth(secure.user.userId || email, secure.token);
   };
   const handleStoreLogout = () => {
     lsSet('sd_store_site_session', '');
+    localStorage.removeItem('sd_security_session');
     setStoreAuthed(false);
     setTab('receive');
   };
@@ -368,30 +415,56 @@ export default function StorePortal() {
               </div>
             </div>
             <form onSubmit={handleStoreAuth} className="space-y-3">
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-[#1e3050] bg-[#0a1626] p-1">
+                <button type="button" onClick={() => { setAuthMode('password'); setAuthMsg(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${authMode === 'password' ? 'bg-brand-orange text-white' : 'text-gray-400'}`}>Password</button>
+                <button type="button" onClick={() => { setAuthMode('otp'); setAuthMsg(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${authMode === 'otp' ? 'bg-brand-orange text-white' : 'text-gray-400'}`}>Gmail OTP</button>
+              </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 mb-1.5">Store Admin ID / Email</label>
                 <input
                   value={authId}
-                  onChange={(e) => setAuthId(e.target.value)}
-                  placeholder="e.g. SA-XXXXXX"
+                  onChange={(e) => { setAuthId(e.target.value); setAuthMsg(''); }}
+                  placeholder={authMode === 'otp' ? 'approved@email.com' : 'e.g. SA-XXXXXX'}
                   className="w-full bg-[#0a1626] border border-[#1e3050] rounded-xl px-3.5 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-orange/60"
                   autoFocus
                 />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 mb-1.5">Password</label>
-                <input
-                  type="password"
-                  value={authPass}
-                  onChange={(e) => setAuthPass(e.target.value)}
-                  placeholder="Enter your store admin password"
-                  className="w-full bg-[#0a1626] border border-[#1e3050] rounded-xl px-3.5 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-orange/60"
-                />
-              </div>
+              {authMode === 'password' ? (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 mb-1.5">Password</label>
+                  <input
+                    type="password"
+                    value={authPass}
+                    onChange={(e) => { setAuthPass(e.target.value); setAuthMsg(''); }}
+                    placeholder="Enter your store admin password"
+                    className="w-full bg-[#0a1626] border border-[#1e3050] rounded-xl px-3.5 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-orange/60"
+                  />
+                </div>
+              ) : authOtpSent ? (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 mb-1.5">OTP Code</label>
+                  <input
+                    value={authOtpCode}
+                    onChange={(e) => { setAuthOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setAuthMsg(''); }}
+                    placeholder="6-digit code"
+                    inputMode="numeric"
+                    className="w-full bg-[#0a1626] border border-[#1e3050] rounded-xl px-3.5 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-orange/60"
+                  />
+                </div>
+              ) : null}
               {authMsg && <p className="text-[10px] font-bold text-red-400">{authMsg}</p>}
-              <button type="submit" className="w-full rounded-xl bg-gradient-to-r from-brand-orange to-orange-600 text-white text-xs font-black py-3.5 hover:opacity-90 transition-opacity cursor-pointer">
-                Unlock Store Portal
-              </button>
+              {authMode === 'password' ? (
+                <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-gradient-to-r from-brand-orange to-orange-600 text-white text-xs font-black py-3.5 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-60">
+                  {authBusy ? 'Checking...' : 'Unlock Store Portal'}
+                </button>
+              ) : (
+                <>
+                  <button type="button" onClick={authOtpSent ? loginStoreOtp : sendStoreOtp} disabled={authBusy} className="w-full rounded-xl bg-gradient-to-r from-brand-orange to-orange-600 text-white text-xs font-black py-3.5 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-60">
+                    {authBusy ? 'Please wait...' : authOtpSent ? 'Verify OTP & Unlock' : 'Send Login OTP'}
+                  </button>
+                  {authOtpSent && <button type="button" onClick={sendStoreOtp} disabled={authBusy} className="w-full rounded-xl border border-[#1e3050] px-4 py-2 text-[10px] font-black uppercase text-gray-300 disabled:opacity-60">Resend OTP</button>}
+                </>
+              )}
             </form>
             <button onClick={goBack} className="w-full mt-3 text-[10px] text-gray-500 hover:text-gray-300 py-2 cursor-pointer">← Back to roles</button>
           </div>

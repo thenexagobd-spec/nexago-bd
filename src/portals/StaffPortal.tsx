@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, Wrench, LifeBuoy, Bell, BarChart3, CheckCircle2, TrendingUp, Ticket, ShieldCheck, Lock, LogOut } from 'lucide-react';
 import PortalShell from './PortalShell';
-import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync, securityApi, securityAudit, lsGet } from './portalUtils';
+import { useOrders, useTickets, useNotifications, useWalletBal, useWalletTxns, bdt, statusBadge, useCloudSync, securityApi, securityAudit, lsGet, platformOtpSend, platformOtpLogin } from './portalUtils';
 
 export default function StaffPortal() {
   useCloudSync();
@@ -17,6 +17,10 @@ export default function StaffPortal() {
     try { return JSON.parse(localStorage.getItem('sd_staff_security_session') || 'null'); } catch { return null; }
   });
   const [login, setLogin] = useState({ userId: '', password: '' });
+  const [loginMode, setLoginMode] = useState<'password' | 'otp'>('password');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [orders, setOrders] = useOrders();
   const [tickets, setTickets] = useTickets();
@@ -56,21 +60,26 @@ export default function StaffPortal() {
   const staffLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const userId = login.userId.trim();
+    setLoginBusy(true);
+    setLoginError('');
     const rec = staffRecords.find((s: any) => String(s.id || '').trim().toLowerCase() === userId.toLowerCase());
     if (rec) {
       const cardExp = rec.cardExpiresAt || rec.expiresAt;
       if (cardExp && Date.now() > Date.parse(cardExp)) {
         setLoginError('Your staff ID card has expired. Super Admin renewal required.');
+        setLoginBusy(false);
         securityAudit('staff-login-denied', { actor: userId, reason: 'staff ID card expired' });
         return;
       }
       if (rec.status && rec.status !== 'Active') {
         setLoginError(`Your account is ${rec.status}. Contact Super Admin.`);
+        setLoginBusy(false);
         securityAudit('staff-login-denied', { actor: userId, reason: `staff status ${rec.status}` });
         return;
       }
       if (rec.loginEnabled === false) {
         setLoginError('Portal access is not enabled for this account.');
+        setLoginBusy(false);
         securityAudit('staff-login-denied', { actor: userId, reason: 'staff portal access disabled' });
         return;
       }
@@ -82,11 +91,45 @@ export default function StaffPortal() {
       localStorage.setItem('sd_staff_security_session', JSON.stringify(next));
       setSession(next);
       setLoginError('');
+      setLoginBusy(false);
       securityAudit('staff-login-success', { actor: userId, role: data.user?.role || 'staff', reason: 'staff portal login' });
     }).catch((err) => {
       setLoginError(String(err?.message || '') === 'CARD_EXPIRED' ? 'Your staff ID card has expired. Super Admin renewal required.' : 'Invalid Staff ID/email or password.');
+      setLoginBusy(false);
       securityAudit('staff-login-failed', { actor: userId || 'unknown', reason: 'server rejected staff login' });
     });
+  };
+
+  const sendStaffOtp = async () => {
+    const email = login.userId.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginError('OTP login-er jonno staff email din.'); return; }
+    setLoginBusy(true);
+    setLoginError('');
+    const ok = await platformOtpSend(email);
+    setLoginBusy(false);
+    if (!ok) { setLoginError('OTP pathano jayni. Super Admin-created active staff email kina check korun.'); return; }
+    setOtpSent(true);
+  };
+
+  const staffOtpLogin = async () => {
+    const email = login.userId.trim().toLowerCase();
+    if (!otpCode.trim()) { setLoginError('OTP code din.'); return; }
+    setLoginBusy(true);
+    setLoginError('');
+    const data = await platformOtpLogin({ email, code: otpCode });
+    if (!data?.token || !data.user || (data.user.role !== 'staff' && data.user.role !== 'super-admin-staff' && data.user.role !== 'super-admin')) {
+      setLoginError('Invalid OTP or unauthorized staff account.');
+      setLoginBusy(false);
+      return;
+    }
+    const next = { token: data.token, user: data.user, loggedAt: Date.now() };
+    localStorage.setItem('sd_security_session', data.token);
+    localStorage.setItem('sd_staff_security_session', JSON.stringify(next));
+    setSession(next);
+    setOtpCode('');
+    setOtpSent(false);
+    setLoginBusy(false);
+    securityAudit('staff-otp-login-success', { actor: email, role: data.user?.role || 'staff', reason: 'staff Gmail OTP login' });
   };
 
   const staffLogout = () => {
@@ -94,6 +137,8 @@ export default function StaffPortal() {
     localStorage.removeItem('sd_security_session');
     setSession(null);
     setLogin({ userId: '', password: '' });
+    setOtpCode('');
+    setOtpSent(false);
   };
 
   if (!session) {
@@ -126,18 +171,38 @@ export default function StaffPortal() {
                 <p className="mt-1 text-[11px] text-gray-400">Enter approved Staff ID/email and password.</p>
               </div>
               <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-1 rounded-xl border border-[#1e3050] bg-[#080e17] p-1">
+                  <button type="button" onClick={() => { setLoginMode('password'); setLoginError(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${loginMode === 'password' ? 'bg-violet-600 text-white' : 'text-gray-400'}`}>Password</button>
+                  <button type="button" onClick={() => { setLoginMode('otp'); setLoginError(''); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase ${loginMode === 'otp' ? 'bg-violet-600 text-white' : 'text-gray-400'}`}>Gmail OTP</button>
+                </div>
                 <label className="block">
                   <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Staff ID / Email</span>
-                  <input value={login.userId} onChange={e => setLogin(prev => ({ ...prev, userId: e.target.value }))} className="w-full rounded-xl border border-[#1e3050] bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-violet-400" placeholder="STF-... or email" autoComplete="username" />
+                  <input value={login.userId} onChange={e => { setLogin(prev => ({ ...prev, userId: e.target.value })); setLoginError(''); }} className="w-full rounded-xl border border-[#1e3050] bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-violet-400" placeholder={loginMode === 'otp' ? 'staff@email.com' : 'STF-... or email'} autoComplete="username" />
                 </label>
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Password</span>
-                  <input value={login.password} onChange={e => setLogin(prev => ({ ...prev, password: e.target.value }))} className="w-full rounded-xl border border-[#1e3050] bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-violet-400" placeholder="Password" type="password" autoComplete="current-password" />
-                </label>
+                {loginMode === 'password' ? (
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">Password</span>
+                    <input value={login.password} onChange={e => { setLogin(prev => ({ ...prev, password: e.target.value })); setLoginError(''); }} className="w-full rounded-xl border border-[#1e3050] bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-violet-400" placeholder="Password" type="password" autoComplete="current-password" />
+                  </label>
+                ) : otpSent ? (
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-black uppercase text-gray-400">OTP Code</span>
+                    <input value={otpCode} onChange={e => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setLoginError(''); }} className="w-full rounded-xl border border-[#1e3050] bg-[#080e17] px-4 py-3 text-sm text-white outline-none focus:border-violet-400" placeholder="6-digit code" inputMode="numeric" />
+                  </label>
+                ) : null}
                 {loginError && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">{loginError}</p>}
-                <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white shadow-lg transition-colors hover:bg-violet-500">
-                  <Lock className="h-4 w-4" /> Open Staff Console
-                </button>
+                {loginMode === 'password' ? (
+                  <button type="submit" disabled={loginBusy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white shadow-lg transition-colors hover:bg-violet-500 disabled:opacity-60">
+                    <Lock className="h-4 w-4" /> {loginBusy ? 'Checking...' : 'Open Staff Console'}
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" onClick={otpSent ? staffOtpLogin : sendStaffOtp} disabled={loginBusy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white shadow-lg transition-colors hover:bg-violet-500 disabled:opacity-60">
+                      <Lock className="h-4 w-4" /> {loginBusy ? 'Please wait...' : otpSent ? 'Verify OTP & Open' : 'Send Staff OTP'}
+                    </button>
+                    {otpSent && <button type="button" onClick={sendStaffOtp} disabled={loginBusy} className="w-full rounded-xl border border-[#1e3050] px-4 py-2 text-[10px] font-black uppercase text-gray-300 disabled:opacity-60">Resend OTP</button>}
+                  </>
+                )}
               </div>
               <p className="mt-5 text-center text-[10px] text-gray-500">No temporary access. Super Admin must create a real staff account first.</p>
             </form>

@@ -290,6 +290,33 @@ export async function securityAudit(action: string, detail: Record<string, any> 
   try { await securityApi('/audit', { action, ...detail }); } catch { /* old flow stays working if security API is offline */ }
 }
 
+export async function platformLogin(opts: { userId: string; password: string; secretCode?: string }): Promise<{ token?: string; user?: any; requiresSecret?: boolean; expiresAt?: number } | null> {
+  try {
+    const data = await securityApi('/login', opts);
+    return { token: data.token, user: data.user, requiresSecret: data.requiresSecret, expiresAt: data.expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+export async function platformOtpSend(email: string): Promise<boolean> {
+  try {
+    await securityApi('/otp-send', { email });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function platformOtpLogin(opts: { email: string; code: string; secretCode?: string }): Promise<{ token?: string; user?: any; requiresSecret?: boolean; expiresAt?: number } | null> {
+  try {
+    const data = await securityApi('/otp-login', opts);
+    return { token: data.token, user: data.user, requiresSecret: data.requiresSecret, expiresAt: data.expiresAt };
+  } catch {
+    return null;
+  }
+}
+
 export async function persistOrderToCloud(order: any): Promise<boolean> {
   if (!order || !order.id) return false;
   const key = currentCloudKey();
