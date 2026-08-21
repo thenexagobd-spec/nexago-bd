@@ -679,6 +679,8 @@ export default function StoreAdminPortal() {
     );
   }
 
+  const activeAdminId = activeApplication?.adminId || sessionAdminId || '';
+  const activeAdminPassword = activeApplication?.password || storeAdminCreds[activeAdminId]?.password || '';
   const storeAdminAccessUrl = `${window.location.origin}/store-admin?key=${activeStoreId}${activeBranchId ? `&branch=${activeBranchId}` : ''}`;
 
   return (
@@ -725,6 +727,28 @@ export default function StoreAdminPortal() {
                 <Copy className="h-3 w-3" />
                 <span>Copy Link</span>
               </button>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                { label: 'Store ID', value: activeStoreId },
+                { label: 'Store Admin ID', value: activeAdminId },
+                { label: 'Store Admin Password', value: activeAdminPassword || 'Not generated' },
+                { label: 'Active Branch Login', value: activeBranch ? `${activeBranch.branchAdminId || 'No Branch Admin ID'} / ${activeBranch.branchPassword || 'No Password'}` : 'All branches' },
+              ].map(item => (
+                <div key={item.label} className="rounded-xl border border-[#1e3050] bg-[#101d30] p-3">
+                  <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">{item.label}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate font-mono text-[10px] font-black text-white">{item.value}</p>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(String(item.value))}
+                      className="shrink-0 rounded-lg border border-brand-orange/30 bg-brand-orange/10 p-1.5 text-brand-orange hover:bg-brand-orange/20"
+                      title={`Copy ${item.label}`}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
