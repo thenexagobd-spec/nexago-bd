@@ -407,7 +407,7 @@ export default function App() {
     const legacyNames = /rahim|shakib|arif hossain|chillox|sultan|madchef|takeout|gulshan|dhanmondi/i;
     const legacyOrderPrefix = 'ORD-' + '001';
     const legacyDriverPrefix = 'DRV' + '12345';
-    const legacyProductPrefix = 'PROD-' + '10';
+    const legacyProductId = /^PROD-1(0\d|1[0-2])$/;
     const legacyInventoryPrefix = 'INV-' + '30';
     return rows.filter((row) => {
       const id = String(row.id || row.orderId || row.plateNumber || '');
@@ -420,11 +420,30 @@ export default function App() {
       if (kind === 'banners' && /^BNR-/.test(id)) return false;
       if (kind === 'tickets' && (/^TCK-/.test(id) || new RegExp(`^${legacyOrderPrefix}\\d+`).test(text))) return false;
       if (kind === 'notifications' && (/^NTF-/.test(id) || new RegExp(`^${legacyOrderPrefix}\\d+`).test(text) || legacyNames.test(text))) return false;
-      if (kind === 'products' && new RegExp(`^${legacyProductPrefix}\\d$`).test(id)) return false;
+      if (kind === 'products' && legacyProductId.test(id)) return false;
       if (kind === 'stores' && /^STR-0[1-5]$/.test(id) && !row.adminId) return false;
       if (kind === 'inventory' && new RegExp(`^${legacyInventoryPrefix}[1-4]$`).test(id)) return false;
       return true;
     });
+  };
+
+  const mergeProductRecords = (localRows: any[] = [], incomingRows: any[] = []) => {
+    const byId = new Map<string, any>();
+    const scoreTime = (row: any) => Date.parse(row?.deletedAt || row?.updatedAt || row?.createdAt || '') || 0;
+    [...localRows, ...incomingRows].forEach((row: any) => {
+      if (!row?.id) return;
+      const id = String(row.id);
+      const current = byId.get(id);
+      if (!current) {
+        byId.set(id, row);
+        return;
+      }
+      const currentTime = scoreTime(current);
+      const rowTime = scoreTime(row);
+      if (rowTime > currentTime) byId.set(id, row);
+      else if (rowTime === currentTime && (row?.isDeleted || row?.deletedAt)) byId.set(id, row);
+    });
+    return stripLegacySeedData(Array.from(byId.values()), 'products');
   };
 
   // Compact Layout / Tight Mode state
@@ -726,7 +745,7 @@ export default function App() {
         return same(prev, next) ? prev : next;
       });
       setProducts(prev => {
-        const next = stripLegacySeedData(getStoredData<any[]>('sd_products', []), 'products');
+        const next = mergeProductRecords(prev, getStoredData<any[]>('sd_products', []));
         return same(prev, next) ? prev : next;
       });
       setCategories(prev => {
@@ -846,7 +865,7 @@ export default function App() {
       if (!res.ok) throw new Error('http ' + res.status);
       const data = await res.json();
       if (data && data.state && data.state.updatedAt && (data.state.products || data.state.banners || data.state.stores)) {
-        if (Array.isArray(data.state.products)) setProducts(stripLegacySeedData(data.state.products, 'products'));
+        if (Array.isArray(data.state.products)) setProducts(prev => mergeProductRecords(prev, data.state.products));
         if (Array.isArray(data.state.categories)) setCategories(data.state.categories);
         if (Array.isArray(data.state.stores)) setStores(stripLegacySeedData(data.state.stores, 'stores'));
         if (Array.isArray(data.state.branches)) setBranches(data.state.branches);

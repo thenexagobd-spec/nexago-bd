@@ -77,6 +77,23 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     }, ...prev].slice(0, 12));
   };
 
+  const isDeletedProduct = (product: any) => product?.isDeleted === true || Boolean(product?.deletedAt) || product?.status === 'Deleted';
+  const activeProducts = products.filter((product: any) => !isDeletedProduct(product));
+  const deletedProducts = products.filter((product: any) => isDeletedProduct(product));
+  const replaceActiveProducts = (nextActiveProducts: any[]) => {
+    const nextIds = new Set(nextActiveProducts.map((product: any) => product.id));
+    onProductsChange([...nextActiveProducts, ...deletedProducts.filter((product: any) => !nextIds.has(product.id))]);
+  };
+  const tombstoneProduct = (product: any, reason = 'Removed from catalog') => ({
+    ...product,
+    isDeleted: true,
+    deletedAt: nowTimeLocal(),
+    deletedReason: reason,
+    stock: 0,
+    status: 'Deleted',
+    updatedAt: nowTimeLocal(),
+  });
+
   const doUndo = () => {
     if (undoStack.length === 0) return;
     const snap = undoStack[0];
@@ -111,8 +128,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     if (selected.size === 0) return;
     pushUndo(`Bulk delete ${selected.size} item(s)`);
     const ids = Array.from(selected);
-    onProductsChange(products.filter((x: any) => !ids.includes(x.id)));
-    // Track deletions so cloud sync never re-adds them
+    onProductsChange(products.map((x: any) => ids.includes(x.id) ? tombstoneProduct(x, 'Bulk delete') : x));
     const deleted = new Set<string>(getStoredData<string[]>('sd_deleted_product_ids', []));
     ids.forEach(id => deleted.add(String(id)));
     setStoredData('sd_deleted_product_ids', [...deleted]);
@@ -123,12 +139,12 @@ export default function ProductInventoryView({ products, onProductsChange, showT
 
   const bulkLabels = () => {
     if (selected.size === 0) return;
-    setLabelSel(products.filter((x: any) => selected.has(x.id)));
+    setLabelSel(activeProducts.filter((x: any) => selected.has(x.id)));
   };
 
   const bulkExport = () => {
     if (selected.size === 0) return;
-    downloadBlob(`products-${todayISO()}.csv`, encodeCSV(products.filter((x: any) => selected.has(x.id))));
+    downloadBlob(`products-${todayISO()}.csv`, encodeCSV(activeProducts.filter((x: any) => selected.has(x.id))));
   };
 
   const waNumber = (p: any) => {
@@ -197,10 +213,10 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     showToast(`Variants saved — total stock ${newSum}`, 'success');
   };
 
-  const categories = Array.from(new Set(products.map((p: any) => p.category).filter(Boolean)));
+  const categories = Array.from(new Set(activeProducts.map((p: any) => p.category).filter(Boolean)));
   const fallbackImg = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600';
 
-  const enriched = products.map((p: any) => {
+  const enriched = activeProducts.map((p: any) => {
     const rp = p.reorderPoint ?? 5;
     const stock = p.stock ?? 0;
     const cost = p.cost ?? Math.round((p.price ?? 0) * 0.75);
@@ -256,7 +272,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     if (price <= 0) { showToast('Enter a valid selling price', 'info'); return; }
     pushUndo(editing ? 'Edit product' : 'Add product');
     const product: any = {
-      id: editing ? editing.id : 'PROD-' + (100 + products.length + 1),
+      id: editing ? editing.id : 'PROD-' + (100 + activeProducts.length + 1),
       name: form.name.trim(),
       category: form.category.trim() || 'Uncategorized',
       stock: Number(form.stock) || 0,
@@ -304,8 +320,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     const p = products.find((x: any) => x.id === deleteId);
     if (!p) return;
     pushUndo('Delete product');
-    onProductsChange(products.filter((x: any) => x.id !== deleteId));
-    // Track deletion so cloud sync re-adds never bring it back
+    onProductsChange(products.map((x: any) => x.id === deleteId ? tombstoneProduct(x) : x));
     const deleted = new Set<string>(getStoredData<string[]>('sd_deleted_product_ids', []));
     deleted.add(String(deleteId));
     setStoredData('sd_deleted_product_ids', [...deleted]);
@@ -367,7 +382,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     setTab('pos');
   };
 
-  const exportCSV = () => downloadBlob(`products-${todayISO()}.csv`, encodeCSV(products));
+  const exportCSV = () => downloadBlob(`products-${todayISO()}.csv`, encodeCSV(activeProducts));
 
   const onImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -385,7 +400,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
           const i = header.indexOf(name);
           return isHeader ? i : CSV_ORDER.indexOf(name);
         };
-        const existingKeys = new Set(products.map((x: any) => (x.sku || x.id || '').toLowerCase()));
+        const existingKeys = new Set(activeProducts.map((x: any) => (x.sku || x.id || '').toLowerCase()));
         const added: any[] = [];
         dataRows.forEach((r: string[]) => {
           const name = (r[idx('name')] || '').trim();
@@ -401,7 +416,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
           const stock = num(r[idx('stock')]);
           const rp = num(r[idx('reorderPoint')]) || 5;
           const item: any = {
-            id: 'PROD-' + Math.floor(100 + products.length + added.length + Math.random() * 900),
+            id: 'PROD-' + Math.floor(100 + activeProducts.length + added.length + Math.random() * 900),
             name,
             category: (r[idx('category')] || '').trim() || 'Uncategorized',
             sku: sku || undefined,
@@ -497,8 +512,8 @@ export default function ProductInventoryView({ products, onProductsChange, showT
         <PurchaseOrdersView
           pos={pos}
           onPosChange={setPos}
-          products={products}
-          onProductsChange={onProductsChange}
+          products={activeProducts}
+          onProductsChange={replaceActiveProducts}
           addBatches={(bs) => setBatches(prev => [...bs, ...prev])}
           logEntry={logEntry}
           showToast={showToast}
@@ -507,13 +522,13 @@ export default function ProductInventoryView({ products, onProductsChange, showT
       )}
 
       {tab === 'reports' && (
-        <InventoryReportsView products={products} ledger={ledger} batches={batches} />
+        <InventoryReportsView products={activeProducts} ledger={ledger} batches={batches} />
       )}
 
       {tab === 'warehouse' && (
         <StoreOpsView
-          products={products}
-          onProductsChange={onProductsChange}
+          products={activeProducts}
+          onProductsChange={replaceActiveProducts}
           logEntry={logEntry}
           showToast={showToast}
           snapshot={pushUndo}
@@ -526,7 +541,7 @@ export default function ProductInventoryView({ products, onProductsChange, showT
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Products</span>
-              <div className="text-2xl font-black text-white mt-1 flex items-center space-x-2"><Package className="w-4 h-4 text-brand-orange" /><span>{products.length}</span></div>
+              <div className="text-2xl font-black text-white mt-1 flex items-center space-x-2"><Package className="w-4 h-4 text-brand-orange" /><span>{activeProducts.length}</span></div>
             </div>
             <div className="bg-brand-card p-4 border border-brand-border rounded-xl">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Inventory Value (at cost)</span>
