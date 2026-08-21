@@ -66,6 +66,7 @@ export default function StoreAdminPortal() {
   const [otpBusy, setOtpBusy] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, any>>({});
+  const [docUploadState, setDocUploadState] = useState<Record<string, 'ready' | 'syncing' | 'saved' | 'failed'>>({});
   const [signupReview, setSignupReview] = useState(false);
   const [submittedAppId, setSubmittedAppId] = useState('');
   const branchSession = branches.find((b: any) => b.branchAdminId === sessionAdminId && b.status === 'Active');
@@ -233,19 +234,30 @@ export default function StoreAdminPortal() {
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = String(reader.result || '');
-      const stored = await secureFileUpload({ name: file.name, type: file.type, dataUrl }, { role: 'store-admin-signup', owner: signup.email || signup.phone || signup.ownerName, storeId: signup.storeName });
-      setUploadedDocs(prev => ({ ...prev, [key]: stored }));
+      const localDoc = { name: file.name, type: file.type, dataUrl, uploadedAt: new Date().toISOString() };
+      setUploadedDocs(prev => ({ ...prev, [key]: localDoc }));
+      setDocUploadState(prev => ({ ...prev, [key]: 'syncing' }));
+      secureFileUpload(localDoc, { role: 'store-admin-signup', owner: signup.email || signup.phone || signup.ownerName, storeId: signup.storeName })
+        .then((stored) => {
+          setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], ...stored } }));
+          setDocUploadState(prev => ({ ...prev, [key]: 'saved' }));
+        })
+        .catch(() => setDocUploadState(prev => ({ ...prev, [key]: 'failed' })));
     };
     reader.readAsDataURL(file);
   };
 
   const submitSignup = async () => {
     const missing = storeDocMeta.find(d => d.required && !uploadedDocs[d.key]);
-    if (!signup.ownerName || !signup.phone || !signup.email || !signup.storeName || !signup.storeAddress || !signup.tradeLicenseNo || !signup.tinBin) return;
-    if (otpStep !== 'verified') return;
-    if (!signup.password || signup.password.length < 8) return;
-    if (signup.password !== signup.confirmPassword) return;
-    if (missing) return;
+    setOtpError('');
+    if (!signup.ownerName || !signup.phone || !signup.email || !signup.storeName || !signup.storeAddress || !signup.tradeLicenseNo || !signup.tinBin) {
+      setOtpError('Required owner, store, phone, email, address, trade license and TIN/BIN fields must be filled.');
+      return;
+    }
+    if (otpStep !== 'verified') { setOtpError('Verify owner Gmail OTP before submit.'); return; }
+    if (!signup.password || signup.password.length < 8) { setOtpError('Password must be at least 8 characters.'); return; }
+    if (signup.password !== signup.confirmPassword) { setOtpError('Password and confirm password do not match.'); return; }
+    if (missing) { setOtpError(`${missing.label} is required before submit.`); return; }
     const idConflict = await identityCheck({ phone: signup.phone, email: signup.email });
     if (idConflict.taken) {
       const c = idConflict.conflict;
@@ -257,7 +269,7 @@ export default function StoreAdminPortal() {
     const docData = (key: string) => typeof uploadedDocs[key] === 'string' ? uploadedDocs[key] : uploadedDocs[key]?.dataUrl || '';
     const usedFingerprints = new Set(storeAdminApps.flatMap((app: any) => (app.documents || []).map((d: any) => d.fingerprint).filter(Boolean)));
     const duplicate = storeDocMeta.find(d => docData(d.key) && usedFingerprints.has(fingerprintOf(docData(d.key))));
-    if (duplicate) return;
+    if (duplicate) { setOtpError(`${duplicate.label} already exists in another application. Same document cannot be reused.`); return; }
     const storeId = makeStoreId();
     const adminId = makeStoreAdminId();
     const app = {
@@ -294,6 +306,7 @@ export default function StoreAdminPortal() {
     setOtpCode('');
     setOtpError('');
     setUploadedDocs({});
+    setDocUploadState({});
     setSignupReview(false);
   };
 
@@ -621,12 +634,26 @@ export default function StoreAdminPortal() {
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {storeDocMeta.map(d => (
-                  <label key={d.key} className="rounded-2xl border border-[#1e3050] bg-[#0a1322] p-3">
-                    <span className="flex items-center gap-2 text-[10px] font-black uppercase text-white"><FileText className="h-3.5 w-3.5 text-brand-orange" /> {d.label}</span>
-                    <span className="mt-1 block text-[8px] text-gray-500">{d.required ? 'Required' : 'Optional'}</span>
-                    <input type="file" onChange={e => handleDocUpload(d.key, e.target.files?.[0])} className="mt-3 w-full text-[9px] text-gray-400" />
-                    {uploadedDocs[d.key] && <span className="mt-2 block text-[9px] font-bold text-emerald-400">Submitted</span>}
-                  </label>
+                  <div key={d.key} className="rounded-2xl border border-[#1e3050] bg-[#0a1322] p-3">
+                    <label className="block cursor-pointer">
+                      <span className="flex items-center gap-2 text-[10px] font-black uppercase text-white"><FileText className="h-3.5 w-3.5 text-brand-orange" /> {d.label}</span>
+                      <span className="mt-1 block text-[8px] text-gray-500">{d.required ? 'Required' : 'Optional'} · Image or PDF accepted</span>
+                      <input type="file" accept="image/*,.pdf,application/pdf" onChange={e => handleDocUpload(d.key, e.target.files?.[0])} className="mt-3 w-full text-[9px] text-gray-400" />
+                    </label>
+                    {uploadedDocs[d.key] && (
+                      <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate text-[9px] font-bold text-emerald-300">{uploadedDocs[d.key].name || 'Document submitted'}</span>
+                          <span className="shrink-0 text-[8px] font-black uppercase text-emerald-400">{docUploadState[d.key] === 'syncing' ? 'Syncing' : docUploadState[d.key] === 'failed' ? 'Local Saved' : 'Submitted'}</span>
+                        </div>
+                        {String(uploadedDocs[d.key].type || '').includes('pdf') ? (
+                          <div className="mt-2 flex h-24 items-center justify-center rounded-lg border border-[#1e3050] bg-[#101d30] text-[10px] font-black uppercase text-gray-400">PDF Ready</div>
+                        ) : (
+                          <img src={uploadedDocs[d.key].dataUrl} alt={d.label} className="mt-2 h-24 w-full rounded-lg border border-[#1e3050] object-cover" />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
               {signupReview && (
@@ -653,7 +680,7 @@ export default function StoreAdminPortal() {
               <h2 className="flex items-center gap-2 text-sm font-black text-white"><Search className="h-4 w-4 text-brand-orange" /> Track Application</h2>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <input value={trackId} onChange={e => setTrackId(e.target.value)} placeholder="Enter Store Admin ID (SA-...)" className="min-w-0 flex-1 rounded-xl border border-[#1e3050] bg-[#0a1322] px-3 py-2 text-xs outline-none focus:border-brand-orange" />
-                <button className="rounded-xl bg-[#132238] px-4 py-2 text-[10px] font-black uppercase text-gray-200">Check</button>
+                <button onClick={() => setTrackId(trackId.trim())} className="rounded-xl bg-[#132238] px-4 py-2 text-[10px] font-black uppercase text-gray-200 hover:border-brand-orange">Check</button>
               </div>
               {tracked && (
                 <div className="mt-4 rounded-2xl border border-[#1e3050] bg-[#0a1322] p-4 text-xs">
@@ -670,6 +697,46 @@ export default function StoreAdminPortal() {
                       <p>Store Admin: <a className="text-brand-orange underline" href={`/store-admin?key=${tracked.storeId}`}>{window.location.origin}/store-admin?key={tracked.storeId}</a></p>
                     </div>
                   )}
+                  <div className="mt-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white">Submitted Document Preview</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {storeDocMeta.map(d => {
+                        const doc = (tracked.documents || []).find((x: any) => x.key === d.key || x.type === d.label);
+                        const dataUrl = doc?.dataUrl || doc?.attachmentUrl || doc?.privateUrl || '';
+                        const isPdf = String(doc?.type || doc?.mimeType || dataUrl).toLowerCase().includes('pdf');
+                        return (
+                          <div key={d.key} className="rounded-xl border border-[#1e3050] bg-[#101d30] p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="min-w-0 truncate text-[10px] font-black text-white">{d.label}</p>
+                              <span className={`shrink-0 rounded-lg px-2 py-0.5 text-[8px] font-black uppercase ${dataUrl ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}>{dataUrl ? doc?.status || 'Submitted' : 'Missing'}</span>
+                            </div>
+                            {dataUrl ? (
+                              <>
+                                {isPdf ? (
+                                  <iframe title={d.label} src={dataUrl} className="mt-2 h-36 w-full rounded-lg border border-[#1e3050] bg-white" />
+                                ) : (
+                                  <img src={dataUrl} alt={d.label} className="mt-2 h-36 w-full rounded-lg border border-[#1e3050] object-cover" />
+                                )}
+                                <div className="mt-2 grid grid-cols-3 gap-1">
+                                  <button onClick={() => window.open(dataUrl, '_blank')} className="rounded-lg border border-[#1e3050] px-2 py-1 text-[8px] font-black uppercase text-gray-300">Open</button>
+                                  <button onClick={() => {
+                                    const w = window.open('', '_blank');
+                                    if (!w) return;
+                                    w.document.write(isPdf ? `<iframe src="${dataUrl}" style="width:100%;height:100vh;border:0"></iframe>` : `<img src="${dataUrl}" style="max-width:100%;display:block;margin:auto" />`);
+                                    w.document.close();
+                                    w.print();
+                                  }} className="rounded-lg border border-[#1e3050] px-2 py-1 text-[8px] font-black uppercase text-gray-300">Print</button>
+                                  <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`${d.label} - ${tracked.adminId} - ${tracked.storeName}`)}`, '_blank')} className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[8px] font-black uppercase text-emerald-300">WhatsApp</button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="mt-2 flex h-36 items-center justify-center rounded-lg border border-dashed border-[#1e3050] text-[10px] text-gray-500">No file submitted</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
