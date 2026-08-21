@@ -81,6 +81,11 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     if (undoStack.length === 0) return;
     const snap = undoStack[0];
     onProductsChange(snap.products || []);
+    // Remove restored product IDs from the deletion tracker so cloud sync doesn't re-filter them
+    const restoredIds = new Set((snap.products || []).map((p: any) => String(p.id)));
+    const deleted = new Set<string>(getStoredData<string[]>('sd_deleted_product_ids', []));
+    restoredIds.forEach((id: string) => deleted.delete(id));
+    setStoredData('sd_deleted_product_ids', [...deleted]);
     setLedger(snap.ledger || []);
     setBatches(snap.batches || []);
     setPos(snap.pos || []);
@@ -107,6 +112,10 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     pushUndo(`Bulk delete ${selected.size} item(s)`);
     const ids = Array.from(selected);
     onProductsChange(products.filter((x: any) => !ids.includes(x.id)));
+    // Track deletions so cloud sync never re-adds them
+    const deleted = new Set<string>(getStoredData<string[]>('sd_deleted_product_ids', []));
+    ids.forEach(id => deleted.add(String(id)));
+    setStoredData('sd_deleted_product_ids', [...deleted]);
     logEntry({ productId: 'BULK-DELETE', productName: `${ids.length} product(s) deleted`, type: 'Remove', qty: 0, reason: 'Bulk delete', by: 'Admin', date: todayISO() });
     setSelected(new Set());
     showToast(`Deleted ${ids.length} product(s)`, 'success');
@@ -296,6 +305,10 @@ export default function ProductInventoryView({ products, onProductsChange, showT
     if (!p) return;
     pushUndo('Delete product');
     onProductsChange(products.filter((x: any) => x.id !== deleteId));
+    // Track deletion so cloud sync re-adds never bring it back
+    const deleted = new Set<string>(getStoredData<string[]>('sd_deleted_product_ids', []));
+    deleted.add(String(deleteId));
+    setStoredData('sd_deleted_product_ids', [...deleted]);
     logEntry({ productId: p.id, productName: p.name, type: 'Remove', qty: 0, reason: 'Removed from catalog', by: 'Admin', date: todayISO() });
     showToast(`"${p.name}" removed`, 'info');
     setDeleteId(null);

@@ -52,6 +52,7 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_driver_creds: 'driverCreds',
   sd_zones: 'zones',
   sd_products: 'products',
+  sd_deleted_product_ids: 'deletedProductIds',
   sd_categories: 'categories',
   sd_inventory: 'inventory',
   sd_inventory_v2: 'inventoryV2',
@@ -449,6 +450,10 @@ export function useCloudSync() {
         if (!state || typeof state !== 'object') return false;
         let changed = false;
         applyingRemoteState = true;
+        // Read deleted product IDs first so we can filter them out of the merge.
+        const deletedProductIds = new Set<string>(
+          Array.isArray((state as any).deletedProductIds) ? (state as any).deletedProductIds : []
+        );
         for (const [localKey, cloudKey] of Object.entries(CLOUD_KEY_MAP)) {
           const cloudVal = (state as any)[cloudKey];
           if (cloudVal === undefined) continue;
@@ -456,6 +461,10 @@ export function useCloudSync() {
           let next: any;
           if (Array.isArray(cloudVal)) {
             next = unionByIdArr(Array.isArray(localVal) ? localVal as any[] : [], cloudVal);
+            // Filter out deleted products so they stay gone across syncs
+            if (cloudKey === 'products' && deletedProductIds.size > 0) {
+              next = (next as any[]).filter((item: any) => item && !deletedProductIds.has(String(item.id)));
+            }
           } else if (cloudVal && typeof cloudVal === 'object') {
             next = { ...(localVal && typeof localVal === 'object' ? localVal as object : {}), ...cloudVal };
           } else {
