@@ -602,6 +602,7 @@ export default function App() {
   // UI Control states
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [quickActionModal, setQuickActionModal] = useState<'driver' | 'user' | 'zone' | 'notification' | 'banner' | null>(null);
+  const [storeAdminPrompt, setStoreAdminPrompt] = useState<any | null>(null);
   const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<Record<string, string>>({});
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isAddingStore, setIsAddingStore] = useState(false);
@@ -622,6 +623,8 @@ export default function App() {
   // Merchant specific interactive states
   const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
   const [expandedStoreOrderId, setExpandedStoreOrderId] = useState<string | null>(null);
+  const [expandedStoreAdminAppId, setExpandedStoreAdminAppId] = useState<string | null>(null);
+  const [expandedStoreCardId, setExpandedStoreCardId] = useState<string | null>(null);
   const [mProdName, setMProdName] = useState('');
   const [mProdCat, setMProdCat] = useState('Fruits & Vegetables');
   const [mProdPrice, setMProdPrice] = useState('');
@@ -2499,22 +2502,32 @@ export default function App() {
         };
 
         const modifyStoreAdminApp = (app: any) => {
-          const field = window.prompt('Field to modify: ownerName, phone, email, storeName, storeAddress, tradeLicenseNo, tinBin, settlementNumber, businessType');
-          if (!field || !(field in app)) return;
-          const value = window.prompt(`New value for ${field}`, app[field] || '');
-          if (value === null) return;
-          const reason = window.prompt('Required reason for modification');
-          if (!reason?.trim()) { showToast('Modification reason is required and must be saved.', 'info'); return; }
-          setStoreAdminApps(prev => prev.map((a: any) => a.id === app.id ? {
-            ...a,
-            [field]: value,
-            modifiedAt: new Date().toLocaleString('en-GB'),
-            modificationLog: [
-              ...(a.modificationLog || []),
-              { field, oldValue: app[field] || '', newValue: value, reason: reason.trim(), time: new Date().toISOString(), actor: 'super-admin' }
+          setStoreAdminPrompt({
+            title: 'Modify Store Admin Record',
+            subtitle: `${app.adminId} · ${app.storeName}`,
+            submitLabel: 'Save Modification',
+            fields: [
+              { name: 'field', label: 'Field', type: 'select', value: 'phone', options: ['ownerName', 'phone', 'email', 'storeName', 'storeAddress', 'tradeLicenseNo', 'tinBin', 'settlementNumber', 'businessType'] },
+              { name: 'value', label: 'New Value', value: app.phone || '' },
+              { name: 'reason', label: 'Permanent Reason', type: 'textarea', value: '' },
             ],
-          } : a));
-          showToast(`${field} modified with permanent reason.`, 'success');
+            onSubmit: (values: any) => {
+              const field = values.field;
+              if (!field || !(field in app)) { showToast('Valid field is required.', 'info'); return false; }
+              if (!values.reason?.trim()) { showToast('Modification reason is required and must be saved.', 'info'); return false; }
+              setStoreAdminApps(prev => prev.map((a: any) => a.id === app.id ? {
+                ...a,
+                [field]: values.value,
+                modifiedAt: new Date().toLocaleString('en-GB'),
+                modificationLog: [
+                  ...(a.modificationLog || []),
+                  { field, oldValue: app[field] || '', newValue: values.value, reason: values.reason.trim(), time: new Date().toISOString(), actor: 'super-admin' }
+                ],
+              } : a));
+              showToast(`${field} modified with permanent reason.`, 'success');
+              return true;
+            }
+          });
         };
 
         const toggleStoreAdminPage = (storeId: string, pageId: string) => {
@@ -2541,10 +2554,16 @@ export default function App() {
         };
 
         const takeStoreAdminAction = (store: any, action: 'warning' | 'review' | 'suspend' | 'freeze' | 'restrict' | 'blacklist' | 'restore') => {
-          const reason = window.prompt(`Required reason for ${action.toUpperCase()} action against ${store.name}`);
+          setStoreAdminPrompt({
+            title: `${action.toUpperCase()} Store Admin`,
+            subtitle: store.name,
+            submitLabel: 'Save Action',
+            fields: [{ name: 'reason', label: 'Permanent Reason', type: 'textarea', value: '' }],
+            onSubmit: (values: any) => {
+          const reason = values.reason;
           if (!reason?.trim()) {
             showToast('Action reason is required and permanently saved.', 'info');
-            return;
+            return false;
           }
           setStores(prev => prev.map((s: any) => {
             if (s.id !== store.id) return s;
@@ -2587,6 +2606,9 @@ export default function App() {
             storeId: store.id,
           }, ...prev]);
           showToast(`${action.toUpperCase()} action saved for ${store.name}.`, action === 'restore' ? 'success' : 'info');
+          return true;
+            }
+          });
         };
 
         const handleCreateStore = (e: React.FormEvent) => {
@@ -2702,6 +2724,7 @@ export default function App() {
                     const cred = storeAdminCreds[app.adminId];
                     const storeLink = `${window.location.origin}/store?key=${encodeURIComponent(app.storeId)}`;
                     const adminLink = `${window.location.origin}/store-admin?key=${encodeURIComponent(app.storeId)}`;
+                    const isOpen = expandedStoreAdminAppId === app.id;
                     return (
                     <div key={app.id} className="rounded-xl border border-brand-border/70 bg-[#080e17] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -2711,8 +2734,19 @@ export default function App() {
                           <p className="text-[10px] text-gray-400">{app.ownerName} · {app.phone}</p>
                           <p className="text-[10px] text-gray-500">{app.storeAddress}</p>
                         </div>
-                        <span className={`rounded-lg border px-2 py-1 text-[8px] font-black uppercase ${app.status === 'Verified' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : app.status === 'Rejected' ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{app.status}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`rounded-lg border px-2 py-1 text-[8px] font-black uppercase ${app.status === 'Verified' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : app.status === 'Rejected' ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{app.status}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedStoreAdminAppId(prev => prev === app.id ? null : app.id)}
+                            className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-1.5 text-[9px] font-black uppercase text-brand-orange"
+                          >
+                            {isOpen ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
                       </div>
+                      {isOpen && (
+                      <>
                       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                         {(app.documents || []).map((doc: any) => (
                           <a key={doc.type} href={doc.dataUrl || '#'} target="_blank" rel="noreferrer" className={`rounded-lg border px-2 py-2 text-[9px] font-bold ${doc.dataUrl ? 'border-sky-500/30 bg-sky-500/10 text-sky-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>
@@ -2742,6 +2776,8 @@ export default function App() {
                         <button onClick={() => approveStoreAdmin(app, false)} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-red-300">Reject</button>
                         <button onClick={() => approveStoreAdmin(app, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[9px] font-black uppercase text-white">Approve & Generate Password</button>
                       </div>
+                      </>
+                      )}
                     </div>
                   );})}
                 </div>
@@ -2838,6 +2874,7 @@ export default function App() {
                 const storeBranches = branches.filter((b: any) => b.storeId === s.id);
                 const storeOrders = orders.filter((o: any) => ((o.storeId && o.storeId === s.id) || String(o.storeName || '').toLowerCase() === String(s.name || '').toLowerCase()));
                 const storeRevenue = storeOrders.filter((o: any) => o.status !== 'Cancelled').reduce((sum, o: any) => sum + (Number(o.amount) || 0), 0);
+                const isStoreOpen = expandedStoreCardId === s.id;
                 const branchOrderRows = storeBranches.map((b: any) => {
                   const rows = storeOrders.filter((o: any) => o.branchId === b.id);
                   return { branch: b, rows, revenue: rows.filter((o: any) => o.status !== 'Cancelled').reduce((sum, o: any) => sum + (Number(o.amount) || 0), 0) };
@@ -2855,6 +2892,29 @@ export default function App() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 font-medium mb-2">{s.address}</p>
+                      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div className="rounded-lg bg-[#080e17] p-2">
+                          <p className="text-[8px] font-black uppercase text-gray-500">Orders</p>
+                          <p className="text-sm font-black text-white">{storeOrders.length}</p>
+                        </div>
+                        <div className="rounded-lg bg-[#080e17] p-2">
+                          <p className="text-[8px] font-black uppercase text-gray-500">Revenue</p>
+                          <p className="text-sm font-black text-emerald-300">৳{storeRevenue.toLocaleString()}</p>
+                        </div>
+                        <div className="rounded-lg bg-[#080e17] p-2">
+                          <p className="text-[8px] font-black uppercase text-gray-500">Branches</p>
+                          <p className="text-sm font-black text-sky-300">{storeBranches.length}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedStoreCardId(prev => prev === s.id ? null : s.id)}
+                          className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-3 py-2 text-[9px] font-black uppercase text-brand-orange"
+                        >
+                          {isStoreOpen ? 'Hide Details' : 'Show Details'}
+                        </button>
+                      </div>
+                      {isStoreOpen && (
+                      <>
                       <div className="mb-3 rounded-lg border border-brand-orange/25 bg-brand-orange/10 p-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
@@ -2922,6 +2982,8 @@ export default function App() {
                           </div>
                         )}
                       </div>
+                      </>
+                      )}
                       <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2.5">
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <div>
@@ -2944,31 +3006,42 @@ export default function App() {
                                 key={mode.id}
                                 type="button"
                                 onClick={() => {
-                                  const reason = window.prompt('Reason for delivery permission change', `${s.name} delivery mode set to ${mode.label}`);
-                                  if (!reason?.trim()) {
+                                  setStoreAdminPrompt({
+                                    title: 'Delivery Driver Permission',
+                                    subtitle: `${s.name} · ${mode.label}`,
+                                    submitLabel: 'Update Permission',
+                                    fields: [
+                                      { name: 'reason', label: 'Permanent Reason', type: 'textarea', value: `${s.name} delivery mode set to ${mode.label}` },
+                                      ...(mode.id === 'personal' || mode.id === 'both' ? [
+                                        { name: 'driverName', label: 'Personal driver/company name', value: s.personalDriverInfo?.name || s.ownerName || '' },
+                                        { name: 'driverPhone', label: 'Personal driver/company phone', value: s.personalDriverInfo?.phone || s.phone || '' },
+                                        { name: 'driverVehicle', label: 'Vehicle / delivery note', value: s.personalDriverInfo?.vehicle || 'Store managed delivery' },
+                                      ] : []),
+                                    ],
+                                    onSubmit: (values: any) => {
+                                  if (!values.reason?.trim()) {
                                     showToast('Reason required before changing delivery permission.', 'info');
-                                    return;
+                                    return false;
                                   }
                                   const personalDriverInfo = mode.id === 'personal' || mode.id === 'both'
-                                    ? {
-                                        name: window.prompt('Personal driver/company name', s.personalDriverInfo?.name || s.ownerName || '') || s.personalDriverInfo?.name || '',
-                                        phone: window.prompt('Personal driver/company phone', s.personalDriverInfo?.phone || s.phone || '') || s.personalDriverInfo?.phone || '',
-                                        vehicle: window.prompt('Vehicle / delivery note', s.personalDriverInfo?.vehicle || 'Store managed delivery') || s.personalDriverInfo?.vehicle || '',
-                                      }
+                                    ? { name: values.driverName || '', phone: values.driverPhone || '', vehicle: values.driverVehicle || '' }
                                     : s.personalDriverInfo;
                                   setStores(prev => prev.map((store: any) => store.id === s.id ? {
                                     ...store,
                                     deliveryProviderMode: mode.id,
                                     personalDriverInfo,
                                     deliveryPermissionUpdatedAt: new Date().toISOString(),
-                                    deliveryPermissionReason: reason.trim(),
+                                    deliveryPermissionReason: values.reason.trim(),
                                     deliveryPermissionLog: [
                                       ...(store.deliveryPermissionLog || []),
-                                      { mode: mode.id, label: mode.label, reason: reason.trim(), personalDriverInfo, at: new Date().toISOString(), by: 'super-admin' },
+                                      { mode: mode.id, label: mode.label, reason: values.reason.trim(), personalDriverInfo, at: new Date().toISOString(), by: 'super-admin' },
                                     ],
                                   } : store));
-                                  securityAudit('store-delivery-provider-updated', { storeId: s.id, storeName: s.name, mode: mode.id, reason: reason.trim(), personalDriverInfo });
+                                  securityAudit('store-delivery-provider-updated', { storeId: s.id, storeName: s.name, mode: mode.id, reason: values.reason.trim(), personalDriverInfo });
                                   showToast(`${s.name} delivery mode updated to ${mode.label}`, 'success');
+                                  return true;
+                                    }
+                                  });
                                 }}
                                 className={`rounded-lg border px-2 py-1.5 text-[8px] font-black uppercase transition-all ${active ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' : 'border-brand-border bg-[#080e17] text-gray-400 hover:border-emerald-500/30 hover:text-emerald-300'}`}
                               >
@@ -2992,9 +3065,18 @@ export default function App() {
                       <div className="mb-3 flex flex-wrap gap-2">
                         <span className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[9px] font-black uppercase text-sky-300">{storeBranches.length} Branches</span>
                         <button onClick={() => {
-                          const name = window.prompt('Branch name');
-                          if (!name) return;
-                          const address = window.prompt('Branch address') || '';
+                          setStoreAdminPrompt({
+                            title: 'Add Store Branch',
+                            subtitle: s.name,
+                            submitLabel: 'Create Branch',
+                            fields: [
+                              { name: 'name', label: 'Branch name', value: '' },
+                              { name: 'address', label: 'Branch address', type: 'textarea', value: '' },
+                            ],
+                            onSubmit: (values: any) => {
+                          const name = values.name?.trim();
+                          if (!name) { showToast('Branch name is required.', 'info'); return false; }
+                          const address = values.address || '';
                           const branchNo = String(storeBranches.length + 1).padStart(3, '0');
                           const branchId = `${s.id}-BR-${branchNo}`;
                           const branchPassword = Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -3013,6 +3095,9 @@ export default function App() {
                           };
                           setBranches(prev => prev.some((b: any) => b.id === branch.id) ? prev : [branch, ...prev]);
                           showToast(`Branch ${branch.id} added. Login: ${branch.branchAdminId} / ${branchPassword}`, 'success');
+                          return true;
+                            }
+                          });
                         }} className="rounded-lg border border-brand-orange/30 bg-brand-orange/10 px-2 py-1 text-[9px] font-black uppercase text-brand-orange">+ Add Branch</button>
                       </div>
                       {storeBranches.length > 0 && (
@@ -3107,12 +3192,21 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => {
-                              const subject = window.prompt('Fix request subject', `${s.name} store support fix`);
-                              if (!subject) return;
-                              const terms = window.prompt('Terms and condition / reason for access request', 'Super Admin needs temporary permission to review and fix this store issue. All actions will be recorded with admin/staff ID.');
+                              setStoreAdminPrompt({
+                                title: 'Send Admin Fix Request',
+                                subtitle: s.name,
+                                submitLabel: 'Send Request',
+                                fields: [
+                                  { name: 'subject', label: 'Fix request subject', value: `${s.name} store support fix` },
+                                  { name: 'terms', label: 'Terms / reason for access request', type: 'textarea', value: 'Super Admin needs temporary permission to review and fix this store issue. All actions will be recorded with admin/staff ID.' },
+                                ],
+                                onSubmit: (values: any) => {
+                              const subject = values.subject?.trim();
+                              const terms = values.terms;
+                              if (!subject) { showToast('Subject is required.', 'info'); return false; }
                               if (!terms?.trim()) {
                                 showToast('Terms/reason is required before sending request.', 'info');
-                                return;
+                                return false;
                               }
                               const ticket: any = {
                                 id: `ADMREQ-${Date.now().toString().slice(-7)}`,
@@ -3141,6 +3235,9 @@ export default function App() {
                                 storeId: s.id,
                               }, ...prev]);
                               showToast(`Fix request sent to ${s.name} Store Admin.`, 'success');
+                              return true;
+                                }
+                              });
                             }}
                             className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-amber-300"
                           >
@@ -7818,6 +7915,55 @@ export default function App() {
               </div>
               <button onClick={submitNewCoupon} className="w-full px-4 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-lg text-xs font-bold cursor-pointer">Create Promo Code</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* STORE ADMIN IN-APP CONTROL MODAL */}
+      {storeAdminPrompt && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-brand-dark/85 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-brand-border bg-[#0c1624] shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-brand-border/70 p-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-white">{storeAdminPrompt.title}</h3>
+                {storeAdminPrompt.subtitle && <p className="mt-1 text-[10px] font-semibold text-gray-400">{storeAdminPrompt.subtitle}</p>}
+              </div>
+              <button onClick={() => setStoreAdminPrompt(null)} className="rounded-lg border border-brand-border bg-brand-dark p-2 text-gray-400 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form
+              className="space-y-3 p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const formData = new FormData(event.currentTarget);
+                const values: Record<string, string> = {};
+                (storeAdminPrompt.fields || []).forEach((field: any) => {
+                  values[field.name] = String(formData.get(field.name) || '');
+                });
+                const ok = storeAdminPrompt.onSubmit?.(values);
+                if (ok !== false) setStoreAdminPrompt(null);
+              }}
+            >
+              {(storeAdminPrompt.fields || []).map((field: any) => (
+                <label key={field.name} className="block">
+                  <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-gray-300">{field.label}</span>
+                  {field.type === 'select' ? (
+                    <select name={field.name} defaultValue={field.value || ''} className="w-full rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-xs font-bold text-white outline-none focus:border-brand-orange">
+                      {(field.options || []).map((option: string) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  ) : field.type === 'textarea' ? (
+                    <textarea name={field.name} defaultValue={field.value || ''} rows={4} className="w-full resize-none rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-xs font-bold text-white outline-none focus:border-brand-orange" />
+                  ) : (
+                    <input name={field.name} defaultValue={field.value || ''} className="w-full rounded-lg border border-brand-border bg-brand-dark px-3 py-2 text-xs font-bold text-white outline-none focus:border-brand-orange" />
+                  )}
+                </label>
+              ))}
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setStoreAdminPrompt(null)} className="rounded-lg border border-brand-border px-4 py-2 text-xs font-bold text-gray-300 hover:bg-white/5">Cancel</button>
+                <button type="submit" className="rounded-lg bg-brand-orange px-4 py-2 text-xs font-black text-white hover:bg-brand-orange-hover">{storeAdminPrompt.submitLabel || 'Submit'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
