@@ -5,8 +5,9 @@
  * Roles Hub — a standalone landing page listing every role portal site on the
  * NexaGo platform. Each site opens on its own clean route (served live by the
  * relay, e.g. https://thanexsago.com/driver?key=nexago-main) with a
- * one-click copy link so teams can share their portal. Each role site's back
- * button lands here so the portals stay fully separate from the super admin panel.
+ * one-click copy link so teams can share their portal. This public hub never
+ * exposes Super Admin URLs; those are private and must be opened manually by an
+ * authorized super admin only.
  */
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -20,8 +21,6 @@ const SITES = [
   { route: 'driver', label: 'Driver Site', desc: 'Accept deliveries, track earnings & manage your workday.', icon: Truck, color: 'text-sky-400 border-sky-500/30 bg-sky-500/10' },
   { route: 'store-site', label: 'Store Site', desc: 'Product catalog, inventory, coupons & live storefront sync.', icon: Store, color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
   { route: 'store-admin', label: 'Store Admin Site', desc: 'Store dashboard, staff, orders, payments & support.', icon: ShieldCheck, color: 'text-teal-400 border-teal-500/30 bg-teal-500/10' },
-  { route: 'super-admin', label: 'Super Admin Site', desc: 'Full platform control center — every module unlocked.', icon: ShieldCheck, color: 'text-brand-orange border-brand-orange/30 bg-brand-orange/10' },
-  { route: 'super-admin-staff', label: 'Super Admin Staff', desc: 'Orders, order tools, support tickets, notifications & reports.', icon: Users, color: 'text-violet-400 border-violet-500/30 bg-violet-500/10' },
 ];
 
 function SiteCard({ site, onCopy, key }: { site: (typeof SITES)[number]; onCopy: (url: string, label: string) => void; key?: string }) {
@@ -88,7 +87,7 @@ function RolesHub() {
         <div className="max-w-4xl mx-auto space-y-5">
           <div>
             <h1 className="text-xl font-black text-white">Choose a portal</h1>
-            <p className="text-[11px] text-gray-400 mt-1">Each role opens on its own separate live site — copy the link and share it with that team member.</p>
+            <p className="text-[11px] text-gray-400 mt-1">Each public role opens on its own separate live site — copy the link and share it with that team member. Super Admin links are private and never shown here.</p>
             <p className="text-[10px] font-mono text-gray-600 mt-1.5">Key: <span className="text-brand-orange">{KEY}</span> · Base: {BASE}</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
