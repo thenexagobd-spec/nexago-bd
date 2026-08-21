@@ -5734,6 +5734,8 @@ const CustomerAuthScreen: React.FC<{
   useEffect(() => {
     const sb = supabaseRef.current;
     if (!sb) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('oauthRole') !== 'customer') return;
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     if (!params.get('access_token')) return;
     (async () => {
@@ -5758,7 +5760,9 @@ const CustomerAuthScreen: React.FC<{
       } finally {
         setGoogleBusy(false);
       }
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      searchParams.delete('oauthRole');
+      const cleanSearch = searchParams.toString();
+      window.history.replaceState(null, '', window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ''));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -5769,7 +5773,9 @@ const CustomerAuthScreen: React.FC<{
       return;
     }
     setGoogleBusy(true);
-    const redirectTo = window.location.origin + window.location.pathname + window.location.search;
+    const params = new URLSearchParams(window.location.search);
+    params.set('oauthRole', 'customer');
+    const redirectTo = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
       .catch(() => {
         setGoogleBusy(false);

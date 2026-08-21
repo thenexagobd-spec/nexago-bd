@@ -299,9 +299,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('Dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const isSuperAdminRoute = window.location.pathname.includes('super-admin') || window.location.pathname.endsWith('/admin') || window.location.pathname.endsWith('/index.html');
-  const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(() => {
+  const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(false);
+  const [isSuperAdminSessionChecking, setIsSuperAdminSessionChecking] = useState(() => {
     const token = localStorage.getItem('sd_security_session') || '';
-    return !!token && localStorage.getItem('sd_super_admin_login') === 'verified';
+    return isSuperAdminRoute && !!token && localStorage.getItem('sd_super_admin_login') === 'verified';
   });
   const [superAdminLogin, setSuperAdminLogin] = useState({ user: '', password: '', secretCode: '' });
   const [superAdminLoginError, setSuperAdminLoginError] = useState('');
@@ -310,6 +311,12 @@ export default function App() {
   const [superAdminOtpSending, setSuperAdminOtpSending] = useState(false);
   const [legalPopup, setLegalPopup] = useState<'privacy' | 'terms' | null>(null);
 
+  const clearSuperAdminSession = () => {
+    localStorage.removeItem('sd_security_session');
+    localStorage.removeItem('sd_super_admin_login');
+    setIsSuperAdminLoggedIn(false);
+  };
+
   // Supabase Google OAuth account chooser. The anon key is safe for browsers.
   // Uses the app-wide shared singleton so only ONE GoTrueClient exists (the
   // auth-js warning + undefined behavior come from creating several clients).
@@ -317,12 +324,34 @@ export default function App() {
   const supabaseRef = useRef(supabase);
   supabaseRef.current = supabase;
 
+  useEffect(() => {
+    const token = localStorage.getItem('sd_security_session') || '';
+    const markedVerified = localStorage.getItem('sd_super_admin_login') === 'verified';
+    if (!isSuperAdminRoute || !token || !markedVerified) {
+      if (isSuperAdminRoute && (!token || !markedVerified)) clearSuperAdminSession();
+      setIsSuperAdminSessionChecking(false);
+      return;
+    }
+    setIsSuperAdminSessionChecking(true);
+    securityApi('/me').then((data) => {
+      if (data.user?.role !== 'super-admin') throw new Error('not super admin');
+      setIsSuperAdminLoggedIn(true);
+    }).catch(() => {
+      clearSuperAdminSession();
+    }).finally(() => {
+      setIsSuperAdminSessionChecking(false);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdminRoute]);
+
   // Google OAuth callback: after the user picks a Gmail account on Google's
   // account chooser, Supabase redirects back with #access_token in the URL.
   // Read the session, pull the chosen email, then auto-send the OTP to it.
   useEffect(() => {
     const sb = supabaseRef.current;
     if (!sb) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    if (!isSuperAdminRoute || searchParams.get('oauthRole') !== 'super-admin') return;
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     if (!params.get('access_token')) return;
     (async () => {
@@ -349,9 +378,11 @@ export default function App() {
         setSuperAdminLoginError('Google sign-in could not be completed. Try again or use username & password.');
       }
       // Clean the hash so a reload doesn't re-trigger the OTP flow.
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      searchParams.delete('oauthRole');
+      const cleanSearch = searchParams.toString();
+      window.history.replaceState(null, '', window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ''));
     })();
-  }, []);
+  }, [isSuperAdminRoute]);
   const [superAdminPasswordForm, setSuperAdminPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '', secretCode: '' });
   const [superAdminPasswordError, setSuperAdminPasswordError] = useState('');
   const [superAdminSessions, setSuperAdminSessions] = useState<any[]>([]);
@@ -6559,7 +6590,9 @@ export default function App() {
     // Google account chooser flow (Supabase OAuth): redirect to Google, pick a
     // Gmail, come back, then send the OTP to the chosen address automatically.
     if (supabase && !superAdminOtp.email) {
-      const redirectTo = window.location.origin + window.location.pathname + window.location.search;
+      const params = new URLSearchParams(window.location.search);
+      params.set('oauthRole', 'super-admin');
+      const redirectTo = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
       supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
         .then(({ error }) => {
           if (error) {
@@ -6695,6 +6728,18 @@ export default function App() {
     const watchId = navigator.geolocation.watchPosition(sendLocation, () => {}, { enableHighAccuracy: true, timeout: 20_000, maximumAge: 15_000 });
     return () => navigator.geolocation.clearWatch(watchId);
   }, [isSuperAdminLoggedIn]);
+
+  if (isSuperAdminRoute && isSuperAdminSessionChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#070d16] p-4 text-gray-100">
+        <div className="rounded-2xl border border-brand-border bg-[#101d30] p-6 text-center shadow-2xl">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand-orange border-t-transparent" />
+          <p className="mt-4 text-xs font-black uppercase tracking-widest text-white">Verifying Super Admin Session</p>
+          <p className="mt-1 text-[10px] text-gray-400">Server role check required before opening the dashboard.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isSuperAdminRoute && !isSuperAdminLoggedIn) {
     const loginDoc = legalPopup ? LEGAL_DOCS[legalPopup] : null;

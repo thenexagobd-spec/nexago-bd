@@ -2462,6 +2462,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/security/me') {
+    const session = requireSession(req, key);
+    if (!session) { sendJson(res, 401, { ok: false, error: 'SESSION_REQUIRED' }); return; }
+    sendJson(res, 200, {
+      ok: true,
+      user: {
+        userId: session.userId,
+        role: session.role,
+        storeId: session.storeId || '',
+        branchId: session.branchId || '',
+        permissions: session.permissions || [],
+      },
+      expiresAt: session.expiresAt || 0,
+      status: session.status || 'Active',
+    });
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/security/admin-set-user-status') {
     if (!rateLimit(req, 'admin-set-user-status', 30, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then((body) => {
