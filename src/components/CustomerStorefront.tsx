@@ -993,6 +993,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   // screen; once verified the customer is marked verified on this device.
   const [custVerified, setCustVerified] = useState<boolean>(() => { try { return localStorage.getItem('ss_cust_verified') === '1'; } catch { return false; } });
 
+  // Customer directory (A-Z) — all customers + add to wallet
+  const [customerDirOpen, setCustomerDirOpen] = useState(false);
+  const [customerDirSearch, setCustomerDirSearch] = useState('');
+  const seedCustomers = useMemo<Array<{ id: string; name: string; phone: string; email: string; orders: number; spent: number; zone: string; joined: string }>>(() => [], []);
+  const [customerWallet, setCustomerWallet] = useState<Record<string, number>>(() => getStoredData('ss_cust_wallet_alloc', {}));
+  useEffect(() => setStoredData('ss_cust_wallet_alloc', customerWallet), [customerWallet]);
   const [tickets, setTickets] = useState<SupportTicketItem[]>(() => getStoredData(LS_KEYS.tickets, []));
   useEffect(() => setStoredData(LS_KEYS.tickets, tickets), [tickets]);
   const [isNewTicketModal, setIsNewTicketModal] = useState(false);
@@ -3556,6 +3562,16 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <p className="text-[9px] text-gray-500">Transactions & balance</p>
                     </div>
                   </button>
+                  <button
+                    onClick={() => { setCustomerDirOpen(true); setCustomerDirSearch(''); }}
+                    className="p-3 rounded-2xl border border-gray-200 hover:border-emerald-500 bg-gray-50 hover:bg-emerald-50 transition-all cursor-pointer text-left space-y-2"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><User className="w-4 h-4" /></div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900">Customers</p>
+                      <p className="text-[9px] text-gray-500">A-Z directory & wallet add</p>
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
@@ -5502,6 +5518,87 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           </div>
         </div>
       )}
+
+      {/* ============ CUSTOMER DIRECTORY MODAL (A-Z + add to wallet) ============ */}
+      {customerDirOpen && (() => {
+        const q = customerDirSearch.trim().toLowerCase();
+        const list = [...seedCustomers]
+          .filter(c => !q || c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.email.toLowerCase().includes(q))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        return (
+          <div className="fixed inset-0 z-[88] bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-5 shadow-2xl border border-gray-200 space-y-3 text-xs animate-in fade-in duration-200 my-auto max-h-[88dvh] overflow-y-auto overflow-x-hidden">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-black text-gray-900 flex items-center space-x-2"><User className="w-4 h-4 text-emerald-600" /><span>Customer Directory</span></h3>
+                  <p className="text-[10px] text-gray-500 mt-0.5">All customers A–Z — tap to add wallet balance</p>
+                </div>
+                <button onClick={() => setCustomerDirOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-4 h-4 text-gray-500" /></button>
+              </div>
+
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={customerDirSearch}
+                  onChange={(e) => setCustomerDirSearch(e.target.value)}
+                  placeholder="Search by name, phone or email..."
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-xs outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                {list.map((c) => {
+                  const alloc = customerWallet[c.id] || 0;
+                  return (
+                    <div key={c.id} className="border border-gray-200 rounded-2xl p-3 flex items-center justify-between gap-2">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-[11px] font-black flex items-center justify-center shrink-0">
+                          {initialsOf(c.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-black text-gray-900 text-xs truncate">{c.name}</p>
+                          <p className="text-[10px] text-gray-500 font-mono truncate">{c.phone} · {c.email}</p>
+                          <div className="flex items-center space-x-2 text-[9px] text-gray-400 mt-0.5">
+                            <span>{c.zone}</span><span>•</span><span>{c.orders} orders</span><span>•</span><span>৳{c.spent.toLocaleString()} spent</span>
+                            {alloc > 0 && <span className="text-emerald-600 font-black">• Wallet: ৳{alloc}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex items-center space-x-1.5">
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={0}
+                            value={alloc === 0 && !customerWallet[c.id] ? '' : alloc}
+                            placeholder="৳"
+                            onChange={(e) => setCustomerWallet(prev => ({ ...prev, [c.id]: Math.max(0, Number(e.target.value) || 0) }))}
+                            className="w-20 border border-gray-300 rounded-xl px-2 py-1.5 text-xs font-mono outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            const amt = customerWallet[c.id] || 0;
+                            if (amt <= 0) { showToast('Enter an amount to add to wallet', 'info'); return; }
+                            setCustomerWallet(prev => ({ ...prev, [c.id]: 0 }));
+                            showToast(`৳${amt.toLocaleString()} added to ${c.name}'s wallet`, 'success');
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black rounded-xl transition-all cursor-pointer flex items-center space-x-1"
+                        >
+                          <Plus className="w-3 h-3" /><span>Add</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {list.length === 0 && (
+                  <p className="text-center text-gray-400 py-8 text-xs">No customers found</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ============ CUSTOMIZE PRODUCT MODAL (product-specific options) ============ */}
       {customizeProd && (() => {
