@@ -2766,17 +2766,38 @@ const server = http.createServer((req, res) => {
       return;
     }
     readBody(req).then(async (body) => {
-      const ids = new Set((Array.isArray(body && body.drivers) ? body.drivers : []).map((x) => String(x)));
-      if (ids.size === 0) { sendJson(res, 400, { ok: false, error: 'drivers[] required' }); return; }
+      const driverIds = new Set((Array.isArray(body && body.drivers) ? body.drivers : []).map((x) => String(x)));
+      const productIds = new Set((Array.isArray(body && body.products) ? body.products : []).map((x) => String(x)));
+      const clearAllProducts = body && body.allProducts === true;
       const store = await loadStoreLatest(key);
-      const before = Array.isArray(store.state.drivers) ? store.state.drivers.length : 0;
-      if (before) {
-        store.state.drivers = store.state.drivers.filter((d) => d && !ids.has(String(d.id)));
+      let removed = 0;
+      if (driverIds.size && Array.isArray(store.state.drivers)) {
+        const before = store.state.drivers.length;
+        store.state.drivers = store.state.drivers.filter((d) => d && !driverIds.has(String(d.id)));
+        removed += before - store.state.drivers.length;
+      }
+      if (Array.isArray(store.state.products)) {
+        if (clearAllProducts) {
+          removed += store.state.products.length;
+          // Track all IDs so cloud sync filter re-adds never bring them back
+          store.state.deletedProductIds = store.state.products.map((p) => String(p.id));
+          store.state.products = [];
+        } else if (productIds.size) {
+          const before = store.state.products.length;
+          store.state.products = store.state.products.filter((p) => p && !productIds.has(String(p.id)));
+          removed += before - store.state.products.length;
+          // Track removed IDs
+          const existing = new Set(Array.isArray(store.state.deletedProductIds) ? store.state.deletedProductIds : []);
+          productIds.forEach((id) => existing.add(id));
+          store.state.deletedProductIds = [...existing];
+        }
+      }
+      if (removed) {
         store.updatedAt = new Date().toISOString();
         await saveStorePermanent(key, store);
         notifyStateSubscribers(key, { reason: 'state-remove' });
       }
-      sendJson(res, 200, { ok: true, removed: before - (Array.isArray(store.state.drivers) ? store.state.drivers.length : 0) });
+      sendJson(res, 200, { ok: true, removed });
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
