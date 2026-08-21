@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order, Product, RefundRequest, ReturnRequest, WalletConfig, WalletKey, DEFAULT_WALLETS, WALLET_CONFIG_KEY, SEND_MONEY_METHODS } from '../types';
-import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi, customerRegister, customerSync, customerLogin, customerForgot, supabaseClient } from '../portals/portalUtils';
+import { handoffPayloadOf, handoffCodeOf, identityCheck, securityApi, customerRegister, customerSync, customerLogin, customerOtpSend, customerOtpLogin, customerForgot, supabaseClient } from '../portals/portalUtils';
 import LeafletMap, { LiveVeh } from './LeafletMap';
 import { LiveDriverSim } from '../hooks/useLiveDrivers';
 import { getStoredData, setStoredData } from '../data';
@@ -1057,7 +1057,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   // no duplicate accounts). If none exists, we create a brand-new permanent ID.
   const normPhone = (p: string) => (p || '').replace(/[^0-9]/g, '');
   const normEmail = (e: string) => (e || '').trim().toLowerCase();
-  const [customerId] = useState<string>(() => {
+  const [customerId, setCustomerId] = useState<string>(() => {
     const myPhone = normPhone(customerProfile.phone);
     const myEmail = normEmail(customerProfile.email);
     const accounts = getStoredData<Array<{ customerId: string; name: string; phone: string; email: string }>>('ss_cust_accounts', []);
@@ -2317,7 +2317,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             setCustVerified(true);
             try {
               localStorage.setItem('ss_cust_verified', '1');
-              if (info?.customerId) localStorage.setItem('ss_cust_id', info.customerId);
+              if (info?.customerId) {
+                setCustomerId(info.customerId);
+                localStorage.setItem('ss_cust_id', info.customerId);
+              }
             } catch { /* ignore */ }
           }}
           showToast={showToast}
@@ -5713,8 +5716,9 @@ const CustomerAuthScreen: React.FC<{
   onVerified: (info?: { customerId?: string; name?: string; email?: string; phone?: string; password?: string; pin?: string }) => void;
   showToast?: (msg: string, type?: string) => void;
 }> = ({ email, name, phone, customerId, onUpdateProfile, onVerified, showToast }) => {
-  const [mode, setMode] = useState<'login' | 'signup'>('signup');
-  const [step, setStep] = useState<'form' | 'otp' | 'details' | 'done'>('form');
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
+  const [step, setStep] = useState<'form' | 'otp' | 'loginOtp' | 'details' | 'done'>('form');
   const [emailField, setEmailField] = useState(email || '');
   const [nameField, setNameField] = useState(name || '');
   const [phoneField, setPhoneField] = useState(phone || '');
@@ -5744,11 +5748,6 @@ const CustomerAuthScreen: React.FC<{
         if (error || !data.session) throw error || new Error('no session');
         const gmail = String(data.session.user.email || '').trim().toLowerCase();
         if (!gmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gmail)) throw new Error('no email');
-        const taken = await identityCheck({ email: gmail, excludeId: customerId, excludeRole: 'customer' }).catch(() => null);
-        if (taken && taken.taken) {
-          showToast?.('This Gmail already belongs to another account. Log in with that account instead.', 'info');
-          return;
-        }
         const emailPrefix = safeText(gmail).split('@')[0] || 'customer';
         const res = await customerRegister({ name: nameField.trim() || emailPrefix, email: gmail, phone: phoneField.trim(), customerId, balance: 0 });
         if (!res || !res.customer) throw new Error('register failed');
@@ -5791,23 +5790,56 @@ const CustomerAuthScreen: React.FC<{
   const [doneCard, setDoneCard] = useState<{ customerId: string; email: string; phone: string; password: string; pin: string } | null>(null);
 
   const emailOk = () => /^[\w.+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(emailField.trim());
+  const loginIdOk = () => emailOk() || /^NEX\d{6,}$/i.test(emailField.trim());
   const phoneOk = () => !phoneField.trim() || /^\+?88?01\d{9}$/.test(phoneField.trim().replace(/[^0-9]/g, ''));
   const genPin = () => String(Math.floor(100000 + Math.random() * 900000));
 
   // Password login.
   const doLogin = () => {
-    if (!emailOk()) { setError('Enter a valid email address.'); return; }
+    if (!loginIdOk()) { setError('Enter your Gmail or permanent Customer ID.'); return; }
     if (!passField) { setError('Enter your password.'); return; }
     setBusy(true);
     setError('');
-    customerLogin({ email: emailField.trim().toLowerCase(), password: passField })
+    customerLogin({ identifier: emailField.trim(), password: passField })
       .then((res) => {
         if (!res || !res.customer) { setError('Wrong email or password. Try again, or use Forgot Password.'); return; }
         onUpdateProfile({ name: res.customer.name || nameField, email: res.customer.email || emailField, phone: res.customer.phone || phoneField });
         showToast?.('Welcome back! Logged in with password.', 'success');
         onVerified({ customerId: res.customer.customerId, name: res.customer.name, email: res.customer.email, phone: res.customer.phone });
       })
-      .catch((err) => setError(String(err?.message || 'Login failed. Try again.')))
+      .catch(() => setError('Password milche na. Forgot Password diye Gmail OTP verify kore new password set korun.'))
+      .finally(() => setBusy(false));
+  };
+
+  const sendLoginOtp = () => {
+    if (!loginIdOk()) { setError('Enter your Gmail or permanent Customer ID.'); return; }
+    setBusy(true);
+    setError('');
+    const target = emailField.trim();
+    setSentTo(target);
+    customerOtpSend({ identifier: target })
+      .then((res) => {
+        if (!res) { setError('Customer account found holo na. Gmail/Customer ID check korun.'); return; }
+        setStep('loginOtp');
+        showToast?.(`OTP sent to ${res.sentTo || 'your Gmail'}.`, 'success');
+      })
+      .catch(() => setError('OTP pathate parlam na. Try again.'))
+      .finally(() => setBusy(false));
+  };
+
+  const verifyLoginOtp = () => {
+    if (!otpCode.trim()) { setError('Enter the 6-digit code from your Gmail.'); return; }
+    setBusy(true);
+    setError('');
+    customerOtpLogin({ identifier: sentTo, code: otpCode })
+      .then((res) => {
+        if (!res || !res.customer) { setError('OTP milche na ba expire hoye geche.'); return; }
+        onUpdateProfile({ name: res.customer.name || nameField, email: res.customer.email || emailField, phone: res.customer.phone || phoneField });
+        setOtpCode('');
+        showToast?.('OTP verified — logged in successfully.', 'success');
+        onVerified({ customerId: res.customer.customerId, name: res.customer.name, email: res.customer.email, phone: res.customer.phone });
+      })
+      .catch(() => setError('OTP login failed. Code check kore abar try korun.'))
       .finally(() => setBusy(false));
   };
 
@@ -5978,8 +6010,8 @@ const CustomerAuthScreen: React.FC<{
               <p className="mt-1.5 text-[12px] text-gray-300 leading-relaxed">One permanent account for all your devices — Gmail + phone linked, order & wallet data never lost.</p>
 
               <div className="mt-5 grid grid-cols-2 gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
-                <button onClick={() => { setMode('signup'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'signup' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Create Account</button>
-                <button onClick={() => { setMode('login'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'login' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Sign In</button>
+                <button onClick={() => { setMode('signup'); setStep('form'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'signup' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Create Account</button>
+                <button onClick={() => { setMode('login'); setStep('form'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'login' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Sign In</button>
               </div>
 
               <button
@@ -6009,12 +6041,18 @@ const CustomerAuthScreen: React.FC<{
                     <span>Step 1 of 2 — first verify your Gmail with an OTP. Name, phone & password come next.</span>
                   </p>
                 )}
+                {mode === 'login' && (
+                  <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
+                    <button onClick={() => { setLoginMethod('password'); setError(''); }} className={`py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer ${loginMethod === 'password' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'}`}>Password</button>
+                    <button onClick={() => { setLoginMethod('otp'); setError(''); }} className={`py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer ${loginMethod === 'otp' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'}`}>OTP Login</button>
+                  </div>
+                )}
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail Address <span className="text-emerald-400">*</span></label>
-                  <input value={emailField} onChange={(e) => { setEmailField(e.target.value); setError(''); }} placeholder="name@gmail.com"
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{mode === 'login' ? 'Gmail or Customer ID' : 'Gmail Address'} <span className="text-emerald-400">*</span></label>
+                  <input value={emailField} onChange={(e) => { setEmailField(e.target.value); setError(''); }} placeholder={mode === 'login' ? 'name@gmail.com or NEX1234567890' : 'name@gmail.com'}
                     className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
                 </div>
-                {mode === 'login' && (
+                {mode === 'login' && loginMethod === 'password' && (
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Password <span className="text-emerald-400">*</span></label>
                     <div className="relative">
@@ -6033,13 +6071,22 @@ const CustomerAuthScreen: React.FC<{
                   </button>
                 ) : (
                   <>
-                    <button onClick={doLogin} disabled={busy}
-                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                      {busy ? 'Signing in…' : 'Sign In with Password'}
-                    </button>
-                    <button onClick={() => { setForgotMode(true); setError(''); }} className="w-full text-center text-[11px] font-bold text-emerald-300 hover:text-emerald-200 transition-colors cursor-pointer">
-                      Forgot Password?
-                    </button>
+                    {loginMethod === 'password' ? (
+                      <>
+                        <button onClick={doLogin} disabled={busy}
+                          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                          {busy ? 'Signing in…' : 'Sign In with Password'}
+                        </button>
+                        <button onClick={() => { setForgotMode(true); setError(''); }} className="w-full text-center text-[11px] font-bold text-emerald-300 hover:text-emerald-200 transition-colors cursor-pointer">
+                          Forgot Password?
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={sendLoginOtp} disabled={busy}
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                        {busy ? 'Sending OTP…' : 'Send Login OTP'}
+                      </button>
+                    )}
                   </>
                 )}
                 {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
@@ -6065,6 +6112,29 @@ const CustomerAuthScreen: React.FC<{
               <button onClick={() => setStep('form')} disabled={busy}
                 className="w-full py-2.5 rounded-xl text-[11px] font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">
                 ← Back
+              </button>
+              {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
+            </div>
+          )}
+
+          {!forgotMode && step === 'loginOtp' && (
+            <div className="mt-6 space-y-3">
+              <div className="rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3 text-[11px] text-emerald-200">
+                <b className="text-white">Customer OTP Login</b> — enter the 6-digit code sent to the Gmail linked with <b className="text-white">{sentTo}</b>.
+              </div>
+              <input value={otpCode} onChange={(e) => { setOtpCode(e.target.value); setError(''); }} placeholder="6-digit code"
+                className="cs-auth-input w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:text-gray-500" />
+              <button onClick={verifyLoginOtp} disabled={busy}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
+                {busy ? 'Verifying…' : 'Login with OTP'}
+              </button>
+              <button onClick={sendLoginOtp} disabled={busy}
+                className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
+                Resend Login OTP
+              </button>
+              <button onClick={() => { setStep('form'); setOtpCode(''); setError(''); }} disabled={busy}
+                className="w-full py-2.5 rounded-xl text-[11px] font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">
+                ← Back to Sign In
               </button>
               {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
             </div>

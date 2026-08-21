@@ -381,9 +381,27 @@ export async function customerRegister(opts: { name?: string; phone?: string; em
   }
 }
 
-export async function customerLogin(opts: { email: string; password: string }): Promise<{ customer?: any; walletBalance?: number; txns?: any[] } | null> {
+export async function customerLogin(opts: { email?: string; identifier?: string; password: string }): Promise<{ customer?: any; walletBalance?: number; txns?: any[] } | null> {
   try {
     const data = await securityApi('/customer/login', { ...opts });
+    return { customer: data.customer, walletBalance: data.walletBalance, txns: data.txns };
+  } catch {
+    return null;
+  }
+}
+
+export async function customerOtpSend(opts: { email?: string; identifier?: string }): Promise<{ sentTo?: string } | null> {
+  try {
+    const data = await securityApi('/customer/otp-send', { ...opts });
+    return { sentTo: data.sentTo };
+  } catch {
+    return null;
+  }
+}
+
+export async function customerOtpLogin(opts: { email?: string; identifier?: string; code: string }): Promise<{ customer?: any; walletBalance?: number; txns?: any[] } | null> {
+  try {
+    const data = await securityApi('/customer/otp-login', { ...opts });
     return { customer: data.customer, walletBalance: data.walletBalance, txns: data.txns };
   } catch {
     return null;

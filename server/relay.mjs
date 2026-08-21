@@ -926,6 +926,41 @@ async function supabaseFetchCustomer(customerId) {
   };
 }
 
+async function supabaseFindCustomerByPhoneOrEmail(phone = '', email = '') {
+  if (!supabaseConfigured || !serviceClient) return null;
+  const p = normalizePhoneForIdentity(phone);
+  const e = normalizeEmailForIdentity(email);
+  const filters = [];
+  if (p) filters.push(`phone_norm.eq.${p}`);
+  if (e) filters.push(`email_norm.eq.${e}`);
+  if (!filters.length) return null;
+  const { data, error } = await serviceClient.from(SUPABASE_TABLE.customers).select('*').or(filters.join(',')).limit(1);
+  if (error || !data || !data[0]) return null;
+  const row = data[0];
+  return {
+    customerId: row.customer_id,
+    name: row.name || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    payload: row.payload || {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function findCustomerByLoginIdentifier(identifier = '') {
+  const raw = String(identifier || '').trim();
+  if (!raw) return null;
+  if (/^NEX\d{6,}$/i.test(raw)) {
+    const customerId = raw.toUpperCase();
+    const local = readCustomers().find((c) => c && String(c.customerId || '').toUpperCase() === customerId);
+    if (local) return local;
+    return supabaseFetchCustomer(customerId);
+  }
+  const email = normalizeEmailForIdentity(raw);
+  return findCustomerByPhoneOrEmail('', email) || await supabaseFindCustomerByPhoneOrEmail('', email);
+}
+
 async function supabaseFetchWallet(customerId) {
   if (!supabaseConfigured || !serviceClient || !customerId) return null;
   const { data, error } = await serviceClient.from(SUPABASE_TABLE.wallets).select('*').eq('customer_id', customerId).maybeSingle();
@@ -2156,8 +2191,10 @@ const server = http.createServer((req, res) => {
   // GET  /api/security/customer/me?customerId=... → customer + wallet + txns.
   // POST /api/security/customer/sync { customerId, balance, txns[] } → pushes
   //   wallet balance + new wallet transactions to the permanent cloud store.
-  // POST /api/security/customer/login { email, password } → verifies password,
+  // POST /api/security/customer/login { identifier/email, password } → verifies password,
   //   returns customer + wallet + txns.
+  // POST /api/security/customer/otp-send { identifier/email } → sends login OTP.
+  // POST /api/security/customer/otp-login { identifier/email, code } → OTP login.
   // POST /api/security/customer/forgot { email, code, newPassword } → verifies
   //   the OTP then sets a new password.
   if (req.method === 'POST' && url.pathname === '/api/security/customer/register') {
@@ -2168,23 +2205,22 @@ const server = http.createServer((req, res) => {
       const password = String(body.password || '');
       if (password && password.length < 6) { sendJson(res, 400, { ok: false, error: 'PASSWORD_TOO_SHORT' }); return; }
       const requestedId = String(body.customerId || '').trim();
-      let customerId = requestedId && requestedId.startsWith('NEX') ? requestedId : '';
+      let customerId = '';
       let record = null;
-      // Adopt the existing ID when the phone/Gmail is already registered.
-      if (!customerId) {
-        const found = findCustomerByPhoneOrEmail(phone, email);
-        if (found) { customerId = found.customerId; record = found; }
+      // Adopt the existing ID when the phone/Gmail is already registered, even
+      // when the browser sends a newly generated customerId.
+      const found = findCustomerByPhoneOrEmail(phone, email);
+      if (found) { customerId = found.customerId; record = found; }
+      if (!record && supabaseConfigured && serviceClient) {
+        record = await supabaseFindCustomerByPhoneOrEmail(phone, email);
+        if (record) customerId = record.customerId;
       }
+      if (!customerId && requestedId && requestedId.startsWith('NEX')) customerId = requestedId;
       if (!customerId) {
         customerId = 'NEX' + Math.floor(1000000000 + Math.random() * 9000000000).toString();
       }
       if (supabaseConfigured && serviceClient && !record) {
         record = await supabaseFetchCustomer(customerId);
-        if (!record && (phone || email)) {
-          const { data } = await serviceClient.from(SUPABASE_TABLE.customers)
-            .select('*').or(`phone_norm.eq.${normalizePhoneForIdentity(phone)},email_norm.eq.${email}`).limit(1);
-          if (data && data[0]) { customerId = data[0].customer_id; record = { customerId, name: data[0].name, phone: data[0].phone, email: data[0].email, payload: data[0].payload }; }
-        }
       }
       const existingHash = record?.payload?.passwordHash || '';
       const passwordHash = password ? hashPassword(password) : existingHash;
@@ -2228,11 +2264,11 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/security/customer/login') {
     if (!rateLimit(req, 'customer-login', 12, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
     readBody(req).then(async (body) => {
-      const email = normalizeEmailForIdentity(body.email);
+      const identifier = String(body.identifier || body.email || '').trim();
       const password = String(body.password || '');
-      const found = findCustomerByPhoneOrEmail('', email);
+      const found = await findCustomerByLoginIdentifier(identifier);
       if (!found || !found.payload?.passwordHash || !verifyPassword(password, found.payload.passwordHash)) {
-        appendAudit(key, { actor: email || 'unknown', role: 'customer', action: 'customer-login-failed', ip: clientIp(req), reason: 'invalid customer password' });
+        appendAudit(key, { actor: identifier || 'unknown', role: 'customer', action: 'customer-login-failed', ip: clientIp(req), reason: 'invalid customer password' });
         sendJson(res, 401, { ok: false, error: 'INVALID_LOGIN' });
         return;
       }
@@ -2245,6 +2281,53 @@ const server = http.createServer((req, res) => {
         walletBalance: wallet ? wallet.balance : 0,
         txns,
       });
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/customer/otp-send') {
+    if (!supabaseConfigured) { sendJson(res, 503, { ok: false, error: 'SUPABASE_NOT_CONFIGURED' }); return; }
+    if (!rateLimit(req, 'customer-otp-send', 8, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const identifier = String(body.identifier || body.email || '').trim();
+      const found = await findCustomerByLoginIdentifier(identifier);
+      const email = normalizeEmailForIdentity(found?.email || identifier);
+      if (!found || !email) { sendJson(res, 404, { ok: false, error: 'CUSTOMER_NOT_FOUND' }); return; }
+      try {
+        await sendEmailOtp(email, 'Customer login OTP');
+        appendAudit(key, { actor: found.customerId, role: 'customer', action: 'customer-otp-sent', ip: clientIp(req), reason: 'OTP login' });
+        sendJson(res, 200, { ok: true, sentTo: email.replace(/^(.{2}).*(@.*)$/, '$1***$2') });
+      } catch (e) {
+        sendJson(res, 500, { ok: false, error: String(e && e.message || e) });
+      }
+    }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/security/customer/otp-login') {
+    if (!supabaseConfigured) { sendJson(res, 503, { ok: false, error: 'SUPABASE_NOT_CONFIGURED' }); return; }
+    if (!rateLimit(req, 'customer-otp-login', 12, 60_000)) { sendJson(res, 429, { ok: false, error: 'RATE_LIMIT' }); return; }
+    readBody(req).then(async (body) => {
+      const identifier = String(body.identifier || body.email || '').trim();
+      const code = String(body.code || '').trim().replace(/\D/g, '');
+      const found = await findCustomerByLoginIdentifier(identifier);
+      const email = normalizeEmailForIdentity(found?.email || identifier);
+      if (!found || !email || !code) { sendJson(res, 404, { ok: false, error: 'CUSTOMER_NOT_FOUND' }); return; }
+      try {
+        await verifyEmailOtp(email, code);
+        const wallet = (supabaseConfigured && serviceClient) ? await supabaseFetchWallet(found.customerId) : null;
+        const txns = (supabaseConfigured && serviceClient) ? await supabaseFetchTxns(found.customerId, 100) : [];
+        appendAudit(key, { actor: found.customerId, role: 'customer', action: 'customer-otp-login', ip: clientIp(req), reason: 'OTP verified' });
+        sendJson(res, 200, {
+          ok: true,
+          customer: { customerId: found.customerId, name: found.name || '', phone: found.phone || '', email: found.email || '' },
+          walletBalance: wallet ? wallet.balance : 0,
+          txns,
+        });
+      } catch {
+        appendAudit(key, { actor: found.customerId, role: 'customer', action: 'customer-otp-login-failed', ip: clientIp(req), reason: 'invalid OTP' });
+        sendJson(res, 401, { ok: false, error: 'INVALID_CODE' });
+      }
     }).catch((e) => sendJson(res, 400, { ok: false, error: String(e && e.message || e) }));
     return;
   }
