@@ -428,7 +428,7 @@ export default function App() {
   };
 
   const mergeProductRecords = (localRows: any[] = [], incomingRows: any[] = []) => {
-    const byId = new Map<string, any>();
+    const byId = new globalThis.Map<string, any>();
     const scoreTime = (row: any) => Date.parse(row?.deletedAt || row?.updatedAt || row?.createdAt || '') || 0;
     [...localRows, ...incomingRows].forEach((row: any) => {
       if (!row?.id) return;
