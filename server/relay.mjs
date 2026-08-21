@@ -414,7 +414,6 @@ function hasStateWriteAccess(req, key) {
     }
     return true;
   }
-  if (!STRICT_SECURITY) return true;
   return !!(STATE_WRITE_TOKEN && req.headers['x-nexago-agent'] === STATE_WRITE_TOKEN);
 }
 
@@ -1286,6 +1285,75 @@ function storefrontView(state, customerId = '') {
   return { profile, banners, products, stores, orders };
 }
 
+function scopedStateForSession(state = {}, session = null, key = '') {
+  if (!session || session.role === 'super-admin') return state;
+  const role = String(session.role || '');
+  const userId = String(session.userId || '');
+  const storeId = String(session.storeId || '');
+  const branchId = String(session.branchId || '');
+  const keyStore = safeKey(key);
+  const inStore = (row) => {
+    if (!row || typeof row !== 'object') return false;
+    const rowStore = String(row.storeId || row.ownerStoreId || row.store_id || row.storeName || '');
+    const rowBranch = String(row.branchId || row.branch_id || '');
+    const storeMatch = storeId ? (rowStore === storeId || rowStore === keyStore || keyStore === storeId) : false;
+    const branchMatch = !branchId || !rowBranch || rowBranch === branchId;
+    return storeMatch && branchMatch;
+  };
+  const isMine = (row) => {
+    if (!row || typeof row !== 'object') return false;
+    if (role === 'customer') return String(row.customerId || row.customer_id || row.ownerId || row.userId || '') === userId;
+    if (role === 'driver') return String(row.driverId || row.driver_id || row.riderId || row.id || row.userId || '') === userId || (Array.isArray(row.offeredDriverIds) && row.offeredDriverIds.map(String).includes(userId));
+    if (role === 'store-admin' || role === 'branch-admin' || role === 'staff') return inStore(row) || String(row.actor || row.userId || '') === userId;
+    return false;
+  };
+  const pickArray = (name, predicate) => Array.isArray(state[name]) ? state[name].filter(predicate) : [];
+  if (role === 'customer') {
+    return {
+      orders: pickArray('orders', isMine),
+      payments: pickArray('payments', isMine),
+      tickets: pickArray('tickets', isMine),
+      notifications: pickArray('notifications', (n) => !n || !n.audience || n.audience === 'all' || n.audience === 'customer' || String(n.customerId || '') === userId),
+      customerAccounts: pickArray('customerAccounts', isMine),
+      wallet: state.wallet,
+      walletTxns: pickArray('walletTxns', isMine),
+    };
+  }
+  if (role === 'driver') {
+    return {
+      drivers: pickArray('drivers', (d) => String(d.id || d.driverId || '') === userId),
+      orders: pickArray('orders', isMine),
+      notifications: pickArray('notifications', (n) => !n || !n.audience || n.audience === 'all' || n.audience === 'driver' || String(n.driverId || '') === userId),
+      tickets: pickArray('tickets', isMine),
+      payments: pickArray('payments', isMine),
+      walletTxns: pickArray('walletTxns', isMine),
+    };
+  }
+  if (role === 'store-admin' || role === 'branch-admin' || role === 'staff') {
+    return {
+      profile: state.profile || {},
+      stores: pickArray('stores', inStore),
+      branches: pickArray('branches', inStore),
+      products: pickArray('products', inStore),
+      categories: pickArray('categories', inStore),
+      inventory: pickArray('inventory', inStore),
+      inventoryV2: pickArray('inventoryV2', inStore),
+      inventoryLogs: pickArray('inventoryLogs', inStore),
+      orders: pickArray('orders', inStore),
+      payments: pickArray('payments', inStore),
+      tickets: pickArray('tickets', inStore),
+      reviews: pickArray('reviews', inStore),
+      coupons: pickArray('coupons', inStore),
+      staff: pickArray('staff', inStore),
+      notifications: pickArray('notifications', (n) => !n || !n.audience || n.audience === 'all' || n.audience === 'store' || n.audience === 'store-admin' || String(n.storeId || '') === storeId),
+      returns: pickArray('returns', inStore),
+      refunds: pickArray('refunds', inStore),
+      walletTxns: pickArray('walletTxns', inStore),
+    };
+  }
+  return {};
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -1782,8 +1850,24 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/state') {
+    const session = requireSession(req, key);
+    if (STRICT_SECURITY && !session && !isTrustedAutomation(req)) {
+      sendJson(res, 401, { ok: false, error: 'SESSION_REQUIRED' });
+      return;
+    }
     loadStoreLatest(key)
-      .then((store) => sendJson(res, 200, { ok: true, key, version: store.version, updatedAt: store.updatedAt, state: store.state, cloud: supabaseConfigured ? 'supabase' : 'local' }))
+      .then((store) => {
+        const scopedState = session ? scopedStateForSession(store.state, session, key) : storefrontView(store.state, String(url.searchParams.get('customerId') || ''));
+        sendJson(res, 200, {
+          ok: true,
+          key,
+          version: store.version,
+          updatedAt: store.updatedAt,
+          state: scopedState,
+          scoped: session ? session.role : 'public-storefront',
+          cloud: supabaseConfigured ? 'supabase' : 'local'
+        });
+      })
       .catch((e) => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
     return;
   }
@@ -2712,12 +2796,23 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname.startsWith('/api/security/file/')) {
-    if (!requireSession(req, key) && !isTrustedAutomation(req)) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
+    const session = requireSession(req, key);
+    if (!session && !isTrustedAutomation(req)) { sendJson(res, 401, { ok: false, error: 'NO_SESSION' }); return; }
+    const canReadFile = (obj) => {
+      if (isTrustedAutomation(req) || !session || session.role === 'super-admin') return true;
+      const owner = String(obj.owner || obj.ownerId || '');
+      const store = String(obj.storeId || '');
+      const branch = String(obj.branchId || '');
+      if (owner && owner === String(session.userId || '')) return true;
+      if ((session.role === 'store-admin' || session.role === 'branch-admin' || session.role === 'staff') && store && store === String(session.storeId || '') && (!branch || !session.branchId || branch === String(session.branchId || ''))) return true;
+      return false;
+    };
     const id = url.pathname.split('/').pop().replace(/[^a-zA-Z0-9_-]/g, '');
     (async () => {
       const file = path.join(FILES_DIR, safeKey(key), `${id}.json`);
       try {
         const obj = decryptJson(JSON.parse(fs.readFileSync(file, 'utf8')));
+        if (!canReadFile(obj)) { sendJson(res, 403, { ok: false, error: 'FILE_FORBIDDEN' }); return; }
         sendJson(res, 200, { ok: true, file: { ...obj, dataUrl: undefined }, dataUrl: obj.dataUrl, cloud: 'local' });
         return;
       } catch { /* try supabase */ }
@@ -2731,6 +2826,7 @@ const server = http.createServer((req, res) => {
           if (error) throw error;
           const obj = data && data.payload ? decryptJson(data.payload) : null;
           if (obj) {
+            if (!canReadFile(obj)) { sendJson(res, 403, { ok: false, error: 'FILE_FORBIDDEN' }); return; }
             sendJson(res, 200, { ok: true, file: { ...obj, dataUrl: undefined }, dataUrl: obj.dataUrl, cloud: 'supabase' });
             return;
           }
