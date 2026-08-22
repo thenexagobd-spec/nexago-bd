@@ -3298,6 +3298,49 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </button>
               </div>
 
+              {/* Home offer ads above category chips */}
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.35fr_1fr]">
+                <button
+                  type="button"
+                  onClick={() => { setSelectedCategory('Grocery'); setActiveNav('Orders'); }}
+                  className="relative min-h-[118px] overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-700 via-teal-600 to-lime-500 p-5 text-left text-white shadow-md"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=1000"
+                    alt="Grocery promotion"
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 h-full w-full object-cover opacity-20"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/75 via-emerald-800/35 to-transparent" />
+                  <div className="relative flex h-full flex-col justify-between gap-3 sm:flex-row sm:items-end">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-lime-100">Today Promotion</p>
+                      <h3 className="mt-1 max-w-xl text-xl font-black leading-tight">সব বাজারের grocery, pharmacy, fast food, fresh item একসাথে</h3>
+                      <p className="mt-1 text-[11px] font-semibold text-white/85">Discount offer, combo deal, fresh market promotion এবং quick delivery.</p>
+                    </div>
+                    <span className="inline-flex w-fit rounded-2xl bg-white px-4 py-2 text-[10px] font-black uppercase text-emerald-700 shadow-sm">Shop Offers</span>
+                  </div>
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { title: '৳100 OFF', sub: 'Grocery basket', cat: 'Grocery', tone: 'from-orange-500 to-amber-400' },
+                    { title: 'Combo Offer', sub: 'Fast food deals', cat: 'Fast Food', tone: 'from-rose-500 to-red-400' },
+                    { title: 'Care Promo', sub: 'Pharmacy essentials', cat: 'Pharmacy', tone: 'from-sky-600 to-cyan-400' },
+                    { title: 'Fresh Today', sub: 'Fish, meat, fruits', cat: 'Meat & Fish', tone: 'from-emerald-600 to-lime-500' },
+                  ].map((ad) => (
+                    <button
+                      key={ad.title}
+                      type="button"
+                      onClick={() => { setSelectedCategory(ad.cat); setActiveNav('Orders'); }}
+                      className={`rounded-2xl bg-gradient-to-br ${ad.tone} p-3 text-left text-white shadow-sm`}
+                    >
+                      <p className="text-sm font-black leading-tight">{ad.title}</p>
+                      <p className="mt-0.5 text-[10px] font-bold text-white/85">{ad.sub}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Category quick chips */}
               <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
                 {CATEGORIES.map((cat) => {
