@@ -920,12 +920,113 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
   const [driverProfileOpen, setDriverProfileOpen] = useState(false);
   const [driverRefreshing, setDriverRefreshing] = useState(false);
   const [notifOn, setNotifOn] = useState(true);
+  const [driverLocationPermission, setDriverLocationPermission] = useState<'checking' | 'granted' | 'denied' | 'prompt' | 'unsupported'>('checking');
+  const [driverLocationPaused, setDriverLocationPaused] = useState(false);
+  const [driverLocationPopup, setDriverLocationPopup] = useState(false);
+  const [driverCameraPermission, setDriverCameraPermission] = useState<'unknown' | 'granted' | 'denied' | 'prompt' | 'unsupported'>('unknown');
+  const [driverNotificationPermission, setDriverNotificationPermission] = useState<'unknown' | 'granted' | 'denied' | 'default' | 'unsupported'>('unknown');
 
   const [driverToast, setDriverToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   const driverShowToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setDriverToast({ message, type });
     setTimeout(() => setDriverToast(null), 3000);
+  };
+
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setDriverLocationPermission('unsupported');
+      return;
+    }
+    let cancelled = false;
+    const openDriverLocationPopup = () => {
+      if (!cancelled) setDriverLocationPopup(true);
+    };
+    if (navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((status) => {
+        if (cancelled) return;
+        setDriverLocationPermission(status.state as 'granted' | 'denied' | 'prompt');
+        openDriverLocationPopup();
+        status.onchange = () => {
+          if (cancelled) return;
+          setDriverLocationPermission(status.state as 'granted' | 'denied' | 'prompt');
+          openDriverLocationPopup();
+        };
+      }).catch(openDriverLocationPopup);
+    } else {
+      openDriverLocationPopup();
+    }
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    setDriverNotificationPermission('Notification' in window ? Notification.permission : 'unsupported');
+    if (navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'camera' as PermissionName }).then((status) => {
+        setDriverCameraPermission(status.state as 'granted' | 'denied' | 'prompt');
+        status.onchange = () => setDriverCameraPermission(status.state as 'granted' | 'denied' | 'prompt');
+      }).catch(() => setDriverCameraPermission(navigator.mediaDevices?.getUserMedia ? 'prompt' : 'unsupported'));
+    } else {
+      setDriverCameraPermission(navigator.mediaDevices?.getUserMedia ? 'prompt' : 'unsupported');
+    }
+  }, []);
+
+  const confirmDriverLocationPermission = () => {
+    setDriverLocationPopup(false);
+    if (!('geolocation' in navigator)) {
+      setDriverLocationPermission('unsupported');
+      driverShowToast('Location is not supported on this device.', 'error');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setDriverLocationPermission('granted');
+        setDriverLocationPaused(false);
+        driverShowToast('Driver live location enabled.', 'success');
+      },
+      () => {
+        setDriverLocationPermission('denied');
+        setDriverLocationPaused(true);
+        setDriverLocationPopup(true);
+        driverShowToast('Location denied. Allow location to use Driver App.', 'error');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
+  const turnOffDriverLocation = () => {
+    setDriverLocationPaused(true);
+    setDriverLocationPopup(true);
+    driverShowToast('Driver location turned off. Allow location again to continue.', 'info');
+  };
+
+  const requestDriverCameraPermission = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setDriverCameraPermission('unsupported');
+      driverShowToast('Camera is not supported on this device.', 'error');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach(track => track.stop());
+      setDriverCameraPermission('granted');
+      driverShowToast('Camera permission allowed.', 'success');
+    } catch {
+      setDriverCameraPermission('denied');
+      driverShowToast('Camera permission denied.', 'error');
+    }
+  };
+
+  const requestDriverNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      setDriverNotificationPermission('unsupported');
+      driverShowToast('Notifications are not supported on this device.', 'error');
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setDriverNotificationPermission(result);
+    setNotifOn(result === 'granted');
+    driverShowToast(result === 'granted' ? 'Notifications enabled.' : 'Notifications not allowed.', result === 'granted' ? 'success' : 'info');
   };
 
   const [custToast, setCustToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -978,6 +1079,12 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
   const posOrderHiddenFromCustomer = isPosOrder(currentOrder) && !posVisibleToCustomer(currentOrder);
 
   const handleDriverToggleOnline = () => {
+    if (!onlineStatus && (driverLocationPaused || driverLocationPermission !== 'granted')) {
+      setDriverLocationPaused(true);
+      setDriverLocationPopup(true);
+      driverShowToast('Allow live location before going online.', 'error');
+      return;
+    }
     if (onlineStatus && hasActiveDelivery) {
       driverShowToast(`Complete order #${currentOrder.id} first — you cannot go offline during an active delivery.`, 'error');
       return;
@@ -4863,6 +4970,58 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
                       </button>
                     </div>
 
+                    <div className="bg-[#111c2e] border border-white/10 p-2.5 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-bold text-white flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-emerald-400" /> Location Permission</p>
+                          <p className="text-[8px] text-gray-400">Required for live driver map, store route and customer delivery</p>
+                        </div>
+                        <button
+                          onClick={() => driverLocationPermission === 'granted' && !driverLocationPaused ? turnOffDriverLocation() : setDriverLocationPopup(true)}
+                          className={`px-3 py-1.5 rounded-lg text-[9px] font-black cursor-pointer ${driverLocationPermission === 'granted' && !driverLocationPaused ? 'bg-red-500/15 text-red-300 border border-red-500/30' : 'bg-emerald-500 text-white'}`}
+                        >
+                          {driverLocationPermission === 'granted' && !driverLocationPaused ? 'Turn Off' : 'Allow'}
+                        </button>
+                      </div>
+                      <p className="text-[8px] text-gray-500">
+                        {driverLocationPermission === 'granted' && !driverLocationPaused ? 'Live location is active. Turning off opens the app popup again.' : 'Location is off. Allow opens app popup first, then phone/browser permission if needed.'}
+                      </p>
+                    </div>
+
+                    <div className="bg-[#111c2e] border border-white/10 p-2.5 rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-white flex items-center gap-1.5"><Camera className="w-3.5 h-3.5 text-blue-400" /> Camera Permission</p>
+                        <p className="text-[8px] text-gray-400">Pickup proof, delivery proof and support evidence</p>
+                      </div>
+                      <button
+                        onClick={requestDriverCameraPermission}
+                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black cursor-pointer ${driverCameraPermission === 'granted' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-blue-500 text-white'}`}
+                      >
+                        {driverCameraPermission === 'granted' ? 'Allowed' : 'Allow'}
+                      </button>
+                    </div>
+
+                    <div className="bg-[#111c2e] border border-white/10 p-2.5 rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-white flex items-center gap-1.5"><Bell className="w-3.5 h-3.5 text-amber-400" /> Notification Permission</p>
+                        <p className="text-[8px] text-gray-400">New order ring, payout and support alerts</p>
+                      </div>
+                      <button
+                        onClick={requestDriverNotificationPermission}
+                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black cursor-pointer ${driverNotificationPermission === 'granted' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500 text-white'}`}
+                      >
+                        {driverNotificationPermission === 'granted' ? 'Allowed' : 'Allow'}
+                      </button>
+                    </div>
+
+                    <div className="bg-[#111c2e] border border-white/10 p-2.5 rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-white flex items-center gap-1.5"><Image className="w-3.5 h-3.5 text-violet-400" /> Gallery / File Access</p>
+                        <p className="text-[8px] text-gray-400">Opens only when driver taps upload/photo buttons</p>
+                      </div>
+                      <span className="px-3 py-1.5 rounded-lg text-[9px] font-black bg-violet-500/15 text-violet-300 border border-violet-500/30">On demand</span>
+                    </div>
+
                     <button
                       onClick={() => { if (showToast) driverShowToast('App is up to date (v1.4.2)', 'success'); }}
                       className="w-full bg-[#111c2e] border border-white/10 p-2.5 rounded-xl flex items-center justify-between cursor-pointer hover:bg-white/5"
@@ -4923,6 +5082,29 @@ const simPickupPt = currentOrder.pickupCoords || { lat: 23.7539, lng: 90.3836 };
             </div>
 
             {/* Driver Modals - rendered outside the scrollable canvas so they always overlay the visible phone */}
+            {driverLocationPopup && (
+              <div className="absolute inset-0 z-[95] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="w-full max-w-[260px] bg-[#111c2e] border border-emerald-500/30 rounded-3xl p-4 shadow-2xl space-y-3">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-black text-white">Driver Location Permission</h5>
+                    <p className="text-[9px] text-gray-400 mt-1 leading-relaxed">Driver app use korte live location permission lagbe. Store route, customer route, admin live map and delivery proof er jonno eta required.</p>
+                  </div>
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-2.5 text-[8.5px] text-emerald-200 font-bold leading-relaxed">
+                    Allow Location চাপলে age app permission confirm hobe, tarpor phone/browser location popup ashbe jodi dorkar hoy.
+                  </div>
+                  {driverLocationPermission === 'denied' && (
+                    <p className="bg-red-500/10 border border-red-500/20 rounded-2xl p-2.5 text-[8.5px] text-red-200 font-bold">Location blocked. Browser/site settings থেকে Location Allow করুন, তারপর আবার Allow চাপুন।</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => { setDriverLocationPaused(true); setDriverLocationPopup(true); driverShowToast('Location remains off. Driver app needs location to continue.', 'info'); }} className="py-2 rounded-2xl bg-white/5 border border-white/10 text-gray-300 text-[10px] font-black">Off</button>
+                    <button onClick={confirmDriverLocationPermission} className="py-2 rounded-2xl bg-emerald-500 text-white text-[10px] font-black">Allow Location</button>
+                  </div>
+                </div>
+              </div>
+            )}
             {driverLocModal && (
               <div className="absolute inset-0 z-[80] bg-black/70 flex items-end">
                 <div className="w-full bg-[#111c2e] border-t border-white/10 rounded-t-3xl p-4 space-y-3">
