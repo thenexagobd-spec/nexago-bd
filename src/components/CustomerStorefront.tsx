@@ -2683,7 +2683,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           showToast={showToast}
         />
       )}
-      {custVerified && (locationSharingPaused || locationPermissionState !== 'granted') && (
+      {custVerified && !isCustomerLocationAllowed() && (locationSharingPaused || locationPermissionState !== 'granted') && (
         <div className="fixed inset-0 z-[120] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4">
           <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 shadow-2xl p-6 text-white space-y-5">
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center">
