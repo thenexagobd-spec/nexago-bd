@@ -1821,13 +1821,24 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
         captureOnOpen();
         status.onchange = () => {
-          if (!cancelled) setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
+          if (cancelled) return;
+          setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
+          captureOnOpen();
         };
       }).catch(captureOnOpen);
     } else {
       captureOnOpen();
     }
-    return () => { cancelled = true; };
+    const recheckLocationPermission = () => {
+      if (!cancelled && document.visibilityState === 'visible') captureOnOpen();
+    };
+    window.addEventListener('focus', recheckLocationPermission);
+    document.addEventListener('visibilitychange', recheckLocationPermission);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', recheckLocationPermission);
+      document.removeEventListener('visibilitychange', recheckLocationPermission);
+    };
   }, [custVerified]);
 
   const handlePlaceCustomerOrder = async () => {
