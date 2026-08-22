@@ -162,6 +162,28 @@ const cleanAccuracy = (accuracy?: number) => (
     : null
 );
 
+const reverseGeocodeLocation = async (lat: number, lng: number) => {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`, {
+      headers: { Accept: 'application/json' }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const a = data?.address || {};
+    const road = [a.house_number, a.road || a.neighbourhood || a.suburb].filter(Boolean).join(' ');
+    const city = a.city || a.town || a.village || a.county || a.state || '';
+    const country = a.country || '';
+    const line = String(data?.display_name || '').trim();
+    return {
+      street: road || line || `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+      area: [city, country].filter(Boolean).join(', '),
+      display: line
+    };
+  } catch {
+    return null;
+  }
+};
+
 const U = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=600`;
 
 const STORE_DEFS: StoreDef[] = [];
@@ -2353,7 +2375,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setLocationPermissionState('granted');
@@ -2361,11 +2383,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         // Auto-fill the delivery address text from the pinned location — in Bangla or English
         const area = nearestAreaOf(lat, lng);
         setDeliveryLocationMeta({ accuracy: pos.coords.accuracy, capturedAt: new Date().toISOString(), source: 'browser-gps', area });
-        const addrText = area
+        const reverse = await reverseGeocodeLocation(lat, lng);
+        const addrText = reverse?.display || (area
           ? (lang === 'bn'
             ? `আপনার বর্তমান অবস্থান, ${AREA_NAMES_BN[area]}, ঢাকা`
             : `Your current location, ${area}, Dhaka`)
-          : `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+          : `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
         setDeliveryAddress(addrText);
         showToast('Current location pinned — address updated', 'success');
       },
@@ -2380,13 +2403,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         const area = nearestAreaOf(lat, lng);
-        setNewAddrCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, source: 'gps' });
-        if (!newAddrArea.trim()) setNewAddrArea(area ? `${area}, Dhaka` : '');
-        if (!newAddrStreet.trim()) setNewAddrStreet(`Live GPS location (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`);
+        const reverse = await reverseGeocodeLocation(lat, lng);
+        setNewAddrCoords({ lat, lng, accuracy: pos.coords.accuracy, source: 'gps' });
+        if (!newAddrArea.trim()) setNewAddrArea(reverse?.area || (area ? `${area}, Dhaka` : ''));
+        if (!newAddrStreet.trim()) setNewAddrStreet(reverse?.street || reverse?.display || `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
         showToast('Live location added to this address', 'success');
       },
       () => showToast('Location permission denied. You can still type the address manually.', 'info'),
@@ -3604,7 +3628,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="font-black text-gray-900 flex items-center gap-1.5"><Eye className="w-3.5 h-3.5 text-emerald-600" /> Address Preview</p>
-                      <span className="text-[10px] font-bold text-gray-500">{newAddrCoords ? 'GPS attached' : 'Manual address'}</span>
+                <span className="text-[10px] font-bold text-gray-500">{newAddrCoords ? 'Live GPS attached' : 'Manual address'}</span>
                     </div>
                     <p className="font-bold text-gray-800">{newAddrTitle || 'Not entered yet'}</p>
                     <p className="text-gray-600">{newAddrStreet || 'Street / house / flat not entered yet'}</p>
@@ -3621,6 +3645,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           {cleanAccuracy(newAddrCoords.accuracy) ? ` · ±${cleanAccuracy(newAddrCoords.accuracy)}m` : ' · live GPS'}
                         </p>
                       </>
+                    )}
+                    {!newAddrCoords && (
+                      <p className="text-[10px] text-amber-700 font-bold">Live location permission asar jonno "Live Location" button click korun. Permission already allowed thakle browser popup abar dekhabe na.</p>
                     )}
                   </div>
                   <div className="flex space-x-2 pt-2">
