@@ -948,6 +948,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [deliveryLocationMeta, setDeliveryLocationMeta] = useState<{ accuracy?: number; capturedAt?: string; source?: 'browser-gps' | 'map-pin'; area?: string } | null>(null);
   const [isLocatingDelivery, setIsLocatingDelivery] = useState(false);
   const [locationPermissionState, setLocationPermissionState] = useState<'checking' | 'granted' | 'denied' | 'prompt' | 'unsupported'>('checking');
+  const [locationConsentAction, setLocationConsentAction] = useState<'delivery' | 'address' | null>(null);
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleSlot, setScheduleSlot] = useState(SCHEDULE_SLOTS[0]);
 
@@ -2418,6 +2419,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     );
   };
 
+  const requestLocationFromApp = (action: 'delivery' | 'address') => {
+    setLocationConsentAction(action);
+  };
+
+  const confirmLocationFromApp = () => {
+    const action = locationConsentAction;
+    setLocationConsentAction(null);
+    if (action === 'address') captureAddressLocation();
+    else locateMe();
+  };
+
   const handleAddAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAddrStreet) return;
@@ -2598,13 +2610,41 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             )}
             <button
               type="button"
-              onClick={locateMe}
+              onClick={() => requestLocationFromApp('delivery')}
               disabled={isLocatingDelivery || locationPermissionState === 'unsupported'}
               className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-600 disabled:text-slate-300 text-slate-950 font-black text-sm transition-all flex items-center justify-center gap-2"
             >
               {isLocatingDelivery ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
               <span>{isLocatingDelivery ? 'Checking location...' : 'Allow Location & Continue'}</span>
             </button>
+          </div>
+        </div>
+      )}
+      {locationConsentAction && (
+        <div className="fixed inset-0 z-[130] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-3xl bg-white shadow-2xl border border-emerald-100 p-5 text-gray-900 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+              <LocateFixed className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black">Location Permission</h3>
+              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                Real delivery location set korte device location permission lagbe. Apni continue korle browser/system location popup ashbe.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3 text-[11px] text-emerald-800 font-bold">
+              {locationConsentAction === 'address'
+                ? 'Saved address-er jonno live GPS address text, map preview, lat/lng save hobe.'
+                : 'Order, tracking, driver, store and super admin system-e customer current location jabe.'}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setLocationConsentAction(null)} className="flex-1 py-2.5 rounded-2xl bg-gray-100 text-gray-700 text-xs font-black">
+                Cancel
+              </button>
+              <button type="button" onClick={confirmLocationFromApp} className="flex-1 py-2.5 rounded-2xl bg-emerald-600 text-white text-xs font-black">
+                Allow Location
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -3591,7 +3631,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <form onSubmit={handleAddAddressSubmit} className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-sm space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800">{editingAddressId ? 'Edit Saved Address' : 'New Address Details'}</h3>
-                    <button type="button" onClick={captureAddressLocation} className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black flex items-center gap-1.5">
+                    <button type="button" onClick={() => requestLocationFromApp('address')} className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black flex items-center gap-1.5">
                       <LocateFixed className="w-3.5 h-3.5" /> Live Location
                     </button>
                   </div>
@@ -4482,7 +4522,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div className="flex items-center justify-between mt-1.5 gap-2">
                       <button
                         type="button"
-                        onClick={locateMe}
+                        onClick={() => requestLocationFromApp('delivery')}
                         className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5"
                       >
                         <LocateFixed className="w-3.5 h-3.5" /><span>Use my current location</span>
