@@ -252,7 +252,8 @@ const STATUS_BN: Record<string, string> = {
   'Out for Delivery': 'ডেলিভারির পথে',
   'Store has accepted your order': 'দোকান আপনার অর্ডার গ্রহণ করেছে',
   'Your items are being packed': 'আপনার পণ্যগুলো প্যাক করা হচ্ছে',
-  'Courier driver is on the way': 'কুরিয়ার ড্রাইভার পথে আছে',
+  'NexaGo delivery driver is on the way': 'NexaGo ডেলিভারি ড্রাইভার পথে আছে',
+  'Delivery driver is on the way': 'ডেলিভারি ড্রাইভার পথে আছে',
   'Order delivered to your door': 'অর্ডার আপনার দরজায় পৌঁছেছে',
 };
 
@@ -728,7 +729,7 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     cancelled: 'বাতিল',
     freeShip: 'ফ্রি',
     callDriver: 'ড্রাইভারকে কল',
-    courierDriver: 'কুরিয়ার ড্রাইভার',
+    courierDriver: 'ডেলিভারি ড্রাইভার',
     atStore: 'দোকানে',
     assignedDriver: 'রাইডার নিয়োগ হয়েছে',
     fromWallet: 'ওয়ালেট থেকে',
@@ -856,7 +857,7 @@ const firstPart = (s: unknown, separator = ',') => safeText(s).split(separator)[
 const ETA_STEPS = [
   { label: 'Order Confirmed', desc: 'Store has accepted your order', min: 0.0 },
   { label: 'Preparing at Store', desc: 'Your items are being packed', min: 0.18 },
-  { label: 'Out for Delivery', desc: 'Courier driver is on the way', min: 0.42 },
+  { label: 'Out for Delivery', desc: 'NexaGo delivery driver is on the way', min: 0.42 },
   { label: 'Delivered', desc: 'Order delivered to your door', min: 0.9 },
 ];
 
@@ -1172,6 +1173,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [customerPhone, setCustomerPhone] = useState<string>('');
 
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+  const [trackingMapPreview, setTrackingMapPreview] = useState<'store' | 'delivery' | null>(null);
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
@@ -5445,7 +5447,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   {trackingOrder.scheduledSlot && <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-bold flex items-center space-x-1"><CalendarClock className="w-3 h-3" /><span>{trackingOrder.scheduledSlot}</span></span>}
                 </div>
               </div>
-              <button onClick={() => setTrackingOrder(null)} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
+              <button onClick={() => { setTrackingOrder(null); setTrackingMapPreview(null); }} className="p-1 rounded-full hover:bg-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
 
             {/* Location links — store pickup + customer's pinned delivery point (no live driver location) */}
@@ -5463,33 +5465,80 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-bold text-gray-700">
                   <span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">{initialsOf(trackingDriver.name)}</span>
                   <span className="min-w-0">
-                    {T.courierDriver}: <b>{trackingDriver.name}</b> · {trackingDriver.vehicleType}
+                    {lang === 'bn' ? 'ডেলিভারি ড্রাইভার' : 'Delivery Driver'}: <b>{trackingDriver.name}</b> · {trackingDriver.vehicleType}
                     {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="ml-1 text-amber-500">★ {rr.avg} <span className="text-gray-400">({rr.count})</span></span> : null; })()}
                   </span>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">
-                <a
-                  href={`https://www.google.com/maps?q=${pickupOfOrder(trackingOrder).lat},${pickupOfOrder(trackingOrder).lng}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-2 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-emerald-400 hover:text-emerald-700 flex items-center justify-center space-x-1 transition-colors"
+                <button
+                  type="button"
+                  onClick={() => setTrackingMapPreview('store')}
+                  className="px-2 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-emerald-400 hover:text-emerald-700 flex items-center justify-center space-x-1 transition-colors cursor-pointer"
                 >
                   <Store className="w-3 h-3" /><span>Store Location</span>
-                </a>
-                <a
-                  href={`https://www.google.com/maps?q=${areaOfOrder(trackingOrder).lat},${areaOfOrder(trackingOrder).lng}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-2 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-emerald-400 hover:text-emerald-700 flex items-center justify-center space-x-1 transition-colors"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTrackingMapPreview('delivery')}
+                  className="px-2 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-emerald-400 hover:text-emerald-700 flex items-center justify-center space-x-1 transition-colors cursor-pointer"
                 >
                   <MapPin className="w-3 h-3" /><span>My Delivery Pin</span>
-                </a>
+                </button>
               </div>
               <p className="text-[9px] text-gray-400 leading-relaxed">
-                Your rider's live position is visible to the admin dashboard only. You can always open the store or your pinned delivery point on Google Maps.
+                {lang === 'bn' ? 'ড্রাইভারের লাইভ লোকেশন শুধু অ্যাডমিন ড্যাশবোর্ডে দেখা যাবে। Store location অথবা delivery pin এখানে app preview-তেই দেখা যাবে।' : 'The driver live position is visible to the admin dashboard only. Store location and delivery pin open in this app preview.'}
               </p>
             </div>
+
+            {trackingMapPreview && (() => {
+              const pk = pickupOfOrder(trackingOrder);
+              const dv = areaOfOrder(trackingOrder);
+              const activePoint = trackingMapPreview === 'store' ? pk : dv;
+              const activeTitle = trackingMapPreview === 'store'
+                ? (lang === 'bn' ? 'দোকানের লোকেশন' : 'Store Location')
+                : (lang === 'bn' ? 'আমার ডেলিভারি পিন' : 'My Delivery Pin');
+              const activeLabel = trackingMapPreview === 'store'
+                ? trackingOrder.storeName
+                : safeText(trackingOrder.address || deliveryAddress, lang === 'bn' ? 'ডেলিভারি ঠিকানা' : 'Delivery address');
+              return (
+                <div className="fixed inset-0 z-[70] bg-slate-950/45 backdrop-blur-sm flex items-center justify-center p-3">
+                  <div className="bg-white rounded-3xl w-full max-w-lg border border-gray-200 shadow-2xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Map Preview</p>
+                        <h4 className="text-sm font-black text-gray-900">{activeTitle}</h4>
+                      </div>
+                      <button type="button" onClick={() => setTrackingMapPreview(null)} className="p-1.5 rounded-full hover:bg-gray-100 cursor-pointer">
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                    <div className="h-72 bg-gray-100">
+                      <LeafletMap
+                        vehicles={trackVeh ? [trackVeh] : []}
+                        zoomTo={14}
+                        trackingId={trackVeh?.id || null}
+                        pickup={{ lat: pk.lat, lng: pk.lng, label: trackingOrder.storeName }}
+                        dropoff={{ lat: dv.lat, lng: dv.lng, label: safeText(trackingOrder.address || deliveryAddress, 'Delivery') }}
+                        marker={{ lat: activePoint.lat, lng: activePoint.lng }}
+                        googleDots
+                      />
+                    </div>
+                    <div className="p-4 space-y-2">
+                      <p className="text-xs font-black text-gray-900">{activeLabel}</p>
+                      <p className="text-[11px] text-gray-500 font-mono">Lat {activePoint.lat.toFixed(6)} · Lng {activePoint.lng.toFixed(6)}</p>
+                      <button
+                        type="button"
+                        onClick={() => setTrackingMapPreview(null)}
+                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl cursor-pointer"
+                      >
+                        {lang === 'bn' ? 'Preview বন্ধ করুন' : 'Close Preview'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Timeline */}
             <div className="space-y-1">
@@ -5502,7 +5551,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 border-2 ${
                         done ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-gray-300 text-gray-400'
                       }`}>
-                        {done ? <Check className="w-3 h-3" /> : <span>{i + 1}</span>}
+                        {done ? <Check className="w-3 h-3" /> : i === 0 ? <Package className="w-3 h-3" /> : i === 1 ? <Store className="w-3 h-3" /> : i === 2 ? <Navigation className="w-3 h-3" /> : <Home className="w-3 h-3" />}
                       </div>
                       {i < ETA_STEPS.length - 1 && <div className={`w-0.5 h-6 ${done ? 'bg-emerald-400' : 'bg-gray-200'}`} />}
                     </div>
@@ -5528,7 +5577,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       {initialsOf(trackingDriver.name)}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-gray-900 truncate">{T.courierDriver}: {trackingDriver.name} {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="text-amber-500">★ {rr.avg}</span> : null; })()}</p>
+                      <p className="font-bold text-gray-900 truncate">{lang === 'bn' ? 'ডেলিভারি ড্রাইভার' : 'Delivery Driver'}: {trackingDriver.name} {(() => { const rr = riderRatingOf(trackingDriver.name); return rr ? <span className="text-amber-500">★ {rr.avg}</span> : null; })()}</p>
                       <p className="text-[10px] text-gray-500 font-mono truncate">{trackingDriver.vehicleType}: {trackingDriver.id} · {trackProgress < 0.12 ? 'At store — picking up your order' : 'En route to you'}</p>
                       {dPhone && <p className="text-[10px] text-gray-600 font-mono font-bold">📞 {dPhone}</p>}
                     </div>
@@ -5555,7 +5604,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             )}
 
             <div className="flex space-x-2">
-              <button onClick={() => setTrackingOrder(null)} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer">
+              <button onClick={() => { setTrackingOrder(null); setTrackingMapPreview(null); }} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer">
                 {T.closeTracking}
               </button>
               <button onClick={() => openReportModal(trackingOrder)} className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5">
