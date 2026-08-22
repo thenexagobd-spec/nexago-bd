@@ -3216,8 +3216,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   {item.key === 'Favorites' && !!item.badge && (
                     <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 text-[10px] font-bold">{item.badge}</span>
                   )}
-                  {item.key === 'Coupons' && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black uppercase">4 Active</span>
+                  {item.key === 'Coupons' && COUPONS.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black uppercase">{COUPONS.length} Active</span>
                   )}
                 </button>
               ))}
@@ -4208,6 +4208,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <p className="text-xs text-gray-500 mt-0.5">{T.promoVoucherSub}</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {COUPONS.length === 0 && (
+                  <div className="md:col-span-2 rounded-2xl border border-gray-200 bg-white p-6 text-center">
+                    <p className="text-sm font-black text-gray-900">{lang === 'bn' ? 'এখন কোনো active coupon নেই' : 'No active coupons right now'}</p>
+                    <p className="mt-1 text-xs text-gray-500">{lang === 'bn' ? 'Super Admin coupon চালু করলে এখানে দেখাবে।' : 'Coupons enabled by Super Admin will appear here.'}</p>
+                  </div>
+                )}
                 {COUPONS.map((cp) => (
                   <div key={cp.code} className="bg-white border border-dashed border-emerald-300 rounded-2xl p-5 shadow-xs flex items-center justify-between bg-emerald-50/30">
                     <div className="space-y-1">

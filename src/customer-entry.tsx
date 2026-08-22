@@ -26,6 +26,148 @@ const API_BASE = window.location.origin;
 const SEED_DRIVERS: any[] = [];
 const SEED_STORES: any[] = [];
 const SEED_PRODUCTS: Product[] = [];
+const STARTER_SEED_KEY = 'nexago_customer_starter_seed_v2';
+
+const starterStore = {
+  id: 'STR-CUSTOMER-STARTER',
+  name: 'NexaGo Starter Mart',
+  address: 'Dhaka, Bangladesh',
+  category: 'Grocery',
+  status: 'active',
+  rating: 0,
+  orders: 0,
+  deliveryFee: 60,
+  deliveryTime: 'Real-time',
+  pickup: { lat: 23.8103, lng: 90.4125 },
+  createdAt: new Date().toISOString(),
+};
+
+const P = (id: string, name: string, category: string, unit: string, stock: number, price: number, image: string) => ({
+  id: `PRD-BD-${id}`,
+  storeId: starterStore.id,
+  name,
+  category,
+  unit,
+  stock,
+  price,
+  cost: Math.max(1, Math.round(price * 0.78)),
+  status: stock > 0 ? 'In Stock' : 'Out of Stock',
+  desc: 'Bangladesh customer catalog item - editable and deletable from admin inventory.',
+  image,
+  createdAt: new Date().toISOString(),
+});
+
+const IMG = {
+  rice: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600',
+  oil: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=600',
+  dal: 'https://images.unsplash.com/photo-1515543904379-3d757afe72e4?auto=format&fit=crop&q=80&w=600',
+  flour: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&q=80&w=600',
+  milk: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&q=80&w=600',
+  egg: 'https://images.unsplash.com/photo-1587486913049-53fc88980cfc?auto=format&fit=crop&q=80&w=600',
+  tea: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&q=80&w=600',
+  grocery: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600',
+  burger: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&q=80&w=600',
+  pizza: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=600',
+  biryani: 'https://images.unsplash.com/photo-1563379091339-03246963d51a?auto=format&fit=crop&q=80&w=600',
+  bakery: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=600',
+  cake: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&q=80&w=600',
+  medicine: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=600',
+  fruit: 'https://images.unsplash.com/photo-1619566636858-adf3ef4640b5?auto=format&fit=crop&q=80&w=600',
+  veg: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&q=80&w=600',
+  fish: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&q=80&w=600',
+  meat: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&q=80&w=600',
+};
+
+const starterProducts = [
+  P('RICE-5KG', 'Miniket Rice 5kg', 'Grocery', 'bag', 35, 520, IMG.rice),
+  P('NAZIR-RICE-5KG', 'Nazirshail Rice 5kg', 'Grocery', 'bag', 26, 610, IMG.rice),
+  P('SOYBEAN-OIL-2L', 'Soybean Oil 2L', 'Grocery', 'bottle', 30, 375, IMG.oil),
+  P('MUSTARD-OIL-500ML', 'Mustard Oil 500ml', 'Grocery', 'bottle', 24, 165, IMG.oil),
+  P('MOSUR-DAL-1KG', 'Mosur Dal 1kg', 'Grocery', 'kg', 40, 145, IMG.dal),
+  P('CHOLA-BOOT-1KG', 'Chola Boot 1kg', 'Grocery', 'kg', 28, 135, IMG.dal),
+  P('ATTA-2KG', 'Fresh Atta 2kg', 'Grocery', 'pack', 38, 120, IMG.flour),
+  P('SUGAR-1KG', 'White Sugar 1kg', 'Grocery', 'kg', 45, 135, IMG.grocery),
+  P('SALT-1KG', 'Iodized Salt 1kg', 'Grocery', 'pack', 60, 42, IMG.grocery),
+  P('TEA-400G', 'Black Tea 400g', 'Grocery', 'pack', 25, 210, IMG.tea),
+  P('MILK-1L', 'Fresh Milk 1L', 'Supermarket', 'pack', 32, 95, IMG.milk),
+  P('EGG-12PCS', 'Farm Eggs 12pcs', 'Supermarket', 'tray', 42, 150, IMG.egg),
+  P('NOODLES-8PACK', 'Instant Noodles 8 Pack', 'Supermarket', 'pack', 35, 180, IMG.grocery),
+  P('BISCUIT-PACK', 'Tea Biscuit Family Pack', 'Supermarket', 'pack', 50, 90, IMG.grocery),
+  P('DETERGENT-1KG', 'Laundry Detergent 1kg', 'Supermarket', 'pack', 30, 185, IMG.grocery),
+  P('DISHWASH-500ML', 'Dishwash Liquid 500ml', 'Supermarket', 'bottle', 28, 115, IMG.grocery),
+  P('BIRIYANI', 'Chicken Biryani', 'Restaurant', 'plate', 18, 220, IMG.biryani),
+  P('KHICHURI', 'Beef Bhuna Khichuri', 'Restaurant', 'box', 16, 260, IMG.biryani),
+  P('THALI', 'Rice Fish Curry Meal', 'Restaurant', 'plate', 20, 190, IMG.fish),
+  P('CHICKEN-CURRY', 'Chicken Curry Meal', 'Restaurant', 'plate', 22, 210, IMG.biryani),
+  P('BURGER', 'Chicken Burger', 'Fast Food', 'pcs', 30, 180, IMG.burger),
+  P('PIZZA', 'Beef Pizza 8 inch', 'Fast Food', 'pcs', 16, 420, IMG.pizza),
+  P('FRIES', 'French Fries Large', 'Fast Food', 'box', 34, 130, IMG.burger),
+  P('SHAWARMA', 'Chicken Shawarma', 'Fast Food', 'pcs', 24, 160, IMG.burger),
+  P('BREAD', 'Milk Bread Loaf', 'Bakery', 'loaf', 35, 80, IMG.bakery),
+  P('CAKE', 'Chocolate Cake 1lb', 'Bakery', 'pcs', 12, 650, IMG.cake),
+  P('CROISSANT', 'Butter Croissant', 'Bakery', 'pcs', 24, 95, IMG.bakery),
+  P('BUN', 'Sweet Bun 4pcs', 'Bakery', 'pack', 28, 70, IMG.bakery),
+  P('PARACETAMOL', 'Paracetamol Tablet Strip', 'Pharmacy', 'strip', 40, 25, IMG.medicine),
+  P('SALINE', 'Oral Saline 10pcs', 'Pharmacy', 'box', 35, 60, IMG.medicine),
+  P('BANDAGE', 'First Aid Bandage Roll', 'Pharmacy', 'pcs', 22, 85, IMG.medicine),
+  P('HAND-SANITIZER', 'Hand Sanitizer 250ml', 'Pharmacy', 'bottle', 30, 120, IMG.medicine),
+  P('APPLE', 'Apple 1kg', 'Fruits & Veg', 'kg', 25, 280, IMG.fruit),
+  P('BANANA', 'Banana 1 dozen', 'Fruits & Veg', 'dozen', 32, 120, IMG.fruit),
+  P('MANGO', 'Seasonal Mango 1kg', 'Fruits & Veg', 'kg', 20, 180, IMG.fruit),
+  P('POTATO', 'Potato 1kg', 'Fruits & Veg', 'kg', 50, 45, IMG.veg),
+  P('ONION', 'Onion 1kg', 'Fruits & Veg', 'kg', 45, 80, IMG.veg),
+  P('TOMATO', 'Tomato 1kg', 'Fruits & Veg', 'kg', 30, 70, IMG.veg),
+  P('RUI-FISH', 'Rui Fish 1kg', 'Meat & Fish', 'kg', 12, 360, IMG.fish),
+  P('PANGAS-FISH', 'Pangas Fish 1kg', 'Meat & Fish', 'kg', 18, 220, IMG.fish),
+  P('CHICKEN-BROILER', 'Broiler Chicken 1kg', 'Meat & Fish', 'kg', 22, 210, IMG.meat),
+  P('BEEF', 'Beef 1kg', 'Meat & Fish', 'kg', 10, 780, IMG.meat),
+];
+
+const starterAddress = {
+  id: 'ADDR-STARTER-001',
+  title: 'Primary Delivery Address',
+  address: 'House / Road / Area - update this address',
+  area: 'Dhaka, Bangladesh',
+  zipCode: '1200',
+  phone: '',
+  isDefault: true,
+  source: 'manual',
+};
+
+const readArray = (key: string) => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeArray = (key: string, rows: any[]) => {
+  try { localStorage.setItem(key, JSON.stringify(rows)); } catch { /* ignore */ }
+};
+
+const seedCustomerStarterData = () => {
+  try {
+    if (localStorage.getItem(STARTER_SEED_KEY) === '1') return;
+    const stores = readArray('sd_stores');
+    const products = readArray('sd_products');
+    const addresses = readArray('ss_addr');
+    const nextStores = stores.some((store: any) => store.id === starterStore.id) ? stores : [starterStore, ...stores];
+    const productIds = new Set(products.map((product: any) => product.id));
+    const nextProducts = [...products, ...starterProducts.filter(product => !productIds.has(product.id))];
+    const nextAddresses = addresses.some((address: any) => address.id === starterAddress.id) ? addresses : [...addresses, starterAddress];
+    writeArray('sd_stores', nextStores);
+    writeArray('sd_products', nextProducts);
+    writeArray('ss_addr', nextAddresses);
+    localStorage.setItem(STARTER_SEED_KEY, '1');
+    window.dispatchEvent(new Event('nexago-local-write'));
+  } catch {
+    /* ignore */
+  }
+};
+
+seedCustomerStarterData();
 
 function PublicCustomerApp() {
   const [stores, setStores] = useState<any[]>(SEED_STORES);
@@ -53,19 +195,23 @@ function PublicCustomerApp() {
         .then(r => (r.ok ? r.json() : Promise.reject(new Error('storefront fetch failed'))))
         .then(d => {
           if (cancelled) return;
-          const realProducts = Array.isArray(d.products) ? d.products.filter((p: any) => !KEY.startsWith('STR-') || p.storeId === KEY) : [];
-          setProducts(realProducts.map((p: any): Product => ({
+          const cloudProducts = Array.isArray(d.products) ? d.products : [];
+          const localProducts = readArray('sd_products');
+          const realProducts = (cloudProducts.length ? cloudProducts : localProducts).filter((p: any) => !KEY.startsWith('STR-') || p.storeId === KEY);
+          setProducts(realProducts.map((p: any) => ({
             id: p.id,
+            storeId: p.storeId || starterStore.id,
             name: p.name,
             price: Number(p.promoPrice || p.price || 0),
             category: p.category || 'General',
             stock: Number(p.stock || 0),
             status: Number(p.stock || 0) <= 0 ? 'Out of Stock' : Number(p.stock || 0) <= 10 ? 'Low Stock' : 'In Stock',
             image: p.image || ''
-          })));
-          if (d && d.stores && Array.isArray(d.stores)) {
-            setStores(KEY.startsWith('STR-') ? d.stores.filter((s: any) => s.id === KEY) : d.stores);
-          }
+          })) as Product[]);
+          const cloudStores = d && Array.isArray(d.stores) ? d.stores : [];
+          const localStores = readArray('sd_stores');
+          const nextStores = cloudStores.length ? cloudStores : localStores;
+          setStores(KEY.startsWith('STR-') ? nextStores.filter((s: any) => s.id === KEY) : nextStores);
           if (d && Array.isArray(d.orders)) setOrders(d.orders);
         })
         .catch(() => {});
