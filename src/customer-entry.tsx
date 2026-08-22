@@ -26,7 +26,7 @@ const API_BASE = window.location.origin;
 const SEED_DRIVERS: any[] = [];
 const SEED_STORES: any[] = [];
 const SEED_PRODUCTS: Product[] = [];
-const STARTER_SEED_KEY = 'nexago_customer_starter_seed_v3';
+const STARTER_SEED_KEY = 'nexago_customer_starter_seed_v4';
 
 const starterStore = {
   id: 'STR-CUSTOMER-STARTER',
@@ -149,7 +149,10 @@ const writeArray = (key: string, rows: any[]) => {
 };
 
 const resolveStarterStoreTarget = (stores: any[], storeAdminApps: any[]) => {
-  const verifiedApp = storeAdminApps.find((app: any) => app?.storeId && String(app.status || '').toLowerCase() === 'verified')
+  const ranastorApp = storeAdminApps.find((app: any) => app?.storeId && String(app.storeName || '').toLowerCase() === 'ranastor')
+    || storeAdminApps.find((app: any) => app?.storeId === 'STR-8944327' || app?.adminId === 'SA-68944327');
+  const verifiedApp = ranastorApp
+    || storeAdminApps.find((app: any) => app?.storeId && String(app.status || '').toLowerCase() === 'verified')
     || storeAdminApps.find((app: any) => app?.storeId);
   if (verifiedApp) {
     const existingStore = stores.find((store: any) => store?.id === verifiedApp.storeId);
@@ -242,7 +245,14 @@ function PublicCustomerApp() {
           if (cancelled) return;
           const cloudProducts = Array.isArray(d.products) ? d.products : [];
           const localProducts = readArray('sd_products');
-          const realProducts = (cloudProducts.length ? cloudProducts : localProducts).filter((p: any) => !KEY.startsWith('STR-') || p.storeId === KEY);
+          const productById = new Map<string, any>();
+          const locallyDeletedIds = new Set(localProducts.filter((product: any) => product?.isDeleted || product?.deletedAt).map((product: any) => String(product.id)));
+          [...cloudProducts, ...localProducts].forEach((product: any) => {
+            if (!product?.id || product.isDeleted || product.deletedAt) return;
+            if (locallyDeletedIds.has(String(product.id))) return;
+            productById.set(String(product.id), product);
+          });
+          const realProducts = Array.from(productById.values()).filter((p: any) => !KEY.startsWith('STR-') || p.storeId === KEY);
           setProducts(realProducts.map((p: any) => ({
             id: p.id,
             storeId: p.storeId || starterStore.id,
@@ -255,7 +265,12 @@ function PublicCustomerApp() {
           })) as Product[]);
           const cloudStores = d && Array.isArray(d.stores) ? d.stores : [];
           const localStores = readArray('sd_stores');
-          const nextStores = cloudStores.length ? cloudStores : localStores;
+          const storeById = new Map<string, any>();
+          [...localStores, ...cloudStores].forEach((store: any) => {
+            if (!store?.id) return;
+            storeById.set(String(store.id), store);
+          });
+          const nextStores = Array.from(storeById.values());
           setStores(KEY.startsWith('STR-') ? nextStores.filter((s: any) => s.id === KEY) : nextStores);
           if (d && Array.isArray(d.orders)) setOrders(d.orders);
         })
