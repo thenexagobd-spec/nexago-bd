@@ -148,6 +148,15 @@ const writeArray = (key: string, rows: any[]) => {
   try { localStorage.setItem(key, JSON.stringify(rows)); } catch { /* ignore */ }
 };
 
+const mergeById = <T extends { id?: string }>(primaryRows: T[] = [], secondaryRows: T[] = []) => {
+  const byId = new Map<string, T>();
+  [...secondaryRows, ...primaryRows].forEach((row: T) => {
+    if (!row?.id) return;
+    byId.set(String(row.id), row);
+  });
+  return Array.from(byId.values());
+};
+
 const resolveStarterStoreTarget = (stores: any[], storeAdminApps: any[]) => {
   const ranastorApp = storeAdminApps.find((app: any) => app?.storeId && String(app.storeName || '').toLowerCase() === 'ranastor')
     || storeAdminApps.find((app: any) => app?.storeId === 'STR-8944327' || app?.adminId === 'SA-68944327');
@@ -272,7 +281,10 @@ function PublicCustomerApp() {
           });
           const nextStores = Array.from(storeById.values());
           setStores(KEY.startsWith('STR-') ? nextStores.filter((s: any) => s.id === KEY) : nextStores);
-          if (d && Array.isArray(d.orders)) setOrders(d.orders);
+          if (d && Array.isArray(d.orders)) {
+            const localCustomerOrders = readArray(CUST_ORDERS_KEY);
+            setOrders(prev => mergeById(d.orders, mergeById(localCustomerOrders, prev)) as Order[]);
+          }
         })
         .catch(() => {});
     };
