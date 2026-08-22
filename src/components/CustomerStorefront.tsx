@@ -254,6 +254,12 @@ interface CustomerNotif {
   read: boolean;
 }
 
+const isDemoDeliveredNotification = (n: Partial<CustomerNotif> | any) => {
+  const text = `${n?.title || ''} ${n?.body || ''} ${n?.message || ''} ${n?.id || ''}`;
+  return /Order Delivered/i.test(text)
+    && /(BDPOS-\d+|POS-\d+|Bangladesh POS Counter|The NexaGo BD Counter)/i.test(text);
+};
+
 interface ProductReview {
   id: string;
   productId: string;
@@ -873,12 +879,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
-  const [customerNotifs, setCustomerNotifs] = useState<CustomerNotif[]>(() => getStoredData(LS_KEYS.notifs, []));
+  const [customerNotifs, setCustomerNotifs] = useState<CustomerNotif[]>(() => getStoredData<CustomerNotif[]>(LS_KEYS.notifs, []).filter(n => !isDemoDeliveredNotification(n)));
   useEffect(() => setStoredData(LS_KEYS.notifs, customerNotifs), [customerNotifs]);
 
   // Live-sync admin/platform notifications (sd_notifications) into this customer's inbox
   const [adminNotifs, setAdminNotifs] = useState<{ id: string; title: string; body: string; time: string; read: boolean }[]>(() => {
-    try { return JSON.parse(localStorage.getItem('sd_notifications') || '[]'); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem('sd_notifications') || '[]').filter((n: any) => !isDemoDeliveredNotification(n)); } catch { return []; }
   });
   // (admin notification live-sync effect is declared below, after the profile)
   // Merge admin notifications at the top of the customer inbox list (fresh ones always visible)
@@ -1140,6 +1146,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         const list = raw ? JSON.parse(raw) : [];
         const myId = localStorage.getItem('ss_cust_id') || '';
         setAdminNotifs(list.filter((n: any) => {
+          if (isDemoDeliveredNotification(n)) return false;
           if (n.audience === 'all' || (n.audience === 'customer' && !n.customerId)) return true;
           if (n.customerId && (n.customerId === customerProfile.phone || n.customerId === customerProfile.name || n.customerId === myId)) return true;
           return false;
@@ -1495,6 +1502,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   useEffect(() => {
     for (const ord of orders) {
       if ((ord.status === 'Completed') && !seenCompletedRef.current.has(ord.id)) {
+        const orderText = `${ord.id || ''} ${ord.storeName || ''}`;
+        if (/(BDPOS-\d+|POS-\d+|Bangladesh POS Counter|The NexaGo BD Counter)/i.test(orderText)) {
+          seenCompletedRef.current.add(ord.id);
+          continue;
+        }
         seenCompletedRef.current.add(ord.id);
         setCustomerNotifs(prev => [{
           id: `CN-${Date.now().toString().slice(-4)}`, title: '✅ Order Delivered',
