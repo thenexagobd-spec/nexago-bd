@@ -144,7 +144,8 @@ const AREA_NAMES_BN: Record<string, string> = {
   'Shahbagh': 'শাহবাগ',
 };
 
-// Approximate reverse-geocoder: nearest known Dhaka area for a lat/lng
+// Approximate reverse-geocoder: nearest known Dhaka area for a lat/lng.
+// If the GPS point is outside Dhaka, do not force a fake Dhaka area.
 const nearestAreaOf = (lat: number, lng: number) => {
   let best = 'Dhanmondi';
   let bestD = Infinity;
@@ -152,8 +153,14 @@ const nearestAreaOf = (lat: number, lng: number) => {
     const d = Math.pow(al - lat, 2) + Math.pow(ag - lng, 2);
     if (d < bestD) { bestD = d; best = name; }
   }
-  return best;
+  return bestD < 0.03 ? best : '';
 };
+
+const cleanAccuracy = (accuracy?: number) => (
+  typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy > 0 && accuracy < 5000
+    ? Math.round(accuracy)
+    : null
+);
 
 const U = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=600`;
 
@@ -2347,14 +2354,18 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
         setLocationPermissionState('granted');
-        setDeliveryPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setDeliveryPin({ lat, lng });
         // Auto-fill the delivery address text from the pinned location — in Bangla or English
-        const area = nearestAreaOf(pos.coords.latitude, pos.coords.longitude);
+        const area = nearestAreaOf(lat, lng);
         setDeliveryLocationMeta({ accuracy: pos.coords.accuracy, capturedAt: new Date().toISOString(), source: 'browser-gps', area });
-        const addrText = lang === 'bn'
-          ? `আপনার বর্তমান অবস্থান, ${AREA_NAMES_BN[area]}, ঢাকা`
-          : `Your current location, ${area}, Dhaka`;
+        const addrText = area
+          ? (lang === 'bn'
+            ? `আপনার বর্তমান অবস্থান, ${AREA_NAMES_BN[area]}, ঢাকা`
+            : `Your current location, ${area}, Dhaka`)
+          : `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
         setDeliveryAddress(addrText);
         showToast('Current location pinned — address updated', 'success');
       },
@@ -2370,10 +2381,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const area = nearestAreaOf(pos.coords.latitude, pos.coords.longitude);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const area = nearestAreaOf(lat, lng);
         setNewAddrCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, source: 'gps' });
-        if (!newAddrArea.trim()) setNewAddrArea(`${area}, Dhaka`);
-        if (!newAddrStreet.trim()) setNewAddrStreet(`Current pinned location (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`);
+        if (!newAddrArea.trim()) setNewAddrArea(area ? `${area}, Dhaka` : '');
+        if (!newAddrStreet.trim()) setNewAddrStreet(`Live GPS location (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`);
         showToast('Live location added to this address', 'success');
       },
       () => showToast('Location permission denied. You can still type the address manually.', 'info'),
@@ -3590,12 +3603,22 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <p className="font-black text-gray-900 flex items-center gap-1.5"><Eye className="w-3.5 h-3.5 text-emerald-600" /> Address Preview</p>
                       <span className="text-[10px] font-bold text-gray-500">{newAddrCoords ? 'GPS attached' : 'Manual address'}</span>
                     </div>
-                    <p className="font-bold text-gray-800">{newAddrTitle || 'Address title'}</p>
-                    <p className="text-gray-600">{newAddrStreet || 'Street / house / flat preview'}</p>
-                    <p className="text-gray-500">{newAddrArea || 'Area / city preview'}</p>
-                    <p className="text-gray-500 font-mono">{newAddrPhone || 'Phone preview'}</p>
+                    <p className="font-bold text-gray-800">{newAddrTitle || 'Not entered yet'}</p>
+                    <p className="text-gray-600">{newAddrStreet || 'Street / house / flat not entered yet'}</p>
+                    <p className="text-gray-500">{newAddrArea || (newAddrCoords ? 'GPS location outside saved Dhaka area list' : 'Area / city not entered yet')}</p>
+                    <p className="text-gray-500 font-mono">{newAddrPhone || 'Phone not entered yet'}</p>
                     {newAddrEmail && <p className="text-gray-500 font-mono">{newAddrEmail} {newAddrEmailVerified ? '✓ verified' : 'not verified'}</p>}
-                    {newAddrCoords && <p className="text-[10px] text-emerald-700 font-mono">Lat {newAddrCoords.lat.toFixed(5)} · Lng {newAddrCoords.lng.toFixed(5)} {newAddrCoords.accuracy ? `· ±${Math.round(newAddrCoords.accuracy)}m` : ''}</p>}
+                    {newAddrCoords && (
+                      <>
+                        <div className="h-32 rounded-xl overflow-hidden border border-emerald-200">
+                          <LeafletMap vehicles={[]} zoomTo={14} marker={{ lat: newAddrCoords.lat, lng: newAddrCoords.lng }} />
+                        </div>
+                        <p className="text-[10px] text-emerald-700 font-mono">
+                          Lat {newAddrCoords.lat.toFixed(5)} · Lng {newAddrCoords.lng.toFixed(5)}
+                          {cleanAccuracy(newAddrCoords.accuracy) ? ` · ±${cleanAccuracy(newAddrCoords.accuracy)}m` : ' · live GPS'}
+                        </p>
+                      </>
+                    )}
                   </div>
                   <div className="flex space-x-2 pt-2">
                     <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">{editingAddressId ? 'Update Address' : 'Save Address'}</button>
@@ -3618,7 +3641,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <p className="text-xs text-gray-500">{addr.area}</p>
                       <p className="text-xs text-gray-500 font-mono">📱 {addr.phone}</p>
                       {addr.email && <p className="text-xs text-gray-500 font-mono">✉ {addr.email} {addr.emailVerified ? '✓' : ''}</p>}
-                      {addr.lat && addr.lng && <p className="text-[10px] text-emerald-700 font-mono">GPS {addr.lat.toFixed(5)}, {addr.lng.toFixed(5)}</p>}
+                      {addr.lat && addr.lng && (
+                        <p className="text-[10px] text-emerald-700 font-mono">
+                          GPS {addr.lat.toFixed(5)}, {addr.lng.toFixed(5)}
+                          {cleanAccuracy(addr.accuracy) ? ` · ±${cleanAccuracy(addr.accuracy)}m` : ''}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs font-bold">
                       <button onClick={() => {
