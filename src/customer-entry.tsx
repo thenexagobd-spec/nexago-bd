@@ -26,10 +26,11 @@ const API_BASE = window.location.origin;
 const SEED_DRIVERS: any[] = [];
 const SEED_STORES: any[] = [];
 const SEED_PRODUCTS: Product[] = [];
-const STARTER_SEED_KEY = 'nexago_customer_starter_seed_v2';
+const STARTER_SEED_KEY = 'nexago_customer_starter_seed_v3';
 
 const starterStore = {
   id: 'STR-CUSTOMER-STARTER',
+  adminId: 'SA-CUSTOMER-STARTER',
   name: 'NexaGo Starter Mart',
   address: 'Dhaka, Bangladesh',
   category: 'Grocery',
@@ -147,15 +148,59 @@ const writeArray = (key: string, rows: any[]) => {
   try { localStorage.setItem(key, JSON.stringify(rows)); } catch { /* ignore */ }
 };
 
+const resolveStarterStoreTarget = (stores: any[], storeAdminApps: any[]) => {
+  const verifiedApp = storeAdminApps.find((app: any) => app?.storeId && String(app.status || '').toLowerCase() === 'verified')
+    || storeAdminApps.find((app: any) => app?.storeId);
+  if (verifiedApp) {
+    const existingStore = stores.find((store: any) => store?.id === verifiedApp.storeId);
+    return {
+      ...starterStore,
+      ...(existingStore || {}),
+      id: verifiedApp.storeId,
+      adminId: verifiedApp.adminId || existingStore?.adminId || '',
+      ownerName: verifiedApp.ownerName || existingStore?.ownerName || '',
+      name: verifiedApp.storeName || existingStore?.name || 'Approved Store',
+      address: verifiedApp.storeAddress || existingStore?.address || 'Bangladesh',
+      category: verifiedApp.businessType || existingStore?.category || 'Grocery',
+      status: existingStore?.status || 'active',
+    };
+  }
+  const existingRealStore = stores.find((store: any) => store?.id && store.id !== starterStore.id);
+  if (existingRealStore) return existingRealStore;
+  return starterStore;
+};
+
 const seedCustomerStarterData = () => {
   try {
     if (localStorage.getItem(STARTER_SEED_KEY) === '1') return;
     const stores = readArray('sd_stores');
+    const storeAdminApps = readArray('sd_store_admin_apps');
     const products = readArray('sd_products');
     const addresses = readArray('ss_addr');
-    const nextStores = stores.some((store: any) => store.id === starterStore.id) ? stores : [starterStore, ...stores];
+    const targetStore = resolveStarterStoreTarget(stores, storeAdminApps);
+    const shouldAddTargetStore = !stores.some((store: any) => store.id === targetStore.id);
+    const nextStores = shouldAddTargetStore ? [targetStore, ...stores] : stores.map((store: any) => store.id === targetStore.id ? { ...store, ...targetStore } : store);
     const productIds = new Set(products.map((product: any) => product.id));
-    const nextProducts = [...products, ...starterProducts.filter(product => !productIds.has(product.id))];
+    const ownedStarterProducts = starterProducts.map(product => ({
+      ...product,
+      storeId: targetStore.id,
+      storeName: targetStore.name,
+      ownerAdminId: targetStore.adminId || '',
+      seededForStoreAdmin: Boolean(targetStore.adminId),
+      updatedAt: new Date().toISOString(),
+    }));
+    const migratedProducts = products.map((product: any) => {
+      if (!String(product?.id || '').startsWith('PRD-BD-') || product.isDeleted || product.deletedAt) return product;
+      return {
+        ...product,
+        storeId: targetStore.id,
+        storeName: targetStore.name,
+        ownerAdminId: targetStore.adminId || product.ownerAdminId || '',
+        seededForStoreAdmin: Boolean(targetStore.adminId),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    const nextProducts = [...migratedProducts, ...ownedStarterProducts.filter(product => !productIds.has(product.id))];
     const nextAddresses = addresses.some((address: any) => address.id === starterAddress.id) ? addresses : [...addresses, starterAddress];
     writeArray('sd_stores', nextStores);
     writeArray('sd_products', nextProducts);

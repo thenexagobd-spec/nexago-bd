@@ -2909,6 +2909,7 @@ export default function App() {
                 const dashboardUrl = `${window.location.origin}${window.location.pathname}?storeId=${s.id}`;
                 const storeBranches = branches.filter((b: any) => b.storeId === s.id);
                 const storeOrders = orders.filter((o: any) => ((o.storeId && o.storeId === s.id) || String(o.storeName || '').toLowerCase() === String(s.name || '').toLowerCase()));
+                const storeProducts = products.filter((p: any) => p.storeId === s.id && !p.isDeleted && !p.deletedAt);
                 const storeRevenue = storeOrders.filter((o: any) => o.status !== 'Cancelled').reduce((sum, o: any) => sum + (Number(o.amount) || 0), 0);
                 const isStoreOpen = expandedStoreCardId === s.id;
                 const branchOrderRows = storeBranches.map((b: any) => {
@@ -2928,7 +2929,7 @@ export default function App() {
                         </span>
                       </div>
                       <p className="truncate text-[10px] text-gray-400 font-medium mb-2">{s.address}</p>
-                      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                         <div className="rounded-lg bg-[#080e17] p-2">
                           <p className="text-[8px] font-black uppercase text-gray-500">Orders</p>
                           <p className="text-xs font-black text-white">{storeOrders.length}</p>
@@ -2940,6 +2941,10 @@ export default function App() {
                         <div className="rounded-lg bg-[#080e17] p-2">
                           <p className="text-[8px] font-black uppercase text-gray-500">Branches</p>
                           <p className="text-xs font-black text-sky-300">{storeBranches.length}</p>
+                        </div>
+                        <div className="rounded-lg bg-[#080e17] p-2">
+                          <p className="text-[8px] font-black uppercase text-gray-500">Products</p>
+                          <p className="text-xs font-black text-brand-orange">{storeProducts.length}</p>
                         </div>
                         <button
                           type="button"
