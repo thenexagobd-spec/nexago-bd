@@ -949,6 +949,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [isLocatingDelivery, setIsLocatingDelivery] = useState(false);
   const [locationPermissionState, setLocationPermissionState] = useState<'checking' | 'granted' | 'denied' | 'prompt' | 'unsupported'>('checking');
   const [locationConsentAction, setLocationConsentAction] = useState<'delivery' | 'address' | null>(null);
+  const [locationSharingPaused, setLocationSharingPaused] = useState(false);
+  const [cameraPermissionState, setCameraPermissionState] = useState<'unknown' | 'granted' | 'denied' | 'prompt' | 'unsupported'>('unknown');
+  const [notificationPermissionState, setNotificationPermissionState] = useState<'unknown' | 'granted' | 'denied' | 'default' | 'unsupported'>('unknown');
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleSlot, setScheduleSlot] = useState(SCHEDULE_SLOTS[0]);
 
@@ -1786,32 +1789,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       showToast('Map থেকে delivery pin দিন অথবা browser location Allow করুন.', 'info');
       return null;
     }
-    setIsLocatingDelivery(true);
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-      });
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error('invalid location');
-      const area = nearestAreaOf(lat, lng);
-      const capturedAt = new Date().toISOString();
-      const nextPin = { lat, lng };
-      const nextMeta = { accuracy: pos.coords.accuracy, capturedAt, source: 'browser-gps' as const, area };
-      setDeliveryPin(nextPin);
-      setDeliveryLocationMeta(nextMeta);
-      if (!deliveryAddress.trim()) {
-        setDeliveryAddress(lang === 'bn'
-          ? `আপনার বর্তমান অবস্থান, ${AREA_NAMES_BN[area]}, ঢাকা`
-          : `Your current location, ${area}, Dhaka`);
-      }
-      return { ...nextPin, meta: nextMeta };
-    } catch {
-      showToast('Order করতে customer location permission Allow করতে হবে. Browser location Allow করে আবার চেষ্টা করুন.', 'info');
-      return null;
-    } finally {
-      setIsLocatingDelivery(false);
-    }
+    setLocationSharingPaused(true);
+    setLocationConsentAction('delivery');
+    showToast('Order করতে app location popup থেকে Allow Location চাপুন.', 'info');
+    return null;
   };
 
   useEffect(() => {
@@ -1824,43 +1805,25 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     let cancelled = false;
-    const captureOnOpen = () => {
-      setIsLocatingDelivery(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          if (cancelled) return;
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const area = nearestAreaOf(lat, lng);
-          setLocationPermissionState('granted');
-          setDeliveryPin({ lat, lng });
-          setDeliveryLocationMeta({ accuracy: pos.coords.accuracy, capturedAt: new Date().toISOString(), source: 'browser-gps', area });
-          setIsLocatingDelivery(false);
-        },
-        () => {
-          if (cancelled) return;
-          setLocationPermissionState('denied');
-          setIsLocatingDelivery(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
+    const askFromApp = () => {
+      if (!cancelled) setLocationConsentAction(prev => prev || 'delivery');
     };
     if (navigator.permissions?.query) {
       navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((status) => {
         if (cancelled) return;
         setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
-        captureOnOpen();
+        askFromApp();
         status.onchange = () => {
           if (cancelled) return;
           setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
-          captureOnOpen();
+          askFromApp();
         };
-      }).catch(captureOnOpen);
+      }).catch(askFromApp);
     } else {
-      captureOnOpen();
+      askFromApp();
     }
     const recheckLocationPermission = () => {
-      if (!cancelled && document.visibilityState === 'visible') captureOnOpen();
+      if (!cancelled && document.visibilityState === 'visible') askFromApp();
     };
     window.addEventListener('focus', recheckLocationPermission);
     document.addEventListener('visibilitychange', recheckLocationPermission);
@@ -1870,6 +1833,46 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       document.removeEventListener('visibilitychange', recheckLocationPermission);
     };
   }, [custVerified]);
+
+  useEffect(() => {
+    setNotificationPermissionState('Notification' in window ? Notification.permission : 'unsupported');
+    if (navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'camera' as PermissionName }).then((status) => {
+        setCameraPermissionState(status.state as 'granted' | 'denied' | 'prompt');
+        status.onchange = () => setCameraPermissionState(status.state as 'granted' | 'denied' | 'prompt');
+      }).catch(() => setCameraPermissionState(navigator.mediaDevices?.getUserMedia ? 'prompt' : 'unsupported'));
+    } else {
+      setCameraPermissionState(navigator.mediaDevices?.getUserMedia ? 'prompt' : 'unsupported');
+    }
+  }, []);
+
+  const requestCameraPermission = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraPermissionState('unsupported');
+      showToast('Camera permission is not supported on this browser/device.', 'info');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach(track => track.stop());
+      setCameraPermissionState('granted');
+      showToast('Camera permission allowed.', 'success');
+    } catch {
+      setCameraPermissionState('denied');
+      showToast('Camera permission denied. Enable it from browser site settings.', 'info');
+    }
+  };
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      setNotificationPermissionState('unsupported');
+      showToast('Notifications are not supported on this browser/device.', 'info');
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setNotificationPermissionState(result);
+    showToast(result === 'granted' ? 'Notification permission allowed.' : 'Notification permission not allowed.', result === 'granted' ? 'success' : 'info');
+  };
 
   const handlePlaceCustomerOrder = async () => {
     if (cart.length === 0) {
@@ -2380,6 +2383,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setLocationPermissionState('granted');
+        setLocationSharingPaused(false);
         setDeliveryPin({ lat, lng });
         // Auto-fill the delivery address text from the pinned location — in Bangla or English
         const area = nearestAreaOf(lat, lng);
@@ -2393,7 +2397,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         setDeliveryAddress(addrText);
         showToast('Current location pinned — address updated', 'success');
       },
-      () => { setLocationPermissionState('denied'); showToast('Could not fetch location — drag the pin to place it manually', 'info'); },
+      () => { setLocationPermissionState('denied'); setLocationSharingPaused(true); setLocationConsentAction('delivery'); showToast('Could not fetch location — allow location permission to continue', 'info'); },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
@@ -2409,12 +2413,14 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         const lng = pos.coords.longitude;
         const area = nearestAreaOf(lat, lng);
         const reverse = await reverseGeocodeLocation(lat, lng);
+        setLocationPermissionState('granted');
+        setLocationSharingPaused(false);
         setNewAddrCoords({ lat, lng, accuracy: pos.coords.accuracy, source: 'gps' });
         if (!newAddrArea.trim()) setNewAddrArea(reverse?.area || (area ? `${area}, Dhaka` : ''));
         if (!newAddrStreet.trim()) setNewAddrStreet(reverse?.street || reverse?.display || `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
         showToast('Live location added to this address', 'success');
       },
-      () => showToast('Location permission denied. You can still type the address manually.', 'info'),
+      () => { setLocationPermissionState('denied'); setLocationSharingPaused(true); setLocationConsentAction('address'); showToast('Location permission denied. Allow location to save live GPS address.', 'info'); },
       { enableHighAccuracy: true, timeout: 9000 }
     );
   };
@@ -2426,8 +2432,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const confirmLocationFromApp = () => {
     const action = locationConsentAction;
     setLocationConsentAction(null);
+    setLocationSharingPaused(false);
     if (action === 'address') captureAddressLocation();
     else locateMe();
+  };
+
+  const turnOffLocationSharing = () => {
+    setLocationSharingPaused(true);
+    setDeliveryPin(null);
+    setDeliveryLocationMeta(null);
+    setLocationConsentAction('delivery');
+    showToast('Location sharing turned off. Allow location again to continue.', 'info');
   };
 
   const handleAddAddressSubmit = (e: React.FormEvent) => {
@@ -2581,7 +2596,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           showToast={showToast}
         />
       )}
-      {custVerified && locationPermissionState !== 'granted' && (
+      {custVerified && (locationSharingPaused || locationPermissionState !== 'granted') && (
         <div className="fixed inset-0 z-[120] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4">
           <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 shadow-2xl p-6 text-white space-y-5">
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center">
@@ -2600,7 +2615,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             </div>
             {locationPermissionState === 'denied' && (
               <div className="rounded-2xl border border-red-400/25 bg-red-500/10 p-3 text-xs text-red-100">
-                Location blocked. Browser/site settings theke Location Allow kore abar button click korun.
+                Location off/blocked. App popup theke Allow Location চাপুন; browser blocked thakle site settings theke Location Allow করতে হবে.
               </div>
             )}
             {locationPermissionState === 'unsupported' && (
@@ -4134,6 +4149,76 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all ${lang === 'bn' ? 'left-[22px]' : 'left-0.5'}`} />
                       </button>
                     </label>
+                    <div className="border-t border-gray-100 pt-4 space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-bold text-gray-800 flex items-center space-x-2">
+                          <LocateFixed className="w-4 h-4 text-emerald-600" />
+                          <span>{lang === 'bn' ? 'লোকেশন পারমিশন' : 'Location Permission'}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => locationPermissionState === 'granted' && !locationSharingPaused ? turnOffLocationSharing() : requestLocationFromApp('delivery')}
+                          className={`px-3 py-2 rounded-xl text-[10px] font-black transition-colors cursor-pointer ${locationPermissionState === 'granted' && !locationSharingPaused ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-emerald-600 text-white'}`}
+                        >
+                          {locationPermissionState === 'granted' && !locationSharingPaused ? (lang === 'bn' ? 'Off করুন' : 'Turn Off') : (lang === 'bn' ? 'Allow করুন' : 'Allow')}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-relaxed">
+                        {locationPermissionState === 'granted' && !locationSharingPaused
+                          ? (lang === 'bn' ? 'লোকেশন চালু আছে। Off করলে সাথে সাথে app popup আবার Allow চাইবে।' : 'Location is active. Turning it off opens the app popup again to allow.')
+                          : (lang === 'bn' ? 'লোকেশন বন্ধ আছে। Allow চাপলে আগে app popup, তারপর দরকার হলে browser popup আসবে।' : 'Location is off. Allow opens the app popup first, then browser popup if needed.')}
+                      </p>
+                    </div>
+                    <div className="border-t border-gray-100 pt-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-bold text-gray-800 flex items-center space-x-2">
+                          <Camera className="w-4 h-4 text-blue-600" />
+                          <span>{lang === 'bn' ? 'ক্যামেরা পারমিশন' : 'Camera Permission'}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={requestCameraPermission}
+                          className={`px-3 py-2 rounded-xl text-[10px] font-black transition-colors cursor-pointer ${cameraPermissionState === 'granted' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-blue-600 text-white'}`}
+                        >
+                          {cameraPermissionState === 'granted' ? (lang === 'bn' ? 'Allowed' : 'Allowed') : (lang === 'bn' ? 'Allow' : 'Allow')}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-relaxed">
+                        {lang === 'bn' ? 'প্রোফাইল ছবি, receipt, support photo/video, proof upload-এর জন্য লাগে।' : 'Needed for profile photo, receipt, support photo/video and proof uploads.'}
+                      </p>
+                    </div>
+                    <div className="border-t border-gray-100 pt-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-bold text-gray-800 flex items-center space-x-2">
+                          <Bell className="w-4 h-4 text-amber-600" />
+                          <span>{lang === 'bn' ? 'নোটিফিকেশন পারমিশন' : 'Notification Permission'}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={requestNotificationPermission}
+                          className={`px-3 py-2 rounded-xl text-[10px] font-black transition-colors cursor-pointer ${notificationPermissionState === 'granted' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-500 text-white'}`}
+                        >
+                          {notificationPermissionState === 'granted' ? (lang === 'bn' ? 'Allowed' : 'Allowed') : (lang === 'bn' ? 'Allow' : 'Allow')}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-relaxed">
+                        {lang === 'bn' ? 'Order update, driver nearby, payment approval, support reply alert পেতে লাগে।' : 'Needed for order updates, driver nearby alerts, payment approvals and support replies.'}
+                      </p>
+                    </div>
+                    <div className="border-t border-gray-100 pt-4 space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-bold text-gray-800 flex items-center space-x-2">
+                          <Package className="w-4 h-4 text-violet-600" />
+                          <span>{lang === 'bn' ? 'গ্যালারি / ফাইল অ্যাক্সেস' : 'Gallery / File Access'}</span>
+                        </span>
+                        <span className="px-3 py-2 rounded-xl bg-violet-50 text-violet-700 border border-violet-100 text-[10px] font-black">
+                          {lang === 'bn' ? 'On demand' : 'On demand'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-relaxed">
+                        {lang === 'bn' ? 'Browser security অনুযায়ী file chooser শুধু upload button চাপলে খুলবে; আলাদা permanent permission লাগে না।' : 'Browser security opens the file chooser only after tapping an upload button; no permanent permission is required.'}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -4458,11 +4543,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
                 <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3 text-xs">
                   <h3 className="font-black uppercase tracking-wider text-gray-800">{T.deliveryDetails}</h3>
-                  {locationPermissionState !== 'granted' && (
+                  {(locationSharingPaused || locationPermissionState !== 'granted') && (
                     <div className={`rounded-xl border p-2.5 text-[10px] font-bold ${locationPermissionState === 'denied' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                      {locationPermissionState === 'denied'
-                        ? 'Location permission blocked. Manual map pin দিয়ে order করা যাবে, অথবা browser site settings থেকে Location Allow করুন.'
-                        : 'Customer app খোলার সময় location permission চাইবে. Real GPS দিলে order location auto save হবে.'}
+                      {locationSharingPaused
+                        ? 'Location sharing app theke OFF ache. Allow Location চাপলে আবার app popup আসবে.'
+                        : locationPermissionState === 'denied'
+                        ? 'Location permission blocked/off. App popup থেকে Allow Location চাপুন; দরকার হলে browser site settings থেকেও Allow করুন.'
+                        : 'Customer app নিজের popup দেখাবে. Allow করলে real GPS order location auto save হবে.'}
                     </div>
                   )}
 
@@ -4534,6 +4621,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5"
                         >
                           <MapPin className="w-3.5 h-3.5 text-emerald-600" /><span>Pin saved</span>
+                        </button>
+                      )}
+                      {locationPermissionState === 'granted' && !locationSharingPaused && (
+                        <button
+                          type="button"
+                          onClick={turnOffLocationSharing}
+                          className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold rounded-xl transition-all cursor-pointer"
+                        >
+                          Off
                         </button>
                       )}
                     </div>
