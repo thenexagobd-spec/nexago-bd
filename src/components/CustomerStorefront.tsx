@@ -3772,7 +3772,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         <div className="h-32 rounded-xl overflow-hidden border border-emerald-200">
                           <LeafletMap
                             vehicles={[]}
-                            zoomTo={14}
+                            zoomTo={18}
                             marker={{ lat: newAddrCoords.lat, lng: newAddrCoords.lng }}
                             markerDraggable
                             onMapClick={updateNewAddressPin}
@@ -3790,7 +3790,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         <div className="h-32 rounded-xl overflow-hidden border border-amber-200">
                           <LeafletMap
                             vehicles={[]}
-                            zoomTo={13}
+                            zoomTo={17}
                             marker={null}
                             onMapClick={updateNewAddressPin}
                           />

@@ -148,9 +148,10 @@ export default function LeafletMap({ vehicles, zoomTo, onVehicleClick, trackingI
 
   useEffect(() => {
     if (!divRef.current) return;
-    const map = L.map(divRef.current, { zoomControl: true, attributionControl: true }).setView([23.78, 90.4045], 12);
+    const map = L.map(divRef.current, { zoomControl: true, attributionControl: true, preferCanvas: true }).setView([23.78, 90.4045], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
+      maxZoom: 19,
+      maxNativeZoom: 19,
       attribution: '&copy; OpenStreetMap',
     }).addTo(map);
     mapRef.current = map;
@@ -340,7 +341,7 @@ export default function LeafletMap({ vehicles, zoomTo, onVehicleClick, trackingI
       }
       if (!fittedRef.current || fittedRef.current.lat !== marker.lat || fittedRef.current.lng !== marker.lng) {
         if (mapRef.current) {
-          mapRef.current.setView([marker.lat, marker.lng], 14, { animate: true });
+          mapRef.current.setView([marker.lat, marker.lng], Math.max(zoomTo, 16), { animate: true });
           fittedRef.current = { lat: marker.lat, lng: marker.lng };
         }
       }
