@@ -1806,6 +1806,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   useEffect(() => {
     if (!custVerified) {
       setLocationPermissionState('checking');
+      setLocationConsentAction(null);
       return;
     }
     if (!('geolocation' in navigator)) {
@@ -2483,7 +2484,21 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     );
   };
 
+  const isCustomerLocationAllowed = () => {
+    try {
+      return localStorage.getItem('nexago_customer_location_allowed') === '1'
+        && localStorage.getItem('nexago_customer_location_paused') !== '1';
+    } catch {
+      return false;
+    }
+  };
+
   const requestLocationFromApp = (action: 'delivery' | 'address') => {
+    if (locationPermissionState === 'granted' && !locationSharingPaused && isCustomerLocationAllowed()) {
+      if (action === 'address') captureAddressLocation();
+      else locateMe();
+      return;
+    }
     setLocationConsentAction(action);
   };
 
@@ -2707,7 +2722,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           </div>
         </div>
       )}
-      {locationConsentAction && (
+      {custVerified && locationConsentAction && (
         <div className="fixed inset-0 z-[130] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-3xl bg-white shadow-2xl border border-emerald-100 p-5 text-gray-900 space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
