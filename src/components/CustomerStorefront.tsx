@@ -47,6 +47,7 @@ interface SavedAddress {
   area: string;
   phone: string;
   isDefault: boolean;
+  zipCode?: string;
   email?: string;
   emailVerified?: boolean;
   lat?: number;
@@ -177,6 +178,7 @@ const reverseGeocodeLocation = async (lat: number, lng: number) => {
     return {
       street: road || line || `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
       area: [city, country].filter(Boolean).join(', '),
+      zipCode: String(a.postcode || a.postal_code || '').trim(),
       display: line
     };
   } catch {
@@ -1125,6 +1127,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [newAddrTitle, setNewAddrTitle] = useState('');
   const [newAddrStreet, setNewAddrStreet] = useState('');
   const [newAddrArea, setNewAddrArea] = useState('');
+  const [newAddrZipCode, setNewAddrZipCode] = useState('');
   const [newAddrPhone, setNewAddrPhone] = useState('');
   const [newAddrEmail, setNewAddrEmail] = useState('');
   const [newAddrEmailVerified, setNewAddrEmailVerified] = useState(false);
@@ -2465,6 +2468,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         } catch { /* ignore */ }
         setNewAddrCoords({ lat, lng, accuracy: pos.coords.accuracy, source: 'gps' });
         if (!newAddrArea.trim()) setNewAddrArea(reverse?.area || (area ? `${area}, Dhaka` : ''));
+        if (!newAddrZipCode.trim()) setNewAddrZipCode(reverse?.zipCode || '');
         if (!newAddrStreet.trim()) setNewAddrStreet(reverse?.street || reverse?.display || `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
         showToast('Live location added to this address', 'success');
       },
@@ -2481,6 +2485,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const requestLocationFromApp = (action: 'delivery' | 'address') => {
     setLocationConsentAction(action);
+  };
+
+  const updateNewAddressPin = async (lat: number, lng: number) => {
+    const area = nearestAreaOf(lat, lng);
+    setNewAddrCoords({ lat, lng, source: 'manual' });
+    const reverse = await reverseGeocodeLocation(lat, lng);
+    setNewAddrArea(reverse?.area || (area ? `${area}, Dhaka` : ''));
+    setNewAddrZipCode(reverse?.zipCode || '');
+    setNewAddrStreet(reverse?.street || reverse?.display || `Pinned map location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
   };
 
   const confirmLocationFromApp = () => {
@@ -2507,6 +2520,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       id: editingAddressId || `ADDR-${Date.now().toString().slice(-3)}`,
       title: newAddrTitle, address: newAddrStreet, area: newAddrArea, phone: newAddrPhone,
       isDefault: editingAddressId ? Boolean(addresses.find(a => a.id === editingAddressId)?.isDefault) : addresses.length === 0,
+      zipCode: newAddrZipCode.trim(),
       email: newAddrEmail.trim(),
       emailVerified: newAddrEmailVerified,
       lat: newAddrCoords?.lat,
@@ -2520,6 +2534,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setNewAddrTitle('');
     setNewAddrStreet('');
     setNewAddrArea('');
+    setNewAddrZipCode('');
     setNewAddrPhone('');
     setNewAddrEmail('');
     setNewAddrEmailVerified(false);
@@ -2533,6 +2548,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setNewAddrTitle('');
     setNewAddrStreet('');
     setNewAddrArea('');
+    setNewAddrZipCode('');
     setNewAddrPhone('');
     setNewAddrEmail('');
     setNewAddrEmailVerified(false);
@@ -2544,6 +2560,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setNewAddrTitle(addr.title);
     setNewAddrStreet(addr.address);
     setNewAddrArea(addr.area);
+    setNewAddrZipCode(addr.zipCode || '');
     setNewAddrPhone(addr.phone);
     setNewAddrEmail(addr.email || '');
     setNewAddrEmailVerified(Boolean(addr.emailVerified));
@@ -3718,9 +3735,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Street Address / Flat / Building</label>
                       <input type="text" value={newAddrStreet} onChange={(e) => setNewAddrStreet(e.target.value)} placeholder="House 12, Road 4, Block B" className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" required />
                     </div>
-                    <div className="sm:col-span-2">
+                    <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Area / Thana / City</label>
                       <input type="text" value={newAddrArea} onChange={(e) => setNewAddrArea(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" required />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Postal / ZIP Code</label>
+                      <input type="text" value={newAddrZipCode} onChange={(e) => setNewAddrZipCode(e.target.value)} placeholder="Auto from GPS or enter manually" className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 font-mono" />
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Gmail for address verification</label>
@@ -3743,12 +3764,20 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <p className="font-bold text-gray-800">{newAddrTitle || 'Not entered yet'}</p>
                     <p className="text-gray-600">{newAddrStreet || 'Street / house / flat not entered yet'}</p>
                     <p className="text-gray-500">{newAddrArea || (newAddrCoords ? 'GPS location outside saved Dhaka area list' : 'Area / city not entered yet')}</p>
+                    <p className="text-gray-500 font-mono">{newAddrZipCode ? `ZIP ${newAddrZipCode}` : 'Postal / ZIP code auto or manual'}</p>
                     <p className="text-gray-500 font-mono">{newAddrPhone || 'Phone not entered yet'}</p>
                     {newAddrEmail && <p className="text-gray-500 font-mono">{newAddrEmail} {newAddrEmailVerified ? '✓ verified' : 'not verified'}</p>}
                     {newAddrCoords && (
                       <>
                         <div className="h-32 rounded-xl overflow-hidden border border-emerald-200">
-                          <LeafletMap vehicles={[]} zoomTo={14} marker={{ lat: newAddrCoords.lat, lng: newAddrCoords.lng }} />
+                          <LeafletMap
+                            vehicles={[]}
+                            zoomTo={14}
+                            marker={{ lat: newAddrCoords.lat, lng: newAddrCoords.lng }}
+                            markerDraggable
+                            onMapClick={updateNewAddressPin}
+                            onMarkerDrag={updateNewAddressPin}
+                          />
                         </div>
                         <p className="text-[10px] text-emerald-700 font-mono">
                           Lat {newAddrCoords.lat.toFixed(5)} · Lng {newAddrCoords.lng.toFixed(5)}
@@ -3757,7 +3786,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       </>
                     )}
                     {!newAddrCoords && (
-                      <p className="text-[10px] text-amber-700 font-bold">Live location permission asar jonno "Live Location" button click korun. Permission already allowed thakle browser popup abar dekhabe na.</p>
+                      <>
+                        <div className="h-32 rounded-xl overflow-hidden border border-amber-200">
+                          <LeafletMap
+                            vehicles={[]}
+                            zoomTo={13}
+                            marker={null}
+                            onMapClick={updateNewAddressPin}
+                          />
+                        </div>
+                        <p className="text-[10px] text-amber-700 font-bold">Map-e click kore pin boshan, ba "Live Location" button click korun. Permission already allowed thakle browser popup abar dekhabe na.</p>
+                      </>
                     )}
                   </div>
                   <div className="flex space-x-2 pt-2">
@@ -3779,6 +3818,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       </div>
                       <p className="text-xs text-gray-700 font-medium">{addr.address}</p>
                       <p className="text-xs text-gray-500">{addr.area}</p>
+                      {addr.zipCode && <p className="text-xs text-gray-500 font-mono">ZIP {addr.zipCode}</p>}
                       <p className="text-xs text-gray-500 font-mono">📱 {addr.phone}</p>
                       {addr.email && <p className="text-xs text-gray-500 font-mono">✉ {addr.email} {addr.emailVerified ? '✓' : ''}</p>}
                       {addr.lat && addr.lng && (
@@ -3790,7 +3830,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs font-bold">
                       <button onClick={() => {
-                        setDeliveryAddress(`${addr.address}, ${addr.area}`);
+                        setDeliveryAddress([addr.address, addr.area, addr.zipCode ? `ZIP ${addr.zipCode}` : ''].filter(Boolean).join(', '));
                         if (addr.lat && addr.lng) {
                           setDeliveryPin({ lat: addr.lat, lng: addr.lng });
                           setDeliveryLocationMeta({ accuracy: addr.accuracy, capturedAt: new Date().toISOString(), source: addr.source === 'gps' ? 'browser-gps' : 'map-pin', area: addr.area });
