@@ -4636,6 +4636,62 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="p-4 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Product grid */}
               <div className="lg:col-span-2 space-y-3">
+                <div className="space-y-2">
+                  <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-700 via-teal-600 to-lime-500 p-4 text-white shadow-sm">
+                    <img
+                      src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=900"
+                      alt="Fresh grocery offer"
+                      referrerPolicy="no-referrer"
+                      className="absolute inset-0 h-full w-full object-cover opacity-20"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/70 via-emerald-800/35 to-transparent" />
+                    <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-lime-100">Fresh Deals Today</p>
+                        <h3 className="mt-1 text-lg font-black leading-tight">সব বাজার, সুপারমার্কেট, রেস্তোরাঁ, ফার্মেসি এক জায়গায়</h3>
+                        <p className="mt-1 max-w-xl text-[11px] font-semibold text-emerald-50/90">
+                          {nm(selectedStore.name)} থেকে grocery, fast food, bakery, ফল-সবজি, মাংস-মাছ instant order করুন।
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {['Limited Offer', 'Promotion', 'Discount', 'Free delivery eligible'].map((tag) => (
+                            <span key={tag} className="rounded-full border border-white/25 bg-white/15 px-2 py-0.5 text-[8px] font-black uppercase text-white shadow-sm">{tag}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setStoreSearch('')}
+                        className="shrink-0 rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase text-emerald-700 shadow-sm hover:bg-emerald-50"
+                      >
+                        Shop Now
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                      {[
+                      { title: 'Grocery Promotion', deal: '৳100 OFF', sub: 'Rice, oil, dal', code: 'SAVE100', cat: 'Grocery', tone: 'from-orange-500 to-amber-400', img: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=400' },
+                      { title: 'Fast Food Offer', deal: 'Combo Deal', sub: 'Burger, pizza, fries', code: 'COMBO', cat: 'Fast Food', tone: 'from-red-500 to-rose-400', img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&q=80&w=400' },
+                      { title: 'Pharmacy Promo', deal: 'Care Pack', sub: 'Medicine essentials', code: 'CARE', cat: 'Pharmacy', tone: 'from-sky-600 to-cyan-400', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400' },
+                      { title: 'Fresh Market Offer', deal: 'Today Fresh', sub: 'Fish, meat, fruits', code: 'FRESH', cat: 'Meat & Fish', tone: 'from-emerald-600 to-lime-500', img: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&q=80&w=400' },
+                    ].map((ad) => (
+                      <button
+                        key={ad.title}
+                        type="button"
+                        onClick={() => { setStoreCat(ad.cat); setStoreSearch(''); }}
+                        className={`relative min-h-[74px] overflow-hidden rounded-2xl bg-gradient-to-br ${ad.tone} p-3 text-left text-white shadow-sm`}
+                      >
+                        <img src={ad.img} alt={ad.title} referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover opacity-20" />
+                        <div className="absolute inset-0 bg-black/20" />
+                        <div className="relative">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-white/80">{ad.title}</p>
+                          <p className="mt-0.5 text-sm font-black leading-tight">{ad.deal}</p>
+                          <p className="mt-0.5 text-[9px] font-bold text-white/85">{ad.sub}</p>
+                          <span className="mt-2 inline-flex rounded-full bg-white px-2 py-0.5 text-[8px] font-black uppercase text-gray-900">Code {ad.code}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="space-y-2.5">
                   <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none">
                     {['All', ...Array.from(new Set(selectedStore.catalog.map(p => p.category)))].map((cat) => (
