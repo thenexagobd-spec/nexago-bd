@@ -219,6 +219,7 @@ const reverseGeocodeLocation = async (lat: number, lng: number) => {
 const U = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=600`;
 
 const STORE_DEFS: StoreDef[] = [];
+const NEXSA_GO_LOGO = '/assets/nexsa-go-logo.jpg';
 
 const BN_NAMES: Record<string, string> = {};
 
@@ -1120,7 +1121,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         reviewsCount: String(store.reviewsCount || 0),
         deliveryTime: store.deliveryTime || 'Real-time',
         deliveryFee: Number(store.deliveryFee || 0),
-        image: store.image || '',
+        image: store.image || NEXSA_GO_LOGO,
         logoText: store.name,
         logoBg: 'bg-emerald-100 text-emerald-800',
         pickup: store.pickup || { lat: 23.8103, lng: 90.4125 },
@@ -3380,7 +3381,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <div key={store.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative">
                       <div>
                         <div className="relative h-24 overflow-hidden bg-gray-100">
-                          <img src={store.image} alt={nm(store.name)} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <img src={store.image || NEXSA_GO_LOGO} alt={nm(store.name)} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-white/25 pointer-events-none" />
                           <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md ${store.badgeColor}`}>{store.category}</span>
                           <button onClick={(e) => toggleFavorite(e, store.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors shadow-md cursor-pointer">
@@ -3603,7 +3604,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         </div>
                         <div className="p-3 space-y-1.5">
                           <div className="flex items-center space-x-2">
-                            <div className={`w-6 h-6 rounded-lg ${store.logoBg} flex items-center justify-center font-black text-[10px] shrink-0 shadow-xs`}>{store.logoText.charAt(0)}</div>
+                            <img src={NEXSA_GO_LOGO} alt={`${nm(store.name)} logo`} className="w-6 h-6 rounded-lg object-cover shrink-0 shadow-xs border border-emerald-100" />
                             <div className="min-w-0">
                               <h3 className="font-bold text-gray-900 text-xs group-hover:text-emerald-600 transition-colors line-clamp-1">{nm(store.name)}</h3>
                               <p className="text-[10px] text-gray-500 line-clamp-1">{store.subtext}</p>
@@ -4663,9 +4664,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 </button>
               </div>
               <div className="absolute bottom-2 left-3 text-white flex items-end gap-2.5">
-                <div className={`hidden sm:flex w-11 h-11 rounded-xl ${selectedStore.logoBg} items-center justify-center font-black text-base shadow-lg border-2 border-white/40`}>
-                  {selectedStore.logoText.charAt(0)}
-                </div>
+                <img src={NEXSA_GO_LOGO} alt={`${nm(selectedStore.name)} logo`} className="hidden sm:block w-11 h-11 rounded-xl object-cover shadow-lg border-2 border-white/40" />
                 <div>
                   <span className={`px-1.5 py-px rounded text-[8px] font-bold uppercase ${selectedStore.badgeColor}`}>{selectedStore.category}</span>
                   <h2 className="text-lg font-black mt-0.5">{nm(selectedStore.name)}</h2>
