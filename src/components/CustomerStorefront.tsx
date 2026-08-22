@@ -2524,10 +2524,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       {!custVerified && (
         <CustomerAuthScreen
           lang={lang}
+          dark={dark}
           email={customerProfile.email}
           name={customerProfile.name}
           phone={customerProfile.phone}
           customerId={customerId}
+          onLangChange={setLang}
+          onDarkChange={setDark}
           onUpdateProfile={(patch) => setCustomerProfile((p) => ({ ...p, ...patch }))}
           onVerified={(info) => {
             setCustVerified(true);
@@ -5929,14 +5932,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 /* ============ CUSTOMER AUTH SCREEN (premium glass) ============ */
 const CustomerAuthScreen: React.FC<{
   lang: Lang;
+  dark: boolean;
   email: string;
   name: string;
   phone: string;
   customerId: string;
+  onLangChange: (lang: Lang) => void;
+  onDarkChange: (dark: boolean) => void;
   onUpdateProfile: (patch: Partial<{ name: string; email: string; phone: string }>) => void;
   onVerified: (info?: { customerId?: string; name?: string; email?: string; phone?: string; password?: string; pin?: string }) => void;
   showToast?: (msg: string, type?: string) => void;
-}> = ({ lang, email, name, phone, customerId, onUpdateProfile, onVerified, showToast }) => {
+}> = ({ lang, dark, email, name, phone, customerId, onLangChange, onDarkChange, onUpdateProfile, onVerified, showToast }) => {
   const A = {
     welcome: lang === 'bn' ? 'স্মার্ট শপে স্বাগতম' : 'Welcome to Smart Shop',
     oneAccount: lang === 'bn' ? 'সব ডিভাইসের জন্য এক স্থায়ী অ্যাকাউন্ট — Gmail + ফোন যুক্ত, অর্ডার ও ওয়ালেট ডাটা হারাবে না।' : 'One permanent account for all your devices — Gmail + phone linked, order & wallet data never lost.',
@@ -6247,13 +6253,33 @@ const CustomerAuthScreen: React.FC<{
         <div className="absolute -bottom-20 -left-16 w-52 h-52 rounded-full bg-teal-400/15 blur-3xl pointer-events-none" />
 
         <div className="relative">
-          <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg">
-              <ShoppingBag className="w-6 h-6 text-white" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center space-x-3 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shrink-0">
+                <ShoppingBag className="w-6 h-6 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-black tracking-tight leading-none">Smart Shop</p>
+                <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mt-1">by NexaGo BD</p>
+              </div>
             </div>
-            <div>
-              <p className="text-lg font-black tracking-tight leading-none">Smart Shop</p>
-              <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-[0.2em] mt-1">by NexaGo BD</p>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => onLangChange(lang === 'bn' ? 'en' : 'bn')}
+                className="h-8 px-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-[10px] font-black text-white transition-colors"
+                title="Change language"
+              >
+                {lang === 'bn' ? 'EN' : 'বাংলা'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onDarkChange(!dark)}
+                className="h-8 px-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-[10px] font-black text-white transition-colors"
+                title="Dark / light mode"
+              >
+                {dark ? 'Light' : 'Dark'}
+              </button>
             </div>
           </div>
 
