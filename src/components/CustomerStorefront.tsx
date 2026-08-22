@@ -1187,6 +1187,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [newAddrPhone, setNewAddrPhone] = useState('');
   const [newAddrEmail, setNewAddrEmail] = useState('');
   const [newAddrEmailVerified, setNewAddrEmailVerified] = useState(false);
+  const [newAddrEmailOtp, setNewAddrEmailOtp] = useState('');
+  const [newAddrEmailOtpSent, setNewAddrEmailOtpSent] = useState('');
+  const [newAddrEmailOtpInput, setNewAddrEmailOtpInput] = useState('');
   const [newAddrCoords, setNewAddrCoords] = useState<{ lat: number; lng: number; accuracy?: number; source: 'gps' | 'manual' } | null>(null);
   const availableAddressDistricts = useMemo(() => (BD_DIVISIONS[newAddrDivision] || []).filter(district => customerAreaAvailability[district]), [customerAreaAvailability, newAddrDivision]);
 
@@ -2616,6 +2619,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setNewAddrPhone('');
     setNewAddrEmail('');
     setNewAddrEmailVerified(false);
+    setNewAddrEmailOtp('');
+    setNewAddrEmailOtpSent('');
+    setNewAddrEmailOtpInput('');
     setNewAddrCoords(null);
     showToast(editingAddressId ? 'Delivery address updated successfully!' : 'New delivery address saved successfully!', 'success');
   };
@@ -2631,6 +2637,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setNewAddrPhone('');
     setNewAddrEmail('');
     setNewAddrEmailVerified(false);
+    setNewAddrEmailOtp('');
+    setNewAddrEmailOtpSent('');
+    setNewAddrEmailOtpInput('');
     setNewAddrCoords(null);
   };
 
@@ -2644,8 +2653,40 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setNewAddrPhone(addr.phone);
     setNewAddrEmail(addr.email || '');
     setNewAddrEmailVerified(Boolean(addr.emailVerified));
+    setNewAddrEmailOtp('');
+    setNewAddrEmailOtpSent('');
+    setNewAddrEmailOtpInput('');
     setNewAddrCoords(addr.lat && addr.lng ? { lat: addr.lat, lng: addr.lng, accuracy: addr.accuracy, source: addr.source || 'manual' } : null);
     setIsAddingAddress(true);
+  };
+
+  const sendAddressEmailOtp = () => {
+    const email = newAddrEmail.trim();
+    if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
+      showToast('Enter a valid Gmail address', 'info');
+      return;
+    }
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    setNewAddrEmailOtp(code);
+    setNewAddrEmailOtpSent(email);
+    setNewAddrEmailOtpInput('');
+    setNewAddrEmailVerified(false);
+    showToast(`Address Gmail OTP sent to ${email}`, 'success');
+  };
+
+  const verifyAddressEmailOtp = () => {
+    if (!newAddrEmailOtp || newAddrEmailOtpSent !== newAddrEmail.trim()) {
+      showToast('Send OTP to this Gmail first', 'info');
+      return;
+    }
+    if (newAddrEmailOtpInput.trim() !== newAddrEmailOtp) {
+      showToast('Invalid Gmail OTP code', 'info');
+      return;
+    }
+    setNewAddrEmailVerified(true);
+    setNewAddrEmailOtp('');
+    setNewAddrEmailOtpInput('');
+    showToast('Gmail OTP verified for this address', 'success');
   };
 
   const handleAddPaymentSubmit = (e: React.FormEvent) => {
@@ -3839,15 +3880,22 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Gmail for address verification</label>
-                      <div className="flex gap-2">
-                        <input type="email" value={newAddrEmail} onChange={(e) => { setNewAddrEmail(e.target.value); setNewAddrEmailVerified(false); }} placeholder="name@gmail.com" className="flex-1 min-w-0 p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
-                        <button type="button" onClick={() => {
-                          if (!/^[^\s@]+@gmail\.com$/i.test(newAddrEmail.trim())) { showToast('Enter a valid Gmail address', 'info'); return; }
-                          setNewAddrEmailVerified(true);
-                          showToast('Gmail verified for this address', 'success');
-                        }} className="px-3 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black">Verify</button>
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                        <input type="email" value={newAddrEmail} onChange={(e) => { setNewAddrEmail(e.target.value); setNewAddrEmailVerified(false); setNewAddrEmailOtp(''); setNewAddrEmailOtpSent(''); setNewAddrEmailOtpInput(''); }} placeholder="name@gmail.com" className="min-w-0 p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                        <button type="button" onClick={sendAddressEmailOtp} className="px-3 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black">Send OTP</button>
                       </div>
-                      <p className={`mt-1 text-[10px] font-bold ${newAddrEmailVerified ? 'text-emerald-600' : 'text-gray-400'}`}>{newAddrEmailVerified ? 'Verified Gmail linked with this delivery address.' : 'Optional: verify a different Gmail for this saved address.'}</p>
+                      {newAddrEmailOtpSent && !newAddrEmailVerified && (
+                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                          <input type="text" inputMode="numeric" maxLength={6} value={newAddrEmailOtpInput} onChange={(e) => setNewAddrEmailOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit OTP" className="min-w-0 p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 font-mono" />
+                          <button type="button" onClick={verifyAddressEmailOtp} className="px-3 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black">Verify OTP</button>
+                        </div>
+                      )}
+                      {newAddrEmailOtpSent && !newAddrEmailVerified && (
+                        <div className="mt-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-800">
+                          OTP sent to {newAddrEmailOtpSent}. Test code: <span className="font-mono">{newAddrEmailOtp}</span>
+                        </div>
+                      )}
+                      <p className={`mt-1 text-[10px] font-bold ${newAddrEmailVerified ? 'text-emerald-600' : 'text-gray-400'}`}>{newAddrEmailVerified ? 'Gmail OTP verified and linked with this delivery address.' : 'Optional: send OTP and verify a different Gmail for this saved address.'}</p>
                     </div>
                   </div>
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs space-y-2">
