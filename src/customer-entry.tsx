@@ -317,7 +317,7 @@ function PublicCustomerApp() {
       placedAt: Date.now(),
       status: orderData.status || 'Pending'
     };
-    setOrders(prev => [newOrder, ...prev]);
+    setOrders(prev => mergeById([newOrder], prev) as Order[]);
     postOrder(newOrder);
     // Mirror into the shared portal store so the Store / Store Admin / Driver sites
     // pick it up live (same keys the admin panel + portals read).
@@ -325,7 +325,7 @@ function PublicCustomerApp() {
       const sharedKey = 'sd_orders_v2';
       const raw = localStorage.getItem(sharedKey);
       const existing = raw ? JSON.parse(raw) : [];
-      localStorage.setItem(sharedKey, JSON.stringify([newOrder, ...existing]));
+      localStorage.setItem(sharedKey, JSON.stringify(mergeById([newOrder], existing)));
       const notifKey = 'sd_notifications';
       const nRaw = localStorage.getItem(notifKey);
       const notifs = nRaw ? JSON.parse(nRaw) : [];
@@ -341,13 +341,13 @@ function PublicCustomerApp() {
   };
 
   const handleUpdateOrder = (order: Order) => {
-    setOrders(prev => prev.map(o => (o.id === order.id ? order : o)));
+    setOrders(prev => mergeById([order], prev) as Order[]);
     postOrder(order);
     showToast(`Order #${order.id} updated`, 'success');
   };
 
   const handleSilentUpdateOrder = (order: Order) => {
-    setOrders(prev => prev.map(o => (o.id === order.id ? order : o)));
+    setOrders(prev => mergeById([order], prev) as Order[]);
     postOrder(order);
   };
 

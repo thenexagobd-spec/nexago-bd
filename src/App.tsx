@@ -477,6 +477,35 @@ export default function App() {
     return stripLegacySeedData(Array.from(byId.values()), 'products');
   };
 
+  const mergeOrderRecords = (localRows: Order[] = [], incomingRows: Order[] = []) => {
+    const byId = new globalThis.Map<string, Order>();
+    const scoreTime = (row: any) => Date.parse(row?.updatedAt || row?.completedAt || row?.createdAt || '') || Number(row?.placedAt || 0) || 0;
+    [...localRows, ...incomingRows].forEach((row: any) => {
+      if (!row?.id) return;
+      const id = String(row.id);
+      const current = byId.get(id);
+      if (!current) {
+        byId.set(id, row);
+        return;
+      }
+      const currentTime = scoreTime(current);
+      const rowTime = scoreTime(row);
+      const currentTimeline = Array.isArray((current as any).timeline) ? (current as any).timeline : [];
+      const rowTimeline = Array.isArray(row.timeline) ? row.timeline : [];
+      const mergedTimeline = [...currentTimeline, ...rowTimeline].filter((item: any, idx, all) => {
+        const key = `${item?.time || item?.at || ''}|${item?.status || ''}|${item?.actor || ''}|${item?.note || ''}`;
+        return key.trim() && all.findIndex((x: any) => `${x?.time || x?.at || ''}|${x?.status || ''}|${x?.actor || ''}|${x?.note || ''}` === key) === idx;
+      });
+      const winner = rowTime >= currentTime ? row : current;
+      byId.set(id, { ...current, ...row, ...winner, timeline: mergedTimeline.length ? mergedTimeline : (winner as any).timeline });
+    });
+    return stripLegacySeedData(Array.from(byId.values()), 'orders').sort((a: any, b: any) => {
+      const bt = scoreTime(b);
+      const at = scoreTime(a);
+      return bt - at;
+    });
+  };
+
   // Compact Layout / Tight Mode state
   const [isTightMode, setIsTightMode] = useState<boolean>(() => {
     const stored = localStorage.getItem('is_tight_mode');
@@ -773,7 +802,8 @@ export default function App() {
     const refreshFromSharedStorage = () => {
       setOrders(prev => {
         const next = stripLegacySeedData(getStoredData<Order[]>('sd_orders_v2', []), 'orders');
-        return same(prev, next) ? prev : next;
+        const merged = mergeOrderRecords(prev, next);
+        return same(prev, merged) ? prev : merged;
       });
       setDrivers(prev => {
         const next = stripLegacySeedData(getStoredData<Driver[]>('sd_drivers', []), 'drivers');
@@ -907,7 +937,7 @@ export default function App() {
         if (Array.isArray(data.state.coupons)) setCoupons(data.state.coupons);
         if (Array.isArray(data.state.reviews)) setReviews(data.state.reviews);
         if (Array.isArray(data.state.banners)) setBanners(stripLegacySeedData(data.state.banners, 'banners'));
-        if (Array.isArray(data.state.orders)) setOrders(stripLegacySeedData(data.state.orders, 'orders'));
+        if (Array.isArray(data.state.orders)) setOrders(prev => mergeOrderRecords(prev, data.state.orders));
         if (Array.isArray(data.state.drivers)) setDrivers(stripLegacySeedData(data.state.drivers, 'drivers'));
         if (Array.isArray(data.state.deletedRecords)) setDeletedRecords(data.state.deletedRecords);
         if (Array.isArray(data.state.notifications)) setNotifications(stripLegacySeedData(data.state.notifications, 'notifications'));
@@ -1002,7 +1032,7 @@ export default function App() {
       const res = await fetch(`${apiBase}/api/state?key=${encodeURIComponent(storeKey)}`);
       if (!res.ok) return;
       const data = await res.json();
-      if (data && data.state && Array.isArray(data.state.orders)) setOrders(stripLegacySeedData(data.state.orders, 'orders'));
+      if (data && data.state && Array.isArray(data.state.orders)) setOrders(prev => mergeOrderRecords(prev, data.state.orders));
     } catch { /* ignore */ }
   };
   useEffect(() => {
@@ -1077,7 +1107,7 @@ export default function App() {
       }
     }
 
-    setOrders([newOrder, ...orders]);
+    setOrders(prev => mergeOrderRecords(prev, [newOrder]));
     persistOrderToCloud(newOrder);
 
     // Customer-placed order → surface on admin live board
@@ -1156,7 +1186,7 @@ export default function App() {
       }
     }
 
-    setOrders([newOrder, ...orders]);
+    setOrders(prev => mergeOrderRecords(prev, [newOrder]));
     persistOrderToCloud(newOrder);
 
     if (newOrder.deliveryCoords || newOrder.pickupCoords) {
@@ -1213,7 +1243,7 @@ export default function App() {
       } : d));
     }
 
-    setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+    setOrders(prev => mergeOrderRecords(prev, [updatedOrder]));
     persistOrderToCloud(updatedOrder);
 
     // Update payment

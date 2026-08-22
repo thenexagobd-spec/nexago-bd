@@ -830,18 +830,21 @@ export const makeNotif = (title: string, message: string, type: 'order' | 'syste
   staffId: opts.staffId,
 });
 
-function useShared<T>(key: string, fallback: T) {
+function useShared<T>(key: string, fallback: T, merge?: (current: T, incoming: T) => T) {
   const [data, setData] = useState<T>(() => lsGet(key, fallback));
   useEffect(() => lsSetDebounced(key, data), [key, data]);
   useEffect(() => {
-    const onStorage = () => setData(lsGet(key, fallback));
+    const onStorage = () => {
+      const incoming = lsGet(key, fallback);
+      setData(current => merge ? merge(current, incoming) : incoming);
+    };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [key]);
+  }, [key, merge]);
   return [data, setData] as const;
 }
 
-export const useOrders = () => useShared<Order[]>('sd_orders_v2', []);
+export const useOrders = () => useShared<Order[]>('sd_orders_v2', [], (current, incoming) => unionByIdArr(current, incoming) as Order[]);
 export const useDrivers = () => useShared<Driver[]>('sd_drivers', []);
 export const useProducts = () => useShared<Product[]>('sd_products', []);
 export const useCategories = () => useShared<any[]>('sd_categories', []);
