@@ -947,9 +947,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [deliveryPin, setDeliveryPin] = useState<{ lat: number; lng: number } | null>(null);
   const [deliveryLocationMeta, setDeliveryLocationMeta] = useState<{ accuracy?: number; capturedAt?: string; source?: 'browser-gps' | 'map-pin'; area?: string } | null>(null);
   const [isLocatingDelivery, setIsLocatingDelivery] = useState(false);
-  const [locationPermissionState, setLocationPermissionState] = useState<'checking' | 'granted' | 'denied' | 'prompt' | 'unsupported'>('checking');
+  const [locationPermissionState, setLocationPermissionState] = useState<'checking' | 'granted' | 'denied' | 'prompt' | 'unsupported'>(() => {
+    try { return localStorage.getItem('nexago_customer_location_allowed') === '1' ? 'granted' : 'checking'; } catch { return 'checking'; }
+  });
   const [locationConsentAction, setLocationConsentAction] = useState<'delivery' | 'address' | null>(null);
-  const [locationSharingPaused, setLocationSharingPaused] = useState(false);
+  const [locationSharingPaused, setLocationSharingPaused] = useState(() => {
+    try { return localStorage.getItem('nexago_customer_location_paused') === '1'; } catch { return false; }
+  });
   const [cameraPermissionState, setCameraPermissionState] = useState<'unknown' | 'granted' | 'denied' | 'prompt' | 'unsupported'>('unknown');
   const [notificationPermissionState, setNotificationPermissionState] = useState<'unknown' | 'granted' | 'denied' | 'default' | 'unsupported'>('unknown');
   const [isScheduled, setIsScheduled] = useState(false);
@@ -1790,6 +1794,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return null;
     }
     setLocationSharingPaused(true);
+    try { localStorage.setItem('nexago_customer_location_paused', '1'); } catch { /* ignore */ }
     setLocationConsentAction('delivery');
     showToast('Order করতে app location popup থেকে Allow Location চাপুন.', 'info');
     return null;
@@ -1805,25 +1810,54 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       return;
     }
     let cancelled = false;
+    const savedAllowed = () => {
+      try { return localStorage.getItem('nexago_customer_location_allowed') === '1'; } catch { return false; }
+    };
+    const savedPaused = () => {
+      try { return localStorage.getItem('nexago_customer_location_paused') === '1'; } catch { return false; }
+    };
     const askFromApp = () => {
       if (!cancelled) setLocationConsentAction(prev => prev || 'delivery');
+    };
+    const applyPermissionState = (state: PermissionState) => {
+      setLocationPermissionState(state as 'granted' | 'denied' | 'prompt');
+      if (state === 'granted' && savedAllowed() && !savedPaused()) {
+        setLocationSharingPaused(false);
+        setLocationConsentAction(null);
+        return;
+      }
+      if (state === 'denied') {
+        setLocationSharingPaused(true);
+        try { localStorage.setItem('nexago_customer_location_paused', '1'); } catch { /* ignore */ }
+      }
+      askFromApp();
     };
     if (navigator.permissions?.query) {
       navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((status) => {
         if (cancelled) return;
-        setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
-        askFromApp();
+        applyPermissionState(status.state);
         status.onchange = () => {
           if (cancelled) return;
-          setLocationPermissionState(status.state as 'granted' | 'denied' | 'prompt');
-          askFromApp();
+          applyPermissionState(status.state);
         };
       }).catch(askFromApp);
     } else {
-      askFromApp();
+      if (savedAllowed() && !savedPaused()) {
+        setLocationPermissionState('granted');
+        setLocationConsentAction(null);
+      } else {
+        askFromApp();
+      }
     }
     const recheckLocationPermission = () => {
-      if (!cancelled && document.visibilityState === 'visible') askFromApp();
+      if (cancelled || document.visibilityState !== 'visible') return;
+      if (savedAllowed() && !savedPaused()) {
+        setLocationPermissionState('granted');
+        setLocationSharingPaused(false);
+        setLocationConsentAction(null);
+      } else {
+        askFromApp();
+      }
     };
     window.addEventListener('focus', recheckLocationPermission);
     document.addEventListener('visibilitychange', recheckLocationPermission);
@@ -2384,6 +2418,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         const lng = pos.coords.longitude;
         setLocationPermissionState('granted');
         setLocationSharingPaused(false);
+        try {
+          localStorage.setItem('nexago_customer_location_allowed', '1');
+          localStorage.setItem('nexago_customer_location_paused', '0');
+        } catch { /* ignore */ }
         setDeliveryPin({ lat, lng });
         // Auto-fill the delivery address text from the pinned location — in Bangla or English
         const area = nearestAreaOf(lat, lng);
@@ -2397,7 +2435,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         setDeliveryAddress(addrText);
         showToast('Current location pinned — address updated', 'success');
       },
-      () => { setLocationPermissionState('denied'); setLocationSharingPaused(true); setLocationConsentAction('delivery'); showToast('Could not fetch location — allow location permission to continue', 'info'); },
+      () => {
+        setLocationPermissionState('denied');
+        setLocationSharingPaused(true);
+        try { localStorage.setItem('nexago_customer_location_paused', '1'); } catch { /* ignore */ }
+        setLocationConsentAction('delivery');
+        showToast('Could not fetch location — allow location permission to continue', 'info');
+      },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
@@ -2415,12 +2459,22 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
         const reverse = await reverseGeocodeLocation(lat, lng);
         setLocationPermissionState('granted');
         setLocationSharingPaused(false);
+        try {
+          localStorage.setItem('nexago_customer_location_allowed', '1');
+          localStorage.setItem('nexago_customer_location_paused', '0');
+        } catch { /* ignore */ }
         setNewAddrCoords({ lat, lng, accuracy: pos.coords.accuracy, source: 'gps' });
         if (!newAddrArea.trim()) setNewAddrArea(reverse?.area || (area ? `${area}, Dhaka` : ''));
         if (!newAddrStreet.trim()) setNewAddrStreet(reverse?.street || reverse?.display || `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
         showToast('Live location added to this address', 'success');
       },
-      () => { setLocationPermissionState('denied'); setLocationSharingPaused(true); setLocationConsentAction('address'); showToast('Location permission denied. Allow location to save live GPS address.', 'info'); },
+      () => {
+        setLocationPermissionState('denied');
+        setLocationSharingPaused(true);
+        try { localStorage.setItem('nexago_customer_location_paused', '1'); } catch { /* ignore */ }
+        setLocationConsentAction('address');
+        showToast('Location permission denied. Allow location to save live GPS address.', 'info');
+      },
       { enableHighAccuracy: true, timeout: 9000 }
     );
   };
@@ -2439,6 +2493,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
   const turnOffLocationSharing = () => {
     setLocationSharingPaused(true);
+    try { localStorage.setItem('nexago_customer_location_paused', '1'); } catch { /* ignore */ }
     setDeliveryPin(null);
     setDeliveryLocationMeta(null);
     setLocationConsentAction('delivery');

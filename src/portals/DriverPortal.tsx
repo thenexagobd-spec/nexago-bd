@@ -130,6 +130,57 @@ export default function DriverPortal() {
     setWatchId(id);
   };
 
+  useEffect(() => {
+    if (authView !== 'dashboard') return;
+    if (!('geolocation' in navigator)) {
+      setLocStatus('unsupported');
+      setLocError('This browser does not support location. Please use Google Chrome on your phone.');
+      lsSet('sd_driver_loc_perm', 'unsupported');
+      return;
+    }
+    if (lsGet<string>('sd_driver_loc_perm', '') !== 'granted') return;
+    let cancelled = false;
+    const markAllowed = () => {
+      if (cancelled || lsGet<string>('sd_driver_loc_perm', '') !== 'granted') return;
+      setLocStatus('granted');
+      setLocError('');
+      startLocWatch();
+    };
+    const markBlocked = () => {
+      if (cancelled) return;
+      setLocStatus('denied');
+      setLocError('Location permission is off. Please allow Location to use the driver app.');
+      lsSet('sd_driver_loc_perm', 'denied');
+    };
+    if (navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((status) => {
+        if (cancelled) return;
+        if (status.state === 'denied') markBlocked();
+        else markAllowed();
+        status.onchange = () => {
+          if (status.state === 'denied') markBlocked();
+          else if (lsGet<string>('sd_driver_loc_perm', '') === 'granted') markAllowed();
+        };
+      }).catch(markAllowed);
+    } else {
+      markAllowed();
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authView]);
+
+  const turnOffDriverLocation = () => {
+    if (locWatchRef.current != null) {
+      navigator.geolocation.clearWatch(locWatchRef.current);
+      locWatchRef.current = null;
+    }
+    setWatchId(null);
+    setGpsOn(false);
+    setLocStatus('denied');
+    setLocError('Location turned off from app settings. Tap Allow Location to turn it on again.');
+    lsSet('sd_driver_loc_perm', 'denied');
+  };
+
   // Keep the driver record fresh every ~20s while this tab is open (drivers are
   // cloud-synced, so the Super Admin map updates without a page reload). The
   // stamp runs even without a location fix yet so the Online status itself keeps
@@ -2444,7 +2495,10 @@ export default function DriverPortal() {
                   <p className="text-[8px] text-gray-400">{locStatus === 'granted' && gpsOn ? 'ON — live tracking active' : locStatus === 'granted' ? 'ON — tracking starting…' : locStatus === 'denied' ? 'BLOCKED — required to use the app' : 'Required to receive orders'}</p>
                 </div>
                 {locStatus === 'granted' ? (
-                  <span className="px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase">Allowed</span>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase">Allowed</span>
+                    <button onClick={turnOffDriverLocation} className="px-2.5 py-1.5 rounded-lg bg-red-500/15 text-red-300 border border-red-500/30 text-[9px] font-black uppercase cursor-pointer hover:bg-red-500/25">Turn Off</button>
+                  </div>
                 ) : (
                   <button onClick={requestLocPermission} className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-black uppercase cursor-pointer hover:bg-amber-500/25">Allow Now</button>
                 )}
