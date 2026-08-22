@@ -63,6 +63,17 @@ interface ManagedUser {
 }
 
 const ANALYSIS_STORAGE_KEY = 'sd_support_analysis_v1';
+const safeText = (value: unknown, fallback = '') => {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+};
+const lowerText = (value: unknown) => safeText(value).toLowerCase();
+const ticketIdOf = (ticket: Partial<SupportTicket> | null | undefined) => safeText(ticket?.id, 'TICKET-UNKNOWN');
+const ticketSubjectOf = (ticket: Partial<SupportTicket> | null | undefined) => safeText(ticket?.subject, 'Untitled support ticket');
+const ticketUserOf = (ticket: Partial<SupportTicket> | null | undefined) => safeText(ticket?.user, 'Unknown user');
+const ticketStatusOf = (ticket: Partial<SupportTicket> | null | undefined) => safeText(ticket?.status, 'Open') as SupportTicket['status'];
+const ticketPriorityOf = (ticket: Partial<SupportTicket> | null | undefined) => safeText(ticket?.priority, 'Medium') as SupportTicket['priority'];
+const ticketMessagesOf = (ticket: Partial<SupportTicket> | null | undefined) => Array.isArray(ticket?.messages) ? ticket.messages : [];
 
 interface AnalysisStore {
   faults: Record<string, FaultRecord>;
@@ -1445,22 +1456,23 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
   }, [channels]);
 
   const categorize = (t: SupportTicket): 'customers' | 'disputes' | 'drivers' | 'technical' => {
-    if (t.user.toLowerCase().includes('driver')) return 'drivers';
-    if (/refund|cancel|wrong|missing|dispute|pricing|charge|cashback|not received/i.test(t.subject)) return 'disputes';
-    if (/technical|bug|crash|error|login|account|gps|map|notification|sync|install|app issue|app won|app not|loading/i.test(t.subject)) return 'technical';
+    const subject = ticketSubjectOf(t);
+    if (lowerText(t.user).includes('driver')) return 'drivers';
+    if (/refund|cancel|wrong|missing|dispute|pricing|charge|cashback|not received/i.test(subject)) return 'disputes';
+    if (/technical|bug|crash|error|login|account|gps|map|notification|sync|install|app issue|app won|app not|loading/i.test(subject)) return 'technical';
     return 'customers';
   };
 
   const normalizedSearch = orderSearch.trim().toLowerCase().replace(/^order[\s#]*/, '');
   const reportedIds = new Set(reports.map(r => r.orderId));
   const matchedReportedOrders = normalizedSearch
-    ? orders.filter(o => reportedIds.has(o.id) && o.id.toLowerCase().includes(normalizedSearch))
+    ? orders.filter(o => reportedIds.has(o.id) && lowerText(o.id).includes(normalizedSearch))
     : [];
   const matchedOrderExistsNotReported = normalizedSearch
-    ? orders.some(o => o.id.toLowerCase().includes(normalizedSearch) && !reportedIds.has(o.id))
+    ? orders.some(o => lowerText(o.id).includes(normalizedSearch) && !reportedIds.has(o.id))
     : false;
   const relatedTickets = normalizedSearch
-    ? tickets.filter(t => t.subject.toLowerCase().includes(normalizedSearch) || t.id.toLowerCase().includes(normalizedSearch) || t.user.toLowerCase().includes(normalizedSearch))
+    ? tickets.filter(t => lowerText(t.subject).includes(normalizedSearch) || lowerText(t.id).includes(normalizedSearch) || lowerText(t.user).includes(normalizedSearch))
     : [];
 
   const filtered = category === 'all' ? tickets : tickets.filter(t => categorize(t) === category);
@@ -1483,14 +1495,14 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
 
   // Ticket ↔ Order auto-link: extract the order id referenced by a ticket
   const extractOrderId = (t: SupportTicket): string | null => {
-    const text = `${t.subject} ${t.messages.map(m => m.text).join(' ')}`;
+    const text = `${ticketSubjectOf(t)} ${ticketMessagesOf(t).map(m => safeText(m.text)).join(' ')}`;
     const m = text.match(/order\s*[#]?\s*([A-Za-z0-9-]{4,})/i) || text.match(/(45\d{7,})/);
     return m ? m[1] : null;
   };
 
   // Open a ticket and auto-load its linked order analysis (if any)
   const openTicket = (t: SupportTicket) => {
-    setActiveTicketId(t.id);
+    setActiveTicketId(ticketIdOf(t));
     const oid = extractOrderId(t);
     if (oid && orders.some(o => o.id === oid)) {
       setActiveOrderId(oid);
@@ -1859,7 +1871,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
 
   // Linked ticket for the active order (Ticket ↔ Order auto-link, reverse direction)
   const linkedTicket = activeOrder
-    ? tickets.find(t => extractOrderId(t) === activeOrder.id) || tickets.find(t => t.subject.toLowerCase().includes(activeOrder.id.toLowerCase()))
+    ? tickets.find(t => extractOrderId(t) === activeOrder.id) || tickets.find(t => lowerText(t.subject).includes(lowerText(activeOrder.id)))
     : undefined;
 
   // One-click SLA-breach auto-fine: posts a driver debit + audit + notification
@@ -2302,7 +2314,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
     'General Technical Issue': ['Restart the app', 'Clear cache', 'Check the network connection', 'Escalate to engineering if unresolved']
   };
 
-  const activeTech = activeTicket && categorize(activeTicket) === 'technical' ? diagnoseIssue(activeTicket.subject) : null;
+  const activeTech = activeTicket && categorize(activeTicket) === 'technical' ? diagnoseIssue(ticketSubjectOf(activeTicket)) : null;
 
   const toggleHealth = (k: string) => {
     const next = health[k] === 'Online' ? 'Issue' : 'Online';
@@ -3436,13 +3448,13 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Related support tickets</p>
                 {relatedTickets.map(ticket => (
-                  <button key={ticket.id} onClick={() => openTicket(ticket)} className="w-full bg-brand-dark/40 border border-brand-border hover:border-brand-orange/40 rounded-lg p-3 text-left cursor-pointer">
+                  <button key={ticketIdOf(ticket)} onClick={() => openTicket(ticket)} className="w-full bg-brand-dark/40 border border-brand-border hover:border-brand-orange/40 rounded-lg p-3 text-left cursor-pointer">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-mono text-[11px] font-bold text-gray-300">{ticket.id}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${ticket.status === 'Open' ? 'bg-red-500/10 text-red-400' : ticket.status === 'In Progress' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{ticket.status}</span>
+                      <span className="font-mono text-[11px] font-bold text-gray-300">{ticketIdOf(ticket)}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${ticketStatusOf(ticket) === 'Open' ? 'bg-red-500/10 text-red-400' : ticketStatusOf(ticket) === 'In Progress' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{ticketStatusOf(ticket)}</span>
                     </div>
-                    <p className="text-xs font-bold text-white">{ticket.subject}</p>
-                    <p className="text-[10px] text-gray-400">By {ticket.user} · {ticket.date}</p>
+                    <p className="text-xs font-bold text-white">{ticketSubjectOf(ticket)}</p>
+                    <p className="text-[10px] text-gray-400">By {ticketUserOf(ticket)} · {safeText(ticket.date, 'No date')}</p>
                   </button>
                 ))}
               </div>
@@ -7102,31 +7114,31 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
               )}
               {filtered.map((ticket) => (
                 <div
-                  key={ticket.id}
+                  key={ticketIdOf(ticket)}
                   onClick={() => openTicket(ticket)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer text-left ${activeTicketId === ticket.id ? 'bg-brand-orange/5 border-brand-orange shadow-lg' : 'bg-brand-card border-brand-border hover:border-brand-orange/30'}`}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer text-left ${activeTicketId === ticketIdOf(ticket) ? 'bg-brand-orange/5 border-brand-orange shadow-lg' : 'bg-brand-card border-brand-border hover:border-brand-orange/30'}`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono text-xs font-bold text-gray-300">{ticket.id}</span>
-                    <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase ${ticket.priority === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/10' : ticket.priority === 'Medium' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/10' : 'bg-blue-500/10 text-blue-400 border border-blue-500/10'}`}>
-                      {ticket.priority} Priority
+                    <span className="font-mono text-xs font-bold text-gray-300">{ticketIdOf(ticket)}</span>
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase ${ticketPriorityOf(ticket) === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/10' : ticketPriorityOf(ticket) === 'Medium' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/10' : 'bg-blue-500/10 text-blue-400 border border-blue-500/10'}`}>
+                      {ticketPriorityOf(ticket)} Priority
                     </span>
                   </div>
 
-                  <h4 className="text-xs font-bold text-white mb-1 line-clamp-1">{ticket.subject}</h4>
-                  <p className="text-[10px] text-gray-400 mb-3">By {ticket.user} • {ticket.date}{ticketAging(ticket.id) !== null && (
-                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${ticketAging(ticket.id)! >= 2 ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'}`}>{ticketAging(ticket.id)}d old</span>
-                  )}{ticket.status !== 'Resolved' && ticketAging(ticket.id) !== null && (
-                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${ticketAging(ticket.id)! > ticketSla(ticket).target ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>SLA {ticketAging(ticket.id)}d/{ticketSla(ticket).target}d</span>
+                  <h4 className="text-xs font-bold text-white mb-1 line-clamp-1">{ticketSubjectOf(ticket)}</h4>
+                  <p className="text-[10px] text-gray-400 mb-3">By {ticketUserOf(ticket)} • {safeText(ticket.date, 'No date')}{ticketAging(ticketIdOf(ticket)) !== null && (
+                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${ticketAging(ticketIdOf(ticket))! >= 2 ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'}`}>{ticketAging(ticketIdOf(ticket))}d old</span>
+                  )}{ticketStatusOf(ticket) !== 'Resolved' && ticketAging(ticketIdOf(ticket)) !== null && (
+                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${ticketAging(ticketIdOf(ticket))! > ticketSla(ticket).target ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>SLA {ticketAging(ticketIdOf(ticket))}d/{ticketSla(ticket).target}d</span>
                   )}</p>
 
                   <div className="flex items-center justify-between">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${ticket.status === 'Open' ? 'bg-red-500/10 text-red-400' : ticket.status === 'In Progress' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                      {ticket.status}
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${ticketStatusOf(ticket) === 'Open' ? 'bg-red-500/10 text-red-400' : ticketStatusOf(ticket) === 'In Progress' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                      {ticketStatusOf(ticket)}
                     </span>
                     <span className="text-[10px] text-gray-500 flex items-center space-x-1">
                       <MessageSquare className="w-3 h-3" />
-                      <span>{ticket.messages.length}</span>
+                      <span>{ticketMessagesOf(ticket).length}</span>
                     </span>
                   </div>
                 </div>
@@ -7145,19 +7157,19 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                     </button>
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-mono text-xs font-bold text-gray-400">{activeTicket.id}</span>
-                        <span className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase ${activeTicket.priority === 'High' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
-                          {activeTicket.priority} Priority
+                        <span className="font-mono text-xs font-bold text-gray-400">{ticketIdOf(activeTicket)}</span>
+                        <span className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase ${ticketPriorityOf(activeTicket) === 'High' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                          {ticketPriorityOf(activeTicket)} Priority
                         </span>
                       </div>
-                      <h3 className="font-bold text-white text-xs mt-0.5">{activeTicket.subject}</h3>
-                      <p className="text-[10px] text-gray-400">Owner: {activeTicket.user} · Auto-assigned: <span className="text-brand-orange font-bold">{agentOf(activeTicket.id)}</span></p>
+                      <h3 className="font-bold text-white text-xs mt-0.5">{ticketSubjectOf(activeTicket)}</h3>
+                      <p className="text-[10px] text-gray-400">Owner: {ticketUserOf(activeTicket)} · Auto-assigned: <span className="text-brand-orange font-bold">{agentOf(ticketIdOf(activeTicket))}</span></p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <select
-                      value={activeTicket.status}
-                      onChange={(e) => changeStatus(activeTicket.id, e.target.value as any)}
+                      value={ticketStatusOf(activeTicket)}
+                      onChange={(e) => changeStatus(ticketIdOf(activeTicket), e.target.value as any)}
                       className="bg-brand-dark text-gray-200 border border-brand-border rounded px-2.5 py-1 text-[11px] outline-none cursor-pointer focus:border-brand-orange"
                     >
                       <option value="Open">Open</option>
@@ -7168,7 +7180,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                 </div>
 
                 <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-brand-dark/10">
-                  {activeTicket.messages.map((msg, idx) => {
+                  {ticketMessagesOf(activeTicket).map((msg, idx) => {
                     const isAdmin = msg.sender === 'admin';
                     const richMsg = msg as any;
                     return (
@@ -7190,7 +7202,7 @@ export default function SupportView({ tickets, onReplyTicket, onUpdateStatus, or
                   })}
                 </div>
 
-                {activeTicket.status !== 'Resolved' ? (
+                {ticketStatusOf(activeTicket) !== 'Resolved' ? (
                   <form onSubmit={handleSend} className="p-3 border-t border-brand-border bg-brand-dark/25 flex items-center space-x-2">
                     <input
                       type="text"
