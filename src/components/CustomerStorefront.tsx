@@ -145,6 +145,21 @@ const AREA_NAMES_BN: Record<string, string> = {
   'Shahbagh': 'শাহবাগ',
 };
 
+const BD_DIVISIONS: Record<string, string[]> = {
+  Dhaka: ['Dhaka', 'Faridpur', 'Gazipur', 'Gopalganj', 'Kishoreganj', 'Madaripur', 'Manikganj', 'Munshiganj', 'Narayanganj', 'Narsingdi', 'Rajbari', 'Shariatpur', 'Tangail'],
+  Chattogram: ['Bandarban', 'Brahmanbaria', 'Chandpur', 'Chattogram', 'Cumilla', 'Cox’s Bazar', 'Feni', 'Khagrachhari', 'Lakshmipur', 'Noakhali', 'Rangamati'],
+  Rajshahi: ['Bogura', 'Joypurhat', 'Naogaon', 'Natore', 'Chapainawabganj', 'Pabna', 'Rajshahi', 'Sirajganj'],
+  Khulna: ['Bagerhat', 'Chuadanga', 'Jashore', 'Jhenaidah', 'Khulna', 'Kushtia', 'Magura', 'Meherpur', 'Narail', 'Satkhira'],
+  Barishal: ['Barguna', 'Barishal', 'Bhola', 'Jhalokathi', 'Patuakhali', 'Pirojpur'],
+  Sylhet: ['Habiganj', 'Moulvibazar', 'Sunamganj', 'Sylhet'],
+  Rangpur: ['Dinajpur', 'Gaibandha', 'Kurigram', 'Lalmonirhat', 'Nilphamari', 'Panchagarh', 'Rangpur', 'Thakurgaon'],
+  Mymensingh: ['Jamalpur', 'Mymensingh', 'Netrokona', 'Sherpur'],
+};
+
+const districtDivisionOf = (district: string) => (
+  Object.entries(BD_DIVISIONS).find(([, districts]) => districts.includes(district))?.[0] || ''
+);
+
 // Approximate reverse-geocoder: nearest known Dhaka area for a lat/lng.
 // If the GPS point is outside Dhaka, do not force a fake Dhaka area.
 const nearestAreaOf = (lat: number, lng: number) => {
@@ -254,6 +269,7 @@ const LS_KEYS = {
   walletIdx: 'ss_wallet_idx',
   refunds: 'ss_refunds',
   reminded: 'ss_reminded',
+  selectedDivision: 'ss_selected_delivery_division',
   selectedArea: 'ss_selected_delivery_area',
 };
 
@@ -1115,7 +1131,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [couponInput, setCouponInput] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad' | 'Upay' | 'Rocket' | 'Cash on Delivery' | 'Card' | 'Split (Wallet + bKash)'>('bKash');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [selectedDeliveryDivision, setSelectedDeliveryDivision] = useState<string>(() => getStoredData(LS_KEYS.selectedDivision, ''));
   const [selectedDeliveryArea, setSelectedDeliveryArea] = useState<string>(() => getStoredData(LS_KEYS.selectedArea, ''));
+  useEffect(() => setStoredData(LS_KEYS.selectedDivision, selectedDeliveryDivision), [selectedDeliveryDivision]);
   useEffect(() => setStoredData(LS_KEYS.selectedArea, selectedDeliveryArea), [selectedDeliveryArea]);
   const [customerPhone, setCustomerPhone] = useState<string>('');
 
@@ -1129,6 +1147,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [newAddrTitle, setNewAddrTitle] = useState('');
   const [newAddrStreet, setNewAddrStreet] = useState('');
+  const [newAddrDivision, setNewAddrDivision] = useState('');
   const [newAddrArea, setNewAddrArea] = useState('');
   const [newAddrZipCode, setNewAddrZipCode] = useState('');
   const [newAddrPhone, setNewAddrPhone] = useState('');
@@ -2471,7 +2490,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           localStorage.setItem('nexago_customer_location_paused', '0');
         } catch { /* ignore */ }
         setNewAddrCoords({ lat, lng, accuracy: pos.coords.accuracy, source: 'gps' });
-        if (!newAddrArea.trim()) setNewAddrArea(reverse?.area || (area ? `${area}, Dhaka` : ''));
+        if (!newAddrArea.trim()) {
+          const nextArea = reverse?.area || (area ? `${area}, Bangladesh` : '');
+          setNewAddrArea(nextArea);
+          setNewAddrDivision(districtDivisionOf(nextArea.replace(/,\s*Bangladesh$/i, '')));
+        }
         if (!newAddrZipCode.trim()) setNewAddrZipCode(reverse?.zipCode || '');
         if (!newAddrStreet.trim()) setNewAddrStreet(reverse?.street || reverse?.display || `Live GPS location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
         showToast('Live location added to this address', 'success');
@@ -2510,6 +2533,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setNewAddrCoords({ lat, lng, source: 'manual' });
     const reverse = await reverseGeocodeLocation(lat, lng);
     setNewAddrArea(reverse?.area || (area ? `${area}, Dhaka` : ''));
+    setNewAddrDivision(districtDivisionOf((reverse?.area || area).replace(/,\s*Bangladesh$/i, '')));
     setNewAddrZipCode(reverse?.zipCode || '');
     setNewAddrStreet(reverse?.street || reverse?.display || `Pinned map location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
   };
@@ -2551,6 +2575,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setEditingAddressId(null);
     setNewAddrTitle('');
     setNewAddrStreet('');
+    setNewAddrDivision('');
     setNewAddrArea('');
     setNewAddrZipCode('');
     setNewAddrPhone('');
@@ -2565,6 +2590,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setIsAddingAddress(false);
     setNewAddrTitle('');
     setNewAddrStreet('');
+    setNewAddrDivision('');
     setNewAddrArea('');
     setNewAddrZipCode('');
     setNewAddrPhone('');
@@ -2577,6 +2603,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     setEditingAddressId(addr.id);
     setNewAddrTitle(addr.title);
     setNewAddrStreet(addr.address);
+    setNewAddrDivision(districtDivisionOf(addr.area.replace(/,\s*Bangladesh$/i, '')));
     setNewAddrArea(addr.area);
     setNewAddrZipCode(addr.zipCode || '');
     setNewAddrPhone(addr.phone);
@@ -2926,13 +2953,26 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="hidden lg:flex items-center space-x-1.5 bg-gray-100 hover:bg-gray-200/80 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 transition-colors border border-gray-200">
               <MapPin className="w-3.5 h-3.5 text-emerald-600" />
               <select
+                value={selectedDeliveryDivision}
+                onChange={(e) => {
+                  setSelectedDeliveryDivision(e.target.value);
+                  setSelectedDeliveryArea('');
+                }}
+                className="bg-transparent outline-none font-bold cursor-pointer max-w-[120px]"
+                title="Select division"
+              >
+                <option value="">Division</option>
+                {Object.keys(BD_DIVISIONS).map(division => <option key={division} value={division}>{division}</option>)}
+              </select>
+              <select
                 value={selectedDeliveryArea}
                 onChange={(e) => setSelectedDeliveryArea(e.target.value)}
-                className="bg-transparent outline-none font-bold cursor-pointer max-w-[170px]"
-                title="Select delivery area"
+                disabled={!selectedDeliveryDivision}
+                className="bg-transparent outline-none font-bold cursor-pointer max-w-[130px] disabled:text-gray-400"
+                title="Select district"
               >
-                <option value="">Select area</option>
-                {Object.keys(AREA_COORDS).map(area => <option key={area} value={area}>{area}, Dhaka</option>)}
+                <option value="">District</option>
+                {(BD_DIVISIONS[selectedDeliveryDivision] || []).map(district => <option key={district} value={district}>{district}</option>)}
               </select>
               <ChevronDown className="w-3 h-3 text-gray-500" />
             </div>
@@ -3765,11 +3805,19 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <input type="text" value={newAddrStreet} onChange={(e) => setNewAddrStreet(e.target.value)} placeholder="House 12, Road 4, Block B" className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" required />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Area / Thana / City</label>
-                      <select value={newAddrArea} onChange={(e) => setNewAddrArea(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 bg-white" required>
-                        <option value="">Select area / thana / city</option>
-                        {Object.keys(AREA_COORDS).map(area => <option key={area} value={`${area}, Dhaka`}>{area}, Dhaka</option>)}
-                        {newAddrArea && !Object.keys(AREA_COORDS).some(area => newAddrArea === `${area}, Dhaka`) && <option value={newAddrArea}>{newAddrArea}</option>}
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Division</label>
+                      <select value={newAddrDivision} onChange={(e) => { setNewAddrDivision(e.target.value); setNewAddrArea(''); }} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 bg-white" required>
+                        <option value="">Select division</option>
+                        {Object.keys(BD_DIVISIONS).map(division => <option key={division} value={division}>{division}</option>)}
+                        {newAddrArea && !newAddrDivision && <option value="custom">Detected / custom</option>}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">District</label>
+                      <select value={newAddrArea.replace(/,\s*Bangladesh$/i, '')} onChange={(e) => setNewAddrArea(e.target.value ? `${e.target.value}, Bangladesh` : '')} disabled={!newAddrDivision} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 bg-white disabled:bg-gray-100 disabled:text-gray-400" required>
+                        <option value="">Select district</option>
+                        {(BD_DIVISIONS[newAddrDivision] || []).map(district => <option key={district} value={district}>{district}</option>)}
+                        {newAddrArea && !Object.values(BD_DIVISIONS).flat().some(district => newAddrArea === `${district}, Bangladesh`) && <option value={newAddrArea.replace(/,\s*Bangladesh$/i, '')}>{newAddrArea}</option>}
                       </select>
                     </div>
                     <div>
