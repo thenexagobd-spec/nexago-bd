@@ -454,6 +454,61 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     forgotGmailPwd: 'Forgot Gmail password',
     forgotAppPwd: 'Forgot App password',
     recoverViaGmail: 'Reset via your connected Gmail',
+    account: 'Account',
+    logOut: 'Log Out',
+    loggedOutMsg: 'Logged out — see you soon!',
+    noNotifications: 'No notifications',
+    smartWallet: 'Smart Wallet',
+    smartShopCashWallet: 'Smart Shop Cash Wallet',
+    walletUseSub: 'Use instant wallet balance for 1-click order checkout!',
+    addMoney: 'Add Money',
+    walletRealNote: 'Card or bKash / Nagad — send to personal number, admin verifies (100% real)',
+    walletTransactionHistory: 'Wallet Transaction History',
+    secureWallet: 'Secure Wallet',
+    secureWalletSub: 'Every transaction is protected. Add money with bKash, Nagad or Card and pay in one tap.',
+    walletSafeNote: 'Your balance is safe with Smart Shop. Order payments and cashback update instantly in your transaction history.',
+    orderTools: 'Order Tools',
+    orderToolsSub: 'Everything you need for your orders — all in one place.',
+    trackOrders: 'Track Orders',
+    liveDeliveryStatus: 'Live delivery status',
+    reorder: 'Reorder',
+    rebuyOneTap: 'Re-buy in one tap',
+    requestRefund: 'Request Refund',
+    moneyBackSupport: 'Money back support',
+    orderReceipt: 'Order Receipt',
+    printViewQr: 'Print / view QR',
+    activePromoCodes: 'Active promo codes',
+    topupHistory: 'Top-up History',
+    transactionsBalance: 'Transactions & balance',
+    customers: 'Customers',
+    customerDirectoryWallet: 'A-Z directory & wallet add',
+    activePromoVouchers: 'Active Promo Vouchers',
+    promoVoucherSub: 'Apply discount codes to save big on your groceries and food orders',
+    minOrder: 'Min order',
+    expires: 'Expires',
+    useCode: 'Use Code',
+    applied: 'Applied',
+    helpTitle: 'Help & Customer Support',
+    helpSub: 'Submit support tickets or resolve delivery questions',
+    openSupportTicket: 'Open Support Ticket',
+    supportRequests: 'Your Support Requests',
+    commonProblems: 'Common Problems & Solutions',
+    noFaqs: 'No FAQs yet — the admin will add common problems and solutions here.',
+    adminResponse: 'Admin response',
+    preferences: 'Preferences',
+    darkMode: 'Dark Mode',
+    lightMode: 'Light Mode',
+    totalSpend: 'Total spend',
+    browsingFreeDelivery: 'Browsing free delivery stores',
+    defaultMethod: 'Default Method',
+    setAsActive: 'Set as Active',
+    unlink: 'Unlink',
+    paymentUnlinked: 'Payment account unlinked',
+    selectedAsPrimary: 'Selected {m} as primary checkout method',
+    addMoneyPendingTitle: 'Top-up Pending — Admin Verification',
+    transactionStatus: 'Transaction status',
+    pendingWalletNote: 'Added to your wallet transaction history as Pending. Once the admin verifies, it turns Completed and your balance updates automatically.',
+    done: 'Done',
   },
   bn: {
     brandTag: 'নেক্সাগো বিডি ডেলিভারি',
@@ -645,6 +700,61 @@ const T_DICT: Record<Lang, Record<string, string>> = {
     forgotGmailPwd: 'Gmail পাসওয়ার্ড ভুলে গেছেন',
     forgotAppPwd: 'অ্যাপ পাসওয়ার্ড ভুলে গেছেন',
     recoverViaGmail: 'সংযুক্ত Gmail বা ফোন OTP দিয়ে রিসেট করুন',
+    account: 'অ্যাকাউন্ট',
+    logOut: 'লগ আউট',
+    loggedOutMsg: 'লগ আউট হয়েছে — আবার দেখা হবে!',
+    noNotifications: 'কোনো নোটিফিকেশন নেই',
+    smartWallet: 'স্মার্ট ওয়ালেট',
+    smartShopCashWallet: 'স্মার্ট শপ ক্যাশ ওয়ালেট',
+    walletUseSub: 'এক ক্লিকে অর্ডার পেমেন্টের জন্য ইনস্ট্যান্ট ওয়ালেট ব্যালেন্স ব্যবহার করুন!',
+    addMoney: 'টাকা যোগ করুন',
+    walletRealNote: 'কার্ড অথবা বিকাশ / নগদ — ব্যক্তিগত নম্বরে পাঠান, অ্যাডমিন যাচাই করবে (১০০% রিয়াল)',
+    walletTransactionHistory: 'ওয়ালেট লেনদেন ইতিহাস',
+    secureWallet: 'নিরাপদ ওয়ালেট',
+    secureWalletSub: 'প্রতিটি লেনদেন সুরক্ষিত। বিকাশ, নগদ বা কার্ড দিয়ে টাকা যোগ করুন এবং এক ট্যাপে পেমেন্ট করুন।',
+    walletSafeNote: 'আপনার ব্যালেন্স নিরাপদ। অর্ডার পেমেন্ট ও ক্যাশব্যাক সাথে সাথে লেনদেন ইতিহাসে আপডেট হয়।',
+    orderTools: 'অর্ডার টুলস',
+    orderToolsSub: 'আপনার অর্ডারের জন্য দরকারি সবকিছু এক জায়গায়।',
+    trackOrders: 'অর্ডার ট্র্যাক',
+    liveDeliveryStatus: 'লাইভ ডেলিভারি স্ট্যাটাস',
+    reorder: 'আবার অর্ডার',
+    rebuyOneTap: 'এক ট্যাপে আবার কিনুন',
+    requestRefund: 'রিফান্ড অনুরোধ',
+    moneyBackSupport: 'টাকা ফেরত সাপোর্ট',
+    orderReceipt: 'অর্ডার রসিদ',
+    printViewQr: 'প্রিন্ট / QR দেখুন',
+    activePromoCodes: 'চলমান প্রোমো কোড',
+    topupHistory: 'টপ-আপ ইতিহাস',
+    transactionsBalance: 'লেনদেন ও ব্যালেন্স',
+    customers: 'কাস্টমার',
+    customerDirectoryWallet: 'A-Z ডিরেক্টরি ও ওয়ালেট যোগ',
+    activePromoVouchers: 'চলমান প্রোমো ভাউচার',
+    promoVoucherSub: 'গ্রোসারি ও খাবার অর্ডারে বেশি সেভ করতে ডিসকাউন্ট কোড ব্যবহার করুন',
+    minOrder: 'ন্যূনতম অর্ডার',
+    expires: 'মেয়াদ',
+    useCode: 'কোড ব্যবহার',
+    applied: 'প্রয়োগ হয়েছে',
+    helpTitle: 'সাহায্য ও কাস্টমার সাপোর্ট',
+    helpSub: 'সাপোর্ট টিকিট জমা দিন বা ডেলিভারি সমস্যা সমাধান করুন',
+    openSupportTicket: 'সাপোর্ট টিকিট খুলুন',
+    supportRequests: 'আপনার সাপোর্ট অনুরোধ',
+    commonProblems: 'সাধারণ সমস্যা ও সমাধান',
+    noFaqs: 'এখনো কোনো FAQ নেই — অ্যাডমিন এখানে সাধারণ সমস্যা ও সমাধান যোগ করবে।',
+    adminResponse: 'অ্যাডমিন উত্তর',
+    preferences: 'পছন্দসমূহ',
+    darkMode: 'ডার্ক মোড',
+    lightMode: 'লাইট মোড',
+    totalSpend: 'মোট খরচ',
+    browsingFreeDelivery: 'ফ্রি ডেলিভারি দোকান দেখা হচ্ছে',
+    defaultMethod: 'ডিফল্ট পদ্ধতি',
+    setAsActive: 'সক্রিয় করুন',
+    unlink: 'আনলিংক',
+    paymentUnlinked: 'পেমেন্ট অ্যাকাউন্ট আনলিংক হয়েছে',
+    selectedAsPrimary: '{m} প্রধান চেকআউট পদ্ধতি হিসেবে নির্বাচিত হয়েছে',
+    addMoneyPendingTitle: 'টপ-আপ পেন্ডিং — অ্যাডমিন যাচাই',
+    transactionStatus: 'লেনদেনের অবস্থা',
+    pendingWalletNote: 'আপনার ওয়ালেট লেনদেন ইতিহাসে Pending হিসেবে যোগ হয়েছে। অ্যাডমিন যাচাই করলে Completed হবে এবং ব্যালেন্স আপডেট হবে।',
+    done: 'সম্পন্ন',
   },
 };
 
@@ -2308,6 +2418,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     <div className={`cs-glass min-h-screen font-sans text-gray-800 flex flex-col overflow-x-hidden ${dark ? 'cs-dark' : ''}`}>
       {!custVerified && (
         <CustomerAuthScreen
+          lang={lang}
           email={customerProfile.email}
           name={customerProfile.name}
           phone={customerProfile.phone}
@@ -2533,7 +2644,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                   <div className="py-2 space-y-2 max-h-60 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
                     {mergedNotifs.length === 0 ? (
-                      <p className="text-gray-400 py-2 text-center">No notifications</p>
+                      <p className="text-gray-400 py-2 text-center">{T.noNotifications}</p>
                     ) : mergedNotifs.map(n => (
                       <div
                         key={n.id}
@@ -2573,12 +2684,12 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
             {/* Visible logout button */}
             <button
-              onClick={() => { setCustVerified(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast('Logged out — see you soon!', 'info'); }}
+              onClick={() => { setCustVerified(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast(T.loggedOutMsg, 'info'); }}
               className="flex items-center space-x-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-xs font-bold text-red-500 transition-colors cursor-pointer"
-              title="Log Out"
+              title={T.logOut}
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Log Out</span>
+              <span className="hidden sm:inline">{T.logOut}</span>
             </button>
 
             {/* Profile menu */}
@@ -2599,10 +2710,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <p className="text-[10px] text-gray-400">{customerProfile.email}</p>
                   </div>
                   <button onClick={() => { setActiveNav('Settings'); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-gray-300 font-semibold hover:bg-white/5 hover:text-white rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
-                    <Settings className="w-4 h-4 text-gray-400" /><span>My Account Settings</span>
+                    <Settings className="w-4 h-4 text-gray-400" /><span>{T.accountSettings}</span>
                   </button>
-                  <button onClick={() => { setCustVerified(false); setIsProfileOpen(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast('Logged out — see you soon!', 'info'); }} className="w-full text-left px-3 py-2 text-red-400 font-semibold hover:bg-white/5 hover:text-red-300 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
-                    <LogOut className="w-4 h-4" /><span>Log Out</span>
+                  <button onClick={() => { setCustVerified(false); setIsProfileOpen(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast(T.loggedOutMsg, 'info'); }} className="w-full text-left px-3 py-2 text-red-400 font-semibold hover:bg-white/5 hover:text-red-300 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
+                    <LogOut className="w-4 h-4" /><span>{T.logOut}</span>
                   </button>
                 </div>
               )}
@@ -2703,7 +2814,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <p className="text-[10px] text-emerald-100/90 mt-0.5">{T.freeDeliverySub}</p>
               </div>
               <button
-                onClick={() => { setSelectedCategory('All'); setActiveNav('Orders'); showToast('Browsing free delivery stores', 'info'); }}
+                onClick={() => { setSelectedCategory('All'); setActiveNav('Orders'); showToast(T.browsingFreeDelivery, 'info'); }}
                 className="w-full py-2 bg-white hover:bg-emerald-50 text-emerald-800 rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs"
               >
                 {T.shopNow}
@@ -2725,7 +2836,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   style={{ width: `${Math.min(100, Math.round((totalSpend / (LOYALTY_TIERS[tier.key === 'gold' ? 2 : tier.key === 'silver' ? 2 : 1].minSpend)) * 100))}%` }}
                 />
               </div>
-              <p className="text-[9px] text-white/75">Total spend: ৳{totalSpend.toLocaleString()}</p>
+              <p className="text-[9px] text-white/75">{T.totalSpend}: ৳{totalSpend.toLocaleString()}</p>
             </div>
           </div>
         </aside>
@@ -3174,7 +3285,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                           })()}
                           {active && !held && ord.paymentStatus === 'Pending' && (
                             <p className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-2 py-1 mt-1 w-fit font-semibold">
-                              ⏳ Tracking opens once admin verifies & approves your payment.
+                              ⏳ {lang === 'bn' ? 'অ্যাডমিন পেমেন্ট যাচাই ও অনুমোদন করলে ট্র্যাকিং চালু হবে।' : 'Tracking opens once admin verifies & approves your payment.'}
                             </p>
                           )}
                         </div>
@@ -3406,17 +3517,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                         <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase ${
                           pm.type === 'bKash' ? 'bg-pink-100 text-pink-700' : pm.type === 'Nagad' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
                         }`}>{pm.type}</span>
-                        {pm.isDefault && <span className="text-[10px] font-bold text-emerald-600">Default Method</span>}
+                        {pm.isDefault && <span className="text-[10px] font-bold text-emerald-600">{T.defaultMethod}</span>}
                       </div>
                       <p className="text-sm font-bold text-gray-900">{pm.accountName}</p>
                       <p className="text-xs font-mono text-gray-500">{pm.accountNumber}</p>
                     </div>
                     <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
-                      <button onClick={() => { setPaymentMethod(pm.type as any); showToast(`Selected ${pm.type} as primary checkout method`, 'info'); }} className="text-emerald-700 font-bold">
-                        Set as Active
+                      <button onClick={() => { setPaymentMethod(pm.type as any); showToast(T.selectedAsPrimary.replace('{m}', pm.type), 'info'); }} className="text-emerald-700 font-bold">
+                        {T.setAsActive}
                       </button>
-                      <button onClick={() => { setPaymentMethods(prev => prev.filter(p => p.id !== pm.id)); showToast('Payment account unlinked', 'info'); }} className="text-red-500 font-bold">
-                        Unlink
+                      <button onClick={() => { setPaymentMethods(prev => prev.filter(p => p.id !== pm.id)); showToast(T.paymentUnlinked, 'info'); }} className="text-red-500 font-bold">
+                        {T.unlink}
                       </button>
                     </div>
                   </div>
@@ -3430,24 +3541,24 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div className="space-y-1">
-                  <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Smart Shop Cash Wallet</span>
+                  <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">{T.smartShopCashWallet}</span>
                   <p className="text-3xl font-black font-mono">৳{walletBalance.toLocaleString()}</p>
-                  <p className="text-[11px] text-emerald-100">Use instant wallet balance for 1-click order checkout!</p>
+                  <p className="text-[11px] text-emerald-100">{T.walletUseSub}</p>
                 </div>
                 <div className="shrink-0 w-full sm:w-72">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200 mb-2">Smart Wallet</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200 mb-2">{T.smartWallet}</p>
                   <button
                     onClick={() => { setAddMoneyOpen(true); setAddMoneyStep('method'); setAddMoneyError(''); }}
                     className="w-full py-3 bg-white text-emerald-800 font-black text-xs rounded-2xl shadow-lg hover:bg-emerald-50 transition-all cursor-pointer flex items-center justify-center space-x-2"
                   >
-                    <Plus className="w-4 h-4" /><span>Add Money</span>
+                    <Plus className="w-4 h-4" /><span>{T.addMoney}</span>
                   </button>
-                  <p className="text-[9px] text-emerald-100 mt-2">Card or bKash / Nagad — send to personal number, admin verifies (100% real)</p>
+                  <p className="text-[9px] text-emerald-100 mt-2">{T.walletRealNote}</p>
                 </div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs space-y-4">
-                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Wallet Transaction History</h3>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">{T.walletTransactionHistory}</h3>
                 <div className="divide-y divide-gray-100">
                   {walletTransactions.map((tx) => (
                     <div key={tx.id} className="py-3 flex items-center justify-between text-xs">
@@ -3483,11 +3594,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center"><ShieldCheck className="w-5 h-5 text-emerald-200" /></div>
                     <div>
-                      <h3 className="text-sm font-black uppercase tracking-wider">Secure Wallet</h3>
-                      <p className="text-[11px] text-emerald-100">Every transaction is protected. Add money with bKash, Nagad or Card and pay in one tap.</p>
+                      <h3 className="text-sm font-black uppercase tracking-wider">{T.secureWallet}</h3>
+                      <p className="text-[11px] text-emerald-100">{T.secureWalletSub}</p>
                     </div>
                   </div>
-                  <p className="text-[11px] text-emerald-100/80">Your balance is safe with Smart Shop. Order payments and cashback update instantly in your transaction history.</p>
+                  <p className="text-[11px] text-emerald-100/80">{T.walletSafeNote}</p>
                 </div>
               </div>
 
@@ -3496,9 +3607,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center space-x-2">
-                      <Wrench className="w-4 h-4 text-emerald-600" /><span>Order Tools</span>
+                      <Wrench className="w-4 h-4 text-emerald-600" /><span>{T.orderTools}</span>
                     </h3>
-                    <p className="text-[10px] text-gray-500 mt-0.5">Everything you need for your orders — all in one place.</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{T.orderToolsSub}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -3508,8 +3619,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><Package className="w-4 h-4" /></div>
                     <div>
-                      <p className="text-xs font-black text-gray-900">Track Orders</p>
-                      <p className="text-[9px] text-gray-500">Live delivery status</p>
+                      <p className="text-xs font-black text-gray-900">{T.trackOrders}</p>
+                      <p className="text-[9px] text-gray-500">{T.liveDeliveryStatus}</p>
                     </div>
                   </button>
                   <button
@@ -3518,8 +3629,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><RotateCcw className="w-4 h-4" /></div>
                     <div>
-                      <p className="text-xs font-black text-gray-900">Reorder</p>
-                      <p className="text-[9px] text-gray-500">Re-buy in one tap</p>
+                      <p className="text-xs font-black text-gray-900">{T.reorder}</p>
+                      <p className="text-[9px] text-gray-500">{T.rebuyOneTap}</p>
                     </div>
                   </button>
                   <button
@@ -3528,8 +3639,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><Banknote className="w-4 h-4" /></div>
                     <div>
-                      <p className="text-xs font-black text-gray-900">Request Refund</p>
-                      <p className="text-[9px] text-gray-500">Money back support</p>
+                      <p className="text-xs font-black text-gray-900">{T.requestRefund}</p>
+                      <p className="text-[9px] text-gray-500">{T.moneyBackSupport}</p>
                     </div>
                   </button>
                   <button
@@ -3538,8 +3649,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><ScrollText className="w-4 h-4" /></div>
                     <div>
-                      <p className="text-xs font-black text-gray-900">Order Receipt</p>
-                      <p className="text-[9px] text-gray-500">Print / view QR</p>
+                      <p className="text-xs font-black text-gray-900">{T.orderReceipt}</p>
+                      <p className="text-[9px] text-gray-500">{T.printViewQr}</p>
                     </div>
                   </button>
                   <button
@@ -3548,8 +3659,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><BadgePercent className="w-4 h-4" /></div>
                     <div>
-                      <p className="text-xs font-black text-gray-900">Coupons</p>
-                      <p className="text-[9px] text-gray-500">Active promo codes</p>
+                      <p className="text-xs font-black text-gray-900">{T.coupons}</p>
+                      <p className="text-[9px] text-gray-500">{T.activePromoCodes}</p>
                     </div>
                   </button>
                   <button
@@ -3558,8 +3669,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
                     <div>
-                      <p className="text-xs font-black text-gray-900">Top-up History</p>
-                      <p className="text-[9px] text-gray-500">Transactions & balance</p>
+                      <p className="text-xs font-black text-gray-900">{T.topupHistory}</p>
+                      <p className="text-[9px] text-gray-500">{T.transactionsBalance}</p>
                     </div>
                   </button>
                   <button
@@ -3568,8 +3679,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center"><User className="w-4 h-4" /></div>
                     <div>
-                      <p className="text-xs font-black text-gray-900">Customers</p>
-                      <p className="text-[9px] text-gray-500">A-Z directory & wallet add</p>
+                      <p className="text-xs font-black text-gray-900">{T.customers}</p>
+                      <p className="text-[9px] text-gray-500">{T.customerDirectoryWallet}</p>
                     </div>
                   </button>
                 </div>
@@ -3581,8 +3692,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           {activeNav === 'Coupons' && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-xl font-black text-gray-900 tracking-tight">Active Promo Vouchers</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Apply discount codes to save big on your groceries and food orders</p>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">{T.activePromoVouchers}</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{T.promoVoucherSub}</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {COUPONS.map((cp) => (
@@ -3591,13 +3702,13 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <span className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-mono font-black text-xs">{cp.code}</span>
                       <h4 className="font-bold text-sm text-gray-900 pt-1">{cp.discountText}</h4>
                       <p className="text-xs text-gray-500">{cp.desc}</p>
-                      <p className="text-[10px] text-gray-400 font-mono">Min order ৳{cp.minOrder} • Expires {cp.validTill}</p>
+                      <p className="text-[10px] text-gray-400 font-mono">{T.minOrder} ৳{cp.minOrder} • {T.expires} {cp.validTill}</p>
                     </div>
                     <button
                       onClick={() => { setCopiedCoupon(cp.code); handleApplyCouponCode(cp.code); setTimeout(() => setCopiedCoupon(null), 3000); }}
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer shrink-0 flex items-center space-x-1"
                     >
-                      {copiedCoupon === cp.code ? (<><Check className="w-3.5 h-3.5" /><span>Applied</span></>) : (<><Copy className="w-3.5 h-3.5" /><span>Use Code</span></>)}
+                      {copiedCoupon === cp.code ? (<><Check className="w-3.5 h-3.5" /><span>{T.applied}</span></>) : (<><Copy className="w-3.5 h-3.5" /><span>{T.useCode}</span></>)}
                     </button>
                   </div>
                 ))}
@@ -3610,15 +3721,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-black text-gray-900 tracking-tight">Help & Customer Support</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">Submit support tickets or resolve delivery questions</p>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">{T.helpTitle}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{T.helpSub}</p>
                 </div>
                 <button onClick={() => setIsNewTicketModal(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-2">
-                  <Plus className="w-4 h-4" /><span>Open Support Ticket</span>
+                  <Plus className="w-4 h-4" /><span>{T.openSupportTicket}</span>
                 </button>
               </div>
               <div className="space-y-3">
-                <h3 className="text-xs font-black uppercase tracking-wider text-gray-400">Your Support Requests</h3>
+                <h3 className="text-xs font-black uppercase tracking-wider text-gray-400">{T.supportRequests}</h3>
                 {tickets.map((tck) => {
                   const oid = tck.subject.match(/#(\d+)/)?.[1];
                   const adminR = oid ? reports.find(r => r.orderId === oid && r.adminReply) : undefined;
@@ -3636,7 +3747,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <p className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-xl border border-gray-100">"{tck.lastMessage}"</p>
                       {adminR && (
                         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
-                          <p className="text-[9px] font-black text-emerald-700 uppercase tracking-wider mb-0.5">Admin response</p>
+                          <p className="text-[9px] font-black text-emerald-700 uppercase tracking-wider mb-0.5">{T.adminResponse}</p>
                           <p className="text-xs text-emerald-900">{adminR.adminReply}</p>
                         </div>
                       )}
@@ -3646,9 +3757,9 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               </div>
 
               <div className="space-y-3">
-                <h3 className="text-xs font-black uppercase tracking-wider text-gray-400">Common Problems & Solutions</h3>
+                <h3 className="text-xs font-black uppercase tracking-wider text-gray-400">{T.commonProblems}</h3>
                 {helpFaqs.length === 0 && (
-                  <p className="text-xs text-gray-500 bg-white border border-gray-200 rounded-2xl p-4">No FAQs yet — the admin will add common problems and solutions here.</p>
+                  <p className="text-xs text-gray-500 bg-white border border-gray-200 rounded-2xl p-4">{T.noFaqs}</p>
                 )}
                 {helpFaqs.map((f) => (
                   <div key={f.id} className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
@@ -3733,7 +3844,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <button type="button" onClick={() => setShowPrefsCard(!showPrefsCard)} className="w-full flex items-center justify-between p-6 cursor-pointer hover:bg-black/5 transition-colors">
                   <span className="flex items-center space-x-2">
                     <Settings className="w-4 h-4 text-gray-400" />
-                    <span className="font-black text-gray-900 text-sm">Preferences</span>
+                    <span className="font-black text-gray-900 text-sm">{T.preferences}</span>
                   </span>
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showPrefsCard ? 'rotate-180' : ''}`} />
                 </button>
@@ -3741,7 +3852,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <div className="px-6 pb-6 pt-4 border-t border-gray-100 space-y-4 text-xs">
                     <label className="flex items-center justify-between cursor-pointer">
                       <span className="font-bold text-gray-800 flex items-center space-x-2">
-                        <span className="text-base">{dark ? '🌙' : '☀️'}</span><span>{dark ? 'Dark Mode' : 'Light Mode'}</span>
+                        <span className="text-base">{dark ? '🌙' : '☀️'}</span><span>{dark ? T.darkMode : T.lightMode}</span>
                       </span>
                       <button
                         type="button"
@@ -3873,7 +3984,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           { key: 'Orders' as const, label: T.orders, icon: <Store className="w-5 h-5" /> },
           { key: 'My Orders' as const, label: T.myOrders, icon: <Package className="w-5 h-5" /> },
           { key: 'Wallet' as const, label: T.wallet, icon: <Wallet className="w-5 h-5" /> },
-          { key: 'Settings' as const, label: lang === 'bn' ? '??????????' : 'Account', icon: <Settings className="w-5 h-5" /> },
+          { key: 'Settings' as const, label: T.account, icon: <Settings className="w-5 h-5" /> },
         ].map((item) => (
           <button
             key={item.key}
@@ -5262,7 +5373,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <div className="flex items-center space-x-2">
                 <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center"><Wallet className="w-4 h-4" /></div>
                 <div>
-                  <h3 className="text-sm font-black text-gray-900">{addMoneyStep === 'send' ? 'Send Money to Personal Number' : addMoneyStep === 'pending' ? 'Awaiting Admin Verification' : 'Add Money to Wallet'}</h3>
+                  <h3 className="text-sm font-black text-gray-900">{addMoneyStep === 'send' ? T.sendMoneyTo : addMoneyStep === 'pending' ? T.addMoneyPendingTitle : T.addMoney}</h3>
                   <p className="text-[9px] text-gray-400">Current balance: ৳{walletBalance.toLocaleString()}</p>
                 </div>
               </div>
@@ -5494,7 +5605,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     >
                       {T.submitVerify} ৳{parseFloat(addMoneyAmount).toLocaleString()}
                     </button>
-                    <p className="text-[10px] text-gray-400 text-center flex items-center justify-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>Balance is added only after admin verifies your TrxID & amount</span></p>
+                    <p className="text-[10px] text-gray-400 text-center flex items-center justify-center space-x-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /><span>{T.verificationNote}</span></p>
                   </div>
                 )}
               </div>
@@ -5503,15 +5614,15 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <>
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1.5 text-center">
                   <div className="mx-auto w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center"><Clock className="w-5 h-5 text-amber-600" /></div>
-                  <p className="text-xs font-black text-amber-800">Top-up Pending — Admin Verification</p>
+                  <p className="text-xs font-black text-amber-800">{T.addMoneyPendingTitle}</p>
                   <p className="text-[10px] text-amber-700">৳{parseFloat(addMoneyAmount).toLocaleString()} {addMoneyMethod} request submitted. The admin checks the money received on the personal number and adds it to your wallet shortly.</p>
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1.5">
-                  <p className="text-[10px] text-gray-500 font-bold">Transaction status</p>
-                  <p className="text-[11px] text-gray-700">Added to your wallet transaction history as <span className="font-black text-amber-700">Pending</span>. Once the admin verifies, it turns <span className="font-black text-emerald-600">Completed</span> and your balance updates automatically.</p>
+                  <p className="text-[10px] text-gray-500 font-bold">{T.transactionStatus}</p>
+                  <p className="text-[11px] text-gray-700">{T.pendingWalletNote}</p>
                 </div>
                 <button onClick={() => { setAddMoneyOpen(false); setAddMoneyStep('method'); setAddMoneyError(''); }} className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white text-xs font-black rounded-xl transition-all cursor-pointer">
-                  Done
+                  {T.done}
                 </button>
               </>
             )}
@@ -5708,6 +5819,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
 
 /* ============ CUSTOMER AUTH SCREEN (premium glass) ============ */
 const CustomerAuthScreen: React.FC<{
+  lang: Lang;
   email: string;
   name: string;
   phone: string;
@@ -5715,7 +5827,37 @@ const CustomerAuthScreen: React.FC<{
   onUpdateProfile: (patch: Partial<{ name: string; email: string; phone: string }>) => void;
   onVerified: (info?: { customerId?: string; name?: string; email?: string; phone?: string; password?: string; pin?: string }) => void;
   showToast?: (msg: string, type?: string) => void;
-}> = ({ email, name, phone, customerId, onUpdateProfile, onVerified, showToast }) => {
+}> = ({ lang, email, name, phone, customerId, onUpdateProfile, onVerified, showToast }) => {
+  const A = {
+    welcome: lang === 'bn' ? 'স্মার্ট শপে স্বাগতম' : 'Welcome to Smart Shop',
+    oneAccount: lang === 'bn' ? 'সব ডিভাইসের জন্য এক স্থায়ী অ্যাকাউন্ট — Gmail + ফোন যুক্ত, অর্ডার ও ওয়ালেট ডাটা হারাবে না।' : 'One permanent account for all your devices — Gmail + phone linked, order & wallet data never lost.',
+    createAccount: lang === 'bn' ? 'অ্যাকাউন্ট খুলুন' : 'Create Account',
+    signIn: lang === 'bn' ? 'সাইন ইন' : 'Sign In',
+    continueGoogle: lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google',
+    connectingGoogle: lang === 'bn' ? 'Google সংযোগ হচ্ছে…' : 'Connecting to Google…',
+    or: lang === 'bn' ? 'অথবা' : 'or',
+    password: lang === 'bn' ? 'পাসওয়ার্ড' : 'Password',
+    otpLogin: lang === 'bn' ? 'OTP লগইন' : 'OTP Login',
+    gmail: lang === 'bn' ? 'Gmail ঠিকানা' : 'Gmail Address',
+    gmailOrId: lang === 'bn' ? 'Gmail বা Customer ID' : 'Gmail or Customer ID',
+    yourPassword: lang === 'bn' ? 'আপনার পাসওয়ার্ড' : 'Your password',
+    sendOtp: lang === 'bn' ? 'Gmail-এ OTP পাঠান' : 'Send OTP to Gmail',
+    sending: lang === 'bn' ? 'পাঠানো হচ্ছে…' : 'Sending…',
+    signingIn: lang === 'bn' ? 'সাইন ইন হচ্ছে…' : 'Signing in…',
+    signInPassword: lang === 'bn' ? 'পাসওয়ার্ড দিয়ে সাইন ইন' : 'Sign In with Password',
+    forgotPassword: lang === 'bn' ? 'পাসওয়ার্ড ভুলে গেছেন?' : 'Forgot Password?',
+    sendLoginOtp: lang === 'bn' ? 'লগইন OTP পাঠান' : 'Send Login OTP',
+    sendingOtp: lang === 'bn' ? 'OTP পাঠানো হচ্ছে…' : 'Sending OTP…',
+    customerOtpLogin: lang === 'bn' ? 'কাস্টমার OTP লগইন' : 'Customer OTP Login',
+    loginWithOtp: lang === 'bn' ? 'OTP দিয়ে লগইন' : 'Login with OTP',
+    resendOtp: lang === 'bn' ? 'OTP আবার পাঠান' : 'Resend Login OTP',
+    backSignIn: lang === 'bn' ? '← সাইন ইনে ফিরে যান' : '← Back to Sign In',
+    fullName: lang === 'bn' ? 'পুরো নাম' : 'Full Name',
+    phoneNumber: lang === 'bn' ? 'ফোন নম্বর' : 'Phone Number',
+    confirmPassword: lang === 'bn' ? 'পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm Password',
+    createMyAccount: lang === 'bn' ? 'আমার অ্যাকাউন্ট খুলুন' : 'Create My Account',
+    creating: lang === 'bn' ? 'তৈরি হচ্ছে…' : 'Creating…',
+  };
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
   const [step, setStep] = useState<'form' | 'otp' | 'loginOtp' | 'details' | 'done'>('form');
@@ -6006,12 +6148,12 @@ const CustomerAuthScreen: React.FC<{
 
           {!forgotMode && step === 'form' && (
             <>
-              <h1 className="mt-5 text-xl font-black leading-tight">Welcome to Smart Shop</h1>
-              <p className="mt-1.5 text-[12px] text-gray-300 leading-relaxed">One permanent account for all your devices — Gmail + phone linked, order & wallet data never lost.</p>
+              <h1 className="mt-5 text-xl font-black leading-tight">{A.welcome}</h1>
+              <p className="mt-1.5 text-[12px] text-gray-300 leading-relaxed">{A.oneAccount}</p>
 
               <div className="mt-5 grid grid-cols-2 gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
-                <button onClick={() => { setMode('signup'); setStep('form'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'signup' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Create Account</button>
-                <button onClick={() => { setMode('login'); setStep('form'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'login' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>Sign In</button>
+                <button onClick={() => { setMode('signup'); setStep('form'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'signup' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>{A.createAccount}</button>
+                <button onClick={() => { setMode('login'); setStep('form'); setError(''); }} className={`py-2.5 rounded-xl text-[12px] font-black transition-colors cursor-pointer ${mode === 'login' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'text-gray-400 hover:text-white'}`}>{A.signIn}</button>
               </div>
 
               <button
@@ -6025,12 +6167,12 @@ const CustomerAuthScreen: React.FC<{
                   <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                   <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                 </svg>
-                <span>{googleBusy ? 'Connecting to Google…' : 'Continue with Google'}</span>
+                <span>{googleBusy ? A.connectingGoogle : A.continueGoogle}</span>
               </button>
 
               <div className="flex items-center space-x-3 my-4">
                 <div className="flex-1 h-px bg-white/10" />
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">or</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{A.or}</span>
                 <div className="flex-1 h-px bg-white/10" />
               </div>
 
@@ -6043,20 +6185,20 @@ const CustomerAuthScreen: React.FC<{
                 )}
                 {mode === 'login' && (
                   <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
-                    <button onClick={() => { setLoginMethod('password'); setError(''); }} className={`py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer ${loginMethod === 'password' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'}`}>Password</button>
-                    <button onClick={() => { setLoginMethod('otp'); setError(''); }} className={`py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer ${loginMethod === 'otp' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'}`}>OTP Login</button>
+                    <button onClick={() => { setLoginMethod('password'); setError(''); }} className={`py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer ${loginMethod === 'password' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'}`}>{A.password}</button>
+                    <button onClick={() => { setLoginMethod('otp'); setError(''); }} className={`py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer ${loginMethod === 'otp' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'}`}>{A.otpLogin}</button>
                   </div>
                 )}
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{mode === 'login' ? 'Gmail or Customer ID' : 'Gmail Address'} <span className="text-emerald-400">*</span></label>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{mode === 'login' ? A.gmailOrId : A.gmail} <span className="text-emerald-400">*</span></label>
                   <input value={emailField} onChange={(e) => { setEmailField(e.target.value); setError(''); }} placeholder={mode === 'login' ? 'name@gmail.com or NEX1234567890' : 'name@gmail.com'}
                     className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
                 </div>
                 {mode === 'login' && loginMethod === 'password' && (
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Password <span className="text-emerald-400">*</span></label>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{A.password} <span className="text-emerald-400">*</span></label>
                     <div className="relative">
-                      <input type={showPass ? 'text' : 'password'} value={passField} onChange={(e) => { setPassField(e.target.value); setError(''); }} placeholder="Your password"
+                      <input type={showPass ? 'text' : 'password'} value={passField} onChange={(e) => { setPassField(e.target.value); setError(''); }} placeholder={A.yourPassword}
                         className="cs-auth-input w-full rounded-xl px-4 py-3 pr-12 text-[13px] text-white outline-none placeholder:text-gray-500" />
                       <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-300 cursor-pointer">
                         {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -6067,7 +6209,7 @@ const CustomerAuthScreen: React.FC<{
                 {mode === 'signup' ? (
                   <button onClick={sendOtp} disabled={busy}
                     className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                    {busy ? 'Sending…' : 'Send OTP to Gmail'}
+                    {busy ? A.sending : A.sendOtp}
                   </button>
                 ) : (
                   <>
@@ -6075,16 +6217,16 @@ const CustomerAuthScreen: React.FC<{
                       <>
                         <button onClick={doLogin} disabled={busy}
                           className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                          {busy ? 'Signing in…' : 'Sign In with Password'}
+                          {busy ? A.signingIn : A.signInPassword}
                         </button>
                         <button onClick={() => { setForgotMode(true); setError(''); }} className="w-full text-center text-[11px] font-bold text-emerald-300 hover:text-emerald-200 transition-colors cursor-pointer">
-                          Forgot Password?
+                          {A.forgotPassword}
                         </button>
                       </>
                     ) : (
                       <button onClick={sendLoginOtp} disabled={busy}
                         className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                        {busy ? 'Sending OTP…' : 'Send Login OTP'}
+                        {busy ? A.sendingOtp : A.sendLoginOtp}
                       </button>
                     )}
                   </>
@@ -6120,21 +6262,21 @@ const CustomerAuthScreen: React.FC<{
           {!forgotMode && step === 'loginOtp' && (
             <div className="mt-6 space-y-3">
               <div className="rounded-xl bg-emerald-400/10 border border-emerald-400/25 px-4 py-3 text-[11px] text-emerald-200">
-                <b className="text-white">Customer OTP Login</b> — enter the 6-digit code sent to the Gmail linked with <b className="text-white">{sentTo}</b>.
+                <b className="text-white">{A.customerOtpLogin}</b> — {lang === 'bn' ? 'লিংক করা Gmail-এ পাঠানো ৬ সংখ্যার কোড দিন' : 'enter the 6-digit code sent to the Gmail linked with'} <b className="text-white">{sentTo}</b>.
               </div>
               <input value={otpCode} onChange={(e) => { setOtpCode(e.target.value); setError(''); }} placeholder="6-digit code"
                 className="cs-auth-input w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:text-gray-500" />
               <button onClick={verifyLoginOtp} disabled={busy}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                {busy ? 'Verifying…' : 'Login with OTP'}
+                {busy ? (lang === 'bn' ? 'যাচাই হচ্ছে…' : 'Verifying…') : A.loginWithOtp}
               </button>
               <button onClick={sendLoginOtp} disabled={busy}
                 className="w-full py-2.5 rounded-xl border border-white/15 text-[11px] font-bold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
-                Resend Login OTP
+                {A.resendOtp}
               </button>
               <button onClick={() => { setStep('form'); setOtpCode(''); setError(''); }} disabled={busy}
                 className="w-full py-2.5 rounded-xl text-[11px] font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">
-                ← Back to Sign In
+                {A.backSignIn}
               </button>
               {error && <p className="text-[11px] font-bold text-red-400">{error}</p>}
             </div>
@@ -6146,12 +6288,12 @@ const CustomerAuthScreen: React.FC<{
                 <b className="text-white">Step 2 of 2</b> — Gmail <b className="text-white">{sentTo}</b> is verified. Now set up your account details.
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Full Name <span className="text-emerald-400">*</span></label>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{A.fullName} <span className="text-emerald-400">*</span></label>
                 <input value={nameField} onChange={(e) => { setNameField(e.target.value); setError(''); }} placeholder="e.g. Rahim Khan"
                   className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Phone Number <span className="text-emerald-400">*</span></label>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{A.phoneNumber} <span className="text-emerald-400">*</span></label>
                 <input value={phoneField} onChange={(e) => { setPhoneField(e.target.value); setError(''); }} placeholder="e.g. 01712345678"
                   className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
               </div>
@@ -6166,13 +6308,13 @@ const CustomerAuthScreen: React.FC<{
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Confirm Password <span className="text-emerald-400">*</span></label>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{A.confirmPassword} <span className="text-emerald-400">*</span></label>
                 <input type={showPass ? 'text' : 'password'} value={passConfirm} onChange={(e) => { setPassConfirm(e.target.value); setError(''); }} placeholder="Re-type your password"
                   className="cs-auth-input w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none placeholder:text-gray-500" />
               </div>
               <button onClick={createAccount} disabled={busy}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-[13px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 disabled:opacity-60 transition-all cursor-pointer">
-                {busy ? 'Creating…' : 'Create My Account'}
+                {busy ? A.creating : A.createMyAccount}
               </button>
               <button onClick={() => setStep('form')} disabled={busy}
                 className="w-full py-2.5 rounded-xl text-[11px] font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">
