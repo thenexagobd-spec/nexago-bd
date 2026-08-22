@@ -254,6 +254,7 @@ const LS_KEYS = {
   walletIdx: 'ss_wallet_idx',
   refunds: 'ss_refunds',
   reminded: 'ss_reminded',
+  selectedArea: 'ss_selected_delivery_area',
 };
 
 // Send Money merchant wallets come from the shared admin-managed config
@@ -1114,6 +1115,8 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [couponInput, setCouponInput] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad' | 'Upay' | 'Rocket' | 'Cash on Delivery' | 'Card' | 'Split (Wallet + bKash)'>('bKash');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [selectedDeliveryArea, setSelectedDeliveryArea] = useState<string>(() => getStoredData(LS_KEYS.selectedArea, ''));
+  useEffect(() => setStoredData(LS_KEYS.selectedArea, selectedDeliveryArea), [selectedDeliveryArea]);
   const [customerPhone, setCustomerPhone] = useState<string>('');
 
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
@@ -2920,9 +2923,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest">{T.brandTag}</span>
               </div>
             </div>
-            <div className="hidden lg:flex items-center space-x-1.5 bg-gray-100 hover:bg-gray-200/80 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 cursor-pointer transition-colors border border-gray-200">
+            <div className="hidden lg:flex items-center space-x-1.5 bg-gray-100 hover:bg-gray-200/80 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 transition-colors border border-gray-200">
               <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Dhanmondi, Dhaka</span>
+              <select
+                value={selectedDeliveryArea}
+                onChange={(e) => setSelectedDeliveryArea(e.target.value)}
+                className="bg-transparent outline-none font-bold cursor-pointer max-w-[170px]"
+                title="Select delivery area"
+              >
+                <option value="">Select area</option>
+                {Object.keys(AREA_COORDS).map(area => <option key={area} value={area}>{area}, Dhaka</option>)}
+              </select>
               <ChevronDown className="w-3 h-3 text-gray-500" />
             </div>
           </div>
@@ -3323,7 +3334,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     <span className="text-gray-900 font-bold">{T.allStores}</span>
                   </div>
                   <h1 className="text-2xl font-black text-gray-900 tracking-tight mt-1">{searchQuery ? T.searchResults : T.orders}</h1>
-                  <p className="text-xs text-gray-500 mt-0.5">{searchQuery ? `"${searchQuery}"` : ''} {filteredStores.length} {T.storeMatches.toLowerCase()} delivering to Dhanmondi</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {searchQuery ? `"${searchQuery}"` : ''} {filteredStores.length} {T.storeMatches.toLowerCase()}
+                    {selectedDeliveryArea ? ` delivering to ${selectedDeliveryArea}` : ' — select delivery area'}
+                  </p>
                 </div>
 
                 <div className="flex items-center space-x-3">
@@ -3752,7 +3766,11 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Area / Thana / City</label>
-                      <input type="text" value={newAddrArea} onChange={(e) => setNewAddrArea(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" required />
+                      <select value={newAddrArea} onChange={(e) => setNewAddrArea(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 bg-white" required>
+                        <option value="">Select area / thana / city</option>
+                        {Object.keys(AREA_COORDS).map(area => <option key={area} value={`${area}, Dhaka`}>{area}, Dhaka</option>)}
+                        {newAddrArea && !Object.keys(AREA_COORDS).some(area => newAddrArea === `${area}, Dhaka`) && <option value={newAddrArea}>{newAddrArea}</option>}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Postal / ZIP Code</label>
