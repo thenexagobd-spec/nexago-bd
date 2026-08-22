@@ -3,9 +3,46 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Settings, Shield, Bell, Check, Save, RotateCcw, FileText, ScrollText, X, ExternalLink } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Settings, Shield, Bell, Check, Save, RotateCcw, FileText, ScrollText, X, ExternalLink, MapPin } from 'lucide-react';
 import { LEGAL_DOCS } from '../legalContent';
+
+const CUSTOMER_AREA_KEY = 'sd_customer_area_availability';
+
+const BD_DIVISIONS: Record<string, string[]> = {
+  Dhaka: ['Dhaka', 'Faridpur', 'Gazipur', 'Gopalganj', 'Kishoreganj', 'Madaripur', 'Manikganj', 'Munshiganj', 'Narayanganj', 'Narsingdi', 'Rajbari', 'Shariatpur', 'Tangail'],
+  Chattogram: ['Bandarban', 'Brahmanbaria', 'Chandpur', 'Chattogram', 'Cumilla', 'Cox’s Bazar', 'Feni', 'Khagrachhari', 'Lakshmipur', 'Noakhali', 'Rangamati'],
+  Rajshahi: ['Bogura', 'Joypurhat', 'Naogaon', 'Natore', 'Chapainawabganj', 'Pabna', 'Rajshahi', 'Sirajganj'],
+  Khulna: ['Bagerhat', 'Chuadanga', 'Jashore', 'Jhenaidah', 'Khulna', 'Kushtia', 'Magura', 'Meherpur', 'Narail', 'Satkhira'],
+  Barishal: ['Barguna', 'Barishal', 'Bhola', 'Jhalokathi', 'Patuakhali', 'Pirojpur'],
+  Sylhet: ['Habiganj', 'Moulvibazar', 'Sunamganj', 'Sylhet'],
+  Rangpur: ['Dinajpur', 'Gaibandha', 'Kurigram', 'Lalmonirhat', 'Nilphamari', 'Panchagarh', 'Rangpur', 'Thakurgaon'],
+  Mymensingh: ['Jamalpur', 'Mymensingh', 'Netrokona', 'Sherpur'],
+};
+
+const allDistricts = Object.values(BD_DIVISIONS).flat();
+const defaultAvailability = () => allDistricts.reduce<Record<string, boolean>>((acc, district) => {
+  acc[district] = true;
+  return acc;
+}, {});
+
+const readAvailability = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CUSTOMER_AREA_KEY) || '{}');
+    return { ...defaultAvailability(), ...(parsed || {}) };
+  } catch {
+    return defaultAvailability();
+  }
+};
+
+const saveAvailability = (value: Record<string, boolean>) => {
+  try {
+    localStorage.setItem(CUSTOMER_AREA_KEY, JSON.stringify(value));
+    window.dispatchEvent(new Event('nexago-local-write'));
+  } catch {
+    /* ignore */
+  }
+};
 
 export default function SettingsView() {
   const [baseFee, setBaseFee] = useState(40);
@@ -16,14 +53,29 @@ export default function SettingsView() {
   const [codEnabled, setCodEnabled] = useState(true);
   const [cardEnabled, setCardEnabled] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [areaAvailability, setAreaAvailability] = useState<Record<string, boolean>>(() => readAvailability());
 
   const [saved, setSaved] = useState(false);
   const [legalDoc, setLegalDoc] = useState<'privacy' | 'terms' | null>(null);
 
+  useEffect(() => {
+    saveAvailability(areaAvailability);
+  }, [areaAvailability]);
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    saveAvailability(areaAvailability);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
+  };
+
+  const availableCount = Object.values(areaAvailability).filter(Boolean).length;
+  const setDivisionAvailability = (division: string, enabled: boolean) => {
+    setAreaAvailability(prev => {
+      const next = { ...prev };
+      BD_DIVISIONS[division].forEach(district => { next[district] = enabled; });
+      return next;
+    });
   };
 
   const legalUrl = (doc: 'privacy' | 'terms') =>
@@ -189,6 +241,58 @@ export default function SettingsView() {
                 className="w-4 h-4 text-brand-orange bg-brand-dark border-brand-border rounded focus:ring-brand-orange"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Customer Delivery Area Availability */}
+        <div className="bg-brand-card border border-brand-border rounded-xl p-5 space-y-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-brand-border/60 pb-2.5">
+            <div>
+              <h3 className="font-semibold text-white text-sm flex items-center space-x-2">
+                <MapPin className="w-4 h-4 text-brand-orange" />
+                <span>Customer Area Availability</span>
+              </h3>
+              <p className="mt-1 text-[10px] text-gray-400">Only enabled districts appear on the Customer site. Disabled districts stay hidden from customer area selection.</p>
+            </div>
+            <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase text-emerald-400">{availableCount} Available</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setAreaAvailability(defaultAvailability())} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-black uppercase text-emerald-400">Enable All Bangladesh</button>
+            <button type="button" onClick={() => setAreaAvailability(allDistricts.reduce<Record<string, boolean>>((acc, district) => ({ ...acc, [district]: false }), {}))} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[10px] font-black uppercase text-red-300">Disable All</button>
+          </div>
+
+          <div className="grid gap-3">
+            {Object.entries(BD_DIVISIONS).map(([division, districts]) => {
+              const enabledInDivision = districts.filter(district => areaAvailability[district]).length;
+              const allOn = enabledInDivision === districts.length;
+              return (
+                <div key={division} className="rounded-xl border border-brand-border bg-brand-dark/40 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-black text-white">{division} Division</p>
+                      <p className="text-[9px] font-bold text-gray-500">{enabledInDivision}/{districts.length} districts available</p>
+                    </div>
+                    <button type="button" onClick={() => setDivisionAvailability(division, !allOn)} className={`rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase ${allOn ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'}`}>
+                      {allOn ? 'Turn Off Division' : 'Turn On Division'}
+                    </button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {districts.map(district => (
+                      <label key={district} className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-[10px] font-bold ${areaAvailability[district] ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : 'border-brand-border bg-[#070e17] text-gray-500'}`}>
+                        <span>{district}</span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(areaAvailability[district])}
+                          onChange={(e) => setAreaAvailability(prev => ({ ...prev, [district]: e.target.checked }))}
+                          className="h-3.5 w-3.5 rounded border-brand-border bg-brand-dark text-brand-orange focus:ring-brand-orange"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

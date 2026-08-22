@@ -118,6 +118,7 @@ export const CLOUD_KEY_MAP: Record<string, string> = {
   sd_reviews: 'reviews',
   sd_marketing: 'marketing',
   sd_banners: 'banners',
+  sd_customer_area_availability: 'customerAreaAvailability',
   sd_stock_ledger: 'stockLedger',
   sd_batches: 'batches',
   sd_purchase_orders: 'purchaseOrders',

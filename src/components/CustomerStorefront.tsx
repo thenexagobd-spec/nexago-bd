@@ -156,6 +156,21 @@ const BD_DIVISIONS: Record<string, string[]> = {
   Mymensingh: ['Jamalpur', 'Mymensingh', 'Netrokona', 'Sherpur'],
 };
 
+const CUSTOMER_AREA_KEY = 'sd_customer_area_availability';
+const allBangladeshDistricts = Object.values(BD_DIVISIONS).flat();
+const defaultCustomerAreaAvailability = () => allBangladeshDistricts.reduce<Record<string, boolean>>((acc, district) => {
+  acc[district] = true;
+  return acc;
+}, {});
+const readCustomerAreaAvailability = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CUSTOMER_AREA_KEY) || '{}');
+    return { ...defaultCustomerAreaAvailability(), ...(parsed || {}) };
+  } catch {
+    return defaultCustomerAreaAvailability();
+  }
+};
+
 const districtDivisionOf = (district: string) => (
   Object.entries(BD_DIVISIONS).find(([, districts]) => districts.includes(district))?.[0] || ''
 );
@@ -1131,10 +1146,29 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [couponInput, setCouponInput] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad' | 'Upay' | 'Rocket' | 'Cash on Delivery' | 'Card' | 'Split (Wallet + bKash)'>('bKash');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [customerAreaAvailability, setCustomerAreaAvailability] = useState<Record<string, boolean>>(() => readCustomerAreaAvailability());
   const [selectedDeliveryDivision, setSelectedDeliveryDivision] = useState<string>(() => getStoredData(LS_KEYS.selectedDivision, ''));
   const [selectedDeliveryArea, setSelectedDeliveryArea] = useState<string>(() => getStoredData(LS_KEYS.selectedArea, ''));
+  const availableDivisions = useMemo(() => Object.keys(BD_DIVISIONS).filter(division => BD_DIVISIONS[division].some(district => customerAreaAvailability[district])), [customerAreaAvailability]);
+  const availableDistrictsForSelectedDivision = useMemo(() => (BD_DIVISIONS[selectedDeliveryDivision] || []).filter(district => customerAreaAvailability[district]), [customerAreaAvailability, selectedDeliveryDivision]);
   useEffect(() => setStoredData(LS_KEYS.selectedDivision, selectedDeliveryDivision), [selectedDeliveryDivision]);
   useEffect(() => setStoredData(LS_KEYS.selectedArea, selectedDeliveryArea), [selectedDeliveryArea]);
+  useEffect(() => {
+    const refreshAreas = () => setCustomerAreaAvailability(readCustomerAreaAvailability());
+    window.addEventListener('storage', refreshAreas);
+    window.addEventListener('nexago-local-write', refreshAreas);
+    return () => {
+      window.removeEventListener('storage', refreshAreas);
+      window.removeEventListener('nexago-local-write', refreshAreas);
+    };
+  }, []);
+  useEffect(() => {
+    if (selectedDeliveryArea && !customerAreaAvailability[selectedDeliveryArea]) setSelectedDeliveryArea('');
+    if (selectedDeliveryDivision && !availableDivisions.includes(selectedDeliveryDivision)) {
+      setSelectedDeliveryDivision('');
+      setSelectedDeliveryArea('');
+    }
+  }, [availableDivisions, customerAreaAvailability, selectedDeliveryArea, selectedDeliveryDivision]);
   const [customerPhone, setCustomerPhone] = useState<string>('');
 
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
@@ -1154,6 +1188,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [newAddrEmail, setNewAddrEmail] = useState('');
   const [newAddrEmailVerified, setNewAddrEmailVerified] = useState(false);
   const [newAddrCoords, setNewAddrCoords] = useState<{ lat: number; lng: number; accuracy?: number; source: 'gps' | 'manual' } | null>(null);
+  const availableAddressDistricts = useMemo(() => (BD_DIVISIONS[newAddrDivision] || []).filter(district => customerAreaAvailability[district]), [customerAreaAvailability, newAddrDivision]);
 
   const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>(() => getStoredData(LS_KEYS.pays, []));
   useEffect(() => setStoredData(LS_KEYS.pays, paymentMethods), [paymentMethods]);
@@ -2962,7 +2997,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 title="Select division"
               >
                 <option value="">Division</option>
-                {Object.keys(BD_DIVISIONS).map(division => <option key={division} value={division}>{division}</option>)}
+                {availableDivisions.map(division => <option key={division} value={division}>{division}</option>)}
               </select>
               <select
                 value={selectedDeliveryArea}
@@ -2972,7 +3007,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 title="Select district"
               >
                 <option value="">District</option>
-                {(BD_DIVISIONS[selectedDeliveryDivision] || []).map(district => <option key={district} value={district}>{district}</option>)}
+                {availableDistrictsForSelectedDivision.map(district => <option key={district} value={district}>{district}</option>)}
               </select>
               <ChevronDown className="w-3 h-3 text-gray-500" />
             </div>
@@ -3808,7 +3843,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Division</label>
                       <select value={newAddrDivision} onChange={(e) => { setNewAddrDivision(e.target.value); setNewAddrArea(''); }} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 bg-white" required>
                         <option value="">Select division</option>
-                        {Object.keys(BD_DIVISIONS).map(division => <option key={division} value={division}>{division}</option>)}
+                        {availableDivisions.map(division => <option key={division} value={division}>{division}</option>)}
                         {newAddrArea && !newAddrDivision && <option value="custom">Detected / custom</option>}
                       </select>
                     </div>
@@ -3816,7 +3851,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">District</label>
                       <select value={newAddrArea.replace(/,\s*Bangladesh$/i, '')} onChange={(e) => setNewAddrArea(e.target.value ? `${e.target.value}, Bangladesh` : '')} disabled={!newAddrDivision} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500 bg-white disabled:bg-gray-100 disabled:text-gray-400" required>
                         <option value="">Select district</option>
-                        {(BD_DIVISIONS[newAddrDivision] || []).map(district => <option key={district} value={district}>{district}</option>)}
+                        {availableAddressDistricts.map(district => <option key={district} value={district}>{district}</option>)}
                         {newAddrArea && !Object.values(BD_DIVISIONS).flat().some(district => newAddrArea === `${district}, Bangladesh`) && <option value={newAddrArea.replace(/,\s*Bangladesh$/i, '')}>{newAddrArea}</option>}
                       </select>
                     </div>
