@@ -3014,15 +3014,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           </div>
 
           <div className="flex items-center space-x-0.5 sm:space-x-2 shrink-0">
-            <button
-              onClick={() => setActiveNav('Wallet')}
-              className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 transition-colors cursor-pointer"
-            >
-              <Wallet className="w-3.5 h-3.5 text-emerald-400" />
-              <span>৳{walletBalance.toLocaleString()}</span>
-              <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${tier.key === 'gold' ? 'bg-amber-400 text-amber-900' : tier.key === 'silver' ? 'bg-slate-300 text-slate-800' : 'bg-white/10 text-gray-300'}`}>{tier.icon} {tier.label}</span>
-            </button>
-
             <div className="relative">
               <button
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
@@ -3081,16 +3072,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
               <Languages className="w-4 h-4 text-emerald-600" />
             </button>
 
-            {/* Visible logout button */}
-            <button
-              onClick={() => { setCustVerified(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast(T.loggedOutMsg, 'info'); }}
-              className="flex items-center space-x-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-xs font-bold text-red-500 transition-colors cursor-pointer"
-              title={T.logOut}
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{T.logOut}</span>
-            </button>
-
             {/* Profile menu */}
             <div className="relative">
               <button
@@ -3110,9 +3091,6 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   </div>
                   <button onClick={() => { setActiveNav('Settings'); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-gray-300 font-semibold hover:bg-white/5 hover:text-white rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
                     <Settings className="w-4 h-4 text-gray-400" /><span>{T.accountSettings}</span>
-                  </button>
-                  <button onClick={() => { setCustVerified(false); setIsProfileOpen(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast(T.loggedOutMsg, 'info'); }} className="w-full text-left px-3 py-2 text-red-400 font-semibold hover:bg-white/5 hover:text-red-300 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
-                    <LogOut className="w-4 h-4" /><span>{T.logOut}</span>
                   </button>
                 </div>
               )}
@@ -4527,6 +4505,26 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                     </div>
                   </form>
                 )}
+              </div>
+
+              <div className="bg-white border border-red-100 rounded-2xl shadow-xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="font-black text-gray-900 text-sm flex items-center gap-2">
+                    <LogOut className="w-4 h-4 text-red-500" />
+                    <span>{T.logOut}</span>
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    {lang === 'bn' ? 'এই customer account থেকে বের হতে এখানে চাপুন।' : 'Use this to sign out from this customer account.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setCustVerified(false); setIsProfileOpen(false); try { localStorage.removeItem('ss_cust_verified'); } catch { /* ignore */ } showToast(T.loggedOutMsg, 'info'); }}
+                  className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-xs font-black text-red-600 transition-colors cursor-pointer inline-flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{T.logOut}</span>
+                </button>
               </div>
             </div>
           )}
