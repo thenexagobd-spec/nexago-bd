@@ -1785,6 +1785,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   };
 
   useEffect(() => {
+    if (!custVerified) {
+      setLocationPermissionState('checking');
+      return;
+    }
     if (!('geolocation' in navigator)) {
       setLocationPermissionState('unsupported');
       return;
@@ -1824,7 +1828,7 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
       captureOnOpen();
     }
     return () => { cancelled = true; };
-  }, []);
+  }, [custVerified]);
 
   const handlePlaceCustomerOrder = async () => {
     if (cart.length === 0) {
@@ -2513,6 +2517,45 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
           }}
           showToast={showToast}
         />
+      )}
+      {custVerified && locationPermissionState !== 'granted' && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 shadow-2xl p-6 text-white space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center">
+              <LocateFixed className="w-7 h-7 text-emerald-300" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black tracking-tight">Location Permission Required</h2>
+              <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+                Customer app use korte real delivery location permission Allow korte hobe. Allow na korle order, checkout, tracking, saved address location kaj korbe na.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3 text-xs text-slate-300 space-y-1.5">
+              <p className="font-bold text-white">Why needed</p>
+              <p>Order-er sathe customer current location Super Admin, Store, Driver system-e real-time jabe.</p>
+              <p>Manual address pore add korte parben, kintu first app unlock-er jonno device location Allow lagbe.</p>
+            </div>
+            {locationPermissionState === 'denied' && (
+              <div className="rounded-2xl border border-red-400/25 bg-red-500/10 p-3 text-xs text-red-100">
+                Location blocked. Browser/site settings theke Location Allow kore abar button click korun.
+              </div>
+            )}
+            {locationPermissionState === 'unsupported' && (
+              <div className="rounded-2xl border border-red-400/25 bg-red-500/10 p-3 text-xs text-red-100">
+                Ei device/browser geolocation support korche na. Supported browser/device diye open korte hobe.
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={locateMe}
+              disabled={isLocatingDelivery || locationPermissionState === 'unsupported'}
+              className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-600 disabled:text-slate-300 text-slate-950 font-black text-sm transition-all flex items-center justify-center gap-2"
+            >
+              {isLocatingDelivery ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
+              <span>{isLocatingDelivery ? 'Checking location...' : 'Allow Location & Continue'}</span>
+            </button>
+          </div>
+        </div>
       )}
       <style>{`
         html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-x: hidden; }
