@@ -7307,6 +7307,7 @@ export default function App() {
             >
               <Menu className="w-5 h-5" />
             </button>
+            <img src="/assets/nexsa-go-logo.jpg" alt="NEXSA GO" className="h-10 w-10 rounded-xl border border-brand-orange/30 object-cover shadow-md" />
             <div>
               <h2 className="text-sm font-bold text-white tracking-wide uppercase">{activeTab}</h2>
               <p className="text-[10px] text-gray-400 mt-0.5">Home &gt; {activeTab}</p>
@@ -7401,9 +7402,7 @@ export default function App() {
 
             {/* Profile Avatar Badge */}
             <div className="flex items-center space-x-2.5 pl-2 border-l border-brand-border/40">
-              <div className="w-8.5 h-8.5 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center font-bold text-brand-orange text-xs">
-                AU
-              </div>
+              <img src="/assets/nexsa-go-logo.jpg" alt="NEXSA GO Admin" className="h-9 w-9 rounded-full border border-brand-orange/30 object-cover" />
               <div className="hidden sm:block text-left">
                 <h4 className="text-xs font-bold text-white leading-tight">Admin User</h4>
                 <p className="text-[9px] text-gray-500 font-semibold uppercase tracking-wider">Super Admin</p>

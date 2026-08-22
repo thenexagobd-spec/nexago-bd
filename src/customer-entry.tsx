@@ -26,7 +26,7 @@ const API_BASE = window.location.origin;
 const SEED_DRIVERS: any[] = [];
 const SEED_STORES: any[] = [];
 const SEED_PRODUCTS: Product[] = [];
-const STARTER_SEED_KEY = 'nexago_customer_starter_seed_v4';
+const STARTER_SEED_KEY = 'nexago_customer_starter_seed_v5';
 
 const starterStore = {
   id: 'STR-CUSTOMER-STARTER',
@@ -79,49 +79,51 @@ const IMG = {
   meat: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&q=80&w=600',
 };
 
+const productPhoto = (query: string) => `https://source.unsplash.com/600x420/?${encodeURIComponent(query)}`;
+
 const starterProducts = [
-  P('RICE-5KG', 'Miniket Rice 5kg', 'Grocery', 'bag', 35, 520, IMG.rice),
-  P('NAZIR-RICE-5KG', 'Nazirshail Rice 5kg', 'Grocery', 'bag', 26, 610, IMG.rice),
-  P('SOYBEAN-OIL-2L', 'Soybean Oil 2L', 'Grocery', 'bottle', 30, 375, IMG.oil),
-  P('MUSTARD-OIL-500ML', 'Mustard Oil 500ml', 'Grocery', 'bottle', 24, 165, IMG.oil),
-  P('MOSUR-DAL-1KG', 'Mosur Dal 1kg', 'Grocery', 'kg', 40, 145, IMG.dal),
-  P('CHOLA-BOOT-1KG', 'Chola Boot 1kg', 'Grocery', 'kg', 28, 135, IMG.dal),
-  P('ATTA-2KG', 'Fresh Atta 2kg', 'Grocery', 'pack', 38, 120, IMG.flour),
-  P('SUGAR-1KG', 'White Sugar 1kg', 'Grocery', 'kg', 45, 135, IMG.grocery),
-  P('SALT-1KG', 'Iodized Salt 1kg', 'Grocery', 'pack', 60, 42, IMG.grocery),
-  P('TEA-400G', 'Black Tea 400g', 'Grocery', 'pack', 25, 210, IMG.tea),
-  P('MILK-1L', 'Fresh Milk 1L', 'Supermarket', 'pack', 32, 95, IMG.milk),
-  P('EGG-12PCS', 'Farm Eggs 12pcs', 'Supermarket', 'tray', 42, 150, IMG.egg),
-  P('NOODLES-8PACK', 'Instant Noodles 8 Pack', 'Supermarket', 'pack', 35, 180, IMG.grocery),
-  P('BISCUIT-PACK', 'Tea Biscuit Family Pack', 'Supermarket', 'pack', 50, 90, IMG.grocery),
-  P('DETERGENT-1KG', 'Laundry Detergent 1kg', 'Supermarket', 'pack', 30, 185, IMG.grocery),
-  P('DISHWASH-500ML', 'Dishwash Liquid 500ml', 'Supermarket', 'bottle', 28, 115, IMG.grocery),
-  P('BIRIYANI', 'Chicken Biryani', 'Restaurant', 'plate', 18, 220, IMG.biryani),
-  P('KHICHURI', 'Beef Bhuna Khichuri', 'Restaurant', 'box', 16, 260, IMG.biryani),
-  P('THALI', 'Rice Fish Curry Meal', 'Restaurant', 'plate', 20, 190, IMG.fish),
-  P('CHICKEN-CURRY', 'Chicken Curry Meal', 'Restaurant', 'plate', 22, 210, IMG.biryani),
-  P('BURGER', 'Chicken Burger', 'Fast Food', 'pcs', 30, 180, IMG.burger),
-  P('PIZZA', 'Beef Pizza 8 inch', 'Fast Food', 'pcs', 16, 420, IMG.pizza),
-  P('FRIES', 'French Fries Large', 'Fast Food', 'box', 34, 130, IMG.burger),
-  P('SHAWARMA', 'Chicken Shawarma', 'Fast Food', 'pcs', 24, 160, IMG.burger),
-  P('BREAD', 'Milk Bread Loaf', 'Bakery', 'loaf', 35, 80, IMG.bakery),
-  P('CAKE', 'Chocolate Cake 1lb', 'Bakery', 'pcs', 12, 650, IMG.cake),
-  P('CROISSANT', 'Butter Croissant', 'Bakery', 'pcs', 24, 95, IMG.bakery),
-  P('BUN', 'Sweet Bun 4pcs', 'Bakery', 'pack', 28, 70, IMG.bakery),
-  P('PARACETAMOL', 'Paracetamol Tablet Strip', 'Pharmacy', 'strip', 40, 25, IMG.medicine),
-  P('SALINE', 'Oral Saline 10pcs', 'Pharmacy', 'box', 35, 60, IMG.medicine),
-  P('BANDAGE', 'First Aid Bandage Roll', 'Pharmacy', 'pcs', 22, 85, IMG.medicine),
-  P('HAND-SANITIZER', 'Hand Sanitizer 250ml', 'Pharmacy', 'bottle', 30, 120, IMG.medicine),
-  P('APPLE', 'Apple 1kg', 'Fruits & Veg', 'kg', 25, 280, IMG.fruit),
-  P('BANANA', 'Banana 1 dozen', 'Fruits & Veg', 'dozen', 32, 120, IMG.fruit),
-  P('MANGO', 'Seasonal Mango 1kg', 'Fruits & Veg', 'kg', 20, 180, IMG.fruit),
-  P('POTATO', 'Potato 1kg', 'Fruits & Veg', 'kg', 50, 45, IMG.veg),
-  P('ONION', 'Onion 1kg', 'Fruits & Veg', 'kg', 45, 80, IMG.veg),
-  P('TOMATO', 'Tomato 1kg', 'Fruits & Veg', 'kg', 30, 70, IMG.veg),
-  P('RUI-FISH', 'Rui Fish 1kg', 'Meat & Fish', 'kg', 12, 360, IMG.fish),
-  P('PANGAS-FISH', 'Pangas Fish 1kg', 'Meat & Fish', 'kg', 18, 220, IMG.fish),
-  P('CHICKEN-BROILER', 'Broiler Chicken 1kg', 'Meat & Fish', 'kg', 22, 210, IMG.meat),
-  P('BEEF', 'Beef 1kg', 'Meat & Fish', 'kg', 10, 780, IMG.meat),
+  P('RICE-5KG', 'Miniket Rice 5kg', 'Grocery', 'bag', 35, 520, productPhoto('miniket rice bag')),
+  P('NAZIR-RICE-5KG', 'Nazirshail Rice 5kg', 'Grocery', 'bag', 26, 610, productPhoto('basmati rice sack')),
+  P('SOYBEAN-OIL-2L', 'Soybean Oil 2L', 'Grocery', 'bottle', 30, 375, productPhoto('soybean oil bottle')),
+  P('MUSTARD-OIL-500ML', 'Mustard Oil 500ml', 'Grocery', 'bottle', 24, 165, productPhoto('mustard oil bottle')),
+  P('MOSUR-DAL-1KG', 'Mosur Dal 1kg', 'Grocery', 'kg', 40, 145, productPhoto('red lentils')),
+  P('CHOLA-BOOT-1KG', 'Chola Boot 1kg', 'Grocery', 'kg', 28, 135, productPhoto('chickpeas')),
+  P('ATTA-2KG', 'Fresh Atta 2kg', 'Grocery', 'pack', 38, 120, productPhoto('wheat flour bag')),
+  P('SUGAR-1KG', 'White Sugar 1kg', 'Grocery', 'kg', 45, 135, productPhoto('white sugar')),
+  P('SALT-1KG', 'Iodized Salt 1kg', 'Grocery', 'pack', 60, 42, productPhoto('iodized salt pack')),
+  P('TEA-400G', 'Black Tea 400g', 'Grocery', 'pack', 25, 210, productPhoto('black tea leaves pack')),
+  P('MILK-1L', 'Fresh Milk 1L', 'Supermarket', 'pack', 32, 95, productPhoto('milk carton')),
+  P('EGG-12PCS', 'Farm Eggs 12pcs', 'Supermarket', 'tray', 42, 150, productPhoto('egg tray')),
+  P('NOODLES-8PACK', 'Instant Noodles 8 Pack', 'Supermarket', 'pack', 35, 180, productPhoto('instant noodles pack')),
+  P('BISCUIT-PACK', 'Tea Biscuit Family Pack', 'Supermarket', 'pack', 50, 90, productPhoto('biscuit pack')),
+  P('DETERGENT-1KG', 'Laundry Detergent 1kg', 'Supermarket', 'pack', 30, 185, productPhoto('laundry detergent pack')),
+  P('DISHWASH-500ML', 'Dishwash Liquid 500ml', 'Supermarket', 'bottle', 28, 115, productPhoto('dishwashing liquid bottle')),
+  P('BIRIYANI', 'Chicken Biryani', 'Restaurant', 'plate', 18, 220, productPhoto('chicken biryani')),
+  P('KHICHURI', 'Beef Bhuna Khichuri', 'Restaurant', 'box', 16, 260, productPhoto('beef khichuri')),
+  P('THALI', 'Rice Fish Curry Meal', 'Restaurant', 'plate', 20, 190, productPhoto('fish curry rice')),
+  P('CHICKEN-CURRY', 'Chicken Curry Meal', 'Restaurant', 'plate', 22, 210, productPhoto('chicken curry rice')),
+  P('BURGER', 'Chicken Burger', 'Fast Food', 'pcs', 30, 180, productPhoto('chicken burger')),
+  P('PIZZA', 'Beef Pizza 8 inch', 'Fast Food', 'pcs', 16, 420, productPhoto('beef pizza')),
+  P('FRIES', 'French Fries Large', 'Fast Food', 'box', 34, 130, productPhoto('french fries box')),
+  P('SHAWARMA', 'Chicken Shawarma', 'Fast Food', 'pcs', 24, 160, productPhoto('chicken shawarma')),
+  P('BREAD', 'Milk Bread Loaf', 'Bakery', 'loaf', 35, 80, productPhoto('bread loaf')),
+  P('CAKE', 'Chocolate Cake 1lb', 'Bakery', 'pcs', 12, 650, productPhoto('chocolate cake')),
+  P('CROISSANT', 'Butter Croissant', 'Bakery', 'pcs', 24, 95, productPhoto('butter croissant')),
+  P('BUN', 'Sweet Bun 4pcs', 'Bakery', 'pack', 28, 70, productPhoto('sweet bread bun')),
+  P('PARACETAMOL', 'Paracetamol Tablet Strip', 'Pharmacy', 'strip', 40, 25, productPhoto('paracetamol tablets')),
+  P('SALINE', 'Oral Saline 10pcs', 'Pharmacy', 'box', 35, 60, productPhoto('oral rehydration saline')),
+  P('BANDAGE', 'First Aid Bandage Roll', 'Pharmacy', 'pcs', 22, 85, productPhoto('medical bandage roll')),
+  P('HAND-SANITIZER', 'Hand Sanitizer 250ml', 'Pharmacy', 'bottle', 30, 120, productPhoto('hand sanitizer bottle')),
+  P('APPLE', 'Apple 1kg', 'Fruits & Veg', 'kg', 25, 280, productPhoto('red apples')),
+  P('BANANA', 'Banana 1 dozen', 'Fruits & Veg', 'dozen', 32, 120, productPhoto('banana bunch')),
+  P('MANGO', 'Seasonal Mango 1kg', 'Fruits & Veg', 'kg', 20, 180, productPhoto('mango fruit')),
+  P('POTATO', 'Potato 1kg', 'Fruits & Veg', 'kg', 50, 45, productPhoto('potatoes')),
+  P('ONION', 'Onion 1kg', 'Fruits & Veg', 'kg', 45, 80, productPhoto('red onions')),
+  P('TOMATO', 'Tomato 1kg', 'Fruits & Veg', 'kg', 30, 70, productPhoto('tomatoes')),
+  P('RUI-FISH', 'Rui Fish 1kg', 'Meat & Fish', 'kg', 12, 360, productPhoto('fresh carp fish')),
+  P('PANGAS-FISH', 'Pangas Fish 1kg', 'Meat & Fish', 'kg', 18, 220, productPhoto('fresh fish fillet')),
+  P('CHICKEN-BROILER', 'Broiler Chicken 1kg', 'Meat & Fish', 'kg', 22, 210, productPhoto('raw whole chicken')),
+  P('BEEF', 'Beef 1kg', 'Meat & Fish', 'kg', 10, 780, productPhoto('fresh beef meat')),
 ];
 
 const starterAddress = {
@@ -201,10 +203,13 @@ const seedCustomerStarterData = () => {
       seededForStoreAdmin: Boolean(targetStore.adminId),
       updatedAt: new Date().toISOString(),
     }));
+    const starterById = new Map(ownedStarterProducts.map(product => [product.id, product]));
     const migratedProducts = products.map((product: any) => {
       if (!String(product?.id || '').startsWith('PRD-BD-') || product.isDeleted || product.deletedAt) return product;
+      const starterProduct = starterById.get(product.id);
       return {
         ...product,
+        image: starterProduct?.image || product.image,
         storeId: targetStore.id,
         storeName: targetStore.name,
         ownerAdminId: targetStore.adminId || product.ownerAdminId || '',

@@ -3306,10 +3306,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   className="relative min-h-[118px] overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-700 via-teal-600 to-lime-500 p-5 text-left text-white shadow-md"
                 >
                   <img
-                    src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=1000"
-                    alt="Grocery promotion"
+                    src="/assets/nexsa-go-logo.jpg"
+                    alt="NEXSA GO promotion"
                     referrerPolicy="no-referrer"
-                    className="absolute inset-0 h-full w-full object-cover opacity-20"
+                    className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-25 sm:w-1/2"
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/75 via-emerald-800/35 to-transparent" />
                   <div className="relative flex h-full flex-col justify-between gap-3 sm:flex-row sm:items-end">
@@ -4682,10 +4682,10 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                 <div className="space-y-2">
                   <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-700 via-teal-600 to-lime-500 p-4 text-white shadow-sm">
                     <img
-                      src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=900"
-                      alt="Fresh grocery offer"
+                      src="/assets/nexsa-go-logo.jpg"
+                      alt="NEXSA GO fresh grocery offer"
                       referrerPolicy="no-referrer"
-                      className="absolute inset-0 h-full w-full object-cover opacity-20"
+                      className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-25 sm:w-1/2"
                     />
                     <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/70 via-emerald-800/35 to-transparent" />
                     <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
