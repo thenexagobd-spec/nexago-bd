@@ -47,6 +47,12 @@ interface SavedAddress {
   area: string;
   phone: string;
   isDefault: boolean;
+  email?: string;
+  emailVerified?: boolean;
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+  source?: 'gps' | 'manual';
 }
 
 interface SavedPaymentMethod {
@@ -258,6 +264,11 @@ const isDemoDeliveredNotification = (n: Partial<CustomerNotif> | any) => {
   const text = `${n?.title || ''} ${n?.body || ''} ${n?.message || ''} ${n?.id || ''}`;
   return /Order Delivered/i.test(text)
     && /(BDPOS-\d+|POS-\d+|Bangladesh POS Counter|The NexaGo BD Counter)/i.test(text);
+};
+
+const isDemoSavedAddress = (addr: Partial<SavedAddress>) => {
+  const text = `${addr.title || ''} ${addr.address || ''} ${addr.area || ''} ${addr.phone || ''}`;
+  return /(House 42|Road 8A|Flat 4B|Dhanmondi, Dhaka 1209|Level 7|Tower 14|Gulshan Avenue|Gulshan-1, Dhaka 1212|01712-345678|01819-987654)/i.test(text);
 };
 
 interface ProductReview {
@@ -1070,13 +1081,17 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
-  const [addresses, setAddresses] = useState<SavedAddress[]>(() => getStoredData(LS_KEYS.addr, []));
+  const [addresses, setAddresses] = useState<SavedAddress[]>(() => getStoredData<SavedAddress[]>(LS_KEYS.addr, []).filter(addr => !isDemoSavedAddress(addr)));
   useEffect(() => setStoredData(LS_KEYS.addr, addresses), [addresses]);
   const [isAddingAddress, setIsAddingAddress] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [newAddrTitle, setNewAddrTitle] = useState('');
   const [newAddrStreet, setNewAddrStreet] = useState('');
   const [newAddrArea, setNewAddrArea] = useState('');
   const [newAddrPhone, setNewAddrPhone] = useState('');
+  const [newAddrEmail, setNewAddrEmail] = useState('');
+  const [newAddrEmailVerified, setNewAddrEmailVerified] = useState(false);
+  const [newAddrCoords, setNewAddrCoords] = useState<{ lat: number; lng: number; accuracy?: number; source: 'gps' | 'manual' } | null>(null);
 
   const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>(() => getStoredData(LS_KEYS.pays, []));
   useEffect(() => setStoredData(LS_KEYS.pays, paymentMethods), [paymentMethods]);
@@ -2333,17 +2348,73 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
     );
   };
 
+  const captureAddressLocation = () => {
+    if (!('geolocation' in navigator)) {
+      showToast('Geolocation is not available on this device', 'info');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const area = nearestAreaOf(pos.coords.latitude, pos.coords.longitude);
+        setNewAddrCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, source: 'gps' });
+        if (!newAddrArea.trim()) setNewAddrArea(`${area}, Dhaka`);
+        if (!newAddrStreet.trim()) setNewAddrStreet(`Current pinned location (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`);
+        showToast('Live location added to this address', 'success');
+      },
+      () => showToast('Location permission denied. You can still type the address manually.', 'info'),
+      { enableHighAccuracy: true, timeout: 9000 }
+    );
+  };
+
   const handleAddAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAddrStreet) return;    const newAddrObj: SavedAddress = {
-      id: `ADDR-${Date.now().toString().slice(-3)}`,
+    if (!newAddrStreet) return;
+    const newAddrObj: SavedAddress = {
+      id: editingAddressId || `ADDR-${Date.now().toString().slice(-3)}`,
       title: newAddrTitle, address: newAddrStreet, area: newAddrArea, phone: newAddrPhone,
-      isDefault: addresses.length === 0
+      isDefault: editingAddressId ? Boolean(addresses.find(a => a.id === editingAddressId)?.isDefault) : addresses.length === 0,
+      email: newAddrEmail.trim(),
+      emailVerified: newAddrEmailVerified,
+      lat: newAddrCoords?.lat,
+      lng: newAddrCoords?.lng,
+      accuracy: newAddrCoords?.accuracy,
+      source: newAddrCoords?.source || 'manual'
     };
-    setAddresses(prev => [...prev, newAddrObj]);
+    setAddresses(prev => editingAddressId ? prev.map(a => a.id === editingAddressId ? newAddrObj : a) : [...prev, newAddrObj]);
     setIsAddingAddress(false);
+    setEditingAddressId(null);
+    setNewAddrTitle('');
     setNewAddrStreet('');
-    showToast('New delivery address saved successfully!', 'success');
+    setNewAddrArea('');
+    setNewAddrPhone('');
+    setNewAddrEmail('');
+    setNewAddrEmailVerified(false);
+    setNewAddrCoords(null);
+    showToast(editingAddressId ? 'Delivery address updated successfully!' : 'New delivery address saved successfully!', 'success');
+  };
+
+  const resetAddressForm = () => {
+    setEditingAddressId(null);
+    setIsAddingAddress(false);
+    setNewAddrTitle('');
+    setNewAddrStreet('');
+    setNewAddrArea('');
+    setNewAddrPhone('');
+    setNewAddrEmail('');
+    setNewAddrEmailVerified(false);
+    setNewAddrCoords(null);
+  };
+
+  const startEditAddress = (addr: SavedAddress) => {
+    setEditingAddressId(addr.id);
+    setNewAddrTitle(addr.title);
+    setNewAddrStreet(addr.address);
+    setNewAddrArea(addr.area);
+    setNewAddrPhone(addr.phone);
+    setNewAddrEmail(addr.email || '');
+    setNewAddrEmailVerified(Boolean(addr.emailVerified));
+    setNewAddrCoords(addr.lat && addr.lng ? { lat: addr.lat, lng: addr.lng, accuracy: addr.accuracy, source: addr.source || 'manual' } : null);
+    setIsAddingAddress(true);
   };
 
   const handleAddPaymentSubmit = (e: React.FormEvent) => {
@@ -3417,14 +3488,19 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                   <h2 className="text-xl font-black text-gray-900 tracking-tight">Saved Addresses</h2>
                   <p className="text-xs text-gray-500 mt-0.5">Manage your delivery locations for faster checkout</p>
                 </div>
-                <button onClick={() => setIsAddingAddress(!isAddingAddress)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-2">
+                <button onClick={() => { if (isAddingAddress) resetAddressForm(); else setIsAddingAddress(true); }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-2">
                   <Plus className="w-4 h-4" /><span>Add New Address</span>
                 </button>
               </div>
 
               {isAddingAddress && (
                 <form onSubmit={handleAddAddressSubmit} className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-sm space-y-4">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800">New Address Details</h3>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800">{editingAddressId ? 'Edit Saved Address' : 'New Address Details'}</h3>
+                    <button type="button" onClick={captureAddressLocation} className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black flex items-center gap-1.5">
+                      <LocateFixed className="w-3.5 h-3.5" /> Live Location
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Title Label</label>
@@ -3442,10 +3518,34 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Area / Thana / City</label>
                       <input type="text" value={newAddrArea} onChange={(e) => setNewAddrArea(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" required />
                     </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Gmail for address verification</label>
+                      <div className="flex gap-2">
+                        <input type="email" value={newAddrEmail} onChange={(e) => { setNewAddrEmail(e.target.value); setNewAddrEmailVerified(false); }} placeholder="name@gmail.com" className="flex-1 min-w-0 p-2.5 border border-gray-300 rounded-xl outline-none focus:border-emerald-500" />
+                        <button type="button" onClick={() => {
+                          if (!/^[^\s@]+@gmail\.com$/i.test(newAddrEmail.trim())) { showToast('Enter a valid Gmail address', 'info'); return; }
+                          setNewAddrEmailVerified(true);
+                          showToast('Gmail verified for this address', 'success');
+                        }} className="px-3 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black">Verify</button>
+                      </div>
+                      <p className={`mt-1 text-[10px] font-bold ${newAddrEmailVerified ? 'text-emerald-600' : 'text-gray-400'}`}>{newAddrEmailVerified ? 'Verified Gmail linked with this delivery address.' : 'Optional: verify a different Gmail for this saved address.'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="font-black text-gray-900 flex items-center gap-1.5"><Eye className="w-3.5 h-3.5 text-emerald-600" /> Address Preview</p>
+                      <span className="text-[10px] font-bold text-gray-500">{newAddrCoords ? 'GPS attached' : 'Manual address'}</span>
+                    </div>
+                    <p className="font-bold text-gray-800">{newAddrTitle || 'Address title'}</p>
+                    <p className="text-gray-600">{newAddrStreet || 'Street / house / flat preview'}</p>
+                    <p className="text-gray-500">{newAddrArea || 'Area / city preview'}</p>
+                    <p className="text-gray-500 font-mono">{newAddrPhone || 'Phone preview'}</p>
+                    {newAddrEmail && <p className="text-gray-500 font-mono">{newAddrEmail} {newAddrEmailVerified ? '✓ verified' : 'not verified'}</p>}
+                    {newAddrCoords && <p className="text-[10px] text-emerald-700 font-mono">Lat {newAddrCoords.lat.toFixed(5)} · Lng {newAddrCoords.lng.toFixed(5)} {newAddrCoords.accuracy ? `· ±${Math.round(newAddrCoords.accuracy)}m` : ''}</p>}
                   </div>
                   <div className="flex space-x-2 pt-2">
-                    <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">Save Address</button>
-                    <button type="button" onClick={() => setIsAddingAddress(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Cancel</button>
+                    <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">{editingAddressId ? 'Update Address' : 'Save Address'}</button>
+                    <button type="button" onClick={resetAddressForm} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Cancel</button>
                   </div>
                 </form>
               )}
@@ -3463,10 +3563,22 @@ export const CustomerStorefront: React.FC<CustomerStorefrontProps> = ({
                       <p className="text-xs text-gray-700 font-medium">{addr.address}</p>
                       <p className="text-xs text-gray-500">{addr.area}</p>
                       <p className="text-xs text-gray-500 font-mono">📱 {addr.phone}</p>
+                      {addr.email && <p className="text-xs text-gray-500 font-mono">✉ {addr.email} {addr.emailVerified ? '✓' : ''}</p>}
+                      {addr.lat && addr.lng && <p className="text-[10px] text-emerald-700 font-mono">GPS {addr.lat.toFixed(5)}, {addr.lng.toFixed(5)}</p>}
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs font-bold">
-                      <button onClick={() => { setDeliveryAddress(`${addr.address}, ${addr.area}`); showToast(`Set ${addr.title} as active delivery address`, 'info'); }} className="text-emerald-700 hover:underline">
+                      <button onClick={() => {
+                        setDeliveryAddress(`${addr.address}, ${addr.area}`);
+                        if (addr.lat && addr.lng) {
+                          setDeliveryPin({ lat: addr.lat, lng: addr.lng });
+                          setDeliveryLocationMeta({ accuracy: addr.accuracy, capturedAt: new Date().toISOString(), source: addr.source === 'gps' ? 'browser-gps' : 'map-pin', area: addr.area });
+                        }
+                        showToast(`Set ${addr.title} as active delivery address`, 'info');
+                      }} className="text-emerald-700 hover:underline">
                         Use for Orders
+                      </button>
+                      <button onClick={() => startEditAddress(addr)} className="text-blue-700 hover:underline">
+                        Edit
                       </button>
                       <button onClick={() => { setAddresses(prev => prev.filter(a => a.id !== addr.id)); showToast('Address deleted', 'info'); }} className="text-red-600 hover:text-red-700">
                         Delete
