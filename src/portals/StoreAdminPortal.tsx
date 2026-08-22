@@ -473,13 +473,6 @@ export default function StoreAdminPortal() {
   const acceptOrder = (id: string) => {
     if (!myOrderIds.has(id)) return;
     const onlineDrivers = drivers.filter(d => d.status !== 'Offline');
-    if (!usesPersonalDriver && onlineDrivers.length === 0) {
-      setNotifications(prev => [
-        makeNotif('Driver unavailable', `Order #${id} cannot be dispatched until a real driver is online.`, 'order', { audience: 'store-admin', storeId: activeStoreId }),
-        ...prev,
-      ]);
-      return;
-    }
     const order = orders.find(o => o.id === id);
     const broadcast = order && !usesPersonalDriver ? newOfferRound(order, drivers) : {};
     const updated = order ? appendTimeline({

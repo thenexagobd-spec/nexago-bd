@@ -1,5 +1,5 @@
-const CACHE_NAME = 'nexago-shell-v2';
-const SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg'];
+const CACHE_NAME = 'nexago-shell-v3';
+const SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest', '/assets/nexsa-go-logo.jpg', '/icon.svg', '/icon-maskable.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

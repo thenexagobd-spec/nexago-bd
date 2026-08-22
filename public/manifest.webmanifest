@@ -10,6 +10,12 @@
   "theme_color": "#059669",
   "icons": [
     {
+      "src": "/assets/nexsa-go-logo.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",

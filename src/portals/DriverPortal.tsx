@@ -808,7 +808,13 @@ export default function DriverPortal() {
   // and nobody has accepted yet (driverId unset). The order is offered to up to
   // 10 riders at once; the first to accept locks it in.
   const offeredToMe = useMemo(
-    () => orders.filter(o => o.offeredDriverIds?.includes(me?.id || '')),
+    () => orders.filter(o => {
+      if (!me?.id) return false;
+      if (o.requiresStorePersonalDriver || o.deliveryProvider === 'personal') return false;
+      if (o.driverId) return o.driverId === me.id;
+      const offeredIds = Array.isArray(o.offeredDriverIds) ? o.offeredDriverIds : [];
+      return offeredIds.includes(me.id) || offeredIds.length === 0;
+    }),
     [orders, me]
   );
   const offers = offeredToMe.filter(o => o.status === 'Confirmed' && !o.pickedUp && !o.driverId);

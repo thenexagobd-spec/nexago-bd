@@ -235,13 +235,6 @@ export default function StorePortal() {
 
   const acceptOrder = (id: string) => {
     const onlineDrivers = drivers.filter(d => d.status !== 'Offline');
-    if (!usesPersonalDriver && onlineDrivers.length === 0) {
-      setNotifications(prev => [
-        makeNotif('Driver unavailable', `Order #${id} is accepted by store, but no real driver is online yet.`, 'order', { audience: 'all' }),
-        ...prev,
-      ]);
-      return;
-    }
     const pickupPin = String(Math.floor(1000 + Math.random() * 9000));
     const order = orders.find(o => o.id === id);
     const broadcast = order && !usesPersonalDriver ? newOfferRound(order, drivers) : {};
